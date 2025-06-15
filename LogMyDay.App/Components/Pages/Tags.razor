@@ -1,0 +1,294 @@
+﻿@page "/tags"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject ILogger<Tags> Logger
+
+<PageTitle>Tags</PageTitle>
+
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Add New Tag</h3>
+            <EditForm Model="newTag" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="mb-3">
+                    <label class="form-label">Title:</label>
+                    <InputText @bind-Value="newTag.Tag" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Type (optional):</label>
+                    <InputSelect @bind-Value="newTag.TypeId" class="form-select">
+                        <option value="">(None)</option>
+                        @foreach (var type in inputTypes)
+                        {
+                            <option value="@type.Id">@type.Name</option>
+                        }
+                    </InputSelect>
+                </div>                <div class="mb-3">
+                    <label class="form-label">Required:</label>
+                    <InputCheckbox @bind-Value="newTag.IsRequired" class="form-check-input" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Repeatable:</label>
+                    <InputCheckbox @bind-Value="newTag.IsRepeatable" class="form-check-input" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Time Granularity:</label>
+                    <InputSelect @bind-Value="newTag.TimeGranularity" class="form-select">
+                        @foreach (var granularity in Enum.GetValues<TimeGranularity>())
+                        {
+                            <option value="@granularity">@granularity</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Is Range:</label>
+                    <InputCheckbox @bind-Value="newTag.IsRange" class="form-check-input" />
+                </div>
+                <button type="submit" class="btn btn-primary">Add Tag</button>
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="text-danger mt-2">@errorMessage</div>
+                }
+            </EditForm>
+        </div>
+        <div class="col-md-12 mt-5">
+            <h3>Tags</h3>
+            <div class="mb-3 d-flex align-items-end gap-2">
+                <div>
+                    <label>Name Filter:</label>
+                    <input class="form-control" style="width:200px;display:inline-block;" @bind="filter" @bind:event="oninput" placeholder="Filter by name..." />
+                </div>
+                <div>
+                    <label>Type:</label>
+                    <select class="form-select" style="width:120px;display:inline-block;" @bind="filterType">
+                        <option value="contains">Contains</option>
+                        <option value="exact">Exact</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Sort:</label>
+                    <select class="form-select" style="width:120px;display:inline-block;" @bind="orderBy">
+                        <option value="asc">A-Z</option>
+                        <option value="desc">Z-A</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="ApplyFilter">Apply</button>
+            </div>
+
+            @if (pagedResult == null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                <table class="table table-bordered table-striped">                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Required</th>
+                            <th>Repeatable</th>
+                            <th>Time Granularity</th>
+                            <th>Is Range</th>
+                            <th></th> <!-- Actions column -->
+                        </tr>
+                    </thead>
+                    <tbody>                        @foreach (var tag in pagedResult.Items)
+                        {
+                            <tr>
+                                <td>@tag.Id</td>
+                                <td>@tag.Title</td>
+                                <td>
+                                    @if (tag.TypeId.HasValue)
+                                    {
+                                        var typeName = inputTypes.FirstOrDefault(t => t.Id == tag.TypeId)?.Name;
+                                        @typeName
+                                    }
+                                    else
+                                    {
+                                        <span>-</span>
+                                    }
+                                </td>
+                                <td>@(tag.IsRequired ? "Yes" : "No")</td>
+                                <td>@(tag.IsRepeatable ? "Yes" : "No")</td>
+                                <td>@tag.TimeGranularity</td>
+                                <td>@(tag.IsRange ? "Yes" : "No")</td>
+                                <td>
+                                    <a class="btn btn-secondary btn-sm me-1" href="/tags/edit/@tag.Id">Edit</a>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => ConfirmDelete(tag.Id)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="d-flex justify-content-between align-items-center">
+                    <button class="btn btn-secondary btn-sm" @onclick="PrevPage" disabled="@(pageNumber == 1)">Previous</button>
+                    <span>Page @pageNumber of @totalPages</span>
+                    <button class="btn btn-secondary btn-sm" @onclick="NextPage" disabled="@(pageNumber == totalPages)">Next</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (tagIdToDelete.HasValue)
+{
+    <div class="modal show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this tag?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => tagIdToDelete = null" disabled="@isDeleting">Cancel</button>
+                    <button class="btn btn-danger" @onclick="() => DeleteTag(tagIdToDelete.Value)" disabled="@isDeleting">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PagedResult<TagResponse>? pagedResult;
+    private int pageNumber = 1;
+    private int pageSize = 20;
+    private int totalPages = 1;
+    private string orderBy = "asc";
+    private string? filter = null;
+    private string filterType = "contains";
+
+    private LogMyDay.Shared.DTOs.TagRequest newTag = new() { 
+        Tag = string.Empty, 
+        TypeId = 1, 
+        IsRequired = false,
+        IsRepeatable = true,
+        TimeGranularity = TimeGranularity.Exact,
+        IsRange = false
+    }; // Default to Integer, not required
+    private string? errorMessage;
+    private List<InputTypeDto> inputTypes = new();
+
+    private int? tagIdToDelete = null;
+    private bool isDeleting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            inputTypes = await ActivityApi.GetInputTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load input types");
+        }
+
+        await LoadTags();
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            pagedResult = await ActivityApi.GetTagsPaged(pageNumber, pageSize, orderBy, filter, filterType);
+            totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / pageSize);
+            errorMessage = null;
+            StateHasChanged();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tags: {ex.Message}";
+            Logger.LogError(ex, "Error loading tags");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {        try
+        {
+            await ActivityApi.CreateTag(newTag);
+            newTag = new() { 
+                Tag = string.Empty, 
+                TypeId = 1, 
+                IsRequired = false,
+                IsRepeatable = true,
+                TimeGranularity = TimeGranularity.Exact,
+                IsRange = false
+            }; // Default to Integer, not required
+            await LoadTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating tag: {ex.Message}";
+            Logger.LogError(ex, "Error creating tag");
+        }
+    }
+
+    private async Task PrevPage()
+    {
+        if (pageNumber > 1)
+        {
+            pageNumber--;
+            await LoadTags();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (pageNumber < totalPages)
+        {
+            pageNumber++;
+            await LoadTags();
+        }
+    }
+
+    private async Task ApplyFilter()
+    {
+        pageNumber = 1;
+        await LoadTags();
+    }
+
+    private async Task DeleteTag(int id)
+    {
+        isDeleting = true;
+        try
+        {
+            await ActivityApi.DeleteTag(id);
+            await LoadTags();
+            errorMessage = null;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting tag: {ex.Message}";
+            Logger.LogError(ex, "Error deleting tag");
+        }
+        finally
+        {
+            isDeleting = false;
+            tagIdToDelete = null;
+        }
+    }
+
+    private void ConfirmDelete(int id)
+    {
+        tagIdToDelete = id;
+    }
+}

@@ -1,0 +1,119 @@
+@page "/tags/edit/{Id:int}"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject ILogger<TagEdit> Logger
+
+<PageTitle>Edit Tag</PageTitle>
+
+<div class="container mt-4">
+    <h3>Edit Tag</h3>
+    @if (isLoading)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (editTag != null)
+    {
+        <EditForm Model="editTag" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="mb-3">
+                <label class="form-label">Title:</label>
+                <InputText @bind-Value="editTag.Tag" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Type (optional):</label>
+                <InputSelect @bind-Value="editTag.TypeId" class="form-select">
+                    <option value="">(None)</option>
+                    @foreach (var type in inputTypes)
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                </InputSelect>
+            </div>            <div class="mb-3">
+                <label class="form-label">Required:</label>
+                <InputCheckbox @bind-Value="editTag.IsRequired" class="form-check-input" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Repeatable:</label>
+                <InputCheckbox @bind-Value="editTag.IsRepeatable" class="form-check-input" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Time Granularity:</label>
+                <InputSelect @bind-Value="editTag.TimeGranularity" class="form-select">
+                    @foreach (var granularity in Enum.GetValues<TimeGranularity>())
+                    {
+                        <option value="@granularity">@granularity</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Is Range:</label>
+                <InputCheckbox @bind-Value="editTag.IsRange" class="form-check-input" />
+            </div>
+            <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
+            <button type="button" class="btn btn-secondary ms-2" @onclick="GoBack" disabled="@isSaving">Cancel</button>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private TagRequest? editTag;
+    private List<InputTypeDto> inputTypes = new();
+    private string? errorMessage;
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            inputTypes = await ActivityApi.GetInputTypesAsync();
+            var tag = await ActivityApi.GetTagById(Id);            editTag = new TagRequest
+            {
+                Tag = tag.Title,
+                TypeId = tag.TypeId ?? 0,
+                IsRequired = tag.IsRequired,
+                IsRepeatable = tag.IsRepeatable,
+                TimeGranularity = tag.TimeGranularity,
+                IsRange = tag.IsRange
+            };
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tag: {ex.Message}";
+            Logger.LogError(ex, "Error loading tag");
+        }
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        isSaving = true;
+        try
+        {
+            await ActivityApi.UpdateTag(Id, editTag!);
+            Navigation.NavigateTo("/tags");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving tag: {ex.Message}";
+            Logger.LogError(ex, "Error saving tag");
+        }
+        isSaving = false;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/tags");
+    }
+}

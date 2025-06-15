@@ -1,0 +1,43 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=False"
+  },
+  "Auth": {
+    "Basic": {
+      "Username": "admin",
+      "Password": "secret123",
+      "UserId": "11111111-1111-1111-1111-111111111111"
+    }
+  },
+  "Api": {
+    "BaseAddress": "https://logmyday.tadata.cz"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "System": "Warning"
+      }
+    },
+    "Enrich": [ "FromLogContext" ],
+    "WriteTo": [
+      { "Name": "Console" },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "Logs/logmyday.log",
+          "rollingInterval": "Day",
+          "shared": true
+        }
+      }
+    ]
+  },
+  "AllowedHosts": "*"
+}

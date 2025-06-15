@@ -1,0 +1,11 @@
+{
+  "ftpHost": "yourhost",
+  "ftpUsername": "your-ftp-username",
+  "ftpPassword": "your-ftp-password",
+  "ftpRemoteDirectory": "/remote/directory/path",
+  "cleanDirectory": "./bin/Release/net9.0",
+  "offlineFilePath": "C:/work/www/app_offline.htm",
+  "publishDirectory": "C:/work",
+  "publishProfilePath": "./Properties/PublishProfiles/FolderProfile.pubxml",
+  "projectPath": "your-project.csproj"
+}

@@ -1,0 +1,54 @@
+﻿@inject NavigationManager Navigation
+@inject LogMyDay.App.Authentication.CredentialStore Store
+
+<nav class="navbar navbar-expand-lg navbar-dark top-navigation">
+    <div class="container-fluid">
+        <!-- Logo/Brand -->
+        <a class="navbar-brand fw-bold" href="">
+            <span class="brand-icon">📊</span>
+            LogMyDay
+        </a>
+
+        <!-- Mobile menu toggle -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Navigation links -->
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                        <span class="nav-icon">🏠</span> Home
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="tags">
+                        <span class="nav-icon">🏷️</span> Tags
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="calendar">
+                        <span class="nav-icon">📅</span> Calendar
+                    </NavLink>
+                </li>
+            </ul>
+            
+            <!-- Logout button -->
+            <div class="navbar-nav">
+                <button class="btn btn-outline-light btn-sm" @onclick="Logout">
+                    <span class="nav-icon">🚪</span> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private void Logout()
+    {
+        Store.Clear();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}
+

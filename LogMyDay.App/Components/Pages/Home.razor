@@ -1,0 +1,694 @@
+﻿@page "/"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Home</PageTitle>
+
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>My Activities</h1>
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted">Press Ctrl+M</small>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#addActivityModal" title="Press Ctrl+M to open">
+                        + Add New Activity
+                    </button>
+                </div>
+            </div>
+        </div> <!-- Filter Section -->
+        <div class="col-12 mb-4">
+            <div class="page-card">
+                <div class="mb-3">
+                    <h5>Filters</h5>
+                </div>
+                <div class="row">
+                    <!-- Display Type -->
+                    <div class="col-md-3">
+                        <label class="form-label">Display Type:</label>
+                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="form-select">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+
+                    <!-- Description Filter -->
+                    <div class="col-md-3">
+                        <label class="form-label">Description Filter:</label>
+                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="form-control"
+                            placeholder="Search description..." />
+                    </div>
+
+                    <!-- Calendar Navigation -->
+                    <div class="col-md-6">
+                        <label class="form-label">Date Selection:</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod">
+                                &lt;
+                            </button>
+                            <div class="flex-grow-1 text-center">
+                                <strong>@GetCurrentPeriodDisplay()</strong>
+                            </div>
+                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod">
+                                &gt;
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="GoToToday">
+                                @GetTodayButtonText()
+                            </button>
+                        </div>
+                        <!-- Mini Calendar for Daily view -->
+                        @if (displayType == "daily")
+                        {
+                            <div class="mt-2">
+                                <div class="calendar-grid">
+                                    <div class="calendar-header">
+                                        @foreach (var day in GetDayNames())
+                                        {
+                                            <div class="calendar-day-header">@day</div>
+                                        }
+                                    </div>
+                                    <div class="calendar-body">
+                                        @foreach (var date in GetCalendarDates())
+                                        {
+                                            <div class="calendar-day @GetDayClass(date)" @onclick="() => SelectDate(date)">
+                                                @date.Day
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activities List -->
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Activities</h3>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-link" @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
+                    <button class="btn btn-link" @onclick="@(() => ChangeOrder("desc"))">Descending</button>
+
+                    @if (displayType != "daily")
+                    {
+                        <div class="ms-3">
+                            <button class="btn btn-secondary btn-sm me-2" @onclick="PrevPage"
+                                disabled="@(GetCurrentPageNumber() == 1)">Previous</button>
+                            <span>Page @GetCurrentPageNumber() of @totalPages</span>
+                            <button class="btn btn-secondary btn-sm ms-2" @onclick="NextPage"
+                                disabled="@(GetCurrentPageNumber() == totalPages)">Next</button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (pagedResult == null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else if (!pagedResult.Items.Any())
+            {
+                <div class="alert alert-info">
+                    No activities found for the selected criteria.
+                </div>
+            }
+            else
+            {
+                @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
+                {
+                    <h5>@group.Key.ToString("yyyy-MM-dd")</h5>
+                    <table class="table table-striped table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Description</th>
+                                <th>Date Started</th>
+                                <th>Date Finished</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var activity in group)
+                            {
+                                <tr>
+                                    <td>@activity.PrimaryTagName</td>
+                                    <td>@activity.Description</td>
+                                    <td>@activity.DateStarted.ToString("HH:mm")</td>
+                                    <td>@(activity.DateFinished?.ToString("HH:mm") ?? "-")</td>
+                                    <td>
+                                        <button @onclick="() => DeleteActivity(activity.Id)"
+                                            class="btn btn-danger btn-sm">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Add New Activity Modal -->
+<div class="modal fade" id="addActivityModal" tabindex="-1" aria-labelledby="addActivityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addActivityModalLabel">Add New Activity</h5>                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newActivity" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />                    <div class="mb-3">
+                        <label class="form-label">Primary Tag:</label>
+                        <InputSelect @bind-Value="newActivity.PrimaryTagId" class="form-select" @ref="primaryTagSelect" tabindex="1" @bind-Value:after="OnTagSelectionChanged">
+                            <option value="">-- Select Tag --</option>
+                            @if (tags != null)
+                            {
+                                foreach (var tag in tags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description:</label>
+                        <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
+                            placeholder="Enter activity description" />
+                    </div>                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Date Started:</label>
+                                @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                {
+                                    <input type="datetime-local" @bind="newActivity.DateStarted" class="form-control" tabindex="3" />
+                                }
+                                else
+                                {
+                                    <InputDate @bind-Value="newActivity.DateStarted" class="form-control" tabindex="3" />
+                                }
+                            </div>
+                        </div>                        @if (selectedTag?.IsRange == true)
+                        {
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Date Finished (optional):</label>
+                                    @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                    {
+                                        <input type="datetime-local" @bind="newActivity.DateFinished" class="form-control" tabindex="4" />
+                                    }
+                                    else
+                                    {
+                                        <InputDate @bind-Value="newActivity.DateFinished" class="form-control" tabindex="4" />
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            Add Activity
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {    private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
+    private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
+    private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new() { DateStarted = DateTime.Now };
+    private string? errorMessage;
+    private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
+
+    // Display and filtering
+    private string displayType = "daily";
+    private string? descriptionFilter;
+    private DateTime selectedDate = DateTime.Today;
+    private DateTime calendarMonth = DateTime.Today;
+    private int pageNumber = 1;
+    private int weekPageNumber = 1;
+    private int monthPageNumber = 1;
+    private int weeksPerPage = 12;
+    private int monthsPerPage = 12;
+    private int totalPages = 1;
+    private string orderBy = "desc";    private bool keyboardListenerAdded = false;
+    private InputSelect<int?>? primaryTagSelect;
+
+    protected override async Task OnInitializedAsync()
+    {
+        selectedDate = DateTime.Today;
+        calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SetupKeyboardShortcuts();
+        }
+    }    private async Task SetupKeyboardShortcuts()
+    {
+        if (!keyboardListenerAdded)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+window.homePageKeyboardHandler = function(event) {
+    if (event.ctrlKey && event.key === 'm') {
+        event.preventDefault();
+        var modal = new bootstrap.Modal(document.getElementById('addActivityModal'));
+        modal.show();
+    }
+};
+document.addEventListener('keydown', window.homePageKeyboardHandler);
+
+// Add event listener for when modal is shown to focus the select
+document.getElementById('addActivityModal').addEventListener('shown.bs.modal', function() {
+    setTimeout(function() {
+        // Try multiple selectors to find the primary tag select
+        var select = document.querySelector('#addActivityModal select[tabindex=""1""]') || 
+                    document.querySelector('#addActivityModal select') ||
+                    document.querySelector('#addActivityModal .form-select');
+        if (select) {
+            select.focus();
+            // Trigger a small interaction to ensure it's ready for keyboard navigation
+            var event = new Event('mousedown', { bubbles: true });
+            select.dispatchEvent(event);
+        }
+    }, 300);
+});
+");
+            keyboardListenerAdded = true;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (keyboardListenerAdded)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+if (window.homePageKeyboardHandler) {
+document.removeEventListener('keydown', window.homePageKeyboardHandler);
+delete window.homePageKeyboardHandler;
+}
+");
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            DateTime? startDate = null;
+            DateTime? endDate = null;
+
+            // Set date range based on display type and selected date/period
+            switch (displayType)
+            {
+                case "daily":
+                    startDate = selectedDate.Date;
+                    endDate = selectedDate.Date.AddDays(1).AddTicks(-1);
+                    // For daily, get all activities for the day (no pagination)
+                    pagedResult = await ActivityApi.GetActivities(1, 1000, orderBy, null, startDate, endDate, descriptionFilter);
+                    totalPages = 1;
+                    break;
+
+                case "weekly":
+                    var weekStart = GetStartOfWeek(selectedDate);
+                    var weekEnd = weekStart.AddDays(7).AddTicks(-1);
+                    pagedResult = await ActivityApi.GetActivitiesByWeeks(weekPageNumber, weeksPerPage, orderBy, null, weekStart, weekEnd,
+                    descriptionFilter);
+                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / weeksPerPage);
+                    break;
+
+                case "monthly":
+                    var monthStart = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+                    var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
+                    pagedResult = await ActivityApi.GetActivitiesByMonths(monthPageNumber, monthsPerPage, orderBy, null, monthStart,
+                    monthEnd, descriptionFilter);
+                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / monthsPerPage);
+                    break;
+            }            tags = await ActivityApi.GetTags();
+            
+            // Initialize selectedTag if a tag is already selected
+            OnTagSelectionChanged();
+            
+            errorMessage = null;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading data: {ex.Message}";
+        }
+    }
+
+    private async Task OnDisplayTypeChanged(ChangeEventArgs e)
+    {
+        displayType = e.Value?.ToString() ?? "daily";
+
+        // Reset pagination counters
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        // Reset to today/this week/this month
+        selectedDate = DateTime.Today;
+        calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+        await LoadData();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        descriptionFilter = e.Value?.ToString();
+
+        // Reset pagination when filter changes
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        await LoadData();
+    }
+
+    private string GetCurrentPeriodDisplay()
+    {
+        return displayType switch
+        {
+            "daily" => selectedDate.ToString("MMMM dd, yyyy"),
+            "weekly" => $"Week of {GetStartOfWeek(selectedDate):MMMM dd, yyyy}",
+            "monthly" => selectedDate.ToString("MMMM yyyy"),
+            _ => selectedDate.ToString("MMMM dd, yyyy")
+        };
+    }
+
+    private string GetTodayButtonText()
+    {
+        return displayType switch
+        {
+            "daily" => "Today",
+            "weekly" => "This Week",
+            "monthly" => "This Month",
+            _ => "Today"
+        };
+    }
+
+    private async Task PreviousCalendarPeriod()
+    {
+        selectedDate = displayType switch
+        {
+            "daily" => selectedDate.AddDays(-1),
+            "weekly" => selectedDate.AddDays(-7),
+            "monthly" => selectedDate.AddMonths(-1),
+            _ => selectedDate.AddDays(-1)
+        };
+
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task NextCalendarPeriod()
+    {
+        selectedDate = displayType switch
+        {
+            "daily" => selectedDate.AddDays(1),
+            "weekly" => selectedDate.AddDays(7),
+            "monthly" => selectedDate.AddMonths(1),
+            _ => selectedDate.AddDays(1)
+        };
+
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task GoToToday()
+    {
+        selectedDate = DateTime.Today;
+        calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+        // Reset pagination
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        await LoadData();
+    }
+
+    private async Task SelectDate(DateTime date)
+    {
+        selectedDate = date;
+        await LoadData();
+    }
+
+    private string[] GetDayNames()
+    {
+        return new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    }
+
+    private List<DateTime> GetCalendarDates()
+    {
+        var firstDayOfMonth = calendarMonth;
+        var startOfWeek = GetStartOfWeek(firstDayOfMonth);
+        var dates = new List<DateTime>();
+
+        for (int i = 0; i < 42; i++) // 6 weeks * 7 days
+        {
+            dates.Add(startOfWeek.AddDays(i));
+        }
+
+        return dates;
+    }
+
+    private string GetDayClass(DateTime date)
+    {
+        var classes = new List<string>();
+
+        if (date.Month != calendarMonth.Month)
+            classes.Add("other-month");
+
+        if (date.Date == selectedDate.Date)
+            classes.Add("selected");
+
+        if (date.Date == DateTime.Today)
+            classes.Add("today");
+
+        return string.Join(" ", classes);
+    }
+
+    private DateTime GetStartOfWeek(DateTime date)
+    {
+        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+        return date.AddDays(-1 * diff).Date;
+    }
+
+    private int GetCurrentPageNumber()
+    {
+        return displayType switch
+        {
+            "weekly" => weekPageNumber,
+            "monthly" => monthPageNumber,
+            _ => pageNumber
+        };
+    }    private async Task HandleValidSubmit()
+    {        
+        try
+        {            // Check for duplicates if tag is selected and not repeatable
+            if (newActivity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
+            {
+                // Only skip duplicate check for Exact granularity since it allows precise timing
+                if (selectedTag.TimeGranularity != LogMyDay.Domain.Enums.TimeGranularity.Exact)
+                {
+                    var duplicateCheck = await ActivityApi.CheckDuplicate(newActivity.PrimaryTagId.Value, newActivity.DateStarted);
+                    if (duplicateCheck.HasDuplicate)
+                    {
+                        var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                        errorMessage = $"An activity for this tag already exists for the selected {granularityText} period. This tag is not repeatable.";
+                        return;
+                    }
+                }
+            }
+
+            await ActivityApi.CreateCalendarItem(newActivity);
+            newActivity = new() { DateStarted = DateTime.Now };
+            selectedTag = null; // Reset selected tag
+            errorMessage = null;
+            await LoadData();
+
+            // Close the modal after successful submission (only if rendered)
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("eval",
+                "bootstrap.Modal.getInstance(document.getElementById('addActivityModal'))?.hide()");
+            }
+            catch (InvalidOperationException)
+            {
+                // Ignore JavaScript interop errors during static rendering
+            }
+        }        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // Handle validation errors from the server
+            var content = await ex.GetContentAsAsync<string>();
+            if (content != null && content.Contains("already exists"))
+            {
+                errorMessage = "An activity for this tag already exists for the selected period. This tag is not repeatable.";
+            }
+            else
+            {
+                errorMessage = $"Validation error: {content ?? ex.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating activity: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteActivity(int id)
+    {
+        try
+        {
+            await ActivityApi.Delete(id);
+            await LoadData();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting activity: {ex.Message}";
+        }
+    }
+
+    private async Task PrevPage()
+    {
+        switch (displayType)
+        {
+            case "weekly":
+                if (weekPageNumber > 1)
+                {
+                    weekPageNumber--;
+                    await LoadData();
+                }
+                break;
+            case "monthly":
+                if (monthPageNumber > 1)
+                {
+                    monthPageNumber--;
+                    await LoadData();
+                }
+                break;
+            default:
+                if (pageNumber > 1)
+                {
+                    pageNumber--;
+                    await LoadData();
+                }
+                break;
+        }
+    }
+
+    private async Task NextPage()
+    {
+        switch (displayType)
+        {
+            case "weekly":
+                if (weekPageNumber < totalPages)
+                {
+                    weekPageNumber++;
+                    await LoadData();
+                }
+                break;
+            case "monthly":
+                if (monthPageNumber < totalPages)
+                {
+                    monthPageNumber++;
+                    await LoadData();
+                }
+                break;
+            default:
+                if (pageNumber < totalPages)
+                {
+                    pageNumber++;
+                    await LoadData();
+                }
+                break;
+        }
+    }
+
+    private async Task ChangeOrder(string order)
+    {
+        orderBy = order;
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+        await LoadData();
+    }
+
+    private async Task FocusPrimaryTagSelect()
+    {
+        try
+        {
+            if (primaryTagSelect?.Element is not null)
+            {
+                await primaryTagSelect.Element.Value.FocusAsync();
+            }
+            else
+            {
+                // Fallback to JavaScript if element reference doesn't work
+                await JSRuntime.InvokeVoidAsync("eval", @"
+                    var select = document.querySelector('#addActivityModal select');
+                    if (select) {
+                        select.focus();
+                    }
+                ");
+            }
+        }
+        catch (Exception)
+        {
+            // Ignore focus errors
+        }
+    }    private void OnTagSelectionChanged()
+    {
+        if (newActivity.PrimaryTagId.HasValue)
+        {
+            selectedTag = tags?.FirstOrDefault(t => t.Id == newActivity.PrimaryTagId.Value);
+            // Clear DateFinished if the selected tag is not a range type
+            if (selectedTag?.IsRange != true)
+            {
+                newActivity.DateFinished = null;
+            }
+        }
+        else
+        {
+            selectedTag = null;
+            newActivity.DateFinished = null;
+        }
+    }
+}

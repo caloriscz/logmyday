@@ -1,0 +1,65 @@
+﻿@page "/login"
+@inject NavigationManager Navigation
+@inject LogMyDay.App.Authentication.CredentialStore Store
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+
+<PageTitle>Login</PageTitle>
+
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
+        <div class="card-body">
+            <h3 class="card-title text-center mb-4">Login</h3>
+            @if (errorMessage != null)
+            {
+                <div class="alert alert-danger text-center" role="alert">@errorMessage</div>
+            }
+            <EditForm Model="loginModel" OnValidSubmit="OnLogin">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <InputText @bind-Value="loginModel.Username" class="form-control" autocomplete="username" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <InputText @bind-Value="loginModel.Password" type="password" class="form-control" autocomplete="current-password" />
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Login</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+
+    public class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private async Task OnLogin()
+    {
+        Store.Set(loginModel.Username, loginModel.Password);
+        
+        try
+        {
+            await ActivityApi.GetActivities();
+            Navigation.NavigateTo("/");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            System.Diagnostics.Debug.WriteLine($"============= [Login] Api error: {ex}");
+            errorMessage = "Invalid credentials. Please check your username and password.";
+            Store.Clear();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"============= [Login] Unexpected error: {ex}");
+            Store.Clear();
+        }
+    }
+}
