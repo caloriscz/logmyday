@@ -49,6 +49,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddScoped<IActivityService, ActivityService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IBackupService, BackupService>();
+builder.Services.AddScoped<IExcelExportService, ExcelExportService>();
 
 
 builder.Services.AddSingleton<CredentialStore>();

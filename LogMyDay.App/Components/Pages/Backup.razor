@@ -4,6 +4,7 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
 @inject IBackupService BackupService
+@inject IExcelExportService ExcelExportService
 @inject IJSRuntime JSRuntime
 @inject ILogger<Backup> Logger
 
@@ -149,11 +150,119 @@
                         </button>
                     </div>
                 </div>
+            </div>        </div>
+
+        <!-- Excel Export Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file-excel me-2"></i>
+                        Excel Reports
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Generate Excel reports with activities data for selected tags.
+                    </p>
+
+                    <!-- Tag Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">Select Tags:</label>
+                        @if (availableTags != null && availableTags.Any())
+                        {
+                            <div class="tag-selection" style="max-height: 200px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 0.375rem; padding: 0.5rem;">
+                                @foreach (var tag in availableTags)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="tag-@tag.Id"
+                                               @onchange="@((e) => ToggleTagSelection(tag.Id, (bool)e.Value!))" />
+                                        <label class="form-check-label" for="tag-@tag.Id">
+                                            @tag.Title
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">Loading tags...</div>
+                        }
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date:</label>
+                            <input type="date" class="form-control" @bind="excelStartDate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">End Date:</label>
+                            <input type="date" class="form-control" @bind="excelEndDate" />
+                        </div>
+                    </div>
+
+                    @if (selectedTagIds.Any())
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                Selected @selectedTagIds.Count tag(s): 
+                                @string.Join(", ", availableTags?.Where(t => selectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())
+                            </small>
+                        </div>
+                    }
+
+                    @if (excelPreview != null)
+                    {
+                        <div class="mb-3">
+                            <div class="alert alert-info">
+                                <h6>Preview:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Activities:</strong> @excelPreview.TotalActivities</li>
+                                    <li><strong>Days:</strong> @excelPreview.TotalDays</li>
+                                    <li><strong>Period:</strong> @excelPreview.DateRangeStart?.ToString("dd/MM/yyyy") - @excelPreview.DateRangeEnd?.ToString("dd/MM/yyyy")</li>
+                                </ul>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-info" 
+                                @onclick="PreviewExcelExport" 
+                                disabled="@(!selectedTagIds.Any() || isGeneratingPreview)">
+                            @if (isGeneratingPreview)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-eye me-2"></i>
+                            }
+                            Preview
+                        </button>
+
+                        <button class="btn btn-info" 
+                                @onclick="GenerateExcelReport" 
+                                disabled="@(!selectedTagIds.Any() || isGeneratingExcel)">
+                            @if (isGeneratingExcel)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-file-excel me-2"></i>
+                            }
+                            Generate Excel
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Clear Data Section -->
+    <!-- Second Row - Clear Data Section -->
     <div class="row">
         <div class="col-12">
             <div class="card border-danger">
@@ -311,6 +420,8 @@
     private bool isImporting = false;
     private bool isValidating = false;
     private bool isClearing = false;
+    private bool isGeneratingExcel = false;
+    private bool isGeneratingPreview = false;
     private bool clearExistingData = false;
     private bool showClearConfirmation = false;
     private string confirmationText = "";
@@ -319,6 +430,13 @@
     private IBrowserFile? selectedFile;
     private BackupImportResult? importResult;
 
+    // Excel export properties
+    private List<TagResponse>? availableTags;
+    private List<int> selectedTagIds = new();
+    private DateTime? excelStartDate = DateTime.Today.AddMonths(-1);
+    private DateTime? excelEndDate = DateTime.Today;
+    private ExcelExportStatistics? excelPreview;
+
     private class BackupInfoResponse
     {
         public BackupMetadata Metadata { get; set; } = new();
@@ -326,12 +444,122 @@
         public string UserId { get; set; } = "";
     }
 
-    private BackupInfoResponse? backupInfo;
-
-    protected override async Task OnInitializedAsync()
+    private BackupInfoResponse? backupInfo;    protected override async Task OnInitializedAsync()
     {
         await LoadBackupInfo();
-    }    private async Task LoadBackupInfo()
+        await LoadAvailableTags();
+    }
+
+    private async Task LoadAvailableTags()
+    {
+        try
+        {
+            availableTags = await ExcelExportService.GetAvailableTagsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load available tags");
+        }
+    }
+
+    private void ToggleTagSelection(int tagId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!selectedTagIds.Contains(tagId))
+            {
+                selectedTagIds.Add(tagId);
+            }
+        }
+        else
+        {
+            selectedTagIds.Remove(tagId);
+        }
+
+        // Clear preview when selection changes
+        excelPreview = null;
+    }
+
+    private async Task PreviewExcelExport()
+    {
+        if (!selectedTagIds.Any()) return;
+
+        isGeneratingPreview = true;
+        ClearStatus();
+
+        try
+        {
+            var request = new ExcelExportRequest
+            {
+                TagIds = selectedTagIds,
+                StartDate = excelStartDate,
+                EndDate = excelEndDate
+            };
+
+            excelPreview = await ExcelExportService.GetExportPreviewAsync(request);
+            
+            if (excelPreview.TotalActivities == 0)
+            {
+                SetStatus("No activities found for the selected criteria", true);
+            }
+            else
+            {
+                SetStatus($"Preview loaded: {excelPreview.TotalActivities} activities across {excelPreview.TotalDays} days", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to generate preview");
+            SetStatus($"Preview failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isGeneratingPreview = false;
+        }
+    }
+
+    private async Task GenerateExcelReport()
+    {
+        if (!selectedTagIds.Any()) return;
+
+        isGeneratingExcel = true;
+        ClearStatus();
+
+        try
+        {
+            var request = new ExcelExportRequest
+            {
+                TagIds = selectedTagIds,
+                StartDate = excelStartDate,
+                EndDate = excelEndDate
+            };
+
+            var result = await ExcelExportService.GenerateExcelReportAsync(request);
+
+            if (result.Success && result.FileContent != null)
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFile", 
+                    result.FileName, 
+                    Convert.ToBase64String(result.FileContent), 
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                
+                SetStatus($"Excel report generated successfully! {result.Statistics.TotalActivities} activities included.", false);
+            }
+            else
+            {
+                SetStatus($"Excel generation failed: {result.Message}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Excel generation failed");
+            SetStatus($"Excel generation failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isGeneratingExcel = false;
+        }
+    }private async Task LoadBackupInfo()
     {
         try
         {
