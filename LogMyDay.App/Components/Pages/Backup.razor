@@ -1,0 +1,564 @@
+@page "/backup"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Api.Application.Interfaces
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject IBackupService BackupService
+@inject IJSRuntime JSRuntime
+@inject ILogger<Backup> Logger
+
+<PageTitle>Backup & Restore - LogMyDay</PageTitle>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="fas fa-database me-2"></i>
+                Backup & Restore
+            </h1>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show">
+                    <i class="fas @(isError ? "fa-exclamation-triangle" : "fa-check-circle") me-2"></i>
+                    @statusMessage
+                    <button type="button" class="btn-close" @onclick="ClearStatus"></button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row">
+        <!-- Export Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-download me-2"></i>
+                        Export Data
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Export all your tags and activities to a JSON file for backup purposes.
+                    </p>
+                    
+                    @if (backupInfo != null)
+                    {
+                        <div class="mb-3">
+                            <h6>Current Database Statistics:</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Tags:</strong> @backupInfo.Metadata.TotalTags</li>
+                                <li><strong>Activities:</strong> @backupInfo.Metadata.TotalActivities</li>
+                                <li><strong>Input Types:</strong> @backupInfo.Metadata.TotalInputTypes</li>
+                                <li><strong>Patterns:</strong> @backupInfo.Metadata.TotalPatterns</li>
+                            </ul>
+                        </div>
+                    }
+
+                    <button class="btn btn-primary" 
+                            @onclick="ExportData" 
+                            disabled="@isExporting">
+                        @if (isExporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-download me-2"></i>
+                        }
+                        Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>
+                        Import Data
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Import tags and activities from a JSON backup file.
+                    </p>
+
+                    <div class="mb-3">
+                        <label for="fileInput" class="form-label">Select Backup File</label>
+                        <InputFile id="fileInput" 
+                                  OnChange="OnFileSelected" 
+                                  accept=".json"
+                                  class="form-control" />
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               id="clearExisting" 
+                               @bind="clearExistingData">
+                        <label class="form-check-label text-warning" for="clearExisting">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Clear existing data before import
+                        </label>
+                    </div>
+
+                    @if (selectedFile != null)
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted">
+                                Selected: @selectedFile.Name (@(selectedFile.Size / 1024)KB)
+                            </small>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" 
+                                @onclick="ValidateFile" 
+                                disabled="@(selectedFile == null || isValidating)">
+                            @if (isValidating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-check me-2"></i>
+                            }
+                            Validate
+                        </button>
+
+                        <button class="btn btn-success" 
+                                @onclick="ImportData" 
+                                disabled="@(selectedFile == null || isImporting)">
+                            @if (isImporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-upload me-2"></i>
+                            }
+                            Import
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Data Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trash me-2"></i>
+                        Danger Zone
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <strong>Warning:</strong> This action will permanently delete all your data. 
+                        Make sure to export your data first if you want to keep it.
+                    </p>
+
+                    <button class="btn btn-danger" 
+                            @onclick="ShowClearConfirmation"
+                            disabled="@isClearing">
+                        @if (isClearing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        else
+                        {
+                            <i class="fas fa-trash me-2"></i>
+                        }
+                        Clear All Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Results Modal -->
+    @if (importResult != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            @if (importResult.Success)
+                            {
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <span>Import Successful</span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                                <span>Import Failed</span>
+                            }
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="() => importResult = null"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>@importResult.Message</p>
+                        
+                        @if (importResult.Success)
+                        {
+                            <h6>Import Statistics:</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="list-unstyled">
+                                        <li><strong>Input Types:</strong> @importResult.Statistics.InputTypesImported imported, @importResult.Statistics.InputTypesSkipped skipped</li>
+                                        <li><strong>Patterns:</strong> @importResult.Statistics.PatternsImported imported, @importResult.Statistics.PatternsSkipped skipped</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="list-unstyled">
+                                        <li><strong>Tags:</strong> @importResult.Statistics.TagsImported imported, @importResult.Statistics.TagsSkipped skipped</li>
+                                        <li><strong>Activities:</strong> @importResult.Statistics.ActivitiesImported imported, @importResult.Statistics.ActivitiesSkipped skipped</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            @if (importResult.Statistics.RecordsCleared > 0)
+                            {
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    @importResult.Statistics.RecordsCleared existing records were cleared before import.
+                                </div>
+                            }
+                        }
+
+                        @if (importResult.Errors.Any())
+                        {
+                            <h6 class="text-danger">Errors:</h6>
+                            <ul class="text-danger">
+                                @foreach (var error in importResult.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        }
+
+                        @if (importResult.Warnings.Any())
+                        {
+                            <h6 class="text-warning">Warnings:</h6>
+                            <ul class="text-warning">
+                                @foreach (var warning in importResult.Warnings)
+                                {
+                                    <li>@warning</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="() => importResult = null">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Clear Confirmation Modal -->
+    @if (showClearConfirmation)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Confirm Data Deletion
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="() => showClearConfirmation = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Are you sure you want to delete ALL data?</strong></p>
+                        <p>This action cannot be undone. All tags, activities, input types, and patterns will be permanently deleted.</p>
+                        <p>Type <code>DELETE</code> to confirm:</p>
+                        <input type="text" class="form-control" @bind="confirmationText" placeholder="Type DELETE to confirm" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="() => showClearConfirmation = false">Cancel</button>
+                        <button type="button" 
+                                class="btn btn-danger" 
+                                @onclick="ClearData" 
+                                disabled="@(confirmationText != "DELETE" || isClearing)">
+                            @if (isClearing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Delete All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isExporting = false;
+    private bool isImporting = false;
+    private bool isValidating = false;
+    private bool isClearing = false;
+    private bool clearExistingData = false;
+    private bool showClearConfirmation = false;
+    private string confirmationText = "";
+    private string statusMessage = "";
+    private bool isError = false;
+    private IBrowserFile? selectedFile;
+    private BackupImportResult? importResult;
+
+    private class BackupInfoResponse
+    {
+        public BackupMetadata Metadata { get; set; } = new();
+        public DateTime CurrentDateTime { get; set; }
+        public string UserId { get; set; } = "";
+    }
+
+    private BackupInfoResponse? backupInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBackupInfo();
+    }    private async Task LoadBackupInfo()
+    {
+        try
+        {
+            var backupData = await BackupService.ExportDataAsync();
+            backupInfo = new BackupInfoResponse
+            {
+                Metadata = backupData.Metadata,
+                CurrentDateTime = DateTime.UtcNow,
+                UserId = "All users"
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load backup info");
+        }
+    }    private async Task ExportData()
+    {
+        isExporting = true;
+        ClearStatus();
+
+        try
+        {
+            var backupData = await BackupService.ExportDataAsync();
+            
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            var jsonContent = JsonSerializer.Serialize(backupData, jsonOptions);
+            var fileName = $"logmyday-backup-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.json";
+            
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(jsonContent)), "application/json");
+            
+            SetStatus("Data exported successfully!", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export failed");
+            SetStatus($"Export failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        ClearStatus();
+    }    private async Task ValidateFile()
+    {
+        if (selectedFile == null) return;
+
+        isValidating = true;
+        ClearStatus();
+
+        try
+        {
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB max
+            using var reader = new StreamReader(stream);
+            var jsonContent = await reader.ReadToEndAsync();
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            BackupData? backupData;
+            try
+            {
+                backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                Logger.LogWarning(ex, "Failed to parse JSON backup file during validation");
+                SetStatus($"Invalid JSON format: {ex.Message}", true);
+                return;
+            }
+
+            if (backupData == null)
+            {
+                SetStatus("Backup data is null or invalid", true);
+                return;
+            }
+
+            var validationResult = await BackupService.ValidateBackupDataAsync(backupData);
+
+            if (validationResult.IsValid)
+            {
+                SetStatus("Backup file is valid and ready for import!", false);
+            }
+            else
+            {
+                var errors = validationResult.Errors != null ? string.Join(", ", validationResult.Errors) : "Unknown validation errors";
+                SetStatus($"Validation failed: {errors}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Validation failed");
+            SetStatus($"Validation failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isValidating = false;
+        }
+    }    private async Task ImportData()
+    {
+        if (selectedFile == null) return;
+
+        isImporting = true;
+        ClearStatus();
+
+        try
+        {
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB max
+            using var reader = new StreamReader(stream);
+            var jsonContent = await reader.ReadToEndAsync();
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            BackupData? backupData;
+            try
+            {
+                backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                Logger.LogWarning(ex, "Failed to parse JSON backup file during import");
+                SetStatus($"Invalid JSON format: {ex.Message}", true);
+                return;
+            }
+
+            if (backupData == null)
+            {
+                SetStatus("Backup data is null or invalid", true);
+                return;
+            }
+
+            importResult = await BackupService.ImportDataAsync(backupData, clearExistingData);
+
+            if (importResult.Success)
+            {
+                SetStatus("Data imported successfully!", false);
+                await LoadBackupInfo(); // Refresh statistics
+            }
+            else
+            {
+                SetStatus($"Import failed: {importResult.Message}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import failed");
+            SetStatus($"Import failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private void ShowClearConfirmation()
+    {
+        showClearConfirmation = true;
+        confirmationText = "";
+    }    private async Task ClearData()
+    {
+        if (confirmationText != "DELETE") return;
+
+        isClearing = true;
+        showClearConfirmation = false;
+
+        try
+        {
+            var recordsCleared = await BackupService.ClearDataAsync();
+            SetStatus($"All data cleared successfully! {recordsCleared} records removed.", false);
+            await LoadBackupInfo(); // Refresh statistics
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Clear operation failed");
+            SetStatus($"Clear operation failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isClearing = false;
+            confirmationText = "";
+        }
+    }
+
+    private void SetStatus(string message, bool error)
+    {
+        statusMessage = message;
+        isError = error;
+    }
+
+    private void ClearStatus()
+    {
+        statusMessage = "";
+        isError = false;
+    }
+}
+
+<script>
+    window.downloadFile = (filename, contentBase64, contentType) => {
+        const byteCharacters = atob(contentBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: contentType });
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    };
+</script>
