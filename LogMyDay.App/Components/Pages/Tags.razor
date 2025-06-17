@@ -86,7 +86,8 @@
             }
             else
             {
-                <table class="table table-bordered table-striped">                    <thead>
+                <table class="table table-bordered table-striped">
+                    <thead>
                         <tr>
                             <th>ID</th>
                             <th>Name</th>
@@ -98,7 +99,8 @@
                             <th></th> <!-- Actions column -->
                         </tr>
                     </thead>
-                    <tbody>                        @foreach (var tag in pagedResult.Items)
+                    <tbody>
+                        @foreach (var tag in pagedResult.Items)
                         {
                             <tr>
                                 <td>@tag.Id</td>
@@ -165,9 +167,10 @@
     private string? filter = null;
     private string filterType = "contains";
 
-    private LogMyDay.Shared.DTOs.TagRequest newTag = new() { 
-        Tag = string.Empty, 
-        TypeId = 1, 
+    private LogMyDay.Shared.DTOs.TagRequest newTag = new()
+    {
+        Tag = string.Empty,
+        TypeId = 1,
         IsRequired = false,
         IsRepeatable = true,
         TimeGranularity = TimeGranularity.Exact,
@@ -214,12 +217,14 @@
     }
 
     private async Task HandleValidSubmit()
-    {        try
+    {
+        try
         {
             await ActivityApi.CreateTag(newTag);
-            newTag = new() { 
-                Tag = string.Empty, 
-                TypeId = 1, 
+            newTag = new()
+            {
+                Tag = string.Empty,
+                TypeId = 1,
                 IsRequired = false,
                 IsRepeatable = true,
                 TimeGranularity = TimeGranularity.Exact,
