@@ -46,19 +46,16 @@
         
         try
         {
-            await ActivityApi.GetActivities();
             Navigation.NavigateTo("/");
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            System.Diagnostics.Debug.WriteLine($"============= [Login] Api error: {ex}");
             errorMessage = "Invalid credentials. Please check your username and password.";
             Store.Clear();
         }
         catch (Exception ex)
         {
             errorMessage = $"Unexpected error: {ex.Message}";
-            System.Diagnostics.Debug.WriteLine($"============= [Login] Unexpected error: {ex}");
             Store.Clear();
         }
     }
