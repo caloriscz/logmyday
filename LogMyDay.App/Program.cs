@@ -21,42 +21,39 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
+var services = builder.Services;
 
-// Add services
-builder.Services.Configure<BasicAuthOptions>(
-    builder.Configuration.GetSection("Auth:Basic"));
-
-builder.Services.AddDbContext<LogMyDayDbContext>(options =>
+services.Configure<BasicAuthOptions>(builder.Configuration.GetSection("Auth:Basic"));
+services.AddDbContext<LogMyDayDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
-builder.Services.AddAuthentication(BasicAuthConstants.Scheme).AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>(
+services.AddAuthentication(BasicAuthConstants.Scheme).AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>(
         BasicAuthConstants.Scheme, null);
 
-builder.Services.AddAuthorization();
+services.AddAuthorization();
 
 
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+services.AddRazorComponents().AddInteractiveServerComponents();
 
-builder.Services.AddControllers()
+services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
-builder.Services.AddEndpointsApiExplorer();
+services.AddEndpointsApiExplorer();
 
-builder.Services.AddScoped<IActivityService, ActivityService>();
-builder.Services.AddScoped<ITagService, TagService>();
-builder.Services.AddScoped<IBackupService, BackupService>();
-builder.Services.AddScoped<IExcelExportService, ExcelExportService>();
+services.AddScoped<IActivityService, ActivityService>();
+services.AddScoped<ITagService, TagService>();
+services.AddScoped<IBackupService, BackupService>();
+services.AddScoped<IExcelExportService, ExcelExportService>();
+
+services.AddSingleton<CredentialStore>();
+services.AddTransient<AuthenticationHeaderHandler>();
 
 
-builder.Services.AddSingleton<CredentialStore>();
-builder.Services.AddTransient<AuthenticationHeaderHandler>();
-
-
-builder.Services.AddRefitClient<IActivityApi>()
+services.AddRefitClient<IActivityApi>()
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
@@ -69,7 +66,7 @@ builder.Services.AddRefitClient<IActivityApi>()
     .AddHttpMessageHandler<AuthenticationHeaderHandler>();
 
 
-builder.Services.AddSwaggerGen(options =>
+services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {

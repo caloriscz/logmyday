@@ -30,7 +30,8 @@ public class TagsController : ControllerBase
     /// Create a tag for given user
     /// </summary>
     /// <param name="model"></param>
-    /// <returns></returns>    [HttpPost]
+    /// <returns></returns>    
+    [HttpPost]
     public async Task<IActionResult> Create(TagRequest model)
     {
         try
