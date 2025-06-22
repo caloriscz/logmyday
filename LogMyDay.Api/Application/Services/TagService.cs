@@ -17,10 +17,12 @@ public class TagService : ITagService
     {
         _context = context;
         _logger = logger;
-    }    public async Task<int> Create(TagRequest createTagRequest)
+    }
+    
+    public async Task<int> Create(TagRequest createTagRequest)
     {
         _logger.LogInformation("Creating tag with request: {@CreateTagRequest}", createTagRequest);
-        
+
         var tag = new Tag
         {
             TagName = createTagRequest.Tag,
@@ -41,7 +43,7 @@ public class TagService : ITagService
 
     public async Task<IList<TagResponse>> GetAll()
     {
-        var tags = await _context.Tags.OrderBy(x => x.TagName).ToListAsync();        var tagsResponse = tags.Select(tag => new TagResponse
+        var tags = await _context.Tags.OrderBy(x => x.TagName).ToListAsync(); var tagsResponse = tags.Select(tag => new TagResponse
         {
             Id = tag.Id,
             Title = tag.TagName,
@@ -65,7 +67,7 @@ public class TagService : ITagService
     /// <exception cref="AppException"></exception>
     public async Task Update(int id, TagRequest model)
     {
-        var tag = await _context.Tags.FindAsync(id);        tag.TagName = model.Tag;
+        var tag = await _context.Tags.FindAsync(id); tag.TagName = model.Tag;
         tag.InputTypeId = model.TypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
         tag.IsRepeatable = model.IsRepeatable;
@@ -98,7 +100,7 @@ public class TagService : ITagService
     /// <returns></returns>
     public async Task<TagResponse> GetTagById(int tagId)
     {
-        Tag? tagResponse = await _context.Tags.FindAsync(tagId);        TagResponse response = new()
+        Tag? tagResponse = await _context.Tags.FindAsync(tagId); TagResponse response = new()
         {
             Id = tagResponse.Id,
             Title = tagResponse.TagName,
@@ -139,7 +141,9 @@ public class TagService : ITagService
         var totalCount = await query.CountAsync();
         var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
         return new PagedResult<TagResponse>
-        {            Items = items.Select(t => new TagResponse {
+        {
+            Items = items.Select(t => new TagResponse
+            {
                 Id = t.Id,
                 Title = t.TagName,
                 TypeId = t.InputTypeId,

@@ -33,8 +33,6 @@ services.AddAuthentication(BasicAuthConstants.Scheme).AddScheme<AuthenticationSc
         BasicAuthConstants.Scheme, null);
 
 services.AddAuthorization();
-
-
 services.AddRazorComponents().AddInteractiveServerComponents();
 
 services.AddControllers()
