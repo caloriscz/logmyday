@@ -38,3 +38,22 @@ It consists of:
 - **LogMyDay.Api.Tests**: Contains unit tests for the API and service layers to ensure reliability and correctness.
 
 The project is designed for extensibility and separation of concerns, making it easy to maintain and expand.
+
+## Tag Entity Overview
+
+The `Tag` entity is a core part of LogMyDay and is used to categorize and structure activity data. Tags can:
+- Be marked as **required**: If a tag is required and the user does not provide information for it (such as time granularity), the system will notify the user (planned feature).
+- Specify **time granularity**: This determines how often an event can be repeated (e.g., exact time, daily, weekly, etc.).
+- Be **repeatable** or not, and can represent a **range** of values.
+- Be linked to an **input type** (see below) and a **pattern** for advanced data validation or suggestions.
+- Be associated with a specific user (for user-specific tags).
+
+## Input Type Overview
+
+Each tag can have an associated input type, which defines the kind of data the tag accepts:
+- **Integer**: Numeric input (e.g., quantity, count).
+- **String**: Text input.
+- **Boolean**: True/false values.
+- **Date**: Date/time input.
+
+Input types help validate user data and improve the user experience. For example, an integer input type will display a numeric input field in the UI, making data entry easier and more reliable.
