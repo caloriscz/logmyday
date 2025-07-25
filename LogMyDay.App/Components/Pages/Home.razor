@@ -237,7 +237,7 @@
 
 @code {    private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
-    private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new() { DateStarted = DateTime.Now };
+    private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
     private string? errorMessage;
     private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
 
@@ -259,6 +259,7 @@
     {
         selectedDate = DateTime.Today;
         calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -378,6 +379,7 @@ delete window.homePageKeyboardHandler;
         selectedDate = DateTime.Today;
         calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
 
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -426,6 +428,7 @@ delete window.homePageKeyboardHandler;
         };
 
         calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -440,6 +443,7 @@ delete window.homePageKeyboardHandler;
         };
 
         calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -453,13 +457,29 @@ delete window.homePageKeyboardHandler;
         weekPageNumber = 1;
         monthPageNumber = 1;
 
+        InitializeNewActivity();
         await LoadData();
     }
 
     private async Task SelectDate(DateTime date)
     {
         selectedDate = date;
+        InitializeNewActivity();
         await LoadData();
+    }
+
+    private void InitializeNewActivity()
+    {
+        // Set the DateStarted to the selected date, but keep the current time if it's today
+        if (selectedDate.Date == DateTime.Today)
+        {
+            newActivity.DateStarted = DateTime.Now;
+        }
+        else
+        {
+            // For other dates, set to the beginning of the selected day
+            newActivity.DateStarted = selectedDate.Date;
+        }
     }
 
     private string[] GetDayNames()
@@ -531,7 +551,8 @@ delete window.homePageKeyboardHandler;
             }
 
             await ActivityApi.CreateCalendarItem(newActivity);
-            newActivity = new() { DateStarted = DateTime.Now };
+            newActivity = new();
+            InitializeNewActivity();
             selectedTag = null; // Reset selected tag
             errorMessage = null;
             await LoadData();
