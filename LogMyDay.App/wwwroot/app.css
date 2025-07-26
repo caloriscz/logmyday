@@ -136,6 +136,12 @@
     color: var(--navbar-text) !important;
 }
 
+/* Override for dark theme brand */
+[data-bs-theme="dark"] .navbar-brand,
+[data-bs-theme="dark"] .navbar-brand span {
+    color: #f8f9fa !important;
+}
+
 /* Override Bootstrap's own dark theme styles */
 [data-bs-theme="dark"] .bg-light {
     background-color: var(--card-bg) !important;
@@ -176,6 +182,21 @@ html, body {
 /* Ensure brand is visible in light theme */
 :root .navbar-brand,
 [data-bs-theme="light"] .navbar-brand {
+    color: #212529 !important;
+}
+
+/* More specific rule to override Bootstrap */
+.navbar .navbar-brand,
+.navbar-expand-lg .navbar-brand,
+html .navbar-brand,
+body .navbar-brand {
+    color: #212529 !important;
+}
+
+/* Force dark text in light theme */
+html:not([data-bs-theme="dark"]) .navbar-brand,
+[data-bs-theme="light"] .navbar-brand,
+.navbar-light .navbar-brand {
     color: #212529 !important;
 }
 
