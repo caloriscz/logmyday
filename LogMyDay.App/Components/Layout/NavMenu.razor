@@ -1,13 +1,14 @@
 ﻿@inject NavigationManager Navigation
 @inject LogMyDay.App.Authentication.CredentialStore Store
+@inject IJSRuntime JSRuntime
 @using System.Reflection
 
-<nav class="navbar navbar-expand-lg navbar-dark top-navigation">
+<nav class="navbar navbar-expand-lg top-navigation">
     <div class="container-fluid">
         <!-- Logo/Brand -->
         <a class="navbar-brand fw-bold" href="">
-            <span class="brand-icon">📊</span>
-            LogMyDay <span style="font-size: xx-small">@GetAppVersion()</span>
+            <i class="bi bi-graph-up brand-icon"></i>
+            LogMyDay <span style="font-size: 0.65rem; opacity: 0.7;">v@(GetAppVersion())</span>
         </a>
 
         <!-- Mobile menu toggle -->
@@ -20,30 +21,33 @@
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
                     <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                        <span class="nav-icon">🏠</span> Home
+                        <i class="bi bi-house"></i> Home
                     </NavLink>
                 </li>
                 <li class="nav-item">
                     <NavLink class="nav-link" href="tags">
-                        <span class="nav-icon">🏷️</span> Tags
+                        <i class="bi bi-tags"></i> Tags
                     </NavLink>
                 </li>
                 <li class="nav-item">
                     <NavLink class="nav-link" href="calendar">
-                        <span class="nav-icon">📅</span> Calendar
+                        <i class="bi bi-calendar3"></i> Calendar
                     </NavLink>
                 </li>
                 <li class="nav-item">
                     <NavLink class="nav-link" href="backup">
-                        <span class="nav-icon">💾</span> Backup
+                        <i class="bi bi-cloud-download"></i> Backup
                     </NavLink>
                 </li>
             </ul>
 
-            <!-- Logout button -->
-            <div class="navbar-nav">
-                <button class="btn btn-outline-light btn-sm" @onclick="Logout">
-                    <span class="nav-icon">🚪</span> Logout
+            <!-- Theme toggle and logout -->
+            <div class="navbar-nav d-flex flex-row align-items-center gap-2">
+                <button class="theme-toggle" @onclick="ToggleTheme" title="Toggle theme">
+                    <i class="bi @(isDarkMode ? "bi-sun" : "bi-moon")"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
+                    <i class="bi bi-box-arrow-right"></i> Logout
                 </button>
             </div>
         </div>
@@ -51,6 +55,20 @@
 </nav>
 
 @code {
+    private bool isDarkMode = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check if user has a saved theme preference
+            var savedTheme = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "theme");
+            isDarkMode = savedTheme == "dark";
+            await ApplyTheme();
+            StateHasChanged();
+        }
+    }
+
     private void Logout()
     {
         Store.Clear();
@@ -62,6 +80,19 @@
         var assembly = Assembly.GetExecutingAssembly();
         var version = assembly.GetName().Version;
         return version?.ToString(3) ?? "Unknown"; // Returns major.minor.build
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await ApplyTheme();
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "theme", isDarkMode ? "dark" : "light");
+    }
+
+    private async Task ApplyTheme()
+    {
+        var theme = isDarkMode ? "dark" : "light";
+        await JSRuntime.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-bs-theme', '{theme}')");
     }
 }
 
