@@ -1,12 +1,13 @@
 ﻿@inject NavigationManager Navigation
 @inject LogMyDay.App.Authentication.CredentialStore Store
+@using System.Reflection
 
 <nav class="navbar navbar-expand-lg navbar-dark top-navigation">
     <div class="container-fluid">
         <!-- Logo/Brand -->
         <a class="navbar-brand fw-bold" href="">
             <span class="brand-icon">📊</span>
-            LogMyDay <span style="font-size: xx-small">0.1.4</span>
+            LogMyDay <span style="font-size: xx-small">@GetAppVersion()</span>
         </a>
 
         <!-- Mobile menu toggle -->
@@ -54,6 +55,13 @@
     {
         Store.Clear();
         Navigation.NavigateTo("/login", forceLoad: true);
+    }
+    
+    private string GetAppVersion()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version;
+        return version?.ToString(3) ?? "Unknown"; // Returns major.minor.build
     }
 }
 
