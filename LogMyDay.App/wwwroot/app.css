@@ -492,6 +492,28 @@ main {
     .badge {
         font-size: 0.75rem;
     }
+    
+    /* Navigation buttons on mobile */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Navigation button styling */
+.btn-outline-secondary.btn-sm {
+    border-width: 1px;
+    font-weight: 500;
+}
+
+.btn-outline-secondary.btn-sm:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-outline-secondary.btn-sm:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* Table styling */

@@ -50,13 +50,38 @@
                     <div class="col-md-6">
                         <label class="form-label">Date Selection:</label>
                         <div class="d-flex align-items-center gap-2">
-                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod">
+                            <!-- Daily navigation (always visible) -->
+                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
                                 &lt;
                             </button>
+                            
+                            <!-- Additional navigation for daily view -->
+                            @if (displayType == "daily")
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousWeek" title="Previous Week">
+                                    &lt;&lt;
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">
+                                    &lt;&lt;&lt;
+                                </button>
+                            }
+                            
                             <div class="flex-grow-1 text-center">
                                 <strong>@GetCurrentPeriodDisplay()</strong>
                             </div>
-                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod">
+                            
+                            <!-- Additional navigation for daily view -->
+                            @if (displayType == "daily")
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">
+                                    &gt;&gt;&gt;
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextWeek" title="Next Week">
+                                    &gt;&gt;
+                                </button>
+                            }
+                            
+                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod" title="Next Day">
                                 &gt;
                             </button>
                             <button class="btn btn-outline-primary" @onclick="GoToToday">
@@ -834,5 +859,53 @@ delete window.homePageKeyboardHandler;
     private void OnDateValueChanged()
     {
         newActivity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+    }
+
+    // Additional navigation methods for daily view
+    private async Task PreviousWeek()
+    {
+        selectedDate = selectedDate.AddDays(-7);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
+        await LoadData();
+    }
+
+    private async Task NextWeek()
+    {
+        selectedDate = selectedDate.AddDays(7);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
+        await LoadData();
+    }
+
+    private async Task PreviousMonth()
+    {
+        selectedDate = selectedDate.AddMonths(-1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
+        await LoadData();
+    }
+
+    private async Task NextMonth()
+    {
+        selectedDate = selectedDate.AddMonths(1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        InitializeNewActivity();
+        await LoadData();
+    }
+
+    private bool IsPreviousMonthDisabled()
+    {
+        // Disable if going back would take us before a reasonable historical limit
+        // For example, disable if it would go before 5 years ago
+        var limitDate = DateTime.Today.AddYears(-5);
+        return selectedDate.AddMonths(-1) < limitDate;
+    }
+
+    private bool IsNextMonthDisabled()
+    {
+        // Disable if going forward would take us beyond next month
+        var nextMonth = DateTime.Today.AddMonths(1);
+        return selectedDate.AddMonths(1) > nextMonth;
     }
 }

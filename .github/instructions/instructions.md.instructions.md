@@ -78,6 +78,16 @@ When creating new activities, the application intelligently sets the initial dat
 
 This feature ensures that activity timestamps are contextually appropriate and reduces the need for manual date/time adjustments when logging activities.
 
+### Enhanced Daily Navigation
+The daily view includes multiple navigation options for efficient access to historical data:
+- **Day Navigation**: Standard previous/next arrows (`<`, `>`) for moving one day at a time
+- **Week Navigation**: Week arrows (`<<`, `>>`) for jumping 7 days forward or backward
+- **Month Navigation**: Month arrows (`<<<`, `>>>`) for navigating by full calendar months
+- **Smart Disable Logic**: Navigation buttons are automatically disabled when reaching limits (5-year history boundary, future dates)
+- **Mobile Optimized**: All navigation controls are touch-friendly and responsive across devices
+
+This multi-level navigation system eliminates the tedious day-by-day clicking when accessing activities from weeks or months ago, significantly improving the user experience for historical data review.
+
 ## Rules and conventions
 
 - Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
