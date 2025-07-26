@@ -182,9 +182,45 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Description:</label>
-                        <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
-                            placeholder="Enter activity description" />
+                        @if (selectedTag?.TypeId.HasValue == true)
+                        {
+                            @if (selectedTag.TypeId == 1) // Integer
+                            {
+                                <label class="form-label">Value:</label>
+                                <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="form-control" tabindex="2"
+                                    placeholder="Enter numeric value" step="1" />
+                            }
+                            else if (selectedTag.TypeId == 2) // String
+                            {
+                                <label class="form-label">Value:</label>
+                                <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
+                                    placeholder="Enter text value" />
+                            }
+                            else if (selectedTag.TypeId == 3) // Boolean
+                            {
+                                <div class="form-check">
+                                    <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-check-input" tabindex="2" id="booleanInput" />
+                                    <label class="form-check-label" for="booleanInput">Value</label>
+                                </div>
+                            }
+                            else if (selectedTag.TypeId == 4) // Date
+                            {
+                                <label class="form-label">Value:</label>
+                                <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" tabindex="2" />
+                            }
+                            else
+                            {
+                                <label class="form-label">Description:</label>
+                                <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
+                                    placeholder="Enter activity description" />
+                            }
+                        }
+                        else
+                        {
+                            <label class="form-label">Description:</label>
+                            <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
+                                placeholder="Enter activity description" />
+                        }
                     </div>                    <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -240,6 +276,11 @@
     private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
     private string? errorMessage;
     private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
+    
+    // Input type value helpers
+    private bool booleanValue = false;
+    private DateTime? dateValue = null;
+    private int? integerValue = null;
 
     // Display and filtering
     private string displayType = "daily";
@@ -554,6 +595,9 @@ delete window.homePageKeyboardHandler;
             newActivity = new();
             InitializeNewActivity();
             selectedTag = null; // Reset selected tag
+            integerValue = null; // Reset integer value
+            booleanValue = false; // Reset boolean value
+            dateValue = null; // Reset date value
             errorMessage = null;
             await LoadData();
 
@@ -705,11 +749,48 @@ delete window.homePageKeyboardHandler;
             {
                 newActivity.DateFinished = null;
             }
+            
+            // Initialize input type values and clear description
+            newActivity.Description = null;
+            if (selectedTag?.InputTypeId == 1) // Integer
+            {
+                integerValue = null;
+                newActivity.Description = string.Empty;
+            }
+            else if (selectedTag?.InputTypeId == 3) // Boolean
+            {
+                booleanValue = false;
+                newActivity.Description = "false";
+            }
+            else if (selectedTag?.InputTypeId == 4) // Date
+            {
+                dateValue = DateTime.Today;
+                newActivity.Description = DateTime.Today.ToString("yyyy-MM-dd");
+            }
         }
         else
         {
             selectedTag = null;
             newActivity.DateFinished = null;
+            newActivity.Description = null;
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
         }
+    }
+    
+    private void OnIntegerValueChanged()
+    {
+        newActivity.Description = integerValue?.ToString() ?? string.Empty;
+    }
+    
+    private void OnBooleanValueChanged()
+    {
+        newActivity.Description = booleanValue.ToString().ToLower();
+    }
+    
+    private void OnDateValueChanged()
+    {
+        newActivity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
     }
 }
