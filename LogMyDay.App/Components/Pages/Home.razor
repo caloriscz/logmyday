@@ -4,6 +4,7 @@
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject ILogger<Home> Logger
 @implements IAsyncDisposable
 
 <PageTitle>Home</PageTitle>
@@ -403,6 +404,7 @@ delete window.homePageKeyboardHandler;
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error loading data");
             errorMessage = $"Error loading data: {ex.Message}";
         }
     }
@@ -619,6 +621,7 @@ delete window.homePageKeyboardHandler;
         {
             // Handle validation errors from the server
             var content = await ex.GetContentAsAsync<string>();
+            Logger.LogWarning("Validation error creating activity: {Content}", content);
             if (content != null && content.Contains("already exists"))
             {
                 errorMessage = "An activity for this tag already exists for the selected period. This tag is not repeatable.";
@@ -630,6 +633,7 @@ delete window.homePageKeyboardHandler;
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error creating activity");
             errorMessage = $"Error creating activity: {ex.Message}";
         }
     }
@@ -647,6 +651,7 @@ delete window.homePageKeyboardHandler;
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error deleting activity with ID {ActivityId}", id);
             errorMessage = $"Error deleting activity: {ex.Message}";
         }
     }
@@ -744,6 +749,7 @@ delete window.homePageKeyboardHandler;
         if (newActivity.PrimaryTagId.HasValue)
         {
             selectedTag = tags?.FirstOrDefault(t => t.Id == newActivity.PrimaryTagId.Value);
+            
             // Clear DateFinished if the selected tag is not a range type
             if (selectedTag?.IsRange != true)
             {
@@ -752,17 +758,17 @@ delete window.homePageKeyboardHandler;
             
             // Initialize input type values and clear description
             newActivity.Description = null;
-            if (selectedTag?.InputTypeId == 1) // Integer
+            if (selectedTag?.TypeId == 1) // Integer
             {
                 integerValue = null;
                 newActivity.Description = string.Empty;
             }
-            else if (selectedTag?.InputTypeId == 3) // Boolean
+            else if (selectedTag?.TypeId == 3) // Boolean
             {
                 booleanValue = false;
                 newActivity.Description = "false";
             }
-            else if (selectedTag?.InputTypeId == 4) // Date
+            else if (selectedTag?.TypeId == 4) // Date
             {
                 dateValue = DateTime.Today;
                 newActivity.Description = DateTime.Today.ToString("yyyy-MM-dd");

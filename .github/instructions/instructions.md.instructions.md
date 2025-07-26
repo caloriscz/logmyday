@@ -57,3 +57,30 @@ Each tag can have an associated input type, which defines the kind of data the t
 - **Date**: Date/time input.
 
 Input types help validate user data and improve the user experience. For example, an integer input type will display a numeric input field in the UI, making data entry easier and more reliable.
+
+## Key Features
+
+### Dynamic Input Types
+The application automatically renders different input controls based on the selected tag's input type:
+- **Integer tags**: Display a `<input type="number">` field with numeric keyboard support on mobile devices
+- **String tags**: Display a text input field for free-form text entry
+- **Boolean tags**: Display a checkbox for true/false values
+- **Date tags**: Display a date picker for date selection
+- **Default/Other types**: Fall back to a standard text input field
+
+This dynamic rendering improves user experience by providing appropriate input controls and mobile-optimized keyboards for different data types.
+
+### Smart Date Initialization
+When creating new activities, the application intelligently sets the initial date and time:
+- **Today's activities**: If the selected date is today, the DateStarted field is initialized to the current date and time (`DateTime.Now`)
+- **Past/future activities**: If the selected date is not today, the DateStarted field is initialized to the beginning of the selected day (midnight)
+- **Calendar navigation**: When navigating between dates using the calendar or date navigation controls, new activities automatically inherit the selected date
+
+This feature ensures that activity timestamps are contextually appropriate and reduces the need for manual date/time adjustments when logging activities.
+
+## Rules and conventions
+
+- Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
+- Always use dependency injection for services and repositories.
+- Follow the SOLID principles for object-oriented design.
+- Use asynchronous programming patterns (async/await) for I/O-bound operations to improve performance and responsiveness.
