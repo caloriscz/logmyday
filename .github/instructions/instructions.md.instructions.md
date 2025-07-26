@@ -84,3 +84,24 @@ This feature ensures that activity timestamps are contextually appropriate and r
 - Always use dependency injection for services and repositories.
 - Follow the SOLID principles for object-oriented design.
 - Use asynchronous programming patterns (async/await) for I/O-bound operations to improve performance and responsiveness.
+
+## Development and Testing Guidelines
+
+### Server Management
+- **Always stop the development server at the end of each conversation/session** to prevent port conflicts and file locking issues
+- When testing changes, stop any existing `dotnet run` processes before starting new ones
+- If you encounter file locking errors (MSB3026) during build, it usually means:
+  - A development server is still running from a previous session
+  - Visual Studio has the project open and running
+  - Multiple instances of the application are running simultaneously
+- **Resolution steps for file locking issues**:
+  1. Stop all `dotnet run` processes in terminals
+  2. Close any running instances in Visual Studio debugger
+  3. Use `Stop-Process -Name "dotnet" -Force` if needed to kill all dotnet processes
+  4. Wait a few seconds before restarting the application
+
+### Testing Workflow
+- Start the server with `dotnet run` for testing
+- Test the changes in the browser
+- **Always terminate the server process before ending the session**
+- Document any server management steps taken during development

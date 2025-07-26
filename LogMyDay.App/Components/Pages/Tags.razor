@@ -86,52 +86,148 @@
             }
             else
             {
-                <table class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th style="width: 100px;">Actions</th>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>Required</th>
-                            <th>Repeatable</th>
-                            <th>Time Granularity</th>
-                            <th>Is Range</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var tag in pagedResult.Items)
-                        {
+                <!-- Desktop Table View -->
+                <div class="table-responsive d-none d-lg-block">
+                    <table class="table table-bordered table-striped">
+                        <thead>
                             <tr>
-                                <td>
-                                    <a class="btn btn-secondary btn-sm me-1" href="/tags/edit/@tag.Id" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <button class="btn btn-danger btn-sm" @onclick="() => ConfirmDelete(tag.Id)" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </td>
-                                <td>@tag.Id</td>
-                                <td>@tag.Title</td>
-                                <td>
-                                    @if (tag.TypeId.HasValue)
-                                    {
-                                        var typeName = inputTypes.FirstOrDefault(t => t.Id == tag.TypeId)?.Name;
-                                        @typeName
-                                    }
-                                    else
-                                    {
-                                        <span>-</span>
-                                    }
-                                </td>
-                                <td>@(tag.IsRequired ? "Yes" : "No")</td>
-                                <td>@(tag.IsRepeatable ? "Yes" : "No")</td>
-                                <td>@tag.TimeGranularity</td>
-                                <td>@(tag.IsRange ? "Yes" : "No")</td>
+                                <th style="width: 100px;">Actions</th>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Required</th>
+                                <th>Repeatable</th>
+                                <th>Time Granularity</th>
+                                <th>Is Range</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @foreach (var tag in pagedResult.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <a class="btn btn-secondary btn-sm me-1" href="/tags/edit/@tag.Id" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-danger btn-sm" @onclick="() => ConfirmDelete(tag.Id)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                    <td>@tag.Id</td>
+                                    <td>@tag.Title</td>
+                                    <td>
+                                        @if (tag.TypeId.HasValue)
+                                        {
+                                            var typeName = inputTypes.FirstOrDefault(t => t.Id == tag.TypeId)?.Name;
+                                            @typeName
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td>@(tag.IsRequired ? "Yes" : "No")</td>
+                                    <td>@(tag.IsRepeatable ? "Yes" : "No")</td>
+                                    <td>@tag.TimeGranularity</td>
+                                    <td>@(tag.IsRange ? "Yes" : "No")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Card View -->
+                <div class="d-lg-none">
+                    @foreach (var tag in pagedResult.Items)
+                    {
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h6 class="card-title mb-0">@tag.Title</h6>
+                                    <div>
+                                        <a class="btn btn-secondary btn-sm me-1" href="/tags/edit/@tag.Id" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-danger btn-sm" @onclick="() => ConfirmDelete(tag.Id)" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">ID:</small>
+                                        <div>@tag.Id</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Type:</small>
+                                        <div>
+                                            @if (tag.TypeId.HasValue)
+                                            {
+                                                var typeName = inputTypes.FirstOrDefault(t => t.Id == tag.TypeId)?.Name;
+                                                @typeName
+                                            }
+                                            else
+                                            {
+                                                <span>-</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">Required:</small>
+                                        <div>
+                                            @if (tag.IsRequired)
+                                            {
+                                                <span class="badge bg-success">Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">No</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Repeatable:</small>
+                                        <div>
+                                            @if (tag.IsRepeatable)
+                                            {
+                                                <span class="badge bg-info">Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">No</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted">Time Granularity:</small>
+                                        <div>@tag.TimeGranularity</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Is Range:</small>
+                                        <div>
+                                            @if (tag.IsRange)
+                                            {
+                                                <span class="badge bg-warning">Yes</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">No</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                
                 <div class="d-flex justify-content-between align-items-center">
                     <button class="btn btn-secondary btn-sm" @onclick="PrevPage" disabled="@(pageNumber == 1)">Previous</button>
                     <span>Page @pageNumber of @totalPages</span>

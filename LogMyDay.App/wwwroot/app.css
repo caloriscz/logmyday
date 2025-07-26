@@ -470,6 +470,30 @@ main {
     box-shadow: 0 4px 8px var(--shadow);
 }
 
+/* Mobile-responsive improvements */
+@media (max-width: 767.98px) {
+    .page-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Mobile card styling */
+    .card {
+        box-shadow: 0 2px 4px var(--shadow);
+        border: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+    
+    .card-title {
+        color: var(--primary-color);
+        font-weight: 600;
+    }
+    
+    .badge {
+        font-size: 0.75rem;
+    }
+}
+
 /* Table styling */
 .table {
     background-color: var(--card-bg);
