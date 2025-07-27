@@ -516,6 +516,41 @@ main {
     cursor: not-allowed;
 }
 
+/* Mobile navigation buttons - minimum 44px touch targets */
+.mobile-nav-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+    margin: 2px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.mobile-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+}
+
+/* Additional spacing for mobile navigation container */
+@media (max-width: 767.98px) {
+    .mobile-nav-container {
+        gap: 8px !important;
+    }
+    
+    .mobile-nav-btn {
+        min-width: 48px;
+        min-height: 48px;
+        margin: 4px;
+    }
+}
+
 /* Table styling */
 .table {
     background-color: var(--card-bg);

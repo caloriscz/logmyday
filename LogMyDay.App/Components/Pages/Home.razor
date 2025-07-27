@@ -49,7 +49,9 @@
                     <!-- Calendar Navigation -->
                     <div class="col-md-6">
                         <label class="form-label">Date Selection:</label>
-                        <div class="d-flex align-items-center gap-2">
+                        
+                        <!-- Desktop Navigation (hidden on mobile) -->
+                        <div class="d-none d-md-flex align-items-center gap-2">
                             <!-- Daily navigation (always visible) -->
                             <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
                                 &lt;
@@ -87,6 +89,61 @@
                             <button class="btn btn-outline-primary" @onclick="GoToToday">
                                 @GetTodayButtonText()
                             </button>
+                        </div>
+                        
+                        <!-- Mobile Navigation (visible only on mobile) -->
+                        <div class="d-md-none">
+                            <!-- Previous Controls Row -->
+                            <div class="text-center mb-3">
+                                <div class="d-flex justify-content-center gap-2 mb-2">
+                                    <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousCalendarPeriod" title="Previous Day">
+                                        &lt;
+                                    </button>
+                                    
+                                    @if (displayType == "daily")
+                                    {
+                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousWeek" title="Previous Week">
+                                            &lt;&lt;
+                                        </button>
+                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">
+                                            &lt;&lt;&lt;
+                                        </button>
+                                    }
+                                </div>
+                                <small class="text-muted">Previous</small>
+                            </div>
+                            
+                            <!-- Date Display Row (centered) -->
+                            <div class="text-center mb-3 py-2">
+                                <div class="fw-bold fs-4">@GetCurrentPeriodDisplay()</div>
+                            </div>
+                            
+                            <!-- Today Button Row (centered) -->
+                            <div class="text-center mb-3">
+                                <button class="btn btn-primary px-4 py-2" @onclick="GoToToday">
+                                    @GetTodayButtonText()
+                                </button>
+                            </div>
+                            
+                            <!-- Next Controls Row -->
+                            <div class="text-center">
+                                <small class="text-muted d-block mb-2">Next</small>
+                                <div class="d-flex justify-content-center gap-2">
+                                    @if (displayType == "daily")
+                                    {
+                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">
+                                            &gt;&gt;&gt;
+                                        </button>
+                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextWeek" title="Next Week">
+                                            &gt;&gt;
+                                        </button>
+                                    }
+                                    
+                                    <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextCalendarPeriod" title="Next Day">
+                                        &gt;
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <!-- Mini Calendar for Daily view -->
                         @if (displayType == "daily")
