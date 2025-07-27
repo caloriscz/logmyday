@@ -94,6 +94,11 @@ This multi-level navigation system eliminates the tedious day-by-day clicking wh
 - Always use dependency injection for services and repositories.
 - Follow the SOLID principles for object-oriented design.
 - Use asynchronous programming patterns (async/await) for I/O-bound operations to improve performance and responsiveness.
+- Do not use Async in the method names, only when there is also synchronous method of the same name
+- Do not use try catch in service method unless really needed (cryptography where it is supposed to and so on)
+- Style: Return and throw always have one free line over it
+- Prefer braces ({}) for all control structures, including if, for, while, etc., even for single-line statements. This improves readability and reduces the risk of bugs
+- Ternary expressions are allowed when they improve clarity, such as for simple conditional assignments or return values
 
 ## Development and Testing Guidelines
 
