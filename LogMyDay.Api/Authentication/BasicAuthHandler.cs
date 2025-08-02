@@ -11,16 +11,19 @@ namespace LogMyDay.Api.Authentication;
 public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
     private readonly IConfiguration _config;
+    private readonly AuthAttemptTracker _attemptTracker;
 
     public BasicAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
         ISystemClock clock,
-        IConfiguration config)
+        IConfiguration config,
+        AuthAttemptTracker attemptTracker)
         : base(options, logger, encoder, clock)
     {
         _config = config;
+        _attemptTracker = attemptTracker;
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -48,6 +51,15 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
             var username = credentials[0];
             var password = credentials[1];
+            var clientIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var identifier = $"{clientIp}:{username}";
+
+            // Check if this IP/username combination is currently blocked
+            if (_attemptTracker.IsBlocked(identifier))
+            {
+                Logger.LogWarning("[BasicAuth] Authentication blocked for {Identifier} due to too many failed attempts", identifier);
+                return Task.FromResult(AuthenticateResult.Fail("Too many failed attempts. Please try again later."));
+            }
 
             var expectedUsername = _config["Auth:Basic:Username"];
             var expectedPassword = _config["Auth:Basic:Password"];
@@ -55,9 +67,13 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
             if (username != expectedUsername || password != expectedPassword)
             {
-                Logger.LogWarning("[BasicAuth] Invalid credentials for user: {User}", username);
+                Logger.LogWarning("[BasicAuth] Invalid credentials for user: {User} from IP: {ClientIp}", username, clientIp);
+                _attemptTracker.RecordFailedAttempt(identifier);
                 return Task.FromResult(AuthenticateResult.Fail("Invalid Username or Password"));
             }
+
+            // Successful authentication - clear any failed attempts
+            _attemptTracker.RecordSuccessfulAttempt(identifier);
 
             var claims = new[]
             {
@@ -69,7 +85,7 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-            Logger.LogInformation("[BasicAuth] User '{User}' authenticated successfully", username);
+            Logger.LogInformation("[BasicAuth] User '{User}' from IP '{ClientIp}' authenticated successfully", username, clientIp);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
         catch (Exception ex)

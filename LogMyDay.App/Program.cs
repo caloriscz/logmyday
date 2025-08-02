@@ -6,10 +6,12 @@ using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Refit;
 using Serilog;
+using System.Threading.RateLimiting;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,10 +31,37 @@ services.AddDbContext<LogMyDayDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
+// Add memory cache for authentication tracking
+services.AddMemoryCache();
+
 services.AddAuthentication(BasicAuthConstants.Scheme).AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>(
         BasicAuthConstants.Scheme, null);
 
 services.AddAuthorization();
+
+// Configure rate limiting for brute-force protection
+services.AddRateLimiter(options =>
+{
+    // General API rate limiting using sliding window
+    options.AddSlidingWindowLimiter("api", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 100; // 100 requests per minute per IP
+        opt.SegmentsPerWindow = 6; // 10-second segments
+    });
+    
+    // Stricter authentication endpoint limiting
+    options.AddSlidingWindowLimiter("auth", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(15);
+        opt.PermitLimit = 10; // 10 auth attempts per 15 minutes per IP
+        opt.SegmentsPerWindow = 3; // 5-minute segments
+    });
+    
+    // Global rejection behavior
+    options.RejectionStatusCode = 429; // Too Many Requests
+});
+
 services.AddRazorComponents().AddInteractiveServerComponents();
 
 services.AddControllers()
@@ -46,6 +75,7 @@ services.AddScoped<IActivityService, ActivityService>();
 services.AddScoped<ITagService, TagService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExcelExportService>();
+services.AddScoped<LogMyDay.Api.Authentication.AuthAttemptTracker>();
 
 services.AddSingleton<CredentialStore>();
 services.AddTransient<AuthenticationHeaderHandler>();
@@ -115,6 +145,9 @@ else
 
 // Force HTTPS redirection for all environments
 app.UseHttpsRedirection();
+
+// Enable rate limiting
+app.UseRateLimiter();
 
 // Add security headers
 app.Use(async (context, next) =>

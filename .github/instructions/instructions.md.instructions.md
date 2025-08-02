@@ -136,6 +136,53 @@ The application automatically adds security headers to all responses:
 - `X-XSS-Protection`: Enables browser XSS filtering
 - `Referrer-Policy`: Controls referrer information leakage
 
+### Rate Limiting & Brute-Force Protection
+LogMyDay implements comprehensive protection against brute-force authentication attacks:
+
+#### Multi-Layer Rate Limiting
+- **Global API Rate Limiting**: 100 requests per minute per IP for general API access
+- **Authentication Rate Limiting**: 10 authentication attempts per 15 minutes per IP for API endpoints
+- **Custom Authentication Tracking**: Progressive lockout system for failed login attempts
+
+#### Authentication Attempt Tracking
+- **Granular Tracking**: Monitors failed attempts by IP address and username combination
+- **Progressive Lockouts**: Implements increasing delays (1min → 5min → 15min → 30min → 1hour)
+- **Automatic Recovery**: Clears tracking on successful authentication or after time windows expire
+- **Configurable Thresholds**: Separate settings for development (3 attempts/10min) and production (5 attempts/15min)
+
+#### Implementation Details
+- **AuthAttemptTracker Service**: In-memory tracking of authentication failures with automatic cleanup
+- **BasicAuthHandler Integration**: Checks for blocks before credential validation, records attempts
+- **Comprehensive Logging**: Detailed logging of failed attempts, lockouts, and suspicious activity
+- **IP-Based Protection**: Prevents distributed attacks while allowing legitimate users from different IPs
+
+#### Rate Limiting Configuration
+Development settings (more lenient for testing):
+```json
+{
+  "Security": {
+    "RateLimit": {
+      "MaxAttemptsPerWindow": 3,
+      "WindowMinutes": 10,
+      "LockoutMinutes": 5
+    }
+  }
+}
+```
+
+Production settings (stricter security):
+```json
+{
+  "Security": {
+    "RateLimit": {
+      "MaxAttemptsPerWindow": 5,
+      "WindowMinutes": 15,
+      "LockoutMinutes": 30
+    }
+  }
+}
+```
+
 ## Rules and conventions
 
 - Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
@@ -149,6 +196,7 @@ The application automatically adds security headers to all responses:
 - Ternary expressions are allowed when they improve clarity, such as for simple conditional assignments or return values
 - **Security**: Never store user credentials in localStorage, sessionStorage, or any client-side storage. Maintain the current server-side credential management approach to ensure security compliance.
 - **HTTPS Enforcement**: Always use HTTPS for all communications. Never add HTTP-only launch profiles or disable SQL Server encryption. All data in transit must be encrypted.
+- **Rate Limiting**: Maintain rate limiting and brute-force protection. Never disable authentication attempt tracking or remove progressive lockout mechanisms. All authentication failures must be logged and tracked.
 
 ## Development and Testing Guidelines
 
