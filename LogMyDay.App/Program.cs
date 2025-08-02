@@ -100,9 +100,11 @@ services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Configure HTTPS security
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // Enhanced HSTS configuration for production
     app.UseHsts();
 }
 else
@@ -111,7 +113,25 @@ else
     app.UseSwaggerUI();
 }
 
+// Force HTTPS redirection for all environments
 app.UseHttpsRedirection();
+
+// Add security headers
+app.Use(async (context, next) =>
+{
+    // Enforce HTTPS and prevent downgrade attacks
+    context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    // Prevent clickjacking
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    // Prevent MIME-type sniffing
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    // XSS protection
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    // Referrer policy
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    
+    await next();
+});
 
 app.UseStaticFiles();
 app.UseRouting();

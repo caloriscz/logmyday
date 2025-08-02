@@ -12,9 +12,9 @@ This repository is organized as follows:
   - `Authentication/`: Basic authentication handlers and options.
   - `Application/`: Application layer interfaces and services.
   - `Infrastructure/`: Data access and infrastructure code.
-- `LogMyDay.App/`: Blazor WebAssembly client application.
+- `LogMyDay.App/`: Blazor Server application.
   - `Components/`: UI components, layouts, and pages.
-  - `Authentication/`: Client-side authentication logic.
+  - `Authentication/`: Server-side authentication logic.
   - `wwwroot/`: Static web assets (CSS, images, JS libraries).
 - `LogMyDay.Domain/`: Domain layer with entities and enums.
   - `Entities/`: Core domain models (Activity, Tag, etc.).
@@ -32,7 +32,7 @@ The application is designed to be user-friendly and efficient for tracking daily
 It consists of:
 
 - **LogMyDay.Api**: An ASP.NET Core Web API that provides endpoints for managing activities, tags, backups, and more. It handles authentication and data storage.
-- **LogMyDay.App**: A Blazor Server app client that serves as the main user interface, allowing users to log, view, and manage their daily activities.
+- **LogMyDay.App**: A Blazor Server application that serves as the main user interface, allowing users to log, view, and manage their daily activities.
 - **LogMyDay.Domain**: Contains the core domain models and business logic, including entities and enums used throughout the application.
 - **LogMyDay.Shared**: Defines shared data transfer objects (DTOs) and interfaces for communication between the client and API.
 - **LogMyDay.Api.Tests**: Contains unit tests for the API and service layers to ensure reliability and correctness.
@@ -88,6 +88,54 @@ The daily view includes multiple navigation options for efficient access to hist
 
 This multi-level navigation system eliminates the tedious day-by-day clicking when accessing activities from weeks or months ago, significantly improving the user experience for historical data review.
 
+## Security
+
+### Authentication Architecture
+LogMyDay uses a secure authentication system designed to protect user credentials and resist common web vulnerabilities:
+
+#### Credential Storage Security
+- **No localStorage Credential Storage**: The application does NOT store plain credentials in browser localStorage, protecting against XSS attacks
+- **Server-Side Session Management**: As a Blazor Server application, authentication state is maintained server-side, not in the browser
+- **In-Memory Credential Storage**: The `CredentialStore` class stores credentials in server-side memory only during the active session
+- **Session-Based Security**: Credentials are automatically cleared when the user logs out or the session ends
+
+#### Implementation Details
+- **CredentialStore Service**: Registered as a singleton service that maintains credentials in private memory fields
+- **AuthenticationHeaderHandler**: Automatically injects Basic Auth headers for API calls using server-side stored credentials
+- **No Client-Side Persistence**: Credentials never reach the browser's localStorage, sessionStorage, or cookies
+- **XSS Protection**: Since credentials are stored server-side, they are not accessible to malicious JavaScript
+
+#### Security Benefits
+- Resistant to XSS credential theft attacks
+- No credential exposure through browser developer tools
+- Automatic credential cleanup on session termination
+- Server-side authentication state management
+
+#### Critical Security Rule
+**NEVER store user credentials in localStorage, sessionStorage, or any client-side storage mechanism.** The current server-side approach must be maintained to ensure security compliance and protect against credential theft.
+
+### HTTPS Enforcement
+LogMyDay enforces HTTPS everywhere to protect data in transit:
+
+#### HTTPS Configuration
+- **HTTPS Redirection**: All HTTP requests are automatically redirected to HTTPS using `UseHttpsRedirection()`
+- **HSTS Headers**: HTTP Strict Transport Security headers force browsers to use HTTPS for all future requests
+- **Development HTTPS**: Development environment uses HTTPS-only launch profiles (no HTTP fallback)
+- **Production Security**: Enhanced security headers including HSTS, X-Frame-Options, and XSS protection
+
+#### Database Encryption
+- **Production**: SQL Server connections use `Encrypt=True` with certificate validation
+- **Development**: SQL Server connections use `Encrypt=True` with `TrustServerCertificate=True` for localhost
+- **No Unencrypted Communications**: All API and database traffic is encrypted
+
+#### Security Headers
+The application automatically adds security headers to all responses:
+- `Strict-Transport-Security`: Enforces HTTPS for 1 year including subdomains
+- `X-Frame-Options`: Prevents clickjacking attacks
+- `X-Content-Type-Options`: Prevents MIME-type sniffing
+- `X-XSS-Protection`: Enables browser XSS filtering
+- `Referrer-Policy`: Controls referrer information leakage
+
 ## Rules and conventions
 
 - Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
@@ -99,6 +147,8 @@ This multi-level navigation system eliminates the tedious day-by-day clicking wh
 - Style: Return and throw always have one free line over it
 - Prefer braces ({}) for all control structures, including if, for, while, etc., even for single-line statements. This improves readability and reduces the risk of bugs
 - Ternary expressions are allowed when they improve clarity, such as for simple conditional assignments or return values
+- **Security**: Never store user credentials in localStorage, sessionStorage, or any client-side storage. Maintain the current server-side credential management approach to ensure security compliance.
+- **HTTPS Enforcement**: Always use HTTPS for all communications. Never add HTTP-only launch profiles or disable SQL Server encryption. All data in transit must be encrypted.
 
 ## Development and Testing Guidelines
 
