@@ -23,7 +23,7 @@
                             <select @bind="selectedTechnique" id="breathingType" class="form-select">
                                 <option value="box">Box Breathing (4-4-4-4)</option>
                                 <option value="relax">Relaxing Breath (4-7-8-1)</option>
-                                <option value="energy">Energizing Breath (4-4-6)</option>
+                                <option value="energy">Energizing Breath (4-4-6-1)</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3 mb-md-0">
@@ -58,6 +58,16 @@
                                     else
                                     {
                                         <i class="bi bi-play-circle me-1"></i>@:Start
+                                    }
+                                </button>
+                                <button @onclick="SaveSession" class="btn btn-primary" disabled="@(selectedTagId == 0 || !canSave || saveCountdown > 0)">
+                                    @if (saveCountdown > 0)
+                                    {
+                                        <span>@saveCountdown s</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-save me-1"></i>@:Save Session
                                     }
                                 </button>
                             </div>
@@ -238,6 +248,8 @@
     private int selectedTagId = 0;
     private bool isActive = false;
     private bool isLoading = false;
+    private bool canSave = false;
+    private int saveCountdown = 0;
     private string currentInstruction = "Press Start to begin";
     private TimeSpan sessionTime = TimeSpan.Zero;
     private int completedCycles = 0;
@@ -245,6 +257,7 @@
     private List<TagResponse>? availableTags;
     private System.Threading.Timer? breathingTimer;
     private System.Threading.Timer? sessionTimer;
+    private System.Threading.Timer? cooldownTimer;
     private DateTime sessionStartTime;
     private int currentPhase = 0;
 
@@ -259,8 +272,26 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var tags = await ActivityApi.GetTags();
-        availableTags = tags.ToList();
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            
+            var allTags = await ActivityApi.GetTags();
+            availableTags = allTags?.Where(t => t.TypeId == 1).ToList(); // Integer input type
+            
+            Logger.LogInformation("Loaded {Count} integer tags for breathing techniques", availableTags?.Count ?? 0);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tags for breathing techniques");
+            statusMessage = "Failed to load tags. You won't be able to save sessions.";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task ToggleBreathing()
@@ -272,6 +303,7 @@
     private async Task StartBreathing()
     {
         isActive = true;
+        canSave = false;
         sessionStartTime = DateTime.Now;
         sessionTime = TimeSpan.Zero;
         completedCycles = 0;
@@ -280,16 +312,15 @@
 
         sessionTimer = new System.Threading.Timer(UpdateSessionTime, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
         await StartBreathingCycle();
-    }
-
-    private async Task StopBreathing()
+    }    private async Task StopBreathing()
     {
         isActive = false;
+        canSave = sessionTime.TotalSeconds >= 30; // Allow saving if session was at least 30 seconds
         breathingTimer?.Dispose();
         sessionTimer?.Dispose();
 
         await ResetVisualization();
-        currentInstruction = "Press Start to begin";
+        currentInstruction = canSave ? "Session complete! You can save your results." : "Press Start to begin";
         currentPhase = 0;
     }
 
@@ -331,6 +362,61 @@
             sessionTime = DateTime.Now - sessionStartTime;
             InvokeAsync(StateHasChanged);
         }
+    }
+
+    private async Task SaveSession()
+    {
+        if (selectedTagId == 0 || !canSave || saveCountdown > 0)
+            return;
+
+        try
+        {
+            var sessionMinutes = (int)Math.Round(sessionTime.TotalMinutes);
+            if (sessionMinutes < 1) sessionMinutes = 1; // Minimum 1 minute
+            
+            var request = new ActivityRequest
+            {
+                DateStarted = sessionStartTime,
+                Description = sessionMinutes.ToString(), // Store minutes as description for integer tags
+                PrimaryTagId = selectedTagId
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            
+            statusMessage = $"Session saved successfully! Duration: {sessionMinutes} minutes";
+            Logger.LogInformation("Breathing session saved: {Minutes} minutes, {Cycles} cycles", sessionMinutes, completedCycles);
+            
+            // Start cooldown
+            saveCountdown = 60;
+            cooldownTimer = new System.Threading.Timer(DecrementCooldown, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save breathing session");
+            statusMessage = "Failed to save session. Please try again.";
+        }
+        
+        StateHasChanged();
+    }
+
+    private void DecrementCooldown(object? state)
+    {
+        if (saveCountdown > 0)
+        {
+            saveCountdown--;
+            InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            cooldownTimer?.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        breathingTimer?.Dispose();
+        sessionTimer?.Dispose();
+        cooldownTimer?.Dispose();
     }
 }
 
