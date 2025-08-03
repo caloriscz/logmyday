@@ -72,27 +72,16 @@
                     }
                 }
             </select>
-        </div>        <div class="col-md-4">
-            <label for="paginationMode" class="form-label">Pagination Mode</label>
-            <select id="paginationMode" class="form-select" @onchange="OnPaginationModeChanged">
-                <option value="weeks" selected>By Weeks (@weeksPerPage weeks)</option>
-                <option value="months">By Months (@monthsPerPage months)</option>
-            </select>
         </div>
     </div>    <div class="mb-2 d-flex justify-content-between align-items-center">
         <div>
             <button class="btn btn-link" @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
             <button class="btn btn-link" @onclick="@(() => ChangeOrder("desc"))">Descending</button>
-        </div>        <div class="me-3">
-            <label class="form-label me-2">Pagination Type:</label>
-            <select class="form-select form-select-sm d-inline-block" style="width: auto;" @onchange="OnPaginationTypeChanged">
-                <option value="weeks" selected="@(paginationType == "weeks")">By Weeks</option>
-                <option value="months" selected="@(paginationType == "months")">By Months</option>
-            </select>
-        </div><div>
-            <button class="btn btn-secondary btn-sm me-2" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)">Previous</button>
-            <span>Page @GetCurrentPageNumber() of @totalPages (@GetPaginationDescription())</span>
-            <button class="btn btn-secondary btn-sm ms-2" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)">Next</button>
+        </div>
+        <div>
+            <button class="btn btn-secondary btn-sm me-2" @onclick="PrevYear" disabled="@(!hasPreviousYear)">Previous Year</button>
+            <span>@currentYear (@(availableYears.Count) years available)</span>
+            <button class="btn btn-secondary btn-sm ms-2" @onclick="NextYear" disabled="@(!hasNextYear)">Next Year</button>
         </div>
     </div>
     <div id="calendar">
@@ -140,7 +129,6 @@
 
 @code {
     private IList<TagResponse>? tags;
-    private PagedResult<ActivityResponse>? pagedResult;
     private Dictionary<string, List<string>>? activitiesByDate;
     private int? selectedTagId;
     private string? errorMessage;
@@ -152,14 +140,11 @@
     private bool showModal = false;
     private string? modalDescription = null;
     
-    // Pagination variables
-    private string paginationMode = "weeks"; // "weeks", "months"
-    private string paginationType = "weeks"; // "weeks", "months"
-    private int weekPageNumber = 1;
-    private int weeksPerPage = 12;
-    private int monthPageNumber = 1;
-    private int monthsPerPage = 12;
-    private int totalPages = 1;
+    // Year navigation variables
+    private int currentYear = DateTime.Now.Year;
+    private List<int> availableYears = new List<int>();
+    private bool hasNextYear = false;
+    private bool hasPreviousYear = false;
     private string orderBy = "desc";
 
     protected override async Task OnInitializedAsync()
@@ -188,42 +173,40 @@
         }
         else
         {
-            pagedResult = null;
             activitiesByDate = null;
         }
     }    private async Task LoadActivitiesForTag(int tagId)
     {
         try
         {
-            switch (paginationType)
-            {
-                case "weeks":
-                    pagedResult = await ActivityApi.GetActivitiesByWeeks(weekPageNumber, weeksPerPage, orderBy, tagId);
-                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / weeksPerPage);
-                    break;
-                case "months":
-                    pagedResult = await ActivityApi.GetActivitiesByMonths(monthPageNumber, monthsPerPage, orderBy, tagId);
-                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / monthsPerPage);
-                    break;
-            }
+            // Load activities for the current year
+            var activities = await ActivityApi.GetActivitiesByYear(currentYear, tagId);
+            
+            // Load available years for navigation
+            availableYears = await ActivityApi.GetAvailableYears(tagId);
+            
+            // Update navigation button states
+            var currentIndex = availableYears.IndexOf(currentYear);
+            hasPreviousYear = currentIndex > 0;
+            hasNextYear = currentIndex < availableYears.Count - 1;
 
-            activitiesByDate = pagedResult?.Items?
+            // Group activities by date
+            activitiesByDate = activities?
                 .GroupBy(a => a.DateStarted.ToString("yyyy-MM-dd"))
-                .ToDictionary(g => g.Key, g => g.Select(a => a.Description ?? string.Empty).ToList());
+                .ToDictionary(g => g.Key, g => g.Select(a => a.Description ?? string.Empty).ToList()) ?? new Dictionary<string, List<string>>();
             
             errorMessage = null;
 
-            if (pagedResult?.Items?.Any() == true)
+            // Set min/max activity months for the year
+            if (activities?.Any() == true)
             {
-                minActivityMonth = pagedResult.Items.Min(a => a.DateStarted).Date;
-                minActivityMonth = new DateTime(minActivityMonth.Value.Year, minActivityMonth.Value.Month, 1);
-                maxActivityMonth = pagedResult.Items.Max(a => a.DateStarted).Date;
-                maxActivityMonth = new DateTime(maxActivityMonth.Value.Year, maxActivityMonth.Value.Month, 1);
+                minActivityMonth = new DateTime(currentYear, 1, 1);
+                maxActivityMonth = new DateTime(currentYear, 12, 1);
             }
             else
             {
-                minActivityMonth = null;
-                maxActivityMonth = null;
+                minActivityMonth = new DateTime(currentYear, 1, 1);
+                maxActivityMonth = new DateTime(currentYear, 12, 1);
             }
         }
         catch (Exception ex)
@@ -255,24 +238,23 @@
         else
         {
             SelectedTagId = null;
-            pagedResult = null;
             activitiesByDate = null;
         }
     }
 
     private IEnumerable<DateTime> GetAllMonths()
     {
-        if (minActivityMonth == null || maxActivityMonth == null)
-            yield break;
-
-        var start = orderBy == "asc" ? minActivityMonth.Value : maxActivityMonth.Value;
-        var end = orderBy == "asc" ? maxActivityMonth.Value : minActivityMonth.Value;
-        int step = orderBy == "asc" ? 1 : -1;
-        var current = start;
-        while ((step > 0 && current <= end) || (step < 0 && current >= end))
+        // Always show all 12 months of the current year
+        for (int month = 1; month <= 12; month++)
         {
-            yield return current;
-            current = current.AddMonths(step);
+            if (orderBy == "asc")
+            {
+                yield return new DateTime(currentYear, month, 1);
+            }
+            else
+            {
+                yield return new DateTime(currentYear, 13 - month, 1);
+            }
         }
     }
 
@@ -360,100 +342,37 @@
             builder.CloseElement(); // tbody
             builder.CloseElement(); // table
         };
-    }    private async Task PrevPage()
+    }    private async Task PrevYear()
     {
-        if (selectedTagId.HasValue)
+        if (selectedTagId.HasValue && hasPreviousYear)
         {
-            switch (paginationType)
+            var currentIndex = availableYears.IndexOf(currentYear);
+            if (currentIndex > 0)
             {
-                case "weeks":
-                    if (weekPageNumber > 1)
-                    {
-                        weekPageNumber--;
-                        await LoadActivitiesForTag(selectedTagId.Value);
-                    }
-                    break;
-                case "months":
-                    if (monthPageNumber > 1)
-                    {
-                        monthPageNumber--;
-                        await LoadActivitiesForTag(selectedTagId.Value);
-                    }
-                    break;
+                currentYear = availableYears[currentIndex - 1];
+                await LoadActivitiesForTag(selectedTagId.Value);
             }
         }
-    }    private async Task NextPage()
+    }
+
+    private async Task NextYear()
     {
-        if (selectedTagId.HasValue)
+        if (selectedTagId.HasValue && hasNextYear)
         {
-            switch (paginationType)
+            var currentIndex = availableYears.IndexOf(currentYear);
+            if (currentIndex < availableYears.Count - 1)
             {
-                case "weeks":
-                    if (weekPageNumber < totalPages)
-                    {
-                        weekPageNumber++;
-                        await LoadActivitiesForTag(selectedTagId.Value);
-                    }
-                    break;
-                case "months":
-                    if (monthPageNumber < totalPages)
-                    {
-                        monthPageNumber++;
-                        await LoadActivitiesForTag(selectedTagId.Value);
-                    }
-                    break;
+                currentYear = availableYears[currentIndex + 1];
+                await LoadActivitiesForTag(selectedTagId.Value);
             }
         }
     }    private async Task ChangeOrder(string order)
     {
         orderBy = order;
-        weekPageNumber = 1;
-        monthPageNumber = 1;
         if (selectedTagId.HasValue)
         {
             await LoadActivitiesForTag(selectedTagId.Value);
         }
-    }    private int GetCurrentPageNumber()
-    {
-        return paginationType switch
-        {
-            "weeks" => weekPageNumber,
-            "months" => monthPageNumber,
-            _ => weekPageNumber
-        };
-    }    private async Task OnPaginationTypeChanged(ChangeEventArgs e)
-    {
-        paginationType = e.Value?.ToString() ?? "weeks";
-        
-        // Reset page numbers when switching pagination types
-        weekPageNumber = 1;
-        monthPageNumber = 1;
-        
-        if (selectedTagId.HasValue)
-        {
-            await LoadActivitiesForTag(selectedTagId.Value);
-        }
-    }    private async Task OnPaginationModeChanged(ChangeEventArgs e)
-    {
-        paginationMode = e.Value?.ToString() ?? "weeks";
-        paginationType = paginationMode;
-        
-        // Reset page numbers when switching pagination types
-        weekPageNumber = 1;
-        monthPageNumber = 1;
-        
-        if (selectedTagId.HasValue)
-        {
-            await LoadActivitiesForTag(selectedTagId.Value);
-        }
-    }    private string GetPaginationDescription()
-    {
-        return paginationType switch
-        {
-            "weeks" => $"{weeksPerPage} weeks per page",
-            "months" => $"{monthsPerPage} months per page",
-            _ => $"{weeksPerPage} weeks per page"
-        };
     }
 
     private void ShowDescriptionModal(string description)

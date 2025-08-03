@@ -358,4 +358,57 @@ public class ActivityService : IActivityService
             .Where(a => a.TagId == tagId && a.DateStarted >= startRange && a.DateStarted <= endRange)
             .AnyAsync();
     }
+
+    public async Task<List<ActivityResponse>> GetByYear(int year, int? tagId = null)
+    {
+        var startDate = new DateTime(year, 1, 1);
+        var endDate = new DateTime(year + 1, 1, 1);
+
+        var query = _context.Activities
+            .Include(a => a.Tag)
+            .ThenInclude(t => t.InputType)
+            .Where(a => a.DateStarted >= startDate && a.DateStarted < endDate);
+
+        if (tagId.HasValue)
+        {
+            query = query.Where(a => a.TagId == tagId.Value);
+        }
+
+        var activities = await query
+            .OrderBy(a => a.DateStarted)
+            .ToListAsync();
+
+        return activities.Select(a => new ActivityResponse
+        {
+            Id = a.Id,
+            DateStarted = a.DateStarted,
+            DateFinished = a.DateFinished,
+            DateCreated = a.DateCreated,
+            Description = a.Description,
+            PrimaryTagId = a.TagId,
+            PrimaryTagName = a.Tag?.TagName ?? string.Empty,
+            PrimaryTagValue = a.Description ?? string.Empty,
+            ElementId = a.Tag?.InputType?.Id,
+            ElementName = a.Tag?.InputType?.Name ?? string.Empty,
+            TagRequired = a.Tag?.IsRequired ?? false
+        }).ToList();
+    }
+
+    public async Task<List<int>> GetAvailableYears(int? tagId = null)
+    {
+        var query = _context.Activities.AsQueryable();
+
+        if (tagId.HasValue)
+        {
+            query = query.Where(a => a.TagId == tagId.Value);
+        }
+
+        var years = await query
+            .Select(a => a.DateStarted.Year)
+            .Distinct()
+            .OrderDescending()
+            .ToListAsync();
+
+        return years;
+    }
 }

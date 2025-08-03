@@ -36,6 +36,12 @@ public interface IActivityApi
         DateTime? endDate = null,
         string? descriptionFilter = null);
 
+    [Get("/api/activities/by-year")]
+    Task<List<ActivityResponse>> GetActivitiesByYear(int year, int? tagId = null);
+
+    [Get("/api/activities/available-years")]
+    Task<List<int>> GetAvailableYears(int? tagId = null);
+
     [Post("/api/activities")]
     Task<ActivityResponse> CreateCalendarItem([Body] ActivityRequest calendarRequest);
 

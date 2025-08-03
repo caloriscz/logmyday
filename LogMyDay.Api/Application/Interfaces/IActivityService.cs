@@ -36,5 +36,7 @@ public interface IActivityService
         DateTime? endDate = null,
         string? descriptionFilter = null
     );
+    Task<List<ActivityResponse>> GetByYear(int year, int? tagId = null);
+    Task<List<int>> GetAvailableYears(int? tagId = null);
     Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted);
 }

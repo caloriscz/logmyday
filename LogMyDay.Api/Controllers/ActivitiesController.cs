@@ -78,7 +78,21 @@ public class ActivitiesController : ControllerBase
     public async Task<IActionResult> GetPagedByMonths([FromQuery] int monthPageNumber = 1, [FromQuery] int monthsPerPage = 12, [FromQuery] string orderBy = "desc", [FromQuery] int? tagId = null, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null, [FromQuery] string? descriptionFilter = null)
     {        var pagedResult = await _activityService.GetPagedByMonths(monthPageNumber, monthsPerPage, orderBy, tagId, startDate, endDate, descriptionFilter);
         return Ok(pagedResult);
-    }    [HttpGet("check-duplicate")]
+    }    [HttpGet("by-year")]
+    public async Task<IActionResult> GetByYear([FromQuery] int year, [FromQuery] int? tagId = null)
+    {
+        var activities = await _activityService.GetByYear(year, tagId);
+        return Ok(activities);
+    }
+
+    [HttpGet("available-years")]
+    public async Task<IActionResult> GetAvailableYears([FromQuery] int? tagId = null)
+    {
+        var years = await _activityService.GetAvailableYears(tagId);
+        return Ok(years);
+    }
+
+    [HttpGet("check-duplicate")]
     public async Task<IActionResult> CheckDuplicate([FromQuery] int tagId, [FromQuery] DateTime dateStarted)
     {
         var hasDuplicate = await _activityService.HasActivityForTimeGranularity(tagId, dateStarted);

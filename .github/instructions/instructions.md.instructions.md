@@ -183,6 +183,31 @@ Production settings (stricter security):
 }
 ```
 
+## Architecture Guidance for Copilot
+
+* Use **Clean Architecture principles**:
+
+  * Separate concerns into clear layers (Domain, Application, Infrastructure, UI).
+  * Avoid code-behind logic; prefer services and dependency injection.
+  * Keep domain models free of dependencies on infrastructure or UI.
+
+* Ensure all code aligns with **Context7 MCP** (Modular Clean Project) structure:
+
+  * Follow modular, scalable folder conventions and patterns.
+  * Use feature folders and domain-driven structure as applicable.
+
+* Integrate **SequentialThinking MCP** for progressive planning:
+
+  * Prefer planning-first mindset before coding.
+  * Write journal notes and intent definitions before actual implementation.
+
+### Usage Notes for Copilot
+
+* Use this document as reference before generating code.
+* Do not implement "Planned" or "Deferred" features until promoted.
+* Use Developer Journal to explain changes.
+* Log errors or tech limitations here to reduce retries.
+
 ## Rules and conventions
 
 - Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
