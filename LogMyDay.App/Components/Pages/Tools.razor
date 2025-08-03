@@ -1,0 +1,123 @@
+﻿@page "/tools"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Api.Application.Interfaces
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject IBackupService BackupService
+@inject IExcelExportService ExcelExportService
+@inject IJSRuntime JSRuntime
+@inject ILogger<Tools> Logger
+
+<PageTitle>Tools</PageTitle>
+
+<div class="container mt-4">
+    <h2 class="mb-4">Tools & Utilities</h2>
+    <p class="text-muted mb-4">Helpful tools to enhance your activity logging experience</p>
+    
+    <div class="row">
+        <!-- Breathing Techniques Tool Card -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">
+                        <i class="bi bi-heart-pulse me-2"></i>
+                        Breathing Techniques
+                    </h5>
+                    <p class="card-text">
+                        Practice guided breathing exercises including box breathing and other relaxation techniques. 
+                        Track your sessions and save them as activities with customizable tags.
+                    </p>
+                    <div class="mt-auto">
+                        <a href="/tools/breathing" class="btn btn-primary">
+                            <i class="bi bi-play-circle me-1"></i>
+                            Start Breathing Exercise
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="bi bi-clock me-1"></i>
+                        Typical session: 5-10 minutes
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Placeholder for future tools -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">
+                        <i class="bi bi-tools me-2"></i>
+                        More Tools Coming Soon
+                    </h5>
+                    <p class="card-text">
+                        Additional productivity and wellness tools will be added here to help you 
+                        better track and manage your daily activities.
+                    </p>
+                    <div class="mt-auto">
+                        <button class="btn btn-outline-secondary" disabled>
+                            <i class="bi bi-wrench me-1"></i>
+                            Coming Soon
+                        </button>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="bi bi-lightbulb me-1"></i>
+                        Suggest new tools via feedback
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export & Backup Tools Card -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">
+                        <i class="bi bi-download me-2"></i>
+                        Data Management
+                    </h5>
+                    <p class="card-text">
+                        Export your activity data and manage backups. Access advanced data 
+                        management features for your LogMyDay information.
+                    </p>
+                    <div class="mt-auto">
+                        <a href="/backup" class="btn btn-outline-primary">
+                            <i class="bi bi-database me-1"></i>
+                            Manage Data
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="bi bi-shield-check me-1"></i>
+                        Export & backup your data
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Additional Information Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h6 class="alert-heading">
+                    <i class="bi bi-info-circle me-2"></i>
+                    About Tools
+                </h6>
+                <p class="mb-0">
+                    These tools are designed to complement your activity logging workflow. 
+                    Each tool can save results directly to your activity log using your configured tags, 
+                    making it easy to track various aspects of your daily routine.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+}
