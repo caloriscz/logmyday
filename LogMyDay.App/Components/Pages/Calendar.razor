@@ -10,20 +10,41 @@
         height: 80px;
     }
     .calendar-value {
-        background: #198754;
+        background: var(--success-color, #198754);
         color: #fff;
         border-radius: 8px;
         padding: 2px 6px;
         display: inline-block;
         margin-top: 4px;
+        font-weight: 500;
+        border: 1px solid transparent;
     }
+    
+    /* Dark theme adjustments for better visibility */
+    [data-bs-theme="dark"] .calendar-value {
+        background: #28a745;
+        border: 1px solid #34ce57;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    
     .calendar-empty {
-        background: #fff3cd;
+        background: var(--warning-color, #fff3cd);
         color: #856404;
         border-radius: 8px;
         padding: 2px 6px;
         display: inline-block;
         margin-top: 4px;
+        font-weight: 500;
+        border: 1px solid transparent;
+    }
+    
+    /* Dark theme adjustments for empty values */
+    [data-bs-theme="dark"] .calendar-empty {
+        background: #6c4e00;
+        border: 1px solid #8a6600;
+        color: #ffcc00;
+        font-weight: 600;
     }    .month-container {
         padding: 10px;
     }
