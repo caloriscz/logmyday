@@ -69,24 +69,21 @@ window.resetBreathingVisualization = () => {
         document.getElementById('traceBottom')
     ];
     
-    console.log('Resetting breathing border trace');
+    console.log('Resetting breathing border trace for next cycle');
     
     segments.forEach(segment => {
         if (segment) {
-            // Smooth fade out
-            segment.style.transition = 'opacity 500ms ease-out, height 500ms ease-out, width 500ms ease-out';
+            // Immediate reset without transition
+            segment.style.transition = 'none';
             segment.style.opacity = '0';
             segment.style.height = '0%';
             segment.style.width = '0%';
             segment.classList.remove('active', 'animating');
-            
-            // Complete reset after animation
-            setTimeout(() => {
-                segment.style.transition = 'none';
-                segment.style.height = '0%';
-                segment.style.width = '0%';
-                segment.style.opacity = '0';
-            }, 600);
         }
     });
+    
+    // Force reflow to ensure reset is applied
+    if (segments[0]) {
+        void segments[0].offsetHeight;
+    }
 };
