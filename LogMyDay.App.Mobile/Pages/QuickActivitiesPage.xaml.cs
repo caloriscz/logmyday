@@ -33,6 +33,66 @@ public partial class QuickActivitiesPage : ContentPage
         }
     }
 
+    private async void OnTestApiClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await DisplayAlert("Testing API", "Starting API connection test...", "OK");
+            
+            // Test the API connection
+            var isConnected = await _apiService.TestApiConnectionAsync();
+            
+            if (isConnected)
+            {
+                var tags = await _apiService.GetTagsAsync();
+                var successMessage = $"✅ API CONNECTION SUCCESS!\n\n";
+                successMessage += $"🏷️ Found {tags.Count} tags:\n";
+                
+                if (tags.Count > 0)
+                {
+                    foreach (var tag in tags.Take(5)) // Show first 5 tags
+                    {
+                        successMessage += $"• {tag.Title}\n";
+                    }
+                    if (tags.Count > 5)
+                    {
+                        successMessage += $"... and {tags.Count - 5} more";
+                    }
+                }
+                
+                await DisplayAlert("API Test Success", successMessage, "OK");
+            }
+            else
+            {
+                var errorMessage = "❌ API CONNECTION FAILED!\n\n";
+                if (!string.IsNullOrEmpty(_apiService.LastError))
+                {
+                    errorMessage += "🔍 ERROR DETAILS:\n";
+                    errorMessage += _apiService.LastError;
+                }
+                else
+                {
+                    errorMessage += "No specific error details available.";
+                }
+                
+                await DisplayAlert("API Test Failed", errorMessage, "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            var exceptionDetails = $"🔥 EXCEPTION DURING API TEST:\n\n";
+            exceptionDetails += $"💥 ERROR: {ex.Message}\n";
+            exceptionDetails += $"📝 TYPE: {ex.GetType().Name}\n";
+            if (ex.InnerException != null)
+            {
+                exceptionDetails += $"🔗 INNER: {ex.InnerException.Message}\n";
+            }
+            exceptionDetails += $"\n📍 STACK TRACE:\n{ex.StackTrace}";
+            
+            await DisplayAlert("Test Exception", exceptionDetails, "OK");
+        }
+    }
+
     private async Task ShowAddButtonDialog()
     {
         try
@@ -46,7 +106,29 @@ public partial class QuickActivitiesPage : ContentPage
             
             if (tags.Count == 0)
             {
-                await DisplayAlert("No Tags", "No tags available. Please create tags in the web application first.\n\nNote: Make sure the API credentials are correct and the server is accessible.", "OK");
+                // Show the actual error details from the API service
+                var errorMessage = "❌ API CALL FAILED\n\n";
+                
+                if (!string.IsNullOrEmpty(_apiService.LastError))
+                {
+                    errorMessage += "🔍 EXCEPTION DETAILS:\n";
+                    errorMessage += _apiService.LastError;
+                }
+                else
+                {
+                    errorMessage += "🔍 DEBUGGING INFO:\n";
+                    errorMessage += "• API URL: https://logmyday.tadata.cz/api/tags\n";
+                    errorMessage += "• Credentials: admin/secret123\n";
+                    errorMessage += "• No exception details available\n";
+                    errorMessage += "• API returned empty response";
+                }
+                
+                errorMessage += "\n\n📝 NEXT STEPS:\n";
+                errorMessage += "• Check internet connection\n";
+                errorMessage += "• Verify server is running\n";
+                errorMessage += "• Test API in browser/Postman";
+                    
+                await DisplayAlert("API Connection Failed", errorMessage, "OK");
                 
                 return;
             }
@@ -100,7 +182,16 @@ public partial class QuickActivitiesPage : ContentPage
             System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
             System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
             
-            await DisplayAlert("Error", $"Failed to create quick button: {ex.Message}", "OK");
+            var detailedError = "🔥 EXCEPTION IN SHOWADDBUTTONDIALOG\n\n";
+            detailedError += $"💥 ERROR: {ex.Message}\n";
+            detailedError += $"📝 TYPE: {ex.GetType().Name}\n";
+            if (ex.InnerException != null)
+            {
+                detailedError += $"🔗 INNER: {ex.InnerException.Message}\n";
+            }
+            detailedError += $"\n📍 STACK TRACE:\n{ex.StackTrace}";
+            
+            await DisplayAlert("Exception Details", detailedError, "OK");
         }
     }
 

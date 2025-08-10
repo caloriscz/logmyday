@@ -29,7 +29,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(appSettings);
 
         // API configuration
-        var apiBaseUrl = "https://logmyday.tadata.cz/api";
+        var apiBaseUrl = "https://logmyday.tadata.cz";
         var apiUsername = "admin";
         var apiPassword = "secret123";
 
