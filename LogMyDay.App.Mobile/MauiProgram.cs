@@ -22,19 +22,16 @@ public static class MauiProgram
 
         // Configure app settings
         var appSettings = new AppSettings();
-#if DEBUG
+
         appSettings.WebUrl = "https://logmyday.tadata.cz";
-#else
-        appSettings.WebUrl = "https://logmyday.tadata.cz";
-#endif
         appSettings.DefaultPage = "/";
         
         builder.Services.AddSingleton(appSettings);
 
         // API configuration
         var apiBaseUrl = "https://logmyday.tadata.cz/api";
-        var apiUsername = "apiuser";
-        var apiPassword = "TempPass123!";
+        var apiUsername = "admin";
+        var apiPassword = "secret123";
 
         // Add authentication handler with proper credentials
         builder.Services.AddTransient<BasicAuthHandler>(provider => 
