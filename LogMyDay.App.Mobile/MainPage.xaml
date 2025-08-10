@@ -1,31 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="LogMyDay.App.Mobile.MainPage"
-             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             Title="LogMyDay">
+<Shell x:Class="LogMyDay.App.Mobile.MainPage"
+       xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:local="clr-namespace:LogMyDay.App.Mobile.Pages"
+       Title="LogMyDay"
+       FlyoutBehavior="Disabled">
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- URL Bar -->
-        <Border Grid.Row="0" BackgroundColor="LightGray" Padding="10">
-            <Grid ColumnDefinitions="*,Auto">
-                <Entry x:Name="urlEntry" 
-                       Grid.Column="0"
-                       Placeholder="Enter URL..." 
-                       Text="{Binding CurrentUrl}" 
-                       VerticalOptions="Center" />
-                <Button x:Name="goButton" 
-                        Grid.Column="1"
-                        Text="Go" 
-                        Clicked="OnGoButtonClicked"
-                        VerticalOptions="Center" 
-                        Margin="10,0,0,0" />
-            </Grid>
-        </Border>
+    <TabBar>
+        <ShellContent Title="Home"
+                      Icon="home.svg"
+                      ContentTemplate="{DataTemplate local:HomePage}" />
+        
+        <ShellContent Title="Quick Activities"
+                      Icon="flash.svg"
+                      ContentTemplate="{DataTemplate local:QuickActivitiesPage}" />
+    </TabBar>
 
-        <!-- WebView -->
-        <WebView x:Name="webView" 
-                 Grid.Row="1"
-                 Source="{Binding CurrentUrl}" />
-    </Grid>
-
-</ContentPage>
+</Shell>
