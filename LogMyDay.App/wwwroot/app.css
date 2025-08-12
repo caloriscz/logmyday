@@ -477,6 +477,12 @@ main {
         margin-bottom: 1rem;
     }
     
+    /* Reduce excessive padding on mobile */
+    .content.px-4 {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    
     /* Mobile card styling */
     .card {
         box-shadow: 0 2px 4px var(--shadow);
@@ -548,6 +554,26 @@ main {
         min-width: 48px;
         min-height: 48px;
         margin: 4px;
+    }
+}
+
+/* Very small screens - further reduce padding */
+@media (max-width: 575.98px) {
+    .content.px-4 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    .page-card {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .container, .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 }
 

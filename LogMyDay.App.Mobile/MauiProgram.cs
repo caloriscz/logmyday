@@ -52,10 +52,12 @@ public static class MauiProgram
         
         // Add view models
         builder.Services.AddTransient<QuickActivitiesViewModel>();
+        builder.Services.AddTransient<SettingsViewModel>();
         
         // Add pages
         builder.Services.AddTransient<HomePage>();
         builder.Services.AddTransient<QuickActivitiesPage>();
+        builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddSingleton<MainPage>();
 
         return builder.Build();

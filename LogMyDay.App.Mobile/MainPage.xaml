@@ -6,6 +6,25 @@
        Title="LogMyDay"
        FlyoutBehavior="Disabled">
 
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto" Padding="10,0">
+            <Label Grid.Column="0" 
+                   Text="LogMyDay" 
+                   FontSize="20" 
+                   FontAttributes="Bold" 
+                   VerticalOptions="Center" 
+                   TextColor="White" />
+            <Button Grid.Column="1"
+                    Text="⚙️"
+                    FontSize="20"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    WidthRequest="40"
+                    HeightRequest="40"
+                    Clicked="OnSettingsClicked" />
+        </Grid>
+    </Shell.TitleView>
+
     <TabBar>
         <ShellContent Title="Home"
                       Icon="home.svg"

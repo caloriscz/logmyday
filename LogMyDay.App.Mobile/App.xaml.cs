@@ -1,3 +1,5 @@
+using LogMyDay.App.Mobile.Pages;
+
 namespace LogMyDay.App.Mobile;
 
 public partial class App : Application
@@ -8,6 +10,9 @@ public partial class App : Application
     {
         InitializeComponent();
         _mainPage = mainPage;
+        
+        // Register routes
+        Routing.RegisterRoute("settings", typeof(SettingsPage));
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

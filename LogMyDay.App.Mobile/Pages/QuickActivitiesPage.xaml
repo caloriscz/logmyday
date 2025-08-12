@@ -14,17 +14,12 @@
         <!-- Header with Add Button -->
         <StackLayout Grid.Row="0" Orientation="Horizontal" HorizontalOptions="FillAndExpand" 
                      Padding="16,10">
-            <Label Text="Quick Activities" 
-                   FontSize="24" 
-                   FontAttributes="Bold" 
-                   VerticalOptions="Center" 
-                   HorizontalOptions="StartAndExpand" />
             <Button Text="+ Add" 
                     BackgroundColor="DodgerBlue" 
                     TextColor="White" 
                     CornerRadius="8"
                     Clicked="OnAddButtonClicked" 
-                    HorizontalOptions="End" />
+                    HorizontalOptions="Center" />
         </StackLayout>
 
         <!-- Quick Activity Buttons List -->
@@ -56,13 +51,15 @@
                                         <Label Text="{Binding Name}" 
                                                FontSize="18" 
                                                FontAttributes="Bold"
+                                               TextColor="{Binding IsEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter=text}"
                                                HorizontalOptions="Start" 
                                                VerticalOptions="Center" />
                                         
                                         <!-- Value (if any) -->
                                         <Label Text="{Binding Value}" 
                                                FontSize="14" 
-                                               TextColor="Gray" 
+                                               TextColor="{Binding IsEnabled, Converter={StaticResource BoolToColorConverter}, ConverterParameter=text}"
+                                               Opacity="0.8"
                                                HorizontalOptions="Start"
                                                IsVisible="{Binding Value, Converter={StaticResource StringToBoolConverter}}" />
                                     </StackLayout>

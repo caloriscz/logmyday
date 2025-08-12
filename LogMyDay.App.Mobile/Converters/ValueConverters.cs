@@ -10,10 +10,12 @@ public class BoolToColorConverter : IValueConverter
         {
             if (parameter?.ToString() == "text")
             {
-                return boolValue ? Colors.Red : Colors.Green;
+                // Text color: dark for enabled (good contrast), light gray for disabled
+                return boolValue ? Colors.DarkGreen : Colors.Gray;
             }
             
-            return boolValue ? Colors.LightGreen : Colors.LightGray;
+            // Background color: green for enabled, light gray for disabled
+            return boolValue ? Colors.MediumSeaGreen : Colors.LightGray;
         }
         
         return Colors.LightGray;
