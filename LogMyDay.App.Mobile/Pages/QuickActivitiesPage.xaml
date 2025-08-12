@@ -19,20 +19,6 @@
                    FontAttributes="Bold" 
                    VerticalOptions="Center" 
                    HorizontalOptions="StartAndExpand" />
-            <Button Text="🔍 Test API" 
-                    BackgroundColor="Orange" 
-                    TextColor="White" 
-                    CornerRadius="8"
-                    Clicked="OnTestApiClicked" 
-                    HorizontalOptions="End" 
-                    Margin="0,0,8,0" />
-            <Button Text="💾 Debug Storage" 
-                    BackgroundColor="Purple" 
-                    TextColor="White" 
-                    CornerRadius="8"
-                    Clicked="OnDebugStorageClicked" 
-                    HorizontalOptions="End" 
-                    Margin="0,0,8,0" />
             <Button Text="+ Add" 
                     BackgroundColor="DodgerBlue" 
                     TextColor="White" 
@@ -47,53 +33,48 @@
                             ItemsSource="{Binding QuickButtons}"
                             SelectionMode="None">
                 <CollectionView.ItemsLayout>
-                    <GridItemsLayout Orientation="Vertical" Span="2" />
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Grid Padding="8">
+                        <Grid Padding="8,4">
                             <Frame BackgroundColor="{Binding IsEnabled, Converter={StaticResource BoolToColorConverter}}"
                                    CornerRadius="12"
                                    HasShadow="True"
                                    Padding="16,12"
-                                   HeightRequest="140"
-                                   MinimumHeightRequest="120">
+                                   HeightRequest="80"
+                                   MinimumHeightRequest="70"
+                                   HorizontalOptions="FillAndExpand">
                                 <Frame.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding Source={x:Reference quickButtonsCollection}, Path=BindingContext.UseButtonCommand}" 
                                                           CommandParameter="{Binding}" />
                                 </Frame.GestureRecognizers>
-                                <Grid RowDefinitions="Auto,*,Auto">
-                                    <!-- Tag Name -->
-                                    <Label Grid.Row="0" 
-                                           Text="{Binding TagName}" 
-                                           FontSize="14" 
-                                           FontAttributes="Bold" 
-                                           HorizontalOptions="Center" />
-                                    
-                                    <!-- Button Name -->
-                                    <Label Grid.Row="1" 
-                                           Text="{Binding Name}" 
-                                           FontSize="16" 
-                                           HorizontalOptions="Center" 
-                                           VerticalOptions="Center" 
-                                           HorizontalTextAlignment="Center" />
-                                    
-                                    <!-- Value (if any) -->
-                                    <Label Grid.Row="2" 
-                                           Text="{Binding Value}" 
-                                           FontSize="12" 
-                                           TextColor="Gray" 
-                                           HorizontalOptions="Center"
-                                           IsVisible="{Binding Value, Converter={StaticResource StringToBoolConverter}}" />
+                                <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+                                    <!-- Button Content -->
+                                    <StackLayout Grid.Column="0" VerticalOptions="Center">
+                                        <!-- Button Name -->
+                                        <Label Text="{Binding Name}" 
+                                               FontSize="18" 
+                                               FontAttributes="Bold"
+                                               HorizontalOptions="Start" 
+                                               VerticalOptions="Center" />
+                                        
+                                        <!-- Value (if any) -->
+                                        <Label Text="{Binding Value}" 
+                                               FontSize="14" 
+                                               TextColor="Gray" 
+                                               HorizontalOptions="Start"
+                                               IsVisible="{Binding Value, Converter={StaticResource StringToBoolConverter}}" />
+                                    </StackLayout>
                                     
                                     <!-- Delete Button -->
-                                    <Button Grid.RowSpan="3"
+                                    <Button Grid.Column="1"
                                             Text="✕"
                                             FontSize="16"
                                             BackgroundColor="Transparent"
                                             TextColor="Red"
                                             HorizontalOptions="End"
-                                            VerticalOptions="Start"
+                                            VerticalOptions="Center"
                                             WidthRequest="30"
                                             HeightRequest="30"
                                             Command="{Binding Source={x:Reference quickButtonsCollection}, Path=BindingContext.DeleteButtonCommand}"

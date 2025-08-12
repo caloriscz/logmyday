@@ -33,151 +33,22 @@ public partial class QuickActivitiesPage : ContentPage
         }
     }
 
-    private async void OnTestApiClicked(object sender, EventArgs e)
-    {
-        try
-        {
-            await DisplayAlert("Testing API", "Starting API connection test...", "OK");
-            
-            // Test the API connection
-            var isConnected = await _apiService.TestApiConnectionAsync();
-            
-            if (isConnected)
-            {
-                var tags = await _apiService.GetTagsAsync();
-                var successMessage = $"✅ API CONNECTION SUCCESS!\n\n";
-                successMessage += $"🏷️ Found {tags.Count} tags:\n";
-                
-                if (tags.Count > 0)
-                {
-                    foreach (var tag in tags.Take(5)) // Show first 5 tags
-                    {
-                        successMessage += $"• {tag.Title}\n";
-                    }
-                    if (tags.Count > 5)
-                    {
-                        successMessage += $"... and {tags.Count - 5} more";
-                    }
-                }
-                
-                await DisplayAlert("API Test Success", successMessage, "OK");
-            }
-            else
-            {
-                var errorMessage = "❌ API CONNECTION FAILED!\n\n";
-                if (!string.IsNullOrEmpty(_apiService.LastError))
-                {
-                    errorMessage += "🔍 ERROR DETAILS:\n";
-                    errorMessage += _apiService.LastError;
-                }
-                else
-                {
-                    errorMessage += "No specific error details available.";
-                }
-                
-                await DisplayAlert("API Test Failed", errorMessage, "OK");
-            }
-        }
-        catch (Exception ex)
-        {
-            var exceptionDetails = $"🔥 EXCEPTION DURING API TEST:\n\n";
-            exceptionDetails += $"💥 ERROR: {ex.Message}\n";
-            exceptionDetails += $"📝 TYPE: {ex.GetType().Name}\n";
-            if (ex.InnerException != null)
-            {
-                exceptionDetails += $"🔗 INNER: {ex.InnerException.Message}\n";
-            }
-            exceptionDetails += $"\n📍 STACK TRACE:\n{ex.StackTrace}";
-            
-            await DisplayAlert("Test Exception", exceptionDetails, "OK");
-        }
-    }
-
-    private async void OnDebugStorageClicked(object sender, EventArgs e)
-    {
-        try
-        {
-            // Get data from service
-            var serviceButtons = await _quickActivityService.GetQuickButtonsAsync();
-            
-            // Get raw data from preferences
-            var rawJson = Microsoft.Maui.Storage.Preferences.Get("quick_activity_buttons", "NOT_FOUND");
-            
-            // Get viewmodel data
-            var viewModelButtons = _viewModel.QuickButtons.ToList();
-            
-            var debugInfo = $"🔍 DEBUG STORAGE INFO\n\n";
-            
-            debugInfo += $"📊 SERVICE DATA:\n";
-            debugInfo += $"• Count: {serviceButtons.Count}\n";
-            foreach (var btn in serviceButtons)
-            {
-                debugInfo += $"• '{btn.Name}' (ID: {btn.Id})\n";
-            }
-            
-            debugInfo += $"\n💾 RAW PREFERENCES:\n";
-            if (rawJson == "NOT_FOUND")
-            {
-                debugInfo += "• No data found in preferences!\n";
-            }
-            else
-            {
-                debugInfo += $"• Raw JSON length: {rawJson.Length}\n";
-                debugInfo += $"• First 200 chars: {rawJson[..Math.Min(200, rawJson.Length)]}\n";
-            }
-            
-            debugInfo += $"\n🖥️ VIEWMODEL DATA:\n";
-            debugInfo += $"• Count: {viewModelButtons.Count}\n";
-            foreach (var btn in viewModelButtons)
-            {
-                debugInfo += $"• '{btn.Name}' (ID: {btn.Id})\n";
-            }
-            
-            await DisplayAlert("Storage Debug", debugInfo, "OK");
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Debug Error", $"Error: {ex.Message}\n\nStack: {ex.StackTrace}", "OK");
-        }
-    }
-
     private async Task ShowAddButtonDialog()
     {
         try
-        {
-            System.Diagnostics.Debug.WriteLine("QuickActivitiesPage: Starting ShowAddButtonDialog...");
-            
+        {            
             // First, get available tags
             var tags = await _apiService.GetTagsAsync();
             
-            System.Diagnostics.Debug.WriteLine($"QuickActivitiesPage: Received {tags.Count} tags from API");
-            
             if (tags.Count == 0)
             {
-                // Show the actual error details from the API service
-                var errorMessage = "❌ API CALL FAILED\n\n";
-                
+                var errorMessage = "No tags available. Please create tags first in the main app.";
                 if (!string.IsNullOrEmpty(_apiService.LastError))
                 {
-                    errorMessage += "🔍 EXCEPTION DETAILS:\n";
-                    errorMessage += _apiService.LastError;
+                    errorMessage += $"\n\nError details: {_apiService.LastError}";
                 }
-                else
-                {
-                    errorMessage += "🔍 DEBUGGING INFO:\n";
-                    errorMessage += "• API URL: https://logmyday.tadata.cz/api/tags\n";
-                    errorMessage += "• Credentials: admin/secret123\n";
-                    errorMessage += "• No exception details available\n";
-                    errorMessage += "• API returned empty response";
-                }
-                
-                errorMessage += "\n\n📝 NEXT STEPS:\n";
-                errorMessage += "• Check internet connection\n";
-                errorMessage += "• Verify server is running\n";
-                errorMessage += "• Test API in browser/Postman";
                     
-                await DisplayAlert("API Connection Failed", errorMessage, "OK");
-                
+                await DisplayAlert("No Tags Found", errorMessage, "OK");
                 return;
             }
 
@@ -192,11 +63,12 @@ public partial class QuickActivitiesPage : ContentPage
 
             var selectedTag = tags.First(t => t.Title == selectedTagName);
 
-            // Get button name
-            var buttonName = await DisplayPromptAsync("Button Name", "Enter a name for this quick activity button:", placeholder: $"{selectedTag.Title} Button");
+            // Get button name with default value set to tag name
+            var buttonName = await DisplayPromptAsync("Button Name", "Enter a name for this quick activity button:", initialValue: selectedTag.Title);
             
             if (string.IsNullOrWhiteSpace(buttonName))
             {
+                await DisplayAlert("Invalid Input", "Button name cannot be empty. Please enter a name for the button.", "OK");
                 return;
             }
 
@@ -226,20 +98,8 @@ public partial class QuickActivitiesPage : ContentPage
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"QuickActivitiesPage Error in ShowAddButtonDialog: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
-            System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-            
-            var detailedError = "🔥 EXCEPTION IN SHOWADDBUTTONDIALOG\n\n";
-            detailedError += $"💥 ERROR: {ex.Message}\n";
-            detailedError += $"📝 TYPE: {ex.GetType().Name}\n";
-            if (ex.InnerException != null)
-            {
-                detailedError += $"🔗 INNER: {ex.InnerException.Message}\n";
-            }
-            detailedError += $"\n📍 STACK TRACE:\n{ex.StackTrace}";
-            
-            await DisplayAlert("Exception Details", detailedError, "OK");
+            System.Diagnostics.Debug.WriteLine($"Error creating quick activity button: {ex.Message}");
+            await DisplayAlert("Error", $"Failed to create quick activity button.\n\nError: {ex.Message}", "OK");
         }
     }
 
