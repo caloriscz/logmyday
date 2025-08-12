@@ -22,14 +22,23 @@ public class QuickActivityService
 
     public async Task AddQuickButtonAsync(QuickActivityButton button)
     {
+        System.Diagnostics.Debug.WriteLine($"🟢 SERVICE: Adding button '{button.Name}' for tag {button.TagName}");
+        
         // Generate new ID
         button.Id = _quickButtons.Count > 0 ? _quickButtons.Max(b => b.Id) + 1 : 1;
         button.CreatedAt = DateTime.Now;
         
         _quickButtons.Add(button);
+        
+        System.Diagnostics.Debug.WriteLine($"🟢 SERVICE: Button added to list, total buttons: {_quickButtons.Count}");
+        
         await SaveQuickButtonsAsync();
         
+        System.Diagnostics.Debug.WriteLine($"🟢 SERVICE: Button saved to preferences, triggering event...");
+        
         QuickButtonsChanged?.Invoke(this, _quickButtons.ToList());
+        
+        System.Diagnostics.Debug.WriteLine($"🟢 SERVICE: Event triggered for {_quickButtons.Count} buttons");
     }
 
     public async Task RemoveQuickButtonAsync(int buttonId)

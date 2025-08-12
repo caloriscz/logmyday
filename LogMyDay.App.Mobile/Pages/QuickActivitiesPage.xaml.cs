@@ -93,6 +93,54 @@ public partial class QuickActivitiesPage : ContentPage
         }
     }
 
+    private async void OnDebugStorageClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            // Get data from service
+            var serviceButtons = await _quickActivityService.GetQuickButtonsAsync();
+            
+            // Get raw data from preferences
+            var rawJson = Microsoft.Maui.Storage.Preferences.Get("quick_activity_buttons", "NOT_FOUND");
+            
+            // Get viewmodel data
+            var viewModelButtons = _viewModel.QuickButtons.ToList();
+            
+            var debugInfo = $"🔍 DEBUG STORAGE INFO\n\n";
+            
+            debugInfo += $"📊 SERVICE DATA:\n";
+            debugInfo += $"• Count: {serviceButtons.Count}\n";
+            foreach (var btn in serviceButtons)
+            {
+                debugInfo += $"• '{btn.Name}' (ID: {btn.Id})\n";
+            }
+            
+            debugInfo += $"\n💾 RAW PREFERENCES:\n";
+            if (rawJson == "NOT_FOUND")
+            {
+                debugInfo += "• No data found in preferences!\n";
+            }
+            else
+            {
+                debugInfo += $"• Raw JSON length: {rawJson.Length}\n";
+                debugInfo += $"• First 200 chars: {rawJson[..Math.Min(200, rawJson.Length)]}\n";
+            }
+            
+            debugInfo += $"\n🖥️ VIEWMODEL DATA:\n";
+            debugInfo += $"• Count: {viewModelButtons.Count}\n";
+            foreach (var btn in viewModelButtons)
+            {
+                debugInfo += $"• '{btn.Name}' (ID: {btn.Id})\n";
+            }
+            
+            await DisplayAlert("Storage Debug", debugInfo, "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Debug Error", $"Error: {ex.Message}\n\nStack: {ex.StackTrace}", "OK");
+        }
+    }
+
     private async Task ShowAddButtonDialog()
     {
         try

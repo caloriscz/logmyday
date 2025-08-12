@@ -86,6 +86,13 @@ public class QuickActivitiesViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task RefreshButtonsAsync()
+    {
+        System.Diagnostics.Debug.WriteLine("🔄 ViewModel RefreshButtonsAsync called");
+        await LoadQuickButtonsAsync();
+        System.Diagnostics.Debug.WriteLine($"🔄 ViewModel refreshed, now showing {QuickButtons.Count} buttons");
+    }
+
     private async Task UseButton(QuickActivityButton button)
     {
         if (!button.IsEnabled)
@@ -154,13 +161,18 @@ public class QuickActivitiesViewModel : INotifyPropertyChanged
 
     private void OnQuickButtonsChanged(object? sender, List<QuickActivityButton> updatedButtons)
     {
+        System.Diagnostics.Debug.WriteLine($"🔵 VIEWMODEL: OnQuickButtonsChanged called with {updatedButtons.Count} buttons");
+        
         MainThread.BeginInvokeOnMainThread(() =>
         {
+            System.Diagnostics.Debug.WriteLine($"🔵 VIEWMODEL: Updating UI on main thread, clearing {QuickButtons.Count} buttons");
             QuickButtons.Clear();
             foreach (var button in updatedButtons)
             {
+                System.Diagnostics.Debug.WriteLine($"🔵 VIEWMODEL: Adding button '{button.Name}' to UI");
                 QuickButtons.Add(button);
             }
+            System.Diagnostics.Debug.WriteLine($"🔵 VIEWMODEL: UI update complete, now showing {QuickButtons.Count} buttons");
         });
     }
 

@@ -26,6 +26,13 @@
                     Clicked="OnTestApiClicked" 
                     HorizontalOptions="End" 
                     Margin="0,0,8,0" />
+            <Button Text="💾 Debug Storage" 
+                    BackgroundColor="Purple" 
+                    TextColor="White" 
+                    CornerRadius="8"
+                    Clicked="OnDebugStorageClicked" 
+                    HorizontalOptions="End" 
+                    Margin="0,0,8,0" />
             <Button Text="+ Add" 
                     BackgroundColor="DodgerBlue" 
                     TextColor="White" 

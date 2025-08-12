@@ -21,11 +21,12 @@ public static class MauiProgram
             });
 
         // Configure app settings
-        var appSettings = new AppSettings();
+        var appSettings = new AppSettings
+        {
+            WebUrl = "https://logmyday.tadata.cz",
+            DefaultPage = "/"
+        };
 
-        appSettings.WebUrl = "https://logmyday.tadata.cz";
-        appSettings.DefaultPage = "/";
-        
         builder.Services.AddSingleton(appSettings);
 
         // API configuration
