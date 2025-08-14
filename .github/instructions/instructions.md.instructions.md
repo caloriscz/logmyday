@@ -211,10 +211,12 @@ Production settings (stricter security):
 ## Rules and conventions
 
 ### Documentation Standards
-- **All markdown files must be placed in the `.github/instructions/` folder** to maintain organized documentation structure
+- **CRITICAL: ALL markdown files must be placed ONLY in the `.github/instructions/` folder** - NEVER create markdown files in the root directory
+- **NO EXCEPTIONS**: Documentation, guides, summaries, and all .md files belong in `.github/instructions/` folder only
 - New documentation should follow the existing naming convention (lowercase with hyphens)
 - Update the main README.md index when adding new documentation files
 - Reference documentation files using relative paths from the instructions folder
+- **REMINDER**: If you create any .md file outside of `.github/instructions/`, it violates project structure rules
 
 ### Code Standards
 - Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.

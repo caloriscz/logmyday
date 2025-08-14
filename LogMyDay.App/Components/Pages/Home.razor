@@ -15,159 +15,10 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1>My Activities</h1>
                 <div class="d-flex align-items-center gap-2">
-                    <small class="text-muted">Press Ctrl+M</small>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
-                        data-bs-target="#addActivityModal" title="Press Ctrl+M to open">
-                        + Add New Activity
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
+                        data-bs-target="#filterModal" title="Open filters">
+                        <i class="bi bi-funnel"></i> Filters
                     </button>
-                </div>
-            </div>
-        </div> <!-- Filter Section -->
-        <div class="col-12 mb-4">
-            <div class="page-card">
-                <div class="mb-3">
-                    <h5>Filters</h5>
-                </div>
-                <div class="row">
-                    <!-- Display Type -->
-                    <div class="col-md-3">
-                        <label class="form-label">Display Type:</label>
-                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="form-select">
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                        </select>
-                    </div>
-
-                    <!-- Description Filter -->
-                    <div class="col-md-3">
-                        <label class="form-label">Description Filter:</label>
-                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="form-control"
-                            placeholder="Search description..." />
-                    </div>
-
-                    <!-- Calendar Navigation -->
-                    <div class="col-md-6">
-                        <label class="form-label">Date Selection:</label>
-                        
-                        <!-- Desktop Navigation (hidden on mobile) -->
-                        <div class="d-none d-md-flex align-items-center gap-2">
-                            <!-- Daily navigation (always visible) -->
-                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
-                                &lt;
-                            </button>
-                            
-                            <!-- Additional navigation for daily view -->
-                            @if (displayType == "daily")
-                            {
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousWeek" title="Previous Week">
-                                    &lt;&lt;
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">
-                                    &lt;&lt;&lt;
-                                </button>
-                            }
-                            
-                            <div class="flex-grow-1 text-center">
-                                <strong>@GetCurrentPeriodDisplay()</strong>
-                            </div>
-                            
-                            <!-- Additional navigation for daily view -->
-                            @if (displayType == "daily")
-                            {
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">
-                                    &gt;&gt;&gt;
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextWeek" title="Next Week">
-                                    &gt;&gt;
-                                </button>
-                            }
-                            
-                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod" title="Next Day">
-                                &gt;
-                            </button>
-                            <button class="btn btn-outline-primary" @onclick="GoToToday">
-                                @GetTodayButtonText()
-                            </button>
-                        </div>
-                        
-                        <!-- Mobile Navigation (visible only on mobile) -->
-                        <div class="d-md-none">
-                            <!-- Previous Controls Row -->
-                            <div class="text-center mb-3">
-                                <div class="d-flex justify-content-center gap-2 mb-2">
-                                    <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousCalendarPeriod" title="Previous Day">
-                                        &lt;
-                                    </button>
-                                    
-                                    @if (displayType == "daily")
-                                    {
-                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousWeek" title="Previous Week">
-                                            &lt;&lt;
-                                        </button>
-                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">
-                                            &lt;&lt;&lt;
-                                        </button>
-                                    }
-                                </div>
-                                <small class="text-muted">Previous</small>
-                            </div>
-                            
-                            <!-- Date Display Row (centered) -->
-                            <div class="text-center mb-3 py-2">
-                                <div class="fw-bold fs-4">@GetCurrentPeriodDisplay()</div>
-                            </div>
-                            
-                            <!-- Today Button Row (centered) -->
-                            <div class="text-center mb-3">
-                                <button class="btn btn-primary px-4 py-2" @onclick="GoToToday">
-                                    @GetTodayButtonText()
-                                </button>
-                            </div>
-                            
-                            <!-- Next Controls Row -->
-                            <div class="text-center">
-                                <small class="text-muted d-block mb-2">Next</small>
-                                <div class="d-flex justify-content-center gap-2">
-                                    @if (displayType == "daily")
-                                    {
-                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">
-                                            &gt;&gt;&gt;
-                                        </button>
-                                        <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextWeek" title="Next Week">
-                                            &gt;&gt;
-                                        </button>
-                                    }
-                                    
-                                    <button class="btn btn-outline-secondary mobile-nav-btn" @onclick="NextCalendarPeriod" title="Next Day">
-                                        &gt;
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Mini Calendar for Daily view -->
-                        @if (displayType == "daily")
-                        {
-                            <div class="mt-2">
-                                <div class="calendar-grid">
-                                    <div class="calendar-header">
-                                        @foreach (var day in GetDayNames())
-                                        {
-                                            <div class="calendar-day-header">@day</div>
-                                        }
-                                    </div>
-                                    <div class="calendar-body">
-                                        @foreach (var date in GetCalendarDates())
-                                        {
-                                            <div class="calendar-day @GetDayClass(date)" @onclick="() => SelectDate(date)">
-                                                @date.Day
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
                 </div>
             </div>
         </div>
@@ -276,9 +127,113 @@
     </div>
 </div>
 
+<!-- Filter Modal -->
+<div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="filterModalLabel">Filters & Navigation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Display Type -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Display Type:</label>
+                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="form-select">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+
+                    <!-- Description Filter -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Description Filter:</label>
+                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="form-control"
+                            placeholder="Search description..." />
+                    </div>
+
+                    <!-- Calendar Navigation -->
+                    <div class="col-12">
+                        <label class="form-label">Date Navigation:</label>
+                        
+                        <!-- Navigation Controls -->
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <!-- Daily navigation -->
+                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
+                                &lt;
+                            </button>
+                            
+                            <!-- Additional navigation for daily view -->
+                            @if (displayType == "daily")
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousWeek" title="Previous Week">
+                                    &lt;&lt;
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">
+                                    &lt;&lt;&lt;
+                                </button>
+                            }
+                            
+                            <div class="flex-grow-1 text-center">
+                                <strong>@GetCurrentPeriodDisplay()</strong>
+                            </div>
+                            
+                            <!-- Additional navigation for daily view -->
+                            @if (displayType == "daily")
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">
+                                    &gt;&gt;&gt;
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="NextWeek" title="Next Week">
+                                    &gt;&gt;
+                                </button>
+                            }
+                            
+                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod" title="Next Day">
+                                &gt;
+                            </button>
+                            <button class="btn btn-outline-primary" @onclick="GoToToday">
+                                @GetTodayButtonText()
+                            </button>
+                        </div>
+                        
+                        <!-- Mini Calendar for Daily view -->
+                        @if (displayType == "daily")
+                        {
+                            <div class="mt-3">
+                                <div class="calendar-grid">
+                                    <div class="calendar-header">
+                                        @foreach (var day in GetDayNames())
+                                        {
+                                            <div class="calendar-day-header">@day</div>
+                                        }
+                                    </div>
+                                    <div class="calendar-body">
+                                        @foreach (var date in GetCalendarDates())
+                                        {
+                                            <div class="calendar-day @GetDayClass(date)" @onclick="() => SelectDate(date)">
+                                                @date.Day
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add New Activity Modal -->
 <div class="modal fade" id="addActivityModal" tabindex="-1" aria-labelledby="addActivityModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="addActivityModalLabel">Add New Activity</h5>                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -378,6 +333,18 @@
                         </div>
                     }
                     
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="addAnotherAfterSave" id="addAnotherCheck">
+                            <label class="form-check-label" for="addAnotherCheck">
+                                <i class="bi bi-plus-circle me-1"></i>Add another activity after saving
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Keep the form open with selected tag and date, but reset description
+                        </small>
+                    </div>
+                    
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">
@@ -395,6 +362,7 @@
     private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
     private string? errorMessage;
     private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
+    private bool addAnotherAfterSave = false;
     
     // Input type value helpers
     private bool booleanValue = false;
@@ -712,24 +680,46 @@ delete window.homePageKeyboardHandler;
             }
 
             await ActivityApi.CreateCalendarItem(newActivity);
+            
+            // Store current values for "Add Another" functionality
+            var keepTagId = newActivity.PrimaryTagId;
+            var keepDate = newActivity.DateStarted;
+            
             newActivity = new();
             InitializeNewActivity();
-            selectedTag = null; // Reset selected tag
+            
+            if (addAnotherAfterSave)
+            {
+                // Keep selected tag and date, but reset description
+                newActivity.PrimaryTagId = keepTagId;
+                newActivity.DateStarted = keepDate;
+                // Don't reset selectedTag so UI shows the kept selection
+                // Reset only the description value, keep other values
+                // Note: Input type values are reset below as normal
+            }
+            else
+            {
+                selectedTag = null; // Reset selected tag only if not adding another
+            }
+            
             integerValue = null; // Reset integer value
             booleanValue = false; // Reset boolean value
             dateValue = null; // Reset date value
             errorMessage = null;
             await LoadData();
 
-            // Close the modal after successful submission (only if rendered)
-            try
+            // Close the modal after successful submission only if not adding another
+            if (!addAnotherAfterSave)
             {
-                await JSRuntime.InvokeVoidAsync("eval",
-                "bootstrap.Modal.getInstance(document.getElementById('addActivityModal'))?.hide()");
-            }
-            catch (InvalidOperationException)
-            {
-                // Ignore JavaScript interop errors during static rendering
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("eval",
+                    "bootstrap.Modal.getInstance(document.getElementById('addActivityModal'))?.hide()");
+                }
+                catch (InvalidOperationException)
+                {
+                    // Ignore JavaScript interop errors during static rendering
+                }
             }
         }        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {

@@ -30,9 +30,9 @@ public static class MauiProgram
         builder.Services.AddSingleton(appSettings);
 
         // API configuration
-        var apiBaseUrl = "https://logmyday.yourserver.cz";
+        var apiBaseUrl = "https://logmyday.tadata.cz";
         var apiUsername = "admin";
-        var apiPassword = "heslo";
+        var apiPassword = "secret123";
 
         // Add authentication handler with proper credentials
         builder.Services.AddTransient<BasicAuthHandler>(provider => 

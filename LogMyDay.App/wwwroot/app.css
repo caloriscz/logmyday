@@ -518,6 +518,25 @@ main {
     }
 }
 
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+}
+
 /* Mobile-responsive improvements */
 @media (max-width: 767.98px) {
     .page-card {
@@ -574,54 +593,6 @@ main {
     .btn-sm {
         padding: 0.25rem 0.5rem;
         font-size: 0.75rem;
-    }
-}
-
-/* CRITICAL MOBILE PADDING FIXES - HIGHEST PRIORITY */
-/* Force override all Bootstrap padding on mobile devices */
-@media screen and (max-width: 768px) {
-    /* Target all possible padding classes and elements */
-    .px-4, 
-    .content.px-4, 
-    .container-fluid.px-4,
-    .container.px-4,
-    article.content,
-    main article.content,
-    .page .content {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    /* Very specific override for the main layout */
-    .page main article.content.px-4 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    /* Additional containers that might have padding */
-    .container-fluid {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-}
-
-/* Even smaller screens */
-@media screen and (max-width: 576px) {
-    .px-4, 
-    .content.px-4, 
-    .container-fluid.px-4,
-    .container.px-4,
-    article.content,
-    main article.content,
-    .page .content,
-    .page main article.content.px-4 {
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
-    }
-    
-    .container-fluid {
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
     }
 }
 
@@ -735,4 +706,52 @@ main {
     background-color: var(--card-bg);
     color: var(--text-color);
     border-color: var(--border-color);
+}
+
+/* BOOTSTRAP 5.3 CONTAINER PADDING OVERRIDE FOR MOBILE */
+/* Override Bootstrap's default container horizontal padding on small breakpoints */
+@media (max-width: 576px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
 }

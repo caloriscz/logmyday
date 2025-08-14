@@ -46,8 +46,12 @@
                 </li>
             </ul>
 
-            <!-- Theme toggle and logout -->
+            <!-- Theme toggle, New Activity, and logout -->
             <div class="navbar-nav d-flex flex-row align-items-center gap-2">
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#addActivityModal" title="Add new activity (Ctrl+M)">
+                    <i class="bi bi-plus-circle"></i> <span class="d-none d-lg-inline">New Activity</span>
+                </button>
                 <button class="theme-toggle" @onclick="ToggleTheme" title="Toggle theme">
                     <i class="bi @(isDarkMode ? "bi-sun" : "bi-moon")"></i>
                 </button>
