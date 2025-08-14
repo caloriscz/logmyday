@@ -2,7 +2,15 @@
 <ContentPage x:Class="LogMyDay.App.Mobile.Pages.SettingsPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             Title="Settings">
+             Title="Settings"
+             Shell.BackButtonBehavior="{x:Null}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Done"
+                     Order="Primary" 
+                     Priority="0"
+                     Clicked="OnDoneClicked" />
+    </ContentPage.ToolbarItems>
 
     <ScrollView Padding="20">
         <StackLayout Spacing="20">

@@ -20,15 +20,33 @@ public partial class QuickActivitiesPage : ContentPage
         BindingContext = _viewModel;
     }
 
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        
+        try
+        {
+            await _viewModel.RefreshButtonsAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading quick buttons: {ex.Message}");
+            await DisplayAlert("Error", "Failed to load quick activity buttons.", "OK");
+        }
+    }
+
     private async void OnAddButtonClicked(object sender, EventArgs e)
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("Add button clicked - starting add process");
+            
             // Show dialog to get button configuration
             await ShowAddButtonDialog();
         }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"Error in OnAddButtonClicked: {ex.Message}");
             await DisplayAlert("Error", $"Error adding button: {ex.Message}", "OK");
         }
     }
@@ -36,11 +54,14 @@ public partial class QuickActivitiesPage : ContentPage
     private async Task ShowAddButtonDialog()
     {
         try
-        {            
+        {
+            System.Diagnostics.Debug.WriteLine("ShowAddButtonDialog started");
+            
             // First, get available tags
             var tags = await _apiService.GetTagsAsync();
+            System.Diagnostics.Debug.WriteLine($"Retrieved {tags?.Count ?? 0} tags from API");
             
-            if (tags.Count == 0)
+            if (tags == null || tags.Count == 0)
             {
                 var errorMessage = "No tags available. Please create tags first in the main app.";
                 if (!string.IsNullOrEmpty(_apiService.LastError))
@@ -93,6 +114,9 @@ public partial class QuickActivitiesPage : ContentPage
             };
 
             await _quickActivityService.AddQuickButtonAsync(quickButton);
+            
+            // Refresh the buttons list
+            await _viewModel.RefreshButtonsAsync();
             
             await DisplayAlert("Success", $"Quick activity button '{buttonName}' created!", "OK");
         }

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Microsoft.Maui.Storage;
 
 namespace LogMyDay.App.Mobile.ViewModels;
 
@@ -40,20 +41,43 @@ public class SettingsViewModel : INotifyPropertyChanged
         }
     }
 
-    public ICommand SaveSettingsCommand { get; }
+    public ICommand SaveSettingsCommand { get; private set; }
 
     public SettingsViewModel()
     {
-        SaveSettingsCommand = new Command(async () => await SaveSettings());
-        LoadSettings();
+        try
+        {
+            SaveSettingsCommand = new Command(async () => await SaveSettings());
+            LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"SettingsViewModel constructor error: {ex.Message}");
+            // Initialize with defaults if there's an error
+            SaveSettingsCommand = new Command(async () => await SaveSettings());
+            ServerUrl = "https://logmyday.tadata.cz";
+            Username = "";
+            Password = "";
+        }
     }
 
     private void LoadSettings()
     {
-        // Load settings from preferences
-        ServerUrl = Preferences.Get("server_url", "https://logmyday.tadata.cz");
-        Username = Preferences.Get("username", "");
-        Password = Preferences.Get("password", "");
+        try
+        {
+            // Load settings from preferences
+            ServerUrl = Preferences.Get("server_url", "https://logmyday.tadata.cz");
+            Username = Preferences.Get("username", "");
+            Password = Preferences.Get("password", "");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading settings: {ex.Message}");
+            // Use defaults if loading fails
+            ServerUrl = "https://logmyday.tadata.cz";
+            Username = "";
+            Password = "";
+        }
     }
 
     private async Task SaveSettings()

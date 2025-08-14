@@ -27,10 +27,12 @@
 
     <TabBar>
         <ShellContent Title="Home"
+                      Route="home"
                       Icon="home.svg"
                       ContentTemplate="{DataTemplate local:HomePage}" />
         
         <ShellContent Title="Quick Activities"
+                      Route="quickactivities"
                       Icon="flash.svg"
                       ContentTemplate="{DataTemplate local:QuickActivitiesPage}" />
     </TabBar>

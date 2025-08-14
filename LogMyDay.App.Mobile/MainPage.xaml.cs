@@ -19,6 +19,15 @@ public partial class MainPage : Shell
 
     private async void OnSettingsClicked(object sender, EventArgs e)
     {
-        await Shell.Current.GoToAsync("//settings");
+        try
+        {
+            await Shell.Current.GoToAsync("settings");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Settings navigation error: {ex.Message}");
+            // Show error to user
+            await DisplayAlert("Error", $"Unable to open settings: {ex.Message}", "OK");
+        }
     }
 }
