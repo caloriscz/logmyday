@@ -26,52 +26,45 @@ public static class MauiProgram
             WebUrl = "https://logmyday.tadata.cz",
             DefaultPage = "/"
         };
-
         builder.Services.AddSingleton(appSettings);
 
-        // API configuration
+        // API configuration - simplified
         var apiBaseUrl = "https://logmyday.tadata.cz";
-        var apiUsername = "admin";
-        var apiPassword = "secret123";
-
-        // Add authentication handler with proper credentials
+        
         builder.Services.AddTransient<BasicAuthHandler>(provider => 
-            new BasicAuthHandler(apiUsername, apiPassword));
+            new BasicAuthHandler("admin", "secret123"));
 
-        // Configure Refit client for API
         builder.Services.AddRefitClient<IActivityApi>()
-            .ConfigureHttpClient(c =>
-            {
-                c.BaseAddress = new Uri(apiBaseUrl);
-            })
+            .ConfigureHttpClient(c => c.BaseAddress = new Uri(apiBaseUrl))
             .AddHttpMessageHandler<BasicAuthHandler>();
 
-        // Add services
+        // Essential services only
         builder.Services.AddSingleton<ApiService>();
         builder.Services.AddSingleton<QuickActivityService>();
         builder.Services.AddSingleton<AuthenticationService>(provider => AuthenticationService.Instance);
         
-        // Add view models
+        // Core ViewModels
         builder.Services.AddTransient<QuickActivitiesViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
-        builder.Services.AddTransient<TagsViewModel>();
         builder.Services.AddTransient<AddActivityViewModel>();
         builder.Services.AddTransient<ActivitiesViewModel>();
+        builder.Services.AddTransient<TagsViewModel>();
         builder.Services.AddTransient<LoginViewModel>();
         
-        // Add pages
+        // Core Pages
         builder.Services.AddTransient<HomePage>();
         builder.Services.AddTransient<QuickActivitiesPage>();
         builder.Services.AddTransient<SettingsPage>();
-        builder.Services.AddTransient<TagsPage>();
         builder.Services.AddTransient<AddActivityPage>();
         builder.Services.AddTransient<ActivitiesPage>();
+        builder.Services.AddTransient<TagsPage>();
         builder.Services.AddTransient<LoginPage>();
         builder.Services.AddSingleton<MainPage>();
 
-        // Register routes
+        // Register essential routes only
         Routing.RegisterRoute("settings", typeof(SettingsPage));
         Routing.RegisterRoute("addactivity", typeof(AddActivityPage));
+        Routing.RegisterRoute("quickactivities", typeof(QuickActivitiesPage));
         Routing.RegisterRoute("login", typeof(LoginPage));
 
         return builder.Build();

@@ -11,28 +11,6 @@ public class MainActivity : MauiAppCompatActivity
 {
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
-        try
-        {
-            base.OnCreate(savedInstanceState);
-            System.Diagnostics.Debug.WriteLine("MainActivity created successfully");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in MainActivity OnCreate: {ex}");
-            throw;
-        }
-    }
-
-    protected override void OnResume()
-    {
-        try
-        {
-            base.OnResume();
-            System.Diagnostics.Debug.WriteLine("MainActivity resumed");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in MainActivity OnResume: {ex}");
-        }
+        base.OnCreate(savedInstanceState);
     }
 }

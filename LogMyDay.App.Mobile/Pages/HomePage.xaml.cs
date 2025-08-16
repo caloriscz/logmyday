@@ -6,7 +6,6 @@ namespace LogMyDay.App.Mobile.Pages;
 public partial class HomePage : ContentPage, INotifyPropertyChanged
 {
     private readonly AppSettings _appSettings;
-    private readonly AuthenticationService _authService;
     private string _currentUrl = string.Empty;
 
     public string CurrentUrl
@@ -14,11 +13,8 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
         get => _currentUrl;
         set
         {
-            if (_currentUrl != value)
-            {
-                _currentUrl = value;
-                OnPropertyChanged();
-            }
+            _currentUrl = value;
+            OnPropertyChanged();
         }
     }
 
@@ -27,17 +23,12 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
         try
         {
             InitializeComponent();
-            _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
-            _authService = AuthenticationService.Instance;
-            
-            // Set the initial URL from app settings
+            _appSettings = appSettings ?? new AppSettings { WebUrl = "https://logmyday.tadata.cz", DefaultPage = "/" };
             CurrentUrl = _appSettings.FullUrl;
-            
             BindingContext = this;
         }
         catch (Exception ex)
         {
-            // Log error and set defaults
             System.Diagnostics.Debug.WriteLine($"HomePage constructor error: {ex.Message}");
             _appSettings = new AppSettings { WebUrl = "https://logmyday.tadata.cz", DefaultPage = "/" };
             CurrentUrl = _appSettings.FullUrl;
@@ -49,17 +40,8 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
     {
         base.OnAppearing();
         
-        // Check authentication first
-        if (!_authService.IsAuthenticated)
-        {
-            // Redirect to login if not authenticated
-            _ = Shell.Current.GoToAsync("//login");
-            return;
-        }
-        
         try
         {
-            // Navigate to the initial URL
             if (!string.IsNullOrEmpty(CurrentUrl))
             {
                 webView.Source = CurrentUrl;
@@ -68,8 +50,14 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"HomePage OnAppearing error: {ex.Message}");
-            // Try to load a fallback URL
             webView.Source = "https://logmyday.tadata.cz";
         }
+    }
+
+    public new event PropertyChangedEventHandler? PropertyChanged;
+
+    protected new virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

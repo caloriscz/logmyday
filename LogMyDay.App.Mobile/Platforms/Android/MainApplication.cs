@@ -1,6 +1,5 @@
 using Android.App;
 using Android.Runtime;
-using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.App.Mobile.Platforms.Android;
 
@@ -12,30 +11,5 @@ public class MainApplication : MauiApplication
     {
     }
 
-    protected override MauiApp CreateMauiApp()
-    {
-        try
-        {
-            return MauiProgram.CreateMauiApp();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error creating MAUI app: {ex}");
-            throw;
-        }
-    }
-
-    public override void OnCreate()
-    {
-        try
-        {
-            base.OnCreate();
-            System.Diagnostics.Debug.WriteLine("MainApplication created successfully");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in MainApplication OnCreate: {ex}");
-            throw;
-        }
-    }
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
 }
