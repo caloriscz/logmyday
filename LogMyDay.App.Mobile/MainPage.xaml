@@ -7,14 +7,21 @@
        FlyoutBehavior="Disabled">
 
     <Shell.TitleView>
-        <Grid ColumnDefinitions="*,Auto" Padding="10,0">
-            <Label Grid.Column="0" 
-                   Text="LogMyDay" 
-                   FontSize="20" 
-                   FontAttributes="Bold" 
-                   VerticalOptions="Center" 
-                   TextColor="White" />
-            <Button Grid.Column="1"
+        <Grid ColumnDefinitions="Auto,*,Auto" Padding="10,0">
+            <!-- New Activity Button on Left -->
+            <Button Grid.Column="0"
+                    Text="+"
+                    FontSize="24"
+                    FontAttributes="Bold"
+                    BackgroundColor="#28a745"
+                    TextColor="White"
+                    WidthRequest="40"
+                    HeightRequest="40"
+                    CornerRadius="20"
+                    Clicked="OnNewActivityClicked" />
+            
+            <!-- Settings Button on Right -->
+            <Button Grid.Column="2"
                     Text="⚙️"
                     FontSize="20"
                     BackgroundColor="Transparent"
@@ -26,14 +33,24 @@
     </Shell.TitleView>
 
     <TabBar>
-        <ShellContent Title="Home"
-                      Route="home"
+        <ShellContent Title="App"
+                      Route="app"
                       Icon="home.svg"
                       ContentTemplate="{DataTemplate local:HomePage}" />
         
-        <ShellContent Title="Quick Activities"
-                      Route="quickactivities"
-                      Icon="flash.svg"
+        <ShellContent Title="Activities"
+                      Route="activities"
+                      Icon="activity.svg"
+                      ContentTemplate="{DataTemplate local:ActivitiesPage}" />
+        
+        <ShellContent Title="Tags"
+                      Route="tags"
+                      Icon="tag.svg"
+                      ContentTemplate="{DataTemplate local:TagsPage}" />
+        
+        <ShellContent Title="Quick"
+                      Route="quick"
+                      Icon="quick.svg"
                       ContentTemplate="{DataTemplate local:QuickActivitiesPage}" />
     </TabBar>
 

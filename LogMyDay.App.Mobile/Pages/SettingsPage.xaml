@@ -3,109 +3,232 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              Title="Settings"
-             Shell.BackButtonBehavior="{x:Null}">
+             Shell.BackButtonBehavior="{x:Null}"
+             NavigationPage.HasNavigationBar="False">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Done"
-                     Order="Primary" 
-                     Priority="0"
-                     Clicked="OnDoneClicked" />
-    </ContentPage.ToolbarItems>
-
-    <ScrollView Padding="20">
-        <StackLayout Spacing="20">
-            <!-- Server Settings Section -->
-            <Frame BackgroundColor="LightBlue" 
-                   CornerRadius="10" 
-                   Padding="15"
-                   HasShadow="True">
-                <StackLayout Spacing="15">
-                    <Label Text="Server Configuration" 
-                           FontSize="20" 
-                           FontAttributes="Bold" 
-                           HorizontalOptions="Center" />
-                    
-                    <!-- Server URL -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Server URL:" 
-                               FontSize="16" 
-                               FontAttributes="Bold" />
-                        <Entry x:Name="serverUrlEntry"
-                               Text="{Binding ServerUrl}"
-                               Placeholder="https://your-server.com"
-                               Keyboard="Url"
-                               FontSize="14" />
-                        <Label Text="The URL of your LogMyDay server instance"
-                               FontSize="12"
-                               TextColor="Gray" />
-                    </StackLayout>
-                    
-                    <!-- Username -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Username:" 
-                               FontSize="16" 
-                               FontAttributes="Bold" />
-                        <Entry x:Name="usernameEntry"
-                               Text="{Binding Username}"
-                               Placeholder="Your username"
-                               FontSize="14" />
-                        <Label Text="Your login username for the server"
-                               FontSize="12"
-                               TextColor="Gray" />
-                    </StackLayout>
-                    
-                    <!-- Password -->
-                    <StackLayout Spacing="5">
-                        <Label Text="Password:" 
-                               FontSize="16" 
-                               FontAttributes="Bold" />
-                        <Entry x:Name="passwordEntry"
-                               Text="{Binding Password}"
-                               Placeholder="Your password"
-                               IsPassword="True"
-                               FontSize="14" />
-                        <Label Text="Your login password for the server"
-                               FontSize="12"
-                               TextColor="Gray" />
-                    </StackLayout>
-                    
-                    <!-- Save Button -->
-                    <Button Text="Save Settings"
-                            BackgroundColor="DodgerBlue"
-                            TextColor="White"
-                            CornerRadius="8"
-                            FontSize="16"
-                            Command="{Binding SaveSettingsCommand}"
-                            Margin="0,10,0,0" />
-                </StackLayout>
-            </Frame>
+    <Grid RowDefinitions="Auto,*,Auto" BackgroundColor="#f8f9fa">
+        
+        <!-- Custom Header -->
+        <Grid Grid.Row="0" BackgroundColor="#007bff" Padding="20,40,20,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             
-            <!-- App Information Section -->
-            <Frame BackgroundColor="LightGray" 
-                   CornerRadius="10" 
-                   Padding="15"
-                   HasShadow="True">
-                <StackLayout Spacing="10">
-                    <Label Text="Application Information" 
-                           FontSize="20" 
-                           FontAttributes="Bold" 
-                           HorizontalOptions="Center" />
-                    
-                    <Label Text="LogMyDay Mobile" 
-                           FontSize="16" 
-                           HorizontalOptions="Center" />
-                    
-                    <Label Text="Version 1.0" 
-                           FontSize="14" 
-                           TextColor="Gray"
-                           HorizontalOptions="Center" />
-                    
-                    <Label Text="Personal activity logging on the go" 
-                           FontSize="12" 
-                           TextColor="Gray"
-                           HorizontalOptions="Center" />
-                </StackLayout>
-            </Frame>
-        </StackLayout>
-    </ScrollView>
+            <Button Grid.Column="2"
+                    Text="Done"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    Clicked="OnDoneClicked" />
+            
+            <Label Grid.Column="1"
+                   Text="Login Settings" 
+                   FontSize="24" 
+                   FontAttributes="Bold" 
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" 
+                   TextColor="White" />
+        </Grid>
+
+        <!-- Settings Content -->
+        <ScrollView Grid.Row="1" Padding="0">
+            <StackLayout Spacing="0">
+                
+                <!-- User Profile Section -->
+                <Frame BackgroundColor="White" 
+                       CornerRadius="0" 
+                       Padding="20,25"
+                       HasShadow="False"
+                       Margin="0,0,0,2">
+                    <StackLayout Spacing="20">
+                        <StackLayout Orientation="Horizontal" Spacing="15">
+                            <Frame BackgroundColor="#007bff" 
+                                   CornerRadius="30" 
+                                   Padding="0"
+                                   WidthRequest="60" 
+                                   HeightRequest="60"
+                                   HasShadow="False">
+                                <Label Text="👤" 
+                                       FontSize="28" 
+                                       HorizontalOptions="Center" 
+                                       VerticalOptions="Center"
+                                       TextColor="White" />
+                            </Frame>
+                            <StackLayout VerticalOptions="Center" Spacing="5">
+                                <Label Text="User Profile" 
+                                       FontSize="20" 
+                                       FontAttributes="Bold" 
+                                       TextColor="#333" />
+                                <Label Text="Configure your server connection" 
+                                       FontSize="14" 
+                                       TextColor="#666" />
+                            </StackLayout>
+                        </StackLayout>
+                    </StackLayout>
+                </Frame>
+
+                <!-- Server Configuration Section -->
+                <Frame BackgroundColor="White" 
+                       CornerRadius="0" 
+                       Padding="20,25"
+                       HasShadow="False"
+                       Margin="0,0,0,2">
+                    <StackLayout Spacing="25">
+                        <Label Text="Server Configuration" 
+                               FontSize="18" 
+                               FontAttributes="Bold" 
+                               TextColor="#333" />
+                        
+                        <!-- Server URL -->
+                        <StackLayout Spacing="8">
+                            <Label Text="Server URL" 
+                                   FontSize="16" 
+                                   FontAttributes="Bold" 
+                                   TextColor="#555" />
+                            <Entry x:Name="serverUrlEntry"
+                                   Text="{Binding ServerUrl}"
+                                   Placeholder="https://your-server.com"
+                                   Keyboard="Url"
+                                   FontSize="16"
+                                   TextColor="#333"
+                                   BackgroundColor="#f8f9fa"
+                                   HorizontalTextAlignment="Start"
+                                   HeightRequest="50" />
+                            <Label Text="Enter the URL of your LogMyDay server instance"
+                                   FontSize="13"
+                                   TextColor="#888" />
+                        </StackLayout>
+                        
+                        <!-- Username -->
+                        <StackLayout Spacing="8">
+                            <Label Text="Username" 
+                                   FontSize="16" 
+                                   FontAttributes="Bold" 
+                                   TextColor="#555" />
+                            <Entry x:Name="usernameEntry"
+                                   Text="{Binding Username}"
+                                   Placeholder="Your username"
+                                   FontSize="16"
+                                   TextColor="#333"
+                                   BackgroundColor="#f8f9fa"
+                                   HorizontalTextAlignment="Start"
+                                   HeightRequest="50" />
+                            <Label Text="Your login username for the server"
+                                   FontSize="13"
+                                   TextColor="#888" />
+                        </StackLayout>
+                        
+                        <!-- Password -->
+                        <StackLayout Spacing="8">
+                            <Label Text="Password" 
+                                   FontSize="16" 
+                                   FontAttributes="Bold" 
+                                   TextColor="#555" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry Grid.Column="0"
+                                       x:Name="passwordEntry"
+                                       Text="{Binding Password}"
+                                       Placeholder="Your password"
+                                       IsPassword="{Binding IsPasswordHidden}"
+                                       FontSize="16"
+                                       TextColor="#333"
+                                       BackgroundColor="#f8f9fa"
+                                       HorizontalTextAlignment="Start"
+                                       HeightRequest="50" />
+                                <Button Grid.Column="1"
+                                        Text="{Binding PasswordToggleText}"
+                                        FontSize="14"
+                                        BackgroundColor="Transparent"
+                                        TextColor="#007bff"
+                                        WidthRequest="60"
+                                        HeightRequest="50"
+                                        Command="{Binding TogglePasswordVisibilityCommand}" />
+                            </Grid>
+                            <Label Text="Your login password for the server"
+                                   FontSize="13"
+                                   TextColor="#888" />
+                        </StackLayout>
+                    </StackLayout>
+                </Frame>
+
+                <!-- Connection Test Section -->
+                <Frame BackgroundColor="White" 
+                       CornerRadius="0" 
+                       Padding="20,25"
+                       HasShadow="False"
+                       Margin="0,0,0,2">
+                    <StackLayout Spacing="15">
+                        <Button Text="Test Connection"
+                                BackgroundColor="#28a745"
+                                TextColor="White"
+                                CornerRadius="8"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                HeightRequest="50"
+                                Command="{Binding TestConnectionCommand}"
+                                IsEnabled="{Binding IsNotTesting}" />
+                        
+                        <StackLayout IsVisible="{Binding ShowConnectionStatus}" Spacing="10">
+                            <Frame BackgroundColor="{Binding ConnectionStatusColor}"
+                                   CornerRadius="8"
+                                   Padding="15,10"
+                                   HasShadow="False">
+                                <Label Text="{Binding ConnectionStatusMessage}" 
+                                       FontSize="14" 
+                                       FontAttributes="Bold"
+                                       TextColor="White"
+                                       HorizontalOptions="Center" />
+                            </Frame>
+                        </StackLayout>
+                    </StackLayout>
+                </Frame>
+
+                <!-- App Information Section -->
+                <Frame BackgroundColor="White" 
+                       CornerRadius="0" 
+                       Padding="20,25"
+                       HasShadow="False"
+                       Margin="0,0,0,20">
+                    <StackLayout Spacing="15">
+                        <Label Text="Application Information" 
+                               FontSize="18" 
+                               FontAttributes="Bold" 
+                               TextColor="#333" />
+                        
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="15">
+                            <Label Grid.Row="0" Grid.Column="0" Text="App:" FontSize="14" FontAttributes="Bold" TextColor="#555" />
+                            <Label Grid.Row="0" Grid.Column="1" Text="LogMyDay Mobile" FontSize="14" TextColor="#777" />
+                            
+                            <Label Grid.Row="1" Grid.Column="0" Text="Version:" FontSize="14" FontAttributes="Bold" TextColor="#555" />
+                            <Label Grid.Row="1" Grid.Column="1" Text="1.0.0" FontSize="14" TextColor="#777" />
+                            
+                            <Label Grid.Row="2" Grid.Column="0" Text="Purpose:" FontSize="14" FontAttributes="Bold" TextColor="#555" />
+                            <Label Grid.Row="2" Grid.Column="1" Text="Personal activity logging" FontSize="14" TextColor="#777" />
+                        </Grid>
+                    </StackLayout>
+                </Frame>
+            </StackLayout>
+        </ScrollView>
+
+        <!-- Save Button -->
+        <Frame Grid.Row="2" 
+               BackgroundColor="White"
+               CornerRadius="0"
+               Padding="20,15"
+               HasShadow="True">
+            <Button Text="💾 Save Settings"
+                    BackgroundColor="#007bff"
+                    TextColor="White"
+                    CornerRadius="8"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    HeightRequest="55"
+                    Command="{Binding SaveSettingsCommand}"
+                    IsEnabled="{Binding IsNotSaving}" />
+        </Frame>
+    </Grid>
+
 </ContentPage>

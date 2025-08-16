@@ -153,6 +153,57 @@ public class ApiService
         }
     }
 
+    public async Task<bool> CreateTagAsync(string tagName)
+    {
+        LastError = null;
+        
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"=== CREATING TAG ===");
+            System.Diagnostics.Debug.WriteLine($"Tag Name: {tagName}");
+            
+            var tagRequest = new TagRequest
+            {
+                Tag = tagName,
+                TypeId = 2, // Default to String type
+                IsRequired = false,
+                IsRepeatable = true,
+                TimeGranularity = LogMyDay.Domain.Enums.TimeGranularity.Exact,
+                IsRange = false
+            };
+            
+            await _activityApi.CreateTag(tagRequest);
+            
+            System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Tag '{tagName}' created successfully");
+            System.Diagnostics.Debug.WriteLine("=== END TAG CREATION ===");
+            
+            return true;
+        }
+        catch (HttpRequestException httpEx)
+        {
+            var errorDetails = $"HTTP Error creating tag: {httpEx.Message}";
+            LastError = errorDetails;
+            
+            System.Diagnostics.Debug.WriteLine("=== TAG CREATION ERROR ===");
+            System.Diagnostics.Debug.WriteLine($"❌ HTTP Error creating tag '{tagName}': {httpEx.Message}");
+            System.Diagnostics.Debug.WriteLine("=== END ERROR ===");
+            
+            return false;
+        }
+        catch (Exception ex)
+        {
+            var errorDetails = $"Error creating tag: {ex.Message}";
+            LastError = errorDetails;
+            
+            System.Diagnostics.Debug.WriteLine("=== TAG CREATION ERROR ===");
+            System.Diagnostics.Debug.WriteLine($"❌ Error creating tag '{tagName}': {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
+            System.Diagnostics.Debug.WriteLine("=== END ERROR ===");
+            
+            return false;
+        }
+    }
+
     public async Task<bool> CreateActivityAsync(ActivityRequest request)
     {
         try
@@ -164,7 +215,77 @@ public class ApiService
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error creating activity: {ex.Message}");
+            LastError = $"Error creating activity: {ex.Message}";
             
+            return false;
+        }
+    }
+
+    public async Task<List<ActivityResponse>> GetActivitiesAsync(
+        DateTime? startDate = null, 
+        DateTime? endDate = null, 
+        int pageSize = 20, 
+        int pageNumber = 1,
+        string orderBy = "desc",
+        int? tagId = null)
+    {
+        LastError = null;
+        
+        try
+        {
+            var result = await _activityApi.GetActivities(
+                pageNumber: pageNumber,
+                pageSize: pageSize,
+                orderBy: orderBy,
+                tagId: tagId,
+                startDate: startDate,
+                endDate: endDate);
+            
+            System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Fetched {result.Items.Count()} activities from API");
+            
+            return result.Items.ToList();
+        }
+        catch (HttpRequestException httpEx)
+        {
+            var errorDetails = $"HTTP Error: {httpEx.Message}";
+            LastError = errorDetails;
+            
+            System.Diagnostics.Debug.WriteLine($"❌ HTTP Error fetching activities: {httpEx.Message}");
+            
+            return new List<ActivityResponse>();
+        }
+        catch (TaskCanceledException tcEx)
+        {
+            var errorDetails = $"Timeout Error: {tcEx.Message}";
+            LastError = errorDetails;
+            
+            System.Diagnostics.Debug.WriteLine($"❌ Timeout fetching activities: {tcEx.Message}");
+            
+            return new List<ActivityResponse>();
+        }
+        catch (Exception ex)
+        {
+            var errorDetails = $"General Error: {ex.Message}";
+            LastError = errorDetails;
+            
+            System.Diagnostics.Debug.WriteLine($"❌ General Error fetching activities: {ex.Message}");
+            
+            return new List<ActivityResponse>();
+        }
+    }
+
+    public async Task<bool> DeleteActivityAsync(int activityId)
+    {
+        try
+        {
+            await _activityApi.Delete(activityId);
+            System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Deleted activity {activityId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Error deleting activity {activityId}: {ex.Message}");
+            LastError = $"Error deleting activity: {ex.Message}";
             return false;
         }
     }

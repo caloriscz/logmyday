@@ -30,4 +30,18 @@ public partial class MainPage : Shell
             await DisplayAlert("Error", $"Unable to open settings: {ex.Message}", "OK");
         }
     }
+
+    private async void OnNewActivityClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await Shell.Current.GoToAsync("addactivity");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Add activity navigation error: {ex.Message}");
+            // Show error to user
+            await DisplayAlert("Error", $"Unable to open add activity: {ex.Message}", "OK");
+        }
+    }
 }

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LogMyDay.App.Mobile.Pages.ActivitiesPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Activities">
+
+    <Grid RowDefinitions="Auto,*" BackgroundColor="#f8f9fa">
+        
+        <!-- Header Section with Date Navigation -->
+        <StackLayout Grid.Row="0" BackgroundColor="White" Padding="20,15">
+            
+            <!-- Date Navigation -->
+            <Grid ColumnDefinitions="Auto,*,Auto" HorizontalOptions="FillAndExpand" Margin="0,0,0,10">
+                <Button Grid.Column="0"
+                        Text="‹"
+                        FontSize="24"
+                        FontAttributes="Bold"
+                        BackgroundColor="Transparent"
+                        TextColor="#007bff"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        Command="{Binding PreviousDayCommand}" />
+                
+                <StackLayout Grid.Column="1" HorizontalOptions="Center" VerticalOptions="Center">
+                    <Label Text="{Binding SelectedDate, StringFormat='{0:dddd, MMMM d}'}" 
+                           FontSize="18" 
+                           FontAttributes="Bold" 
+                           HorizontalOptions="Center" 
+                           TextColor="#333" />
+                    <Label Text="{Binding SelectedDate, StringFormat='{0:yyyy}'}" 
+                           FontSize="14" 
+                           HorizontalOptions="Center" 
+                           TextColor="#666" />
+                </StackLayout>
+                
+                <Button Grid.Column="2"
+                        Text="›"
+                        FontSize="24"
+                        FontAttributes="Bold"
+                        BackgroundColor="Transparent"
+                        TextColor="#007bff"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        Command="{Binding NextDayCommand}" />
+            </Grid>
+            
+            <!-- Quick Actions -->
+            <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+                <Button Grid.Column="0"
+                        Text="📅 Today"
+                        FontSize="16"
+                        BackgroundColor="#007bff"
+                        TextColor="White"
+                        CornerRadius="8"
+                        Command="{Binding GoToTodayCommand}"
+                        HorizontalOptions="Start" />
+                
+                <Button Grid.Column="1"
+                        Text="↻"
+                        FontSize="20"
+                        BackgroundColor="Transparent"
+                        TextColor="#007bff"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        Command="{Binding RefreshCommand}" />
+            </Grid>
+            
+            <!-- Search Filter -->
+            <SearchBar x:Name="ActivitySearchBar"
+                       Placeholder="Search activities..."
+                       BackgroundColor="LightGray"
+                       TextColor="#333"
+                       PlaceholderColor="#666"
+                       TextChanged="OnSearchTextChanged"
+                       Margin="0,15,0,0" />
+        </StackLayout>
+
+        <!-- Activities List -->
+        <RefreshView Grid.Row="1" 
+                     IsRefreshing="{Binding IsRefreshing}"
+                     Command="{Binding RefreshCommand}">
+            
+            <CollectionView ItemsSource="{Binding Activities}"
+                            BackgroundColor="Transparent"
+                            SelectionMode="None">
+                
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="20,10" BackgroundColor="White" Margin="0,0,0,10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Activity Header -->
+                            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0"
+                                       Text="{Binding TagTitle}" 
+                                       FontSize="18" 
+                                       FontAttributes="Bold" 
+                                       VerticalOptions="Center"
+                                       TextColor="#333" />
+                                
+                                <Label Grid.Column="1"
+                                       Text="{Binding TimeDisplay}" 
+                                       FontSize="14" 
+                                       FontAttributes="Bold"
+                                       VerticalOptions="Center"
+                                       TextColor="#007bff"
+                                       HorizontalOptions="End" />
+                            </Grid>
+                            
+                            <!-- Activity Value (if present) -->
+                            <StackLayout Grid.Row="1" 
+                                         IsVisible="{Binding HasValue}"
+                                         Orientation="Horizontal" 
+                                         Spacing="5"
+                                         Margin="0,8,0,0">
+                                <Label Text="💡" FontSize="16" VerticalOptions="Center" />
+                                <Label Text="{Binding Value}" 
+                                       FontSize="16" 
+                                       FontAttributes="Bold"
+                                       VerticalOptions="Center"
+                                       TextColor="#28a745" />
+                            </StackLayout>
+                            
+                            <!-- Activity Description (if present) -->
+                            <Label Grid.Row="2"
+                                   Text="{Binding Description}" 
+                                   FontSize="14" 
+                                   IsVisible="{Binding HasDescription}"
+                                   TextColor="#666"
+                                   Margin="0,8,0,0"
+                                   LineBreakMode="WordWrap" />
+                            
+                            <!-- Separator Line -->
+                            <BoxView Grid.Row="2" 
+                                     Color="LightGray" 
+                                     HeightRequest="1" 
+                                     VerticalOptions="End" 
+                                     Margin="0,15,0,-10" />
+                                     
+                            <!-- Tap Gesture for Details/Edit -->
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ActivityTappedCommand}" 
+                                                      CommandParameter="{Binding}" />
+                            </Grid.GestureRecognizers>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                
+                <CollectionView.EmptyView>
+                    <StackLayout HorizontalOptions="Center" VerticalOptions="Center" Padding="50">
+                        <Label Text="📝" 
+                               FontSize="48" 
+                               HorizontalOptions="Center" 
+                               Margin="0,0,0,20" />
+                        <Label Text="No activities today" 
+                               FontSize="18" 
+                               FontAttributes="Bold" 
+                               HorizontalOptions="Center" 
+                               TextColor="#6c757d" />
+                        <Label Text="Tap 'Add Activity' to get started" 
+                               FontSize="14" 
+                               HorizontalOptions="Center" 
+                               TextColor="#6c757d" 
+                               Margin="0,10,0,0" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Floating Action Button -->
+        <Button Grid.Row="1"
+                Text="+"
+                FontSize="24"
+                FontAttributes="Bold"
+                BackgroundColor="#007bff"
+                TextColor="White"
+                WidthRequest="60"
+                HeightRequest="60"
+                CornerRadius="30"
+                HorizontalOptions="End"
+                VerticalOptions="End"
+                Margin="20"
+                Command="{Binding AddActivityCommand}" />
+    </Grid>
+    
+</ContentPage>

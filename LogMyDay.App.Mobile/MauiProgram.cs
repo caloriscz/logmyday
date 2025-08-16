@@ -53,12 +53,22 @@ public static class MauiProgram
         // Add view models
         builder.Services.AddTransient<QuickActivitiesViewModel>();
         builder.Services.AddTransient<SettingsViewModel>();
+        builder.Services.AddTransient<TagsViewModel>();
+        builder.Services.AddTransient<AddActivityViewModel>();
+        builder.Services.AddTransient<ActivitiesViewModel>();
         
         // Add pages
         builder.Services.AddTransient<HomePage>();
         builder.Services.AddTransient<QuickActivitiesPage>();
         builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<TagsPage>();
+        builder.Services.AddTransient<AddActivityPage>();
+        builder.Services.AddTransient<ActivitiesPage>();
         builder.Services.AddSingleton<MainPage>();
+
+        // Register routes
+        Routing.RegisterRoute("settings", typeof(SettingsPage));
+        Routing.RegisterRoute("addactivity", typeof(AddActivityPage));
 
         return builder.Build();
     }

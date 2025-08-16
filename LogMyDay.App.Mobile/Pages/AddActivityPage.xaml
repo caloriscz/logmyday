@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="LogMyDay.App.Mobile.Pages.AddActivityPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             Title="Add Activity"
+             Shell.BackButtonBehavior="{x:Null}">
+
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="Auto,*,Auto" Padding="10,0">
+            <Button Grid.Column="0"
+                    Text="Cancel"
+                    FontSize="16"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    Clicked="OnCancelClicked" />
+            <Label Grid.Column="1" 
+                   Text="New Activity" 
+                   FontSize="18" 
+                   FontAttributes="Bold" 
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center" 
+                   TextColor="White" />
+            <Button Grid.Column="2"
+                    Text="Save"
+                    FontSize="16"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    Clicked="OnSaveClicked" />
+        </Grid>
+    </Shell.TitleView>
+
+    <ScrollView BackgroundColor="#f8f9fa" Padding="0">
+        <StackLayout Spacing="0">
+            
+            <!-- Tag Selection Card -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="0" 
+                   Padding="20,15"
+                   HasShadow="False"
+                   Margin="0,0,0,10">
+                <StackLayout Spacing="15">
+                    <Label Text="Select Tag" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#333" />
+                    
+                    <Picker x:Name="TagPicker"
+                            Title="Choose a tag..."
+                            ItemsSource="{Binding Tags}"
+                            ItemDisplayBinding="{Binding Title}"
+                            SelectedItem="{Binding SelectedTag}"
+                            BackgroundColor="#f8f9fa"
+                            HeightRequest="50"
+                            FontSize="16" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Date and Time Card -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="0" 
+                   Padding="20,15"
+                   HasShadow="False"
+                   Margin="0,0,0,10">
+                <StackLayout Spacing="15">
+                    <Label Text="Date and Time" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#333" />
+                    
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                        <StackLayout Grid.Column="0" Spacing="5">
+                            <Label Text="Start Date" FontSize="14" TextColor="#666" />
+                            <DatePicker x:Name="StartDatePicker"
+                                        Date="{Binding StartDate}"
+                                        BackgroundColor="#f8f9fa"
+                                        FontSize="16" />
+                        </StackLayout>
+                        
+                        <StackLayout Grid.Column="1" Spacing="5">
+                            <Label Text="Start Time" FontSize="14" TextColor="#666" />
+                            <TimePicker x:Name="StartTimePicker"
+                                        Time="{Binding StartTime}"
+                                        BackgroundColor="#f8f9fa"
+                                        FontSize="16" />
+                        </StackLayout>
+                    </Grid>
+                    
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="15">
+                        <StackLayout Grid.Column="0" Spacing="5">
+                            <Label Text="End Date" FontSize="14" TextColor="#666" />
+                            <DatePicker x:Name="EndDatePicker"
+                                        Date="{Binding EndDate}"
+                                        BackgroundColor="#f8f9fa"
+                                        FontSize="16" />
+                        </StackLayout>
+                        
+                        <StackLayout Grid.Column="1" Spacing="5">
+                            <Label Text="End Time" FontSize="14" TextColor="#666" />
+                            <TimePicker x:Name="EndTimePicker"
+                                        Time="{Binding EndTime}"
+                                        BackgroundColor="#f8f9fa"
+                                        FontSize="16" />
+                        </StackLayout>
+                    </Grid>
+                </StackLayout>
+            </Frame>
+
+            <!-- Value Input Card -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="0" 
+                   Padding="20,15"
+                   HasShadow="False"
+                   Margin="0,0,0,10"
+                   IsVisible="{Binding ShowValueInput}">
+                <StackLayout Spacing="15">
+                    <Label Text="Activity Value" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#333" />
+                    
+                    <!-- Integer Input -->
+                    <Entry x:Name="IntegerEntry"
+                           IsVisible="{Binding ShowIntegerInput}"
+                           Placeholder="Enter number..."
+                           Text="{Binding ActivityValue}"
+                           Keyboard="Numeric"
+                           BackgroundColor="#f8f9fa"
+                           HeightRequest="50"
+                           FontSize="16" />
+                    
+                    <!-- String Input -->
+                    <Entry x:Name="StringEntry"
+                           IsVisible="{Binding ShowStringInput}"
+                           Placeholder="Enter text..."
+                           Text="{Binding ActivityValue}"
+                           BackgroundColor="#f8f9fa"
+                           HeightRequest="50"
+                           FontSize="16" />
+                    
+                    <!-- Boolean Input -->
+                    <StackLayout IsVisible="{Binding ShowBooleanInput}" 
+                                 Orientation="Horizontal" 
+                                 Spacing="10">
+                        <CheckBox x:Name="BooleanCheckBox"
+                                  IsChecked="{Binding BooleanValue}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Check if applicable" 
+                               FontSize="16" 
+                               VerticalOptions="Center" />
+                    </StackLayout>
+                    
+                    <!-- Date Input -->
+                    <DatePicker x:Name="DateEntry"
+                                IsVisible="{Binding ShowDateInput}"
+                                Date="{Binding DateValue}"
+                                BackgroundColor="#f8f9fa"
+                                FontSize="16" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Description Card -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="0" 
+                   Padding="20,15"
+                   HasShadow="False"
+                   Margin="0,0,0,10">
+                <StackLayout Spacing="15">
+                    <Label Text="Description (Optional)" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#333" />
+                    
+                    <Editor x:Name="DescriptionEditor"
+                            Placeholder="Add notes about this activity..."
+                            Text="{Binding Description}"
+                            BackgroundColor="#f8f9fa"
+                            HeightRequest="120"
+                            FontSize="16"
+                            AutoSize="TextChanges" />
+                </StackLayout>
+            </Frame>
+
+            <!-- Options Card -->
+            <Frame BackgroundColor="White" 
+                   CornerRadius="0" 
+                   Padding="20,15"
+                   HasShadow="False"
+                   Margin="0,0,0,20">
+                <StackLayout Spacing="15">
+                    <Label Text="Options" 
+                           FontSize="16" 
+                           FontAttributes="Bold" 
+                           TextColor="#333" />
+                    
+                    <StackLayout Orientation="Horizontal" Spacing="10">
+                        <CheckBox x:Name="AddAnotherCheckBox"
+                                  IsChecked="{Binding AddAnother}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Add another activity after saving" 
+                               FontSize="14" 
+                               VerticalOptions="Center" 
+                               TextColor="#666" />
+                    </StackLayout>
+                </StackLayout>
+            </Frame>
+
+        </StackLayout>
+    </ScrollView>
+
+</ContentPage>
