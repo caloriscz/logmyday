@@ -49,6 +49,7 @@ public static class MauiProgram
         // Add services
         builder.Services.AddSingleton<ApiService>();
         builder.Services.AddSingleton<QuickActivityService>();
+        builder.Services.AddSingleton<AuthenticationService>(provider => AuthenticationService.Instance);
         
         // Add view models
         builder.Services.AddTransient<QuickActivitiesViewModel>();
@@ -56,6 +57,7 @@ public static class MauiProgram
         builder.Services.AddTransient<TagsViewModel>();
         builder.Services.AddTransient<AddActivityViewModel>();
         builder.Services.AddTransient<ActivitiesViewModel>();
+        builder.Services.AddTransient<LoginViewModel>();
         
         // Add pages
         builder.Services.AddTransient<HomePage>();
@@ -64,11 +66,13 @@ public static class MauiProgram
         builder.Services.AddTransient<TagsPage>();
         builder.Services.AddTransient<AddActivityPage>();
         builder.Services.AddTransient<ActivitiesPage>();
+        builder.Services.AddTransient<LoginPage>();
         builder.Services.AddSingleton<MainPage>();
 
         // Register routes
         Routing.RegisterRoute("settings", typeof(SettingsPage));
         Routing.RegisterRoute("addactivity", typeof(AddActivityPage));
+        Routing.RegisterRoute("login", typeof(LoginPage));
 
         return builder.Build();
     }

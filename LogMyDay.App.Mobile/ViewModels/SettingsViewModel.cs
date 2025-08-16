@@ -253,6 +253,28 @@ public class SettingsViewModel : INotifyPropertyChanged
         ShowConnectionStatus = false;
     }
 
+    public async Task ClearCredentialsAsync()
+    {
+        try
+        {
+            // Clear stored settings
+            Preferences.Remove("ServerUrl");
+            Preferences.Remove("Username");  
+            Preferences.Remove("Password");
+            
+            // Reset to defaults
+            ServerUrl = "https://logmyday.tadata.cz";
+            Username = "";
+            Password = "";
+            
+            System.Diagnostics.Debug.WriteLine("Credentials cleared successfully");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error clearing credentials: {ex.Message}");
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)

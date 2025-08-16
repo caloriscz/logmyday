@@ -6,35 +6,16 @@
 
     <Grid RowDefinitions="Auto,Auto,*,Auto" BackgroundColor="#f8f9fa">
         
-        <!-- Add New Tag Form -->
+        <!-- Add New Tag Button -->
         <Frame Grid.Row="0" BackgroundColor="White" CornerRadius="0" Padding="20,15" HasShadow="False" Margin="0,0,0,2">
-            <StackLayout Spacing="15">
-                <Label Text="Add New Tag" 
-                       FontSize="18" 
-                       FontAttributes="Bold" 
-                       TextColor="#333" />
-                
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                    <Entry x:Name="NewTagEntry"
-                           Grid.Column="0"
-                           Placeholder="Enter tag name..."
-                           FontSize="16"
-                           TextColor="#333"
-                           BackgroundColor="#f8f9fa"
-                           HeightRequest="45" />
-                    <Button x:Name="AddTagButton"
-                            Grid.Column="1"
-                            Text="Add"
-                            FontSize="16"
-                            FontAttributes="Bold"
-                            BackgroundColor="#007bff"
-                            TextColor="White"
-                            WidthRequest="80"
-                            HeightRequest="45"
-                            CornerRadius="8"
-                            Clicked="OnAddTagClicked" />
-                </Grid>
-            </StackLayout>
+            <Button Text="+ Add New Tag"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    BackgroundColor="#28a745"
+                    TextColor="White"
+                    CornerRadius="8"
+                    HeightRequest="50"
+                    Command="{Binding OpenAddTagFormCommand}" />
         </Frame>
 
         <!-- Header Section -->

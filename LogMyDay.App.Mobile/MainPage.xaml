@@ -6,33 +6,15 @@
        Title="LogMyDay"
        FlyoutBehavior="Disabled">
 
-    <Shell.TitleView>
-        <Grid ColumnDefinitions="Auto,*,Auto" Padding="10,0">
-            <!-- New Activity Button on Left -->
-            <Button Grid.Column="0"
-                    Text="+"
-                    FontSize="24"
-                    FontAttributes="Bold"
-                    BackgroundColor="#28a745"
-                    TextColor="White"
-                    WidthRequest="40"
-                    HeightRequest="40"
-                    CornerRadius="20"
-                    Clicked="OnNewActivityClicked" />
-            
-            <!-- Settings Button on Right -->
-            <Button Grid.Column="2"
-                    Text="⚙️"
-                    FontSize="20"
-                    BackgroundColor="Transparent"
-                    TextColor="White"
-                    WidthRequest="40"
-                    HeightRequest="40"
-                    Clicked="OnSettingsClicked" />
-        </Grid>
-    </Shell.TitleView>
+    <!-- Login page - always available, no navigation bar or tab bar -->
+    <ShellContent Route="login" 
+                  ContentTemplate="{DataTemplate local:LoginPage}"
+                  Shell.FlyoutBehavior="Disabled"
+                  Shell.TabBarIsVisible="False"
+                  Shell.NavBarIsVisible="False" />
 
-    <TabBar>
+    <!-- Authenticated content with TabBar -->
+    <TabBar Route="main">
         <ShellContent Title="App"
                       Route="app"
                       Icon="home.svg"
@@ -52,6 +34,41 @@
                       Route="quick"
                       Icon="quick.svg"
                       ContentTemplate="{DataTemplate local:QuickActivitiesPage}" />
+        
+        <Shell.TitleView>
+            <Grid ColumnDefinitions="Auto,*,Auto" Padding="10,0">
+                <!-- New Activity Button on Left -->
+                <Button Grid.Column="0"
+                        Text="+"
+                        FontSize="24"
+                        FontAttributes="Bold"
+                        BackgroundColor="#28a745"
+                        TextColor="White"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        CornerRadius="20"
+                        Clicked="OnNewActivityClicked" />
+                
+                <!-- Settings Button on Right -->
+                <Button Grid.Column="2"
+                        Text="⚙️"
+                        FontSize="20"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        WidthRequest="40"
+                        HeightRequest="40"
+                        Clicked="OnSettingsClicked" />
+            </Grid>
+        </Shell.TitleView>
     </TabBar>
+
+    <!-- Settings and Add Activity pages - authenticated only -->
+    <ShellContent Route="settings" 
+                  ContentTemplate="{DataTemplate local:SettingsPage}" 
+                  Shell.FlyoutBehavior="Disabled" />
+    
+    <ShellContent Route="addactivity" 
+                  ContentTemplate="{DataTemplate local:AddActivityPage}" 
+                  Shell.FlyoutBehavior="Disabled" />
 
 </Shell>

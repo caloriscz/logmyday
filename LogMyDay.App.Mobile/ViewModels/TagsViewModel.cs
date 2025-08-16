@@ -21,6 +21,7 @@ public class TagsViewModel : INotifyPropertyChanged
     {
         _apiService = apiService;
         RefreshCommand = new Command(async () => await RefreshTagsAsync());
+        OpenAddTagFormCommand = new Command(async () => await OpenAddTagFormAsync());
     }
 
     public ObservableCollection<TagDisplayModel> Tags
@@ -76,6 +77,7 @@ public class TagsViewModel : INotifyPropertyChanged
     }
 
     public ICommand RefreshCommand { get; }
+    public ICommand OpenAddTagFormCommand { get; }
 
     public async Task LoadTagsAsync()
     {
@@ -158,6 +160,112 @@ public class TagsViewModel : INotifyPropertyChanged
         {
             System.Diagnostics.Debug.WriteLine($"Exception adding tag: {ex.Message}");
             throw;
+        }
+    }
+
+    private async Task OpenAddTagFormAsync()
+    {
+        try
+        {
+            // For now, use a comprehensive input form
+            var tagName = await Shell.Current.DisplayPromptAsync(
+                "New Tag", 
+                "Enter tag name:", 
+                "Next", 
+                "Cancel", 
+                placeholder: "Tag name...");
+
+            if (!string.IsNullOrWhiteSpace(tagName))
+            {
+                // Show additional options in action sheet
+                var typeResult = await Shell.Current.DisplayActionSheet(
+                    "Select Input Type",
+                    "Cancel",
+                    null,
+                    "String (Text)",
+                    "Integer (Number)", 
+                    "Boolean (Checkbox)",
+                    "Date (Date Picker)"
+                );
+                
+                if (typeResult != "Cancel" && typeResult != null)
+                {
+                    var inputType = typeResult switch
+                    {
+                        "String (Text)" => "String",
+                        "Integer (Number)" => "Integer", 
+                        "Boolean (Checkbox)" => "Boolean",
+                        "Date (Date Picker)" => "Date",
+                        _ => "String"
+                    };
+
+                    // Ask about required flag
+                    var isRequired = await Shell.Current.DisplayAlert(
+                        "Tag Settings", 
+                        "Should this tag be required?", 
+                        "Required", 
+                        "Optional");
+
+                    // Ask about repeatable flag  
+                    var isRepeatable = await Shell.Current.DisplayAlert(
+                        "Tag Settings", 
+                        "Can this tag be repeated?", 
+                        "Repeatable", 
+                        "Single Use");
+
+                    // Ask about range flag
+                    var isRange = await Shell.Current.DisplayAlert(
+                        "Tag Settings", 
+                        "Is this tag a range value?", 
+                        "Range", 
+                        "Single Value");
+
+                    // Time granularity
+                    var granularityResult = await Shell.Current.DisplayActionSheet(
+                        "Time Granularity",
+                        "Cancel",
+                        null,
+                        "Exact Time",
+                        "Daily",
+                        "Hourly", 
+                        "Weekly",
+                        "Monthly",
+                        "Yearly"
+                    );
+
+                    if (granularityResult != "Cancel" && granularityResult != null)
+                    {
+                        await CreateTagAsync(tagName, inputType, isRequired, isRepeatable, isRange, granularityResult);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error opening add tag form: {ex.Message}";
+        }
+    }
+
+    private async Task CreateTagAsync(string tagName, string inputType, bool isRequired, bool isRepeatable, bool isRange, string granularity)
+    {
+        try
+        {
+            // For now, create with just the name - the API service needs to be enhanced
+            var success = await _apiService.CreateTagAsync(tagName);
+            if (success)
+            {
+                // Refresh the tags list
+                await RefreshTagsAsync();
+                StatusMessage = $"Tag '{tagName}' created successfully!\nType: {inputType}, Required: {isRequired}, Repeatable: {isRepeatable}, Range: {isRange}, Granularity: {granularity}";
+            }
+            else
+            {
+                StatusMessage = "Failed to create tag";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error creating tag: {ex.Message}";
         }
     }
 

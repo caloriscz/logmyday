@@ -45,7 +45,7 @@
             </Grid>
             
             <!-- Quick Actions -->
-            <Grid ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,10,0,0">
                 <Button Grid.Column="0"
                         Text="📅 Today"
                         FontSize="16"
@@ -56,6 +56,18 @@
                         HorizontalOptions="Start" />
                 
                 <Button Grid.Column="1"
+                        Text="🔽"
+                        FontSize="16"
+                        BackgroundColor="#6c757d"
+                        TextColor="White"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        CornerRadius="8"
+                        Margin="10,0,5,0"
+                        Command="{Binding ToggleSortOrderCommand}"
+                        ToolTipProperties.Text="Toggle sort order" />
+                
+                <Button Grid.Column="2"
                         Text="↻"
                         FontSize="20"
                         BackgroundColor="Transparent"
@@ -64,6 +76,17 @@
                         HeightRequest="44"
                         Command="{Binding RefreshCommand}" />
             </Grid>
+            
+            <!-- Filters Section - Single Modal Button -->
+            <StackLayout Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                <Button Text="� Filters"
+                        FontSize="14"
+                        BackgroundColor="#007bff"
+                        TextColor="White"
+                        CornerRadius="15"
+                        Padding="20,10"
+                        Command="{Binding OpenFiltersCommand}" />
+            </StackLayout>
             
             <!-- Search Filter -->
             <SearchBar x:Name="ActivitySearchBar"
@@ -111,35 +134,30 @@
                                        HorizontalOptions="End" />
                             </Grid>
                             
-                            <!-- Activity Value (if present) -->
-                            <StackLayout Grid.Row="1" 
-                                         IsVisible="{Binding HasValue}"
-                                         Orientation="Horizontal" 
-                                         Spacing="5"
-                                         Margin="0,8,0,0">
-                                <Label Text="💡" FontSize="16" VerticalOptions="Center" />
-                                <Label Text="{Binding Value}" 
-                                       FontSize="16" 
-                                       FontAttributes="Bold"
-                                       VerticalOptions="Center"
-                                       TextColor="#28a745" />
-                            </StackLayout>
-                            
-                            <!-- Activity Description (if present) -->
-                            <Label Grid.Row="2"
-                                   Text="{Binding Description}" 
-                                   FontSize="14" 
-                                   IsVisible="{Binding HasDescription}"
-                                   TextColor="#666"
-                                   Margin="0,8,0,0"
-                                   LineBreakMode="WordWrap" />
-                            
-                            <!-- Separator Line -->
-                            <BoxView Grid.Row="2" 
-                                     Color="LightGray" 
-                                     HeightRequest="1" 
-                                     VerticalOptions="End" 
-                                     Margin="0,15,0,-10" />
+            <!-- Activity Value (if present) -->
+            <Label Grid.Row="1"
+                   Text="{Binding Value}" 
+                   FontSize="14" 
+                   IsVisible="{Binding HasValue}"
+                   TextColor="#666"
+                   Margin="0,5,0,0"
+                   LineBreakMode="WordWrap" />
+            
+            <!-- Activity Description (if present) -->
+            <Label Grid.Row="2"
+                   Text="{Binding Description}" 
+                   FontSize="14" 
+                   IsVisible="{Binding HasDescription}"
+                   TextColor="#666"
+                   Margin="0,5,0,0"
+                   LineBreakMode="WordWrap" />
+                   
+            <!-- Separator Line -->
+            <BoxView Grid.Row="2" 
+                     Color="LightGray" 
+                     HeightRequest="1" 
+                     VerticalOptions="End" 
+                     Margin="0,15,0,-10" />
                                      
                             <!-- Tap Gesture for Details/Edit -->
                             <Grid.GestureRecognizers>

@@ -1,24 +1,17 @@
-﻿using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 using LogMyDay.App.Mobile.Services;
+using LogMyDay.Shared.DTOs;
 
 namespace LogMyDay.App.Mobile.ViewModels;
 
-public class ActivitiesViewModel : INotifyPropertyChanged
+public class TestViewModel : INotifyPropertyChanged
 {
-    private readonly ApiService _apiService;
-
-    public ActivitiesViewModel(ApiService apiService)
+    public TestViewModel()
     {
-        _apiService = apiService;
     }
-
-    public async Task LoadActivitiesAsync()
-    {
-        await Task.CompletedTask;
-    }
-
-    public string SearchText { get; set; } = string.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

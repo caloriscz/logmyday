@@ -6,6 +6,7 @@ namespace LogMyDay.App.Mobile.Pages;
 public partial class HomePage : ContentPage, INotifyPropertyChanged
 {
     private readonly AppSettings _appSettings;
+    private readonly AuthenticationService _authService;
     private string _currentUrl = string.Empty;
 
     public string CurrentUrl
@@ -27,6 +28,7 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
         {
             InitializeComponent();
             _appSettings = appSettings ?? throw new ArgumentNullException(nameof(appSettings));
+            _authService = AuthenticationService.Instance;
             
             // Set the initial URL from app settings
             CurrentUrl = _appSettings.FullUrl;
@@ -46,6 +48,14 @@ public partial class HomePage : ContentPage, INotifyPropertyChanged
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        
+        // Check authentication first
+        if (!_authService.IsAuthenticated)
+        {
+            // Redirect to login if not authenticated
+            _ = Shell.Current.GoToAsync("//login");
+            return;
+        }
         
         try
         {

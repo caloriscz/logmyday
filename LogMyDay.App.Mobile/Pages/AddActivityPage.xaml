@@ -123,6 +123,7 @@
                            IsVisible="{Binding ShowIntegerInput}"
                            Placeholder="Enter number..."
                            Text="{Binding ActivityValue}"
+                           TextColor="#333"
                            Keyboard="Numeric"
                            BackgroundColor="#f8f9fa"
                            HeightRequest="50"
@@ -133,6 +134,7 @@
                            IsVisible="{Binding ShowStringInput}"
                            Placeholder="Enter text..."
                            Text="{Binding ActivityValue}"
+                           TextColor="#333"
                            BackgroundColor="#f8f9fa"
                            HeightRequest="50"
                            FontSize="16" />
