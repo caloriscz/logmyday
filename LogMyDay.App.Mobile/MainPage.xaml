@@ -1,74 +1,25 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<Shell x:Class="LogMyDay.App.Mobile.MainPage"
-       xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-       xmlns:local="clr-namespace:LogMyDay.App.Mobile.Pages"
-       Title="LogMyDay"
-       FlyoutBehavior="Disabled">
+<ContentPage x:Class="LogMyDay.App.Mobile.MainPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Maui;assembly=Microsoft.AspNetCore.Components.WebView.Maui"
+             xmlns:components="clr-namespace:LogMyDay.App.Mobile.Components"
+             BackgroundColor="LightGray">
 
-    <!-- Login page - always available, no navigation bar or tab bar -->
-    <ShellContent Route="login" 
-                  ContentTemplate="{DataTemplate local:LoginPage}"
-                  Shell.FlyoutBehavior="Disabled"
-                  Shell.TabBarIsVisible="False"
-                  Shell.NavBarIsVisible="False" />
+    <Grid>
+        <Label x:Name="StatusLabel" 
+               Text="Initializing Blazor..." 
+               FontSize="16" 
+               TextColor="DarkBlue"
+               HorizontalOptions="Center" 
+               VerticalOptions="Start" 
+               Margin="20,50,20,20" />
 
-    <!-- Authenticated content with TabBar -->
-    <TabBar Route="main">
-        <ShellContent Title="App"
-                      Route="app"
-                      Icon="home.svg"
-                      ContentTemplate="{DataTemplate local:HomePage}" />
-        
-        <ShellContent Title="Activities"
-                      Route="activities"
-                      Icon="activity.svg"
-                      ContentTemplate="{DataTemplate local:ActivitiesPage}" />
-        
-        <ShellContent Title="Tags"
-                      Route="tags"
-                      Icon="tag.svg"
-                      ContentTemplate="{DataTemplate local:TagsPage}" />
-        
-        <ShellContent Title="Quick"
-                      Route="quick"
-                      Icon="quick.svg"
-                      ContentTemplate="{DataTemplate local:QuickActivitiesPage}" />
-        
-        <Shell.TitleView>
-            <Grid ColumnDefinitions="Auto,*,Auto" Padding="10,0">
-                <!-- New Activity Button on Left -->
-                <Button Grid.Column="0"
-                        Text="+"
-                        FontSize="24"
-                        FontAttributes="Bold"
-                        BackgroundColor="#28a745"
-                        TextColor="White"
-                        WidthRequest="40"
-                        HeightRequest="40"
-                        CornerRadius="20"
-                        Clicked="OnNewActivityClicked" />
-                
-                <!-- Settings Button on Right -->
-                <Button Grid.Column="2"
-                        Text="⚙️"
-                        FontSize="20"
-                        BackgroundColor="Transparent"
-                        TextColor="White"
-                        WidthRequest="40"
-                        HeightRequest="40"
-                        Clicked="OnSettingsClicked" />
-            </Grid>
-        </Shell.TitleView>
-    </TabBar>
+        <blazor:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.exact.html">
+            <blazor:BlazorWebView.RootComponents>
+                <blazor:RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
+            </blazor:BlazorWebView.RootComponents>
+        </blazor:BlazorWebView>
+    </Grid>
 
-    <!-- Settings and Add Activity pages - authenticated only -->
-    <ShellContent Route="settings" 
-                  ContentTemplate="{DataTemplate local:SettingsPage}" 
-                  Shell.FlyoutBehavior="Disabled" />
-    
-    <ShellContent Route="addactivity" 
-                  ContentTemplate="{DataTemplate local:AddActivityPage}" 
-                  Shell.FlyoutBehavior="Disabled" />
-
-</Shell>
+</ContentPage>

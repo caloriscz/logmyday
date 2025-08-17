@@ -1,0 +1,150 @@
+@page "/login"
+@inject IActivityApi ActivityApi
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+
+<PageTitle>Login - LogMyDay</PageTitle>
+
+<div class="login-container">
+    <div class="login-header">
+        <h1>LogMyDay</h1>
+        <p class="text-muted">Track your daily activities</p>
+    </div>
+
+    <div class="login-form">
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            
+            <div class="form-group mb-3">
+                <label class="form-label">Username:</label>
+                <InputText @bind-Value="loginModel.Username" class="form-control form-control-lg" placeholder="Enter username" />
+                <ValidationMessage For="@(() => loginModel.Username)" class="text-danger" />
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label">Password:</label>
+                <InputText type="password" @bind-Value="loginModel.Password" class="form-control form-control-lg" placeholder="Enter password" />
+                <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger mb-3" role="alert">
+                    @errorMessage
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                }
+                Login
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+<style>
+    .login-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-header {
+        text-align: center;
+        color: white;
+        margin-bottom: 2rem;
+    }
+
+    .login-header h1 {
+        font-size: 2.5rem;
+        font-weight: 300;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-form {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .form-control-lg {
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+    }
+
+    .btn-lg {
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+    }
+</style>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // If already authenticated, redirect to home
+        if (AuthService.CheckAuthentication())
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            // Store credentials in preferences
+            Preferences.Set("Username", loginModel.Username);
+            Preferences.Set("Password", loginModel.Password);
+
+            // Test API connection by fetching tags
+            var tags = await ActivityApi.GetTags();
+            
+            // If successful, set authentication state
+            AuthService.SetAuthenticated(true);
+            
+            // Navigate to home
+            Navigation.NavigateTo("/");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Invalid username or password.";
+            Logger.LogWarning("Login failed: Unauthorized");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login failed: {ex.Message}";
+            Logger.LogError(ex, "Login error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required] 
+        public string Password { get; set; } = string.Empty;
+    }
+}

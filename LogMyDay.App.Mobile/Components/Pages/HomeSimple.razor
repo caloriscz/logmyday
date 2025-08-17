@@ -1,0 +1,59 @@
+@page "/test"
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+
+<PageTitle>LogMyDay Mobile</PageTitle>
+
+<div class="container-fluid p-3">
+    <h1 class="h3 mb-3">LogMyDay Mobile</h1>
+    <p class="text-success">✅ Blazor is Working!</p>
+    
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Debug Information</h5>
+            <ul class="list-unstyled">
+                <li><strong>Platform:</strong> @DeviceInfo.Platform</li>
+                <li><strong>Version:</strong> @DeviceInfo.VersionString</li>
+                <li><strong>Model:</strong> @DeviceInfo.Model</li>
+                <li><strong>Current time:</strong> @DateTime.Now.ToString("HH:mm:ss")</li>
+                <li><strong>Auth Status:</strong> @(AuthService?.IsAuthenticated == true ? "Authenticated" : "Not Authenticated")</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <button class="btn btn-primary mb-2" @onclick="TestButton">Test Button</button>
+            @if (!string.IsNullOrEmpty(testMessage))
+            {
+                <div class="alert alert-info">
+                    @testMessage
+                </div>
+            }
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Navigation Test</h5>
+            <p>Try these links:</p>
+            <a href="/" class="btn btn-outline-primary btn-sm me-2">Home</a>
+            <a href="/login" class="btn btn-outline-secondary btn-sm me-2">Login</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string testMessage = "";
+    
+    protected override void OnInitialized()
+    {
+        System.Diagnostics.Debug.WriteLine("HomeSimple: Page initialized successfully");
+    }
+    
+    private void TestButton()
+    {
+        testMessage = $"Button clicked at {DateTime.Now:HH:mm:ss}";
+        System.Diagnostics.Debug.WriteLine($"HomeSimple: {testMessage}");
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>LogMyDay Mobile</title>
+    <base href="/" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .mobile-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .mobile-header {
+            background-color: #0d6efd;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .mobile-nav {
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            z-index: 1000;
+        }
+
+        .mobile-nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 0.75rem 0.5rem;
+            color: #6c757d;
+            text-decoration: none;
+            font-size: 0.875rem;
+            border: none;
+            background: none;
+            width: 100%;
+        }
+
+        .mobile-nav-item:hover, .mobile-nav-item.active {
+            color: #0d6efd;
+            background-color: #e7f1ff;
+        }
+
+        .mobile-content {
+            padding: 1rem;
+            padding-bottom: 80px; /* Space for bottom nav */
+        }
+
+        .quick-activity-btn {
+            margin: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        .activity-card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            background-color: white;
+        }
+
+        .activity-time {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+
+        .activity-tag {
+            background-color: #e9ecef;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 1rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="d-flex justify-content-center align-items-center vh-100">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h4 class="mb-3">LogMyDay Mobile</h4>
+                <div id="loading-steps">
+                    <p>🔄 <span id="current-step">Initializing Blazor...</span></p>
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 10%"></div>
+                    </div>
+                    <small class="text-muted">If this takes too long, check the debug console</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display: none;">
+        <div class="alert alert-danger m-3">
+            <h4>🚨 Blazor Error</h4>
+            <p>An unhandled error has occurred. Check the debug console for details.</p>
+            <button class="btn btn-warning reload">Reload App</button>
+            <button class="btn btn-secondary dismiss ms-2">Dismiss</button>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="_framework/blazor.webview.js"></script>
+    <script>
+        console.log('LogMyDay Mobile: HTML loaded, waiting for WebView...');
+        
+        // Don't manually start Blazor - let MAUI handle it
+        // Remove any manual Blazor.start() calls
+        
+        let currentStep = 0;
+        const steps = [
+            'Waiting for WebView...',
+            'Loading Blazor Framework...',
+            'Initializing Components...',
+            'Ready!'
+        ];
+        
+        function updateLoadingStep(step) {
+            const stepElement = document.getElementById('current-step');
+            const progressBar = document.getElementById('progress-bar');
+            if (stepElement) {
+                stepElement.textContent = step;
+                console.log('LogMyDay Mobile: ' + step);
+            }
+            if (progressBar) {
+                const progress = Math.min(((currentStep + 1) / steps.length) * 100, 90);
+                progressBar.style.width = progress + '%';
+            }
+        }
+        
+        // Update loading step immediately
+        updateLoadingStep(steps[0]);
+        
+        // Progressive loading feedback
+        const stepInterval = setInterval(() => {
+            if (currentStep < steps.length - 2) { // Stop before "Ready!" 
+                currentStep++;
+                updateLoadingStep(steps[currentStep]);
+            }
+        }, 2000);
+        
+        // Check for Blazor readiness
+        let blazorCheckCount = 0;
+        const blazorCheck = setInterval(() => {
+            blazorCheckCount++;
+            
+            if (window.Blazor && typeof window.Blazor.start === 'function') {
+                console.log('LogMyDay Mobile: Blazor object found and ready!');
+                clearInterval(blazorCheck);
+                clearInterval(stepInterval);
+                
+                updateLoadingStep('✅ Blazor Ready!');
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.classList.add('bg-success');
+                }
+                
+                // Hide loading after initialization
+                setTimeout(() => {
+                    const loadingSteps = document.getElementById('loading-steps');
+                    if (loadingSteps) {
+                        loadingSteps.style.display = 'none';
+                    }
+                }, 2000);
+                
+            } else if (blazorCheckCount > 50) { // 50 * 300ms = 15 seconds
+                console.error('LogMyDay Mobile: Blazor not ready after 15 seconds');
+                clearInterval(blazorCheck);
+                clearInterval(stepInterval);
+                
+                updateLoadingStep('❌ WebView Error!');
+                
+                document.getElementById('app').innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        <h4>🚨 WebView Communication Error</h4>
+                        <p><strong>Error:</strong> windows.external.receiveMessage is not a function</p>
+                        <p>This is a MAUI Blazor WebView initialization issue.</p>
+                        <details class="mt-2">
+                            <summary>Technical Details</summary>
+                            <ul>
+                                <li>WebView failed to establish communication with Blazor</li>
+                                <li>Platform: ${navigator.platform}</li>
+                                <li>User Agent: ${navigator.userAgent}</li>
+                                <li>Time: ${new Date().toISOString()}</li>
+                                <li>Blazor object: ${window.Blazor ? 'Found' : 'Not Found'}</li>
+                            </ul>
+                        </details>
+                        <button class="btn btn-warning mt-2" onclick="window.location.reload()">🔄 Reload App</button>
+                    </div>`;
+            }
+        }, 300); // Check every 300ms
+    </script>
+</body>
+</html>

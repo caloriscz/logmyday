@@ -36,15 +36,18 @@ public class AuthenticationService : INotifyPropertyChanged
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine("AuthService: CheckAuthentication started");
             var username = Preferences.Get("Username", "");
             var password = Preferences.Get("Password", "");
             var hasCredentials = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
             
+            System.Diagnostics.Debug.WriteLine($"AuthService: HasCredentials = {hasCredentials}");
             SetAuthenticated(hasCredentials);
             return hasCredentials;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"AuthService: Exception in CheckAuthentication: {ex}");
             SetAuthenticated(false);
             return false;
         }

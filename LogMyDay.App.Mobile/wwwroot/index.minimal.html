@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>LogMyDay Mobile</title>
+    <base href="/" />
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100%;
+        }
+
+        .mobile-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .mobile-content {
+            padding: 1rem;
+            margin-bottom: 80px;
+            min-height: calc(100vh - 80px);
+        }
+
+        .mobile-nav {
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            z-index: 1000;
+        }
+
+        .mobile-nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 0.75rem 0.5rem;
+            color: #6c757d;
+            background: none;
+            border: none;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+
+        .mobile-nav-item.active {
+            color: #0d6efd;
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60vh;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="loading-container">
+            <div>
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h4 class="mb-3">LogMyDay Mobile</h4>
+                <p id="loading-status">Initializing WebView...</p>
+                <div class="progress mb-3" style="width: 300px; height: 8px;">
+                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 20%"></div>
+                </div>
+                <small class="text-muted">Please wait while the app loads</small>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display: none;">
+        <div class="alert alert-danger m-3">
+            <h4>🚨 Blazor Error</h4>
+            <p>An error occurred during startup.</p>
+            <button class="btn btn-warning" onclick="window.location.reload()">Reload App</button>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="_framework/blazor.webview.js"></script>
+    <script>
+        console.log('LogMyDay: Starting WebView initialization...');
+        
+        // Simple progress tracking
+        let progress = 20;
+        const progressBar = document.getElementById('progress-bar');
+        const statusElement = document.getElementById('loading-status');
+        
+        function updateProgress(percent, message) {
+            if (progressBar) {
+                progressBar.style.width = percent + '%';
+            }
+            if (statusElement) {
+                statusElement.textContent = message;
+            }
+            console.log(`LogMyDay: ${message} (${percent}%)`);
+        }
+        
+        // Progressive loading feedback with shorter intervals
+        setTimeout(() => updateProgress(40, 'Loading Blazor framework...'), 1000);
+        setTimeout(() => updateProgress(60, 'Initializing components...'), 3000);
+        setTimeout(() => updateProgress(80, 'Almost ready...'), 5000);
+        
+        // Simple error handling - no manual Blazor.start() calls
+        setTimeout(() => {
+            // Check if Blazor has started by looking for signs it's working
+            const appElement = document.getElementById('app');
+            if (appElement && appElement.innerHTML.includes('Loading')) {
+                console.error('LogMyDay: Blazor failed to initialize properly');
+                updateProgress(100, '❌ Startup timeout');
+                
+                appElement.innerHTML = `
+                    <div class="container mt-5">
+                        <div class="alert alert-danger">
+                            <h4>🚨 WebView Communication Error</h4>
+                            <p><strong>Issue:</strong> windows.external.receiveMessage error</p>
+                            <p>This is a known MAUI Blazor WebView issue.</p>
+                            <hr>
+                            <h6>Debug Information:</h6>
+                            <ul>
+                                <li>Platform: ${navigator.platform}</li>
+                                <li>User Agent: ${navigator.userAgent.substring(0, 100)}...</li>
+                                <li>Time: ${new Date().toLocaleString()}</li>
+                            </ul>
+                            <button class="btn btn-warning" onclick="window.location.reload()">🔄 Try Again</button>
+                        </div>
+                    </div>`;
+            }
+        }, 20000); // 20 second timeout
+    </script>
+</body>
+</html>
