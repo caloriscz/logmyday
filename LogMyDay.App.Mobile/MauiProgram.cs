@@ -57,19 +57,52 @@ public static class MauiProgram
             });
             System.Diagnostics.Debug.WriteLine("MauiProgram: AppSettings registered");
 
+            // Register authentication handler
+            builder.Services.AddTransient<AuthenticationHeaderHandler>();
+            System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationHeaderHandler registered");
+
             // Register API services with Refit
             builder.Services.AddRefitClient<IActivityApi>()
                 .ConfigureHttpClient(c => 
                 {
-                    var serverUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
-                    c.BaseAddress = new Uri($"{serverUrl}/api/");
-                });
+                    // Use a fixed base address - don't rely on Preferences during DI setup
+                    c.BaseAddress = new Uri("https://logmyday.tadata.cz/");
+                    c.Timeout = TimeSpan.FromSeconds(30); // 30 second timeout
+                    
+                    System.Diagnostics.Debug.WriteLine($"[HttpClient] Configured base address: {c.BaseAddress}");
+                    System.Diagnostics.Debug.WriteLine($"[HttpClient] Timeout: {c.Timeout}");
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+                {
+                    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
+                    {
+                        // For development - accept all certificates
+                        // In production, you should validate certificates properly
+                        System.Diagnostics.Debug.WriteLine($"[SSL] Certificate validation: {sslPolicyErrors}");
+                        return true;
+                    }
+                })
+                .AddHttpMessageHandler<AuthenticationHeaderHandler>();
             System.Diagnostics.Debug.WriteLine("MauiProgram: Refit API clients registered");
 
             // Register other services
             builder.Services.AddScoped<ApiService>();
             builder.Services.AddScoped<QuickActivityService>();
             System.Diagnostics.Debug.WriteLine("MauiProgram: Other services registered");
+
+            // Register ViewModels
+            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.LoginViewModel>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.ActivitiesViewModel>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.TagsViewModel>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.SettingsViewModel>();
+            System.Diagnostics.Debug.WriteLine("MauiProgram: ViewModels registered");
+
+            // Register Pages
+            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.LoginPage>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.ActivitiesPage>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.TagsPage>();
+            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.SettingsPage>();
+            System.Diagnostics.Debug.WriteLine("MauiProgram: Pages registered");
 
             System.Diagnostics.Debug.WriteLine("MauiProgram: All services registered successfully");
         }

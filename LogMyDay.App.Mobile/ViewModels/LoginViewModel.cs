@@ -156,40 +156,151 @@ public class LoginViewModel : INotifyPropertyChanged
         IsTesting = true;
         ClearError();
 
+        System.Diagnostics.Debug.WriteLine($"=== LOGIN ATTEMPT STARTED ===");
+        System.Diagnostics.Debug.WriteLine($"Server URL: {ServerUrl}");
+        System.Diagnostics.Debug.WriteLine($"Username: '{Username}'");
+        System.Diagnostics.Debug.WriteLine($"Password Length: {Password.Length}");
+
+        // Test network connectivity first
+        if (!await TestNetworkConnectivity())
+        {
+            ErrorMessage = "No network connection available. Please check your internet connection.";
+            IsTesting = false;
+            return;
+        }
+
         try
         {
-            // Save credentials to preferences
+            // Save credentials to preferences BEFORE making API call
+            // This ensures the AuthenticationHeaderHandler can access them
+            System.Diagnostics.Debug.WriteLine($"[Login] Saving credentials to preferences...");
             Preferences.Set("ServerUrl", ServerUrl);
             Preferences.Set("Username", Username);
             Preferences.Set("Password", Password);
+            System.Diagnostics.Debug.WriteLine($"[Login] Credentials saved successfully");
+
+            System.Diagnostics.Debug.WriteLine($"[Login] Making API test call...");
 
             // Test the connection by trying to fetch activities
             await _apiService.GetActivitiesAsync(DateTime.Today);
+
+            System.Diagnostics.Debug.WriteLine($"✅ LOGIN SUCCESS - API call completed");
 
             // If we get here, login was successful - set authentication state
             _authService.SetAuthenticated(true);
 
             // Navigate to the main app
             await Shell.Current.GoToAsync("//main/app");
+            System.Diagnostics.Debug.WriteLine($"✅ Navigation to main app completed");
         }
         catch (HttpRequestException ex)
         {
-            ErrorMessage = "Network error. Please check your connection and server URL.";
-            System.Diagnostics.Debug.WriteLine($"Network error during login: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"❌ LOGIN FAILED - HTTP Error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"HTTP Inner Exception: {ex.InnerException?.Message}");
+            
+            if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
+            {
+                ErrorMessage = "Invalid username or password. Please use 'admin' and 'secret123'.";
+            }
+            else if (ex.Message.Contains("404") || ex.Message.Contains("Not Found"))
+            {
+                ErrorMessage = "Server URL not found. Please check the server address.";
+            }
+            else if (ex.Message.Contains("timeout") || ex.Message.Contains("timed out"))
+            {
+                ErrorMessage = "Connection timeout. Please check your network connection.";
+            }
+            else
+            {
+                ErrorMessage = $"Network error: {ex.Message}";
+            }
+            
+            ClearSavedCredentials();
+        }
+        catch (TaskCanceledException ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ LOGIN FAILED - Timeout: {ex.Message}");
+            ErrorMessage = "Connection timeout. Please check your network and server URL.";
+            ClearSavedCredentials();
         }
         catch (UnauthorizedAccessException)
         {
-            ErrorMessage = "Invalid username or password. Please try again.";
+            System.Diagnostics.Debug.WriteLine($"❌ LOGIN FAILED - Unauthorized");
+            ErrorMessage = "Invalid username or password. Please use 'admin' and 'secret123'.";
             ClearSavedCredentials();
         }
         catch (Exception ex)
         {
-            ErrorMessage = "Login failed. Please check your credentials and try again.";
-            System.Diagnostics.Debug.WriteLine($"Login error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"❌ LOGIN FAILED - General Error: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
+            System.Diagnostics.Debug.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+            ErrorMessage = $"Login failed: {ex.Message}. Please check your credentials.";
         }
         finally
         {
             IsTesting = false;
+            System.Diagnostics.Debug.WriteLine($"=== LOGIN ATTEMPT COMPLETED ===");
+        }
+    }
+
+    private async Task<bool> TestNetworkConnectivity()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[Connectivity] Testing network connectivity...");
+            
+            // Check basic network access
+            var connectivity = Connectivity.Current;
+            var networkAccess = connectivity.NetworkAccess;
+            
+            System.Diagnostics.Debug.WriteLine($"[Connectivity] Network access: {networkAccess}");
+            
+            if (networkAccess != NetworkAccess.Internet)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] ❌ No internet access");
+                return false;
+            }
+
+            // Test very basic HTTP connectivity - try a simple HEAD request
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+            
+            System.Diagnostics.Debug.WriteLine($"[Connectivity] Testing basic HTTP connectivity...");
+            
+            // Try to reach a simple, reliable endpoint first
+            try
+            {
+                var googleResponse = await httpClient.GetAsync("https://www.google.com");
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] Google test: {googleResponse.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] ❌ Google test failed: {ex.Message}");
+                return false;
+            }
+            
+            // Now test our actual server
+            System.Diagnostics.Debug.WriteLine($"[Connectivity] Testing connection to: {ServerUrl}");
+            try
+            {
+                var response = await httpClient.GetAsync(ServerUrl);
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] Server response status: {response.StatusCode}");
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] ✅ Server is reachable");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] ❌ Server connectivity test failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] Exception type: {ex.GetType().Name}");
+                System.Diagnostics.Debug.WriteLine($"[Connectivity] Inner exception: {ex.InnerException?.Message}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Connectivity] ❌ Network test failed: {ex.Message}");
+            return false;
         }
     }
 

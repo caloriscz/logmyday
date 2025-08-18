@@ -233,6 +233,14 @@ public class ApiService
         
         try
         {
+            System.Diagnostics.Debug.WriteLine($"=== API CALL: GetActivities ===");
+            System.Diagnostics.Debug.WriteLine($"Parameters: startDate={startDate}, endDate={endDate}, pageSize={pageSize}");
+            
+            // Log current credentials
+            var username = Preferences.Get("Username", "");
+            var password = Preferences.Get("Password", "");
+            System.Diagnostics.Debug.WriteLine($"Current stored credentials: '{username}' / password length: {password.Length}");
+            
             var result = await _activityApi.GetActivities(
                 pageNumber: pageNumber,
                 pageSize: pageSize,
@@ -242,6 +250,7 @@ public class ApiService
                 endDate: endDate);
             
             System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Fetched {result.Items.Count()} activities from API");
+            System.Diagnostics.Debug.WriteLine("=== END API CALL ===");
             
             return result.Items.ToList();
         }
@@ -250,7 +259,12 @@ public class ApiService
             var errorDetails = $"HTTP Error: {httpEx.Message}";
             LastError = errorDetails;
             
+            System.Diagnostics.Debug.WriteLine($"=== HTTP ERROR ===");
             System.Diagnostics.Debug.WriteLine($"❌ HTTP Error fetching activities: {httpEx.Message}");
+            System.Diagnostics.Debug.WriteLine($"Status Code: {httpEx.Data}");
+            System.Diagnostics.Debug.WriteLine($"Inner Exception: {httpEx.InnerException?.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack Trace: {httpEx.StackTrace}");
+            System.Diagnostics.Debug.WriteLine("=== END HTTP ERROR ===");
             
             return new List<ActivityResponse>();
         }
@@ -259,7 +273,10 @@ public class ApiService
             var errorDetails = $"Timeout Error: {tcEx.Message}";
             LastError = errorDetails;
             
+            System.Diagnostics.Debug.WriteLine($"=== TIMEOUT ERROR ===");
             System.Diagnostics.Debug.WriteLine($"❌ Timeout fetching activities: {tcEx.Message}");
+            System.Diagnostics.Debug.WriteLine($"Inner Exception: {tcEx.InnerException?.Message}");
+            System.Diagnostics.Debug.WriteLine("=== END TIMEOUT ERROR ===");
             
             return new List<ActivityResponse>();
         }
@@ -268,7 +285,12 @@ public class ApiService
             var errorDetails = $"General Error: {ex.Message}";
             LastError = errorDetails;
             
+            System.Diagnostics.Debug.WriteLine($"=== GENERAL ERROR ===");
             System.Diagnostics.Debug.WriteLine($"❌ General Error fetching activities: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
+            System.Diagnostics.Debug.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
+            System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+            System.Diagnostics.Debug.WriteLine("=== END GENERAL ERROR ===");
             
             return new List<ActivityResponse>();
         }

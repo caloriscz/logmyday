@@ -85,6 +85,45 @@
             right: 0.75rem;
             top: 0.5rem;
         }
+        
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 90px; /* Above mobile navigation */
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: #0d6efd;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .fab:hover {
+            background: #0056b3;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .fab:active {
+            transform: scale(0.95);
+        }
+        
+        .fab i {
+            transition: transform 0.2s ease;
+        }
+        
+        .fab:hover i {
+            transform: scale(1.1);
+        }
     </style>
 </head>
 
