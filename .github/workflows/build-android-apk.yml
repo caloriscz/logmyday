@@ -1,0 +1,25 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+          include-prerelease: true
+      - name: Install MAUI workloads
+        run: dotnet workload install maui-android
+      - name: Publish APK
+        run: dotnet publish LogMyDay.App.Mobile/LogMyDay.App.Mobile.csproj -c Release -f net9.0-android -p:AndroidPackageFormat=apk
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogMyDay-APK
+          path: LogMyDay.App.Mobile/bin/Release/net9.0-android/publish/*.apk
