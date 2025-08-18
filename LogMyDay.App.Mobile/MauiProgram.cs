@@ -45,17 +45,25 @@ public static class MauiProgram
             builder.Services.AddSingleton<AuthenticationService>();
             System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationService registered");
 
+            // Register server configuration service
+            builder.Services.AddSingleton<ServerConfigurationService>();
+            System.Diagnostics.Debug.WriteLine("MauiProgram: ServerConfigurationService registered");
+
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>
             {
-                return new AppSettings { WebUrl = "https://logmyday.tadata.cz", DefaultPage = "/" };
+                var serverUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
+                return new AppSettings { WebUrl = serverUrl, DefaultPage = "/" };
             });
             System.Diagnostics.Debug.WriteLine("MauiProgram: AppSettings registered");
 
             // Register API services with Refit
-            var baseUrl = "https://logmyday.tadata.cz";
             builder.Services.AddRefitClient<IActivityApi>()
-                .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseUrl));
+                .ConfigureHttpClient(c => 
+                {
+                    var serverUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
+                    c.BaseAddress = new Uri($"{serverUrl}/api/");
+                });
             System.Diagnostics.Debug.WriteLine("MauiProgram: Refit API clients registered");
 
             // Register other services

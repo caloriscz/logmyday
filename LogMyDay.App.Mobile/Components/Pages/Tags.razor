@@ -1,0 +1,40 @@
+@page "/tags"
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Tags - LogMyDay</PageTitle>
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Activity Tags</h1>
+        <button class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Tag
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-tags display-1 text-muted"></i>
+                    <h5 class="mt-3">No Tags Yet</h5>
+                    <p class="text-muted">Create tags to categorize and organize your activities.</p>
+                    <button class="btn btn-outline-primary">
+                        <i class="bi bi-tag"></i> Create First Tag
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Redirect to login if not authenticated
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}

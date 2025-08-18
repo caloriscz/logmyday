@@ -37,18 +37,32 @@ public class AuthenticationService : INotifyPropertyChanged
         try
         {
             System.Diagnostics.Debug.WriteLine("AuthService: CheckAuthentication started");
-            var username = Preferences.Get("Username", "");
-            var password = Preferences.Get("Password", "");
-            var hasCredentials = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
             
-            System.Diagnostics.Debug.WriteLine($"AuthService: HasCredentials = {hasCredentials}");
-            SetAuthenticated(hasCredentials);
-            return hasCredentials;
+            // IMPORTANT: Just having stored credentials doesn't mean user is authenticated
+            // Authentication should be explicitly set only after successful login
+            // Don't auto-authenticate based on stored credentials
+            
+            System.Diagnostics.Debug.WriteLine($"AuthService: Current auth state = {_isAuthenticated}");
+            return _isAuthenticated;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"AuthService: Exception in CheckAuthentication: {ex}");
             SetAuthenticated(false);
+            return false;
+        }
+    }
+
+    public bool HasStoredCredentials()
+    {
+        try
+        {
+            var username = Preferences.Get("Username", "");
+            var password = Preferences.Get("Password", "");
+            return !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
+        }
+        catch
+        {
             return false;
         }
     }

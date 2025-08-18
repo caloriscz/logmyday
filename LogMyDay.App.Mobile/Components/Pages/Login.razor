@@ -1,6 +1,8 @@
 @page "/login"
+@using System.ComponentModel.DataAnnotations
 @inject IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject LogMyDay.App.Mobile.Services.ServerConfigurationService ServerConfig
 @inject NavigationManager Navigation
 @inject ILogger<Login> Logger
 
@@ -15,6 +17,13 @@
     <div class="login-form">
         <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
             <DataAnnotationsValidator />
+            
+            <div class="form-group mb-3">
+                <label class="form-label">Server URL:</label>
+                <InputText @bind-Value="loginModel.ServerUrl" class="form-control form-control-lg" placeholder="https://logmyday.tadata.cz" />
+                <ValidationMessage For="@(() => loginModel.ServerUrl)" class="text-danger" />
+                <div class="form-text">Enter your LogMyDay server URL</div>
+            </div>
             
             <div class="form-group mb-3">
                 <label class="form-label">Username:</label>
@@ -94,13 +103,24 @@
     private string? errorMessage;
     private bool isLoading = false;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         // If already authenticated, redirect to home
         if (AuthService.CheckAuthentication())
         {
             Navigation.NavigateTo("/");
+            return;
         }
+        
+        // Load saved server URL and credentials
+        loginModel.ServerUrl = ServerConfig.CurrentServerUrl;
+        if (string.IsNullOrEmpty(loginModel.ServerUrl))
+        {
+            loginModel.ServerUrl = "https://logmyday.tadata.cz";
+        }
+        
+        // Optionally load saved username (but not password for security)
+        loginModel.Username = Preferences.Get("Username", "");
     }
 
     private async Task HandleLogin()
@@ -110,23 +130,46 @@
 
         try
         {
-            // Store credentials in preferences
-            Preferences.Set("Username", loginModel.Username);
-            Preferences.Set("Password", loginModel.Password);
+            // Validate server URL
+            var serverUrl = loginModel.ServerUrl?.Trim();
+            if (string.IsNullOrEmpty(serverUrl))
+            {
+                errorMessage = "Server URL is required.";
+                return;
+            }
 
-            // Test API connection by fetching tags
-            var tags = await ActivityApi.GetTags();
+            // Configure server and test connection
+            ServerConfig.UpdateServerConfiguration(serverUrl, loginModel.Username, loginModel.Password);
             
-            // If successful, set authentication state
-            AuthService.SetAuthenticated(true);
+            // Test connection
+            bool connectionSuccess = await ServerConfig.TestConnectionAsync();
             
-            // Navigate to home
-            Navigation.NavigateTo("/");
+            if (connectionSuccess)
+            {
+                // Connection successful - set authentication state
+                AuthService.SetAuthenticated(true);
+                
+                // Navigate to home
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                // Try to get more specific error information
+                var response = await ServerConfig.GetAsync("tags");
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    errorMessage = "Invalid username or password.";
+                }
+                else
+                {
+                    errorMessage = $"Cannot connect to server. Please check your server URL and credentials.";
+                }
+                Logger.LogWarning($"Login failed: {response.StatusCode} {response.ReasonPhrase}");
+            }
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        catch (UriFormatException)
         {
-            errorMessage = "Invalid username or password.";
-            Logger.LogWarning("Login failed: Unauthorized");
+            errorMessage = "Invalid server URL format. Please enter a valid URL like https://example.com";
         }
         catch (Exception ex)
         {
@@ -141,6 +184,10 @@
 
     public class LoginModel
     {
+        [Required]
+        [Url(ErrorMessage = "Please enter a valid URL")]
+        public string ServerUrl { get; set; } = "https://logmyday.tadata.cz";
+
         [Required]
         public string Username { get; set; } = string.Empty;
 

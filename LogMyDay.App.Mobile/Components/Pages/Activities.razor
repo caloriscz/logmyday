@@ -1,0 +1,40 @@
+@page "/activities"
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Activities - LogMyDay</PageTitle>
+
+<div class="container-fluid p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">My Activities</h1>
+        <button class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Activity
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-calendar3 display-1 text-muted"></i>
+                    <h5 class="mt-3">No Activities Yet</h5>
+                    <p class="text-muted">Start logging your daily activities to see them here.</p>
+                    <button class="btn btn-outline-primary">
+                        <i class="bi bi-plus-circle"></i> Log First Activity
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Redirect to login if not authenticated
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}

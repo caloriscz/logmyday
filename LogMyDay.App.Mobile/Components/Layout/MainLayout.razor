@@ -1,0 +1,100 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@implements IDisposable
+
+<div class="mobile-container">
+    <div class="mobile-content">
+        @Body
+    </div>
+    
+    @* Only show navigation if user is authenticated and not on login page *@
+    @if (AuthService.IsAuthenticated && !IsLoginPage)
+    {
+        <nav class="mobile-nav">
+            <button class="mobile-nav-item @(IsActive("/activities") ? "active" : "")" @onclick="@(() => NavigateTo("/activities"))">
+                <div><i class="bi bi-calendar3"></i></div>
+                <div>Activities</div>
+            </button>
+            <button class="mobile-nav-item @(IsActive("/tags") ? "active" : "")" @onclick="@(() => NavigateTo("/tags"))">
+                <div><i class="bi bi-tags"></i></div>
+                <div>Tags</div>
+            </button>
+            <button class="mobile-nav-item @(IsActive("/quick") ? "active" : "")" @onclick="@(() => NavigateTo("/quick"))">
+                <div><i class="bi bi-lightning"></i></div>
+                <div>Quick</div>
+            </button>
+        </nav>
+    }
+</div>
+
+@code {
+    private bool IsLoginPage => GetCurrentPath().Equals("login", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsActive(string path)
+    {
+        try 
+        {
+            var currentPath = GetCurrentPath();
+            return string.Equals(currentPath, path.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+        }
+        catch 
+        {
+            return false;
+        }
+    }
+
+    private string GetCurrentPath()
+    {
+        try
+        {
+            var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri);
+            return currentPath ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private void NavigateTo(string path)
+    {
+        try 
+        {
+            Navigation.NavigateTo(path);
+            System.Diagnostics.Debug.WriteLine($"MainLayout: Navigated to {path}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MainLayout: Navigation error: {ex.Message}");
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        System.Diagnostics.Debug.WriteLine("MainLayout: Conditional layout initialized");
+        AuthService.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    private void OnAuthenticationChanged(bool isAuthenticated)
+    {
+        System.Diagnostics.Debug.WriteLine($"MainLayout: Auth changed to {isAuthenticated}");
+        InvokeAsync(StateHasChanged);
+        
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        else
+        {
+            // If user just logged in, navigate to activities page
+            Navigation.NavigateTo("/activities");
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+}

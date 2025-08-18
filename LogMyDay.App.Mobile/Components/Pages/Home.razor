@@ -1,0 +1,59 @@
+@page "/"
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+
+<PageTitle>Home - LogMyDay</PageTitle>
+
+<div class="container-fluid p-3">
+    <h1 class="h3 mb-3">Welcome to LogMyDay</h1>
+    <p class="text-muted">Track your daily activities with ease</p>
+    
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Getting Started</h5>
+            <p class="card-text">
+                LogMyDay helps you track and organize your daily activities. 
+                Use the navigation below to explore the app.
+            </p>
+        </div>
+    </div>
+    
+    @if (AuthService?.IsAuthenticated == true)
+    {
+        <div class="alert alert-success">
+            <i class="bi bi-check-circle"></i> You are logged in and ready to use LogMyDay!
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary" @onclick="StartLogging">
+                <i class="bi bi-plus-circle"></i> Start Logging Activities
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Please log in to start tracking your activities.
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button class="btn btn-outline-primary" @onclick="GoToLogin">
+                <i class="bi bi-person"></i> Go to Login
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private void StartLogging()
+    {
+        // TODO: Navigate to activity logging page when implemented
+        System.Diagnostics.Debug.WriteLine("Start logging clicked");
+    }
+    
+    private void GoToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+}
+
+@inject NavigationManager Navigation

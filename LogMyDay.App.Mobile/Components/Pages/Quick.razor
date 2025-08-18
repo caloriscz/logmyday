@@ -1,0 +1,62 @@
+@page "/quick"
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Quick Actions - LogMyDay</PageTitle>
+
+<div class="container-fluid p-3">
+    <h1 class="h3 mb-3">Quick Actions</h1>
+    
+    <div class="row g-3">
+        <div class="col-6">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                    <i class="bi bi-lightning display-4 text-primary mb-2"></i>
+                    <h6 class="card-title">Quick Log</h6>
+                    <small class="text-muted">Instant activity</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                    <i class="bi bi-clock-history display-4 text-success mb-2"></i>
+                    <h6 class="card-title">Recent</h6>
+                    <small class="text-muted">Repeat recent</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                    <i class="bi bi-star display-4 text-warning mb-2"></i>
+                    <h6 class="card-title">Favorites</h6>
+                    <small class="text-muted">Frequent activities</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6">
+            <div class="card h-100">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                    <i class="bi bi-calendar-check display-4 text-info mb-2"></i>
+                    <h6 class="card-title">Today</h6>
+                    <small class="text-muted">View today's logs</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Redirect to login if not authenticated
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}
