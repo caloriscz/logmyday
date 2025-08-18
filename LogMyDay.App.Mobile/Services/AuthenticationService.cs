@@ -67,7 +67,7 @@ public class AuthenticationService : INotifyPropertyChanged
         }
     }
 
-    public async void ClearAuthentication()
+    public void ClearAuthentication()
     {
         try
         {
@@ -76,23 +76,13 @@ public class AuthenticationService : INotifyPropertyChanged
             Preferences.Remove("Password");
             SetAuthenticated(false);
             
-            // Force navigation to login page immediately
-            await Shell.Current.GoToAsync("//login");
+            // MainLayout will automatically handle navigation to /login when authentication state changes
+            System.Diagnostics.Debug.WriteLine("Authentication cleared - MainLayout will handle navigation to login");
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error clearing authentication: {ex.Message}");
             SetAuthenticated(false);
-            
-            // Fallback navigation attempt
-            try
-            {
-                await Shell.Current.GoToAsync("//login");
-            }
-            catch (Exception navEx)
-            {
-                System.Diagnostics.Debug.WriteLine($"Navigation fallback error: {navEx.Message}");
-            }
         }
     }
 

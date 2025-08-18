@@ -106,10 +106,10 @@
 
     protected override void OnInitialized()
     {
-        // If already authenticated, redirect to home
+        // If already authenticated, MainLayout will handle navigation automatically
         if (AuthService.CheckAuthentication())
         {
-            Navigation.NavigateTo("/");
+            // No need to navigate manually - MainLayout will redirect to /activities
             return;
         }
         
@@ -148,10 +148,8 @@
             if (connectionSuccess)
             {
                 // Connection successful - set authentication state
+                // MainLayout will automatically handle navigation to /activities
                 AuthService.SetAuthenticated(true);
-                
-                // Navigate to home
-                Navigation.NavigateTo("/");
             }
             else
             {

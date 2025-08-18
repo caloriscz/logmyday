@@ -187,11 +187,10 @@ public class LoginViewModel : INotifyPropertyChanged
             System.Diagnostics.Debug.WriteLine($"✅ LOGIN SUCCESS - API call completed");
 
             // If we get here, login was successful - set authentication state
+            // The MainLayout will automatically handle navigation to /activities when authentication state changes
             _authService.SetAuthenticated(true);
-
-            // Navigate to the main app
-            await Shell.Current.GoToAsync("//main/app");
-            System.Diagnostics.Debug.WriteLine($"✅ Navigation to main app completed");
+            
+            System.Diagnostics.Debug.WriteLine($"✅ Authentication state set to true - MainLayout will handle navigation");
         }
         catch (HttpRequestException ex)
         {
