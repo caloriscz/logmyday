@@ -1,62 +1,476 @@
 @page "/quick"
-@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@using LogMyDay.App.Mobile.Models
+@using LogMyDay.App.Mobile.Services
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@inject AuthenticationService AuthService
 @inject NavigationManager Navigation
+@inject QuickActivityService QuickActivityService
+@inject IActivityApi ActivityApi
+@inject IJSRuntime JSRuntime
 
-<PageTitle>Quick Actions - LogMyDay</PageTitle>
+<PageTitle>Quick Activities - LogMyDay</PageTitle>
 
 <div class="container-fluid p-3">
-    <h1 class="h3 mb-3">Quick Actions</h1>
-    
-    <div class="row g-3">
-        <div class="col-6">
-            <div class="card h-100">
-                <div class="card-body text-center d-flex flex-column justify-content-center">
-                    <i class="bi bi-lightning display-4 text-primary mb-2"></i>
-                    <h6 class="card-title">Quick Log</h6>
-                    <small class="text-muted">Instant activity</small>
-                </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Quick Activities</h1>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
-        
-        <div class="col-6">
-            <div class="card h-100">
-                <div class="card-body text-center d-flex flex-column justify-content-center">
-                    <i class="bi bi-clock-history display-4 text-success mb-2"></i>
-                    <h6 class="card-title">Recent</h6>
-                    <small class="text-muted">Repeat recent</small>
-                </div>
-            </div>
+    }
+    else if (quickButtons.Count == 0)
+    {
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <i class="bi bi-lightning-charge display-1 text-muted mb-3"></i>
+            <h4 class="text-muted mb-3">No Quick Activities Yet</h4>
+            <p class="text-muted mb-4">Create quick activity buttons for one-tap logging!</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addQuickActivityModal">
+                <i class="bi bi-plus-lg"></i> Create Your First Quick Activity
+            </button>
         </div>
-        
-        <div class="col-6">
-            <div class="card h-100">
-                <div class="card-body text-center d-flex flex-column justify-content-center">
-                    <i class="bi bi-star display-4 text-warning mb-2"></i>
-                    <h6 class="card-title">Favorites</h6>
-                    <small class="text-muted">Frequent activities</small>
+    }
+    else
+    {
+        <!-- Quick Activity Buttons -->
+        <div class="row g-3">
+            @foreach (var button in quickButtons)
+            {
+                <div class="col-12">
+                    <div class="card quick-activity-card @(button.IsEnabled ? "card-enabled" : "card-disabled")" 
+                         @onclick="@(() => UseQuickActivity(button))" 
+                         style="@(button.IsEnabled ? "cursor: pointer;" : "cursor: not-allowed;")">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="flex-grow-1">
+                                    <h5 class="card-title mb-1 @(button.IsEnabled ? "" : "text-muted")">
+                                        @button.Name
+                                    </h5>
+                                    <div class="d-flex align-items-center">
+                                        <small class="text-muted me-2">
+                                            <i class="bi bi-tag"></i> @button.TagName
+                                        </small>
+                                        @if (!string.IsNullOrEmpty(button.Value))
+                                        {
+                                            <small class="text-muted">
+                                                <i class="bi bi-arrow-right"></i> @button.Value
+                                            </small>
+                                        }
+                                    </div>
+                                    @if (!button.IsEnabled)
+                                    {
+                                        <small class="text-warning">
+                                            <i class="bi bi-clock"></i> Cooling down...
+                                        </small>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    @if (button.IsEnabled)
+                                    {
+                                        <i class="bi bi-lightning-charge text-primary fs-2 me-3"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-hourglass-split text-muted fs-2 me-3"></i>
+                                    }
+                                    <button class="btn btn-outline-danger btn-sm" 
+                                            @onclick:stopPropagation="true" 
+                                            @onclick="@(() => DeleteQuickActivity(button))"
+                                            title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            }
         </div>
-        
-        <div class="col-6">
-            <div class="card h-100">
-                <div class="card-body text-center d-flex flex-column justify-content-center">
-                    <i class="bi bi-calendar-check display-4 text-info mb-2"></i>
-                    <h6 class="card-title">Today</h6>
-                    <small class="text-muted">View today's logs</small>
-                </div>
+    }
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show mt-3" role="alert">
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="ClearStatus"></button>
+        </div>
+    }
+</div>
+
+<!-- Floating Action Button -->
+<button class="fab" data-bs-toggle="modal" data-bs-target="#addQuickActivityModal" title="Add Quick Activity">
+    <i class="bi bi-plus-lg"></i>
+</button>
+
+<!-- Add Quick Activity Modal -->
+<div class="modal fade" id="addQuickActivityModal" tabindex="-1" aria-labelledby="addQuickActivityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addQuickActivityModalLabel">Add Quick Activity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="newQuickActivity" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Tag:</label>
+                        <InputSelect @bind-Value="newQuickActivity.TagId" class="form-select" @bind-Value:after="OnTagSelectionChanged">
+                            <option value="0">-- Select Tag --</option>
+                            @if (availableTags != null)
+                            {
+                                foreach (var tag in availableTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Button Name:</label>
+                        <InputText @bind-Value="newQuickActivity.Name" class="form-control"
+                            placeholder="Enter button name" />
+                    </div>
+
+                    @if (selectedTag != null && selectedTag.TypeId.HasValue)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Predefined Value:</label>
+                            @switch (selectedTag.TypeId.Value)
+                            {
+                                case 1: // Integer
+                                    <input type="number" @bind="newQuickActivity.Value" class="form-control"
+                                        placeholder="Enter numeric value" />
+                                    break;
+                                case 2: // String
+                                    <InputText @bind-Value="newQuickActivity.Value" class="form-control"
+                                        placeholder="Enter text value" />
+                                    break;
+                                case 3: // Boolean
+                                    <InputSelect @bind-Value="newQuickActivity.Value" class="form-select">
+                                        <option value="">-- Select Value --</option>
+                                        <option value="true">True</option>
+                                        <option value="false">False</option>
+                                    </InputSelect>
+                                    break;
+                                case 4: // Date
+                                    <InputText @bind-Value="newQuickActivity.Value" class="form-control"
+                                        placeholder="YYYY-MM-DD" />
+                                    break;
+                                default:
+                                    <InputText @bind-Value="newQuickActivity.Value" class="form-control"
+                                        placeholder="Enter value" />
+                                    break;
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            Add Quick Activity
+                        </button>
+                    </div>
+                </EditForm>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Custom CSS -->
+<style>
+    .fab {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 56px;
+        height: 56px;
+        background-color: var(--bs-primary);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1030;
+        transition: all 0.3s ease;
+    }
+
+    .fab:hover {
+        background-color: var(--bs-primary);
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .fab:active {
+        transform: scale(0.95);
+    }
+
+    .quick-activity-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        min-height: 80px;
+    }
+
+    .card-enabled {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-enabled:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-enabled:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+    }
+
+    .card-disabled {
+        opacity: 0.6;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .quick-activity-card .card-body {
+        padding: 1rem 1.25rem;
+    }
+</style>
+
 @code {
-    protected override void OnInitialized()
+    private List<QuickActivityButton> quickButtons = new();
+    private List<TagResponse> availableTags = new();
+    private QuickActivityButton newQuickActivity = new();
+    private TagResponse? selectedTag;
+    private bool isLoading = true;
+    private string statusMessage = "";
+    private bool isError = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
     {
         // Redirect to login if not authenticated
         if (!AuthService.IsAuthenticated)
         {
             Navigation.NavigateTo("/login", true);
+            return;
         }
+
+        await LoadQuickButtons();
+        await LoadTags();
+    }
+
+    private async Task LoadQuickButtons()
+    {
+        try
+        {
+            isLoading = true;
+            quickButtons = await QuickActivityService.GetQuickButtonsAsync();
+            
+            // Subscribe to changes
+            QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
+            QuickActivityService.QuickButtonsChanged += OnQuickButtonsChanged;
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to load quick activities: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            var tagsList = await ActivityApi.GetTags();
+            availableTags = tagsList.ToList();
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to load tags: {ex.Message}");
+        }
+    }
+
+    private void OnQuickButtonsChanged(object? sender, List<QuickActivityButton> updatedButtons)
+    {
+        quickButtons = updatedButtons;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTagSelectionChanged()
+    {
+        if (newQuickActivity.TagId > 0)
+        {
+            selectedTag = availableTags?.FirstOrDefault(t => t.Id == newQuickActivity.TagId);
+            if (selectedTag != null)
+            {
+                // Pre-fill button name with tag title if empty
+                if (string.IsNullOrEmpty(newQuickActivity.Name))
+                {
+                    newQuickActivity.Name = selectedTag.Title;
+                }
+            }
+        }
+        else
+        {
+            selectedTag = null;
+            newQuickActivity.Value = null;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            if (newQuickActivity.TagId <= 0)
+            {
+                errorMessage = "Please select a tag.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newQuickActivity.Name))
+            {
+                errorMessage = "Please enter a button name.";
+                return;
+            }
+
+            var selectedTagName = availableTags.FirstOrDefault(t => t.Id == newQuickActivity.TagId)?.Title ?? "";
+            
+            var quickButton = new QuickActivityButton
+            {
+                Name = newQuickActivity.Name,
+                TagId = newQuickActivity.TagId,
+                TagName = selectedTagName,
+                Value = newQuickActivity.Value
+            };
+
+            await QuickActivityService.AddQuickButtonAsync(quickButton);
+            
+            // Reset form
+            newQuickActivity = new();
+            selectedTag = null;
+            errorMessage = null;
+            
+            ShowSuccess($"Quick activity '{quickButton.Name}' created!");
+
+            // Close the modal
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("eval",
+                "bootstrap.Modal.getInstance(document.getElementById('addQuickActivityModal'))?.hide()");
+            }
+            catch (InvalidOperationException)
+            {
+                // Ignore JavaScript interop errors during static rendering
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create quick activity: {ex.Message}";
+        }
+    }
+
+    private async Task UseQuickActivity(QuickActivityButton button)
+    {
+        if (!button.IsEnabled)
+            return;
+
+        try
+        {
+            // Create activity with predefined description value if available
+            var description = !string.IsNullOrEmpty(button.Value) 
+                ? button.Value 
+                : $"Quick activity: {button.Name}";
+
+            var activity = new ActivityRequest
+            {
+                Description = description,
+                DateStarted = DateTime.Now,
+                PrimaryTagId = button.TagId
+            };
+
+            await ActivityApi.CreateCalendarItem(activity);
+            
+            // Update button state (trigger cooldown)
+            await QuickActivityService.UseButtonAsync(button.Id);
+            
+            ShowSuccess($"Activity '{button.Name}' logged successfully!");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to log activity: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteQuickActivity(QuickActivityButton button)
+    {
+        var confirmed = await ShowConfirm("Delete Quick Activity", 
+            $"Are you sure you want to delete '{button.Name}'?");
+        
+        if (confirmed)
+        {
+            try
+            {
+                await QuickActivityService.RemoveQuickButtonAsync(button.Id);
+                ShowSuccess($"Quick activity '{button.Name}' deleted.");
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Failed to delete quick activity: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task<bool> ShowConfirm(string title, string message)
+    {
+        return await JSRuntime.InvokeAsync<bool>("confirm", $"{title}\n\n{message}");
+    }
+
+    private void ShowSuccess(string message)
+    {
+        statusMessage = message;
+        isError = false;
+        StateHasChanged();
+        _ = Task.Delay(3000).ContinueWith(_ => ClearStatus());
+    }
+
+    private void ShowError(string message)
+    {
+        statusMessage = message;
+        isError = true;
+        StateHasChanged();
+    }
+
+    private void ClearStatus()
+    {
+        statusMessage = "";
+        isError = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
     }
 }
