@@ -88,6 +88,45 @@ The daily view includes multiple navigation options for efficient access to hist
 
 This multi-level navigation system eliminates the tedious day-by-day clicking when accessing activities from weeks or months ago, significantly improving the user experience for historical data review.
 
+### Quick Activities System
+LogMyDay features an advanced Quick Activities system designed for one-tap activity logging:
+
+#### Modern User Interface
+- **Floating Action Button (FAB)**: Consistent with Activities page design, positioned at bottom-right for easy mobile access
+- **Bootstrap Modal Form**: Clean, responsive modal with proper form validation replacing complex JavaScript prompts
+- **Mobile-Optimized**: Fullscreen modal on small devices, responsive design for all screen sizes
+- **Visual Feedback**: Clear indication of button states (enabled/disabled) with appropriate icons and styling
+
+#### Intelligent Button Creation
+- **Tag-Based Setup**: Select from available tags with dropdown selection
+- **Auto-Naming**: Button name automatically pre-fills with selected tag name for convenience
+- **Predefined Values**: Support for predefined description values based on tag input types:
+  - **Integer**: Numeric input with proper validation
+  - **String**: Text input for custom descriptions
+  - **Boolean**: True/False dropdown selection
+  - **Date**: Date input for time-based activities
+- **Form Validation**: Proper client-side and server-side validation with clear error messages
+
+#### Smart Cooldown System
+- **Accidental Prevention**: 15-second cooldown prevents accidental double-taps
+- **Visual Indicators**: Disabled buttons show hourglass icon and "Cooling down..." message
+- **State Management**: Real-time updates across the interface when cooldown expires
+- **User Feedback**: Success messages confirm activity logging and cooldown activation
+
+#### Enhanced Activity Logging
+- **Predefined Descriptions**: Uses configured values instead of generic "Quick activity" text
+- **Instant Logging**: One-tap creates activities with current timestamp
+- **Tag Integration**: Full integration with existing tag system and input types
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+
+#### Technical Implementation
+- **Type-Safe Properties**: Proper integration with QuickActivityButton model
+- **Event-Driven Updates**: Real-time UI updates through service events
+- **Modal Management**: Proper Bootstrap modal lifecycle with JavaScript interop
+- **Blazor Integration**: Full Blazor component integration with form validation and state management
+
+This system transforms quick activity logging from a complex multi-step process into a streamlined, single-tap experience that users actually want to use for frequent activity tracking.
+
 ## Security
 
 ### Authentication Architecture

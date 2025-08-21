@@ -13,6 +13,7 @@ LogMyDay is a personal activity logging application with both web and mobile int
 
 ### Mobile Application
 - **[Mobile Implementation](mobile-implementation.md)** - Mobile app development journey and key features
+- **[Quick Activities Redesign](quick-activities-redesign.md)** - Modern UI redesign for mobile quick activity creation
 - **[Mobile Bug Fixes](mobile-bug-fixes.md)** - Bug resolution and troubleshooting guide
 
 ### Implementation Guides
