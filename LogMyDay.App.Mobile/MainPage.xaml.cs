@@ -54,21 +54,21 @@ public partial class MainPage : ContentPage
     
     private async void StartBlazorMonitoring()
     {
-        System.Diagnostics.Debug.WriteLine("MainPage: Starting Blazor monitoring");
+        //System.Diagnostics.Debug.WriteLine("MainPage: Starting Blazor monitoring");
         
-        // Check after 3 seconds
-        await Task.Delay(3000);
-        StatusLabel.Text = "Waiting for Blazor components...";
-        System.Diagnostics.Debug.WriteLine("MainPage: 3 seconds - waiting for Blazor");
+        //// Check after 3 seconds
+        //await Task.Delay(3000);
+        //StatusLabel.Text = "Waiting for Blazor components...";
+        //System.Diagnostics.Debug.WriteLine("MainPage: 3 seconds - waiting for Blazor");
         
-        // Check after 8 seconds
-        await Task.Delay(5000);
-        StatusLabel.Text = "Blazor loading is taking longer than expected...";
-        System.Diagnostics.Debug.WriteLine("MainPage: 8 seconds - Blazor taking longer");
+        //// Check after 8 seconds
+        //await Task.Delay(5000);
+        //StatusLabel.Text = "Blazor loading is taking longer than expected...";
+        //System.Diagnostics.Debug.WriteLine("MainPage: 8 seconds - Blazor taking longer");
         
-        // Check after 15 seconds
-        await Task.Delay(7000);
-        StatusLabel.Text = "⚠️ Blazor WebView may have a communication issue";
-        System.Diagnostics.Debug.WriteLine("MainPage: 15 seconds - potential WebView communication issue");
+        //// Check after 15 seconds
+        //await Task.Delay(7000);
+        //StatusLabel.Text = "⚠️ Blazor WebView may have a communication issue";
+        //System.Diagnostics.Debug.WriteLine("MainPage: 15 seconds - potential WebView communication issue");
     }
 }
