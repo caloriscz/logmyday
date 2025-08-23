@@ -294,7 +294,8 @@
                             <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
                                 placeholder="Enter activity description" />
                         }
-                    </div>                    <div class="row">
+                    </div>                    
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label">Date Started:</label>
@@ -307,7 +308,9 @@
                                     <InputDate @bind-Value="newActivity.DateStarted" class="form-control" tabindex="3" />
                                 }
                             </div>
-                        </div>                        @if (selectedTag?.IsRange == true)
+
+                        </div>                        
+                        @if (selectedTag?.IsRange == true)
                         {
                             <div class="col-md-6">
                                 <div class="mb-3">
