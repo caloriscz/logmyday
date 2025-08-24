@@ -1,3 +1,102 @@
+# Mobile Client Architecture (Aug 2025 Refactor)
+
+This document captures the mobile (LogMyDay.App.Mobile) implementation after the August 2025 refactor that resolved the `net_http_operation_started` exceptions and phantom logout host (`https://0.0.0.1`).
+## Overview
+The .NET MAUI mobile app embeds a BlazorWebView and connects to a user‑selected LogMyDay server instance. Users can change server + credentials at runtime without restarting the app.
+
+## Core Principles
+- Do not mutate an in-use `HttpClient` (no changing `BaseAddress` / `DefaultRequestHeaders` after first request).
+- Build new `HttpClient` instances via `IHttpClientFactory` when context changes.
+- Keep password in memory only; never persist it. Persist server URL + username for UX only.
+
+- Refit clients are created on demand, not registered with a static base URL at DI startup.
+
+## Key Components
+| Component | Responsibility |
+|-----------|----------------|
+| `ApiContext` | Holds current `Server` (Uri), `Username`, `Password`; change notification event. |
+| `DynamicAuthHandler` | Injects Basic Auth header using current context just-in-time. |
+| `ApiClientProvider` | Lazily builds Refit interfaces with a fresh `HttpClient` per context version. |
+| `Preferences` | Stores `ServerUrl`, `Username` (NOT password). |
+| Login Page | Validates URL, configures context, performs probe call (`GetTags`) to confirm connectivity. |
+| Logout (MobileTopbar) | Clears authentication state + context + optional username preference; navigates to `/login`. |
+
+## Lifecycle
+1. App starts → loads saved server URL & username (if any) into login form.
+2. User submits credentials:
+  - Validate absolute HTTPS URL (prepend `https://` if scheme omitted).
+  - Call `ApiContext.Configure(server, username, password)`.
+  - First API probe triggers `ApiClientProvider` to build a new Refit client (`dynamic-api` named client + `DynamicAuthHandler`).
+3. Subsequent requests reuse cached Refit interface until context changes.
+4. On logout → `ApiContext.Clear()` invalidates provider; any future API usage before re-login throws a controlled "not configured" error if attempted.
+
+## Why the Previous Approach Failed
+| Issue | Old Pattern | New Pattern |
+|-------|-------------|-------------|
+| Dynamic server switching | Mutated singleton `HttpClient.BaseAddress` | Rebuild client per context change |
+| Credentials header | Set via mutated `DefaultRequestHeaders` | Injected per request by handler |
+| Logout artifact `https://0.0.0.1` | Placeholder / invalid base during mutation window | No mutation; either valid server or unconfigured state |
+| net_http_operation_started | Property mutation after first request | Never mutate after first use |
+
+## Adding a New API Interface (Mobile)
+1. Define interface in `LogMyDay.Shared` (e.g., `IBackupApi`).
+2. Extend `ApiClientProvider`:
+```csharp
+private IBackupApi? _backup;
+public IBackupApi Backup => _backup ??= Build<IBackupApi>();
+```
+3. Inject `IApiClientProvider` where needed and use `provider.Backup`.
+4. No DI registration for the Refit interface itself; provider manages lifecycle.
+
+## Validation Checklist
+- URL validated & normalized (ensure HTTPS).
+- Context configured before first API call.
+- Probe call succeeds before marking authenticated.
+- Password never written to `Preferences`.
+- Logout clears context and navigates to `/login`.
+
+## Migration To New Pattern
+Remove / delete after verifying no references:
+- `ServerConfigurationService`
+- Mobile `AuthenticationHeaderHandler`
+- Any code directly setting `_httpClient.BaseAddress` at runtime
+
+## Future Enhancements
+- Use `SecureStorage` for optional password persistence.
+- Add `/api/health` light probe to replace `GetTags` for login validation.
+- Add offline caching layer (SQLite) for recent activities.
+
+## Security Notes
+- Basic Auth credentials transient in memory only.
+- Enforce HTTPS; reject or warn on non-HTTPS input.
+- No silent fallback to placeholder hosts.
+- Avoid logging raw credentials; only log high-level auth events.
+
+## Common Pitfalls Avoided
+| Pitfall | Avoidance Strategy |
+|---------|--------------------|
+| Reusing mutated `HttpClient` | Always create new via factory per configuration epoch |
+| Race conditions on logout | Context clear triggers provider invalidation atomically |
+| Leaking password to storage | Store only username + server URL |
+| Stale auth header | Handler reads latest context on every request |
+
+## Sample Minimal Registration (Extract)
+```csharp
+builder.Services.AddSingleton<IApiContext, ApiContext>();
+builder.Services.AddTransient<DynamicAuthHandler>();
+builder.Services.AddHttpClient("dynamic-api").AddHttpMessageHandler<DynamicAuthHandler>();
+builder.Services.AddSingleton<IApiClientProvider, ApiClientProvider>();
+// Back-compat injection for existing pages
+builder.Services.AddTransient<IActivityApi>(sp => sp.GetRequiredService<IApiClientProvider>().Activity);
+```
+
+## Error Handling Guidance
+- If `ApiContext.Server` is null, report "Server not configured" instead of attempting calls.
+- Catch `ApiException` (401) on probe → show invalid credentials, clear context.
+- Network failures → instruct user to verify URL / connectivity; do not clear server unless user edits it.
+
+## Summary
+The refactor isolates dynamic server selection and credentials into a context-driven pattern that is safe, testable, and avoids platform `HttpClient` mutation constraints. This ensures reliable login/logout cycles and prepares the mobile client for future secure storage and additional API surfaces.
 # Mobile App Implementation Summary
 
 ## Completed Features

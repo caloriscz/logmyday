@@ -12,7 +12,8 @@ This repository is organized as follows:
   - `Authentication/`: Basic authentication handlers and options.
   - `Application/`: Application layer interfaces and services.
   - `Infrastructure/`: Data access and infrastructure code.
-- `LogMyDay.App/`: Blazor Server application.
+- `LogMyDay.App/`: Blazor Server application (runs on the same host as API, server-side rendering, in-memory credential storage per circuit).
+- `LogMyDay.App.Mobile/`: .NET MAUI (Android) application hosting a BlazorWebView. Uses dynamic per-user server selection and on-demand Refit client creation (see "Client Applications & HTTP Architecture").
   - `Components/`: UI components, layouts, and pages.
   - `Authentication/`: Server-side authentication logic.
   - `wwwroot/`: Static web assets (CSS, images, JS libraries).
@@ -25,17 +26,18 @@ This repository is organized as follows:
 
 ## Basic Project Information
 
-LogMyDay is a personal activity logging application. User can add tags to activities, manage backups, and view their logged activities. 
+LogMyDay is a personal activity logging application. Users can add tags to activities, manage backups, and view their logged activities. 
 
 The application is designed to be user-friendly and efficient for tracking daily activities.
 
 It consists of:
 
-- **LogMyDay.Api**: An ASP.NET Core Web API that provides endpoints for managing activities, tags, backups, and more. It handles authentication and data storage.
-- **LogMyDay.App**: A Blazor Server application that serves as the main user interface, allowing users to log, view, and manage their daily activities.
-- **LogMyDay.Domain**: Contains the core domain models and business logic, including entities and enums used throughout the application.
-- **LogMyDay.Shared**: Defines shared data transfer objects (DTOs) and interfaces for communication between the client and API.
-- **LogMyDay.Api.Tests**: Contains unit tests for the API and service layers to ensure reliability and correctness.
+- **LogMyDay.Api**: ASP.NET Core Web API providing activity, tag, backup, export endpoints.
+- **LogMyDay.App**: Blazor Server UI (single hosted instance per server) – server manages user sessions and credentials purely in memory.
+- **LogMyDay.App.Mobile**: MAUI + BlazorWebView client pointing to ANY user‑provided LogMyDay server (self-hosted). Supports dynamic server URL & credentials at runtime without restarting the app.
+- **LogMyDay.Domain**: Core domain entities and enums (pure, no infrastructure dependencies).
+- **LogMyDay.Shared**: DTOs + Refit interfaces (shared contract layer).
+- **LogMyDay.Api.Tests**: Unit / service tests.
 
 The project is designed for extensibility and separation of concerns, making it easy to maintain and expand.
 
@@ -129,20 +131,51 @@ This system transforms quick activity logging from a complex multi-step process 
 
 ## Security
 
+### Client Applications & HTTP Architecture (UPDATED – Aug 2025 Refactor)
+
+There are now TWO distinct client patterns:
+
+1. Blazor Server (`LogMyDay.App`)
+  - Uses `CredentialStore` (singleton) storing credentials in memory only for the active SignalR circuit.
+  - A typed Refit client is registered at startup with a fixed `BaseAddress` from configuration.
+  - Credentials are injected per request via `AuthenticationHeaderHandler` (no mutation of `HttpClient.BaseAddress`).
+
+2. MAUI Mobile (`LogMyDay.App.Mobile`)
+  - Users enter server URL + credentials at login.
+  - We DO NOT mutate an existing `HttpClient` after first use (avoids `net_http_operation_started`).
+  - Components:
+    - `ApiContext`: Holds current `Server` (Uri), `Username`, `Password` (password in memory only – not persisted), change notifications.
+    - `DynamicAuthHandler`: Delegating handler adding Basic Auth from `ApiContext` at send time.
+    - `ApiClientProvider`: Builds Refit clients on demand using `IHttpClientFactory` (named client "dynamic-api"). A new `HttpClient` instance is created when context changes; old instances are allowed to GC – no runtime mutation.
+  - Username + server URL stored in `Preferences` (password intentionally NOT persisted; future enhancement may use secure storage). 
+  - Login flow: validate URL → configure context → make a probe call (e.g., `GetTags`) → mark authenticated.
+  - Logout flow: clear context (`ApiContext.Clear()`), remove transient username preference if desired, navigate to login. No phantom requests to placeholder hosts.
+
+### Deprecated (Mobile)
+- `ServerConfigurationService`: Replaced by `ApiContext` + `ApiClientProvider` + `DynamicAuthHandler`.
+- `AuthenticationHeaderHandler` (mobile variant): Replaced by `DynamicAuthHandler` (context-aware).
+
+Remove any new code that attempts to mutate `HttpClient.BaseAddress` or `DefaultRequestHeaders` after requests have been issued. Always build a new client via `IHttpClientFactory` when the server context changes.
+
 ### Authentication Architecture
-LogMyDay uses a secure authentication system designed to protect user credentials and resist common web vulnerabilities:
+LogMyDay uses patterns suited to each runtime to protect user credentials and resist common web vulnerabilities:
 
-#### Credential Storage Security
-- **No localStorage Credential Storage**: The application does NOT store plain credentials in browser localStorage, protecting against XSS attacks
-- **Server-Side Session Management**: As a Blazor Server application, authentication state is maintained server-side, not in the browser
-- **In-Memory Credential Storage**: The `CredentialStore` class stores credentials in server-side memory only during the active session
-- **Session-Based Security**: Credentials are automatically cleared when the user logs out or the session ends
+#### Credential Storage Security (Blazor Server)
+- No localStorage/sessionStorage usage – credentials only in memory on server.
+- Session ends → credentials cleared.
 
-#### Implementation Details
-- **CredentialStore Service**: Registered as a singleton service that maintains credentials in private memory fields
-- **AuthenticationHeaderHandler**: Automatically injects Basic Auth headers for API calls using server-side stored credentials
-- **No Client-Side Persistence**: Credentials never reach the browser's localStorage, sessionStorage, or cookies
-- **XSS Protection**: Since credentials are stored server-side, they are not accessible to malicious JavaScript
+#### Credential Storage Security (Mobile)
+- `ApiContext` holds credentials in app memory; password NOT persisted.
+- Username/server URL persisted in `Preferences` for UX – safe without password.
+- Future: optionally move password to secure platform storage (e.g., `SecureStorage`) – not yet implemented.
+
+#### Implementation Details (Blazor Server)
+- `CredentialStore` singleton
+- `AuthenticationHeaderHandler` sets Basic auth header per request
+
+#### Implementation Details (Mobile)
+- `ApiContext` + `DynamicAuthHandler` + `ApiClientProvider`
+- Per-change invalidation triggers new Refit client construction.
 
 #### Security Benefits
 - Resistant to XSS credential theft attacks
@@ -150,8 +183,10 @@ LogMyDay uses a secure authentication system designed to protect user credential
 - Automatic credential cleanup on session termination
 - Server-side authentication state management
 
-#### Critical Security Rule
-**NEVER store user credentials in localStorage, sessionStorage, or any client-side storage mechanism.** The current server-side approach must be maintained to ensure security compliance and protect against credential theft.
+#### Critical Security Rules
+- Do NOT store plaintext credentials in browser storage or insecure mobile storage.
+- Do NOT mutate an in-use `HttpClient` to switch servers – always rebuild via factory.
+- Enforce HTTPS only; reject or warn on `http://` server inputs (prepend `https://` if user omits scheme).
 
 ### HTTPS Enforcement
 LogMyDay enforces HTTPS everywhere to protect data in transit:
@@ -176,7 +211,7 @@ The application automatically adds security headers to all responses:
 - `Referrer-Policy`: Controls referrer information leakage
 
 ### Rate Limiting & Brute-Force Protection
-LogMyDay implements comprehensive protection against brute-force authentication attacks:
+Blazor Server / API implement brute-force and general rate limiting; mobile client should not bypass or disable these measures.
 
 #### Multi-Layer Rate Limiting
 - **Global API Rate Limiting**: 100 requests per minute per IP for general API access
@@ -222,7 +257,7 @@ Production settings (stricter security):
 }
 ```
 
-## Architecture Guidance for Copilot
+## Architecture Guidance
 
 * Use **Clean Architecture principles**:
 
@@ -240,14 +275,31 @@ Production settings (stricter security):
   * Prefer planning-first mindset before coding.
   * Write journal notes and intent definitions before actual implementation.
 
-### Usage Notes for Copilot
+### Recent Refactor Summary (Aug 2025)
+| Area | Before | After |
+|------|--------|-------|
+| Mobile server selection | Mutated singleton HttpClient (`BaseAddress`, headers) | `ApiContext` + new client instances via factory |
+| Auth header (mobile) | Handler reading `Preferences` every request | Handler reads in-memory context (no password persistence) |
+| Logout failure | Phantom call to invalid host (e.g., 0.0.0.1) + HttpClient mutation exception | Clean context clear; no mutation exceptions |
+| Adding new API endpoints | Risk of coupling to fixed client | Build via provider or add new Refit interface through provider pattern |
 
-* Use this document as reference before generating code.
-* Do not implement "Planned" or "Deferred" features until promoted.
-* Use Developer Journal to explain changes.
-* Log errors or tech limitations here to reduce retries.
+### Adding New Refit Interfaces (Mobile)
+1. Define interface in `LogMyDay.Shared`.
+2. Inject `IApiClientProvider` and extend provider (add property & lazy builder) OR create a new dedicated provider if justified.
+3. Never set `BaseAddress` after using the client; rely on provider rebuild when context changes.
 
-## Rules and conventions
+### Migration Cleanup Tasks
+- Remove any lingering references to `ServerConfigurationService` when no longer used.
+- Delete obsolete mobile `AuthenticationHeaderHandler` after ensuring all code uses `DynamicAuthHandler`.
+
+### Validation Checklist (Mobile Login)
+- URL is absolute & HTTPS.
+- `ApiContext.Configure` called once prior to first API call.
+- Probe request succeeds (e.g., `GetTags`).
+- Password not persisted.
+- Logout clears context and navigates to `/login`.
+
+## Rules and Conventions
 
 ### Documentation Standards
 - **CRITICAL: ALL markdown files must be placed ONLY in the `.github/instructions/` folder** - NEVER create markdown files in the root directory
@@ -258,7 +310,7 @@ Production settings (stricter security):
 - **REMINDER**: If you create any .md file outside of `.github/instructions/`, it violates project structure rules
 
 ### Code Standards
-- Never use Console.WriteLine, Debug.WriteLine, or similar methods for logging. Use the built-in logging framework provided by ASP.NET Core.
+- Never use `Console.WriteLine` for production logging. For mobile temporary diagnostics prefer platform logging abstractions; server uses ASP.NET Core logging infrastructure (Serilog configured).
 - Always use dependency injection for services and repositories.
 - Follow the SOLID principles for object-oriented design.
 - Use asynchronous programming patterns (async/await) for I/O-bound operations to improve performance and responsiveness.
