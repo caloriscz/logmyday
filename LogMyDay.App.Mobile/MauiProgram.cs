@@ -24,17 +24,9 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
 
-        System.Diagnostics.Debug.WriteLine("MauiProgram: Basic MAUI configuration completed");
-
         // Add Blazor WebView
         builder.Services.AddMauiBlazorWebView();
-        System.Diagnostics.Debug.WriteLine("MauiProgram: BlazorWebView added");
 
-#if DEBUG
-        builder.Services.AddBlazorWebViewDeveloperTools();
-        builder.Logging.AddDebug();
-        System.Diagnostics.Debug.WriteLine("MauiProgram: Blazor developer tools and debug logging added");
-#endif
 
         // Register essential services
         try
@@ -55,13 +47,9 @@ public static class MauiProgram
                 var serverUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
                 return new AppSettings { WebUrl = serverUrl, DefaultPage = "/" };
             });
-            System.Diagnostics.Debug.WriteLine("MauiProgram: AppSettings registered");
 
             // Register authentication handler
             builder.Services.AddTransient<AuthenticationHeaderHandler>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationHeaderHandler registered");
-
-            // Register API services with Refit
             builder.Services.AddRefitClient<IActivityApi>()
                 .ConfigureHttpClient(c => 
                 {
@@ -69,8 +57,8 @@ public static class MauiProgram
                     c.BaseAddress = new Uri("https://logmyday.tadata.cz/");
                     c.Timeout = TimeSpan.FromSeconds(30); // 30 second timeout
                     
-                    System.Diagnostics.Debug.WriteLine($"[HttpClient] Configured base address: {c.BaseAddress}");
-                    System.Diagnostics.Debug.WriteLine($"[HttpClient] Timeout: {c.Timeout}");
+                    System.Diagnostics.Debug.WriteLine($"========================= [HttpClient] Configured base address: {c.BaseAddress}");
+                    System.Diagnostics.Debug.WriteLine($"========================= [HttpClient] Timeout: {c.Timeout}");
                 })
                 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
                 {
@@ -88,23 +76,7 @@ public static class MauiProgram
             // Register other services
             builder.Services.AddScoped<ApiService>();
             builder.Services.AddScoped<QuickActivityService>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: Other services registered");
 
-            // Register ViewModels
-            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.LoginViewModel>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.ActivitiesViewModel>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.TagsViewModel>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.ViewModels.SettingsViewModel>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: ViewModels registered");
-
-            // Register Pages
-            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.LoginPage>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.ActivitiesPage>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.TagsPage>();
-            builder.Services.AddTransient<LogMyDay.App.Mobile.Pages.SettingsPage>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: Pages registered");
-
-            System.Diagnostics.Debug.WriteLine("MauiProgram: All services registered successfully");
         }
         catch (Exception ex)
         {
