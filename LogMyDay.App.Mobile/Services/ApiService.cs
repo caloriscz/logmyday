@@ -23,21 +23,7 @@ public class ApiService
         
         try
         {
-            // Log the API call details
-            var baseUrl = "https://logmyday.tadata.cz/api"; // From configuration
-            var fullUrl = $"{baseUrl}/tags";
-            
-            System.Diagnostics.Debug.WriteLine("=== API CALL DEBUG INFO ===");
-            System.Diagnostics.Debug.WriteLine($"Base URL: {baseUrl}");
-            System.Diagnostics.Debug.WriteLine($"Full URL: {fullUrl}");
-            System.Diagnostics.Debug.WriteLine($"Credentials: admin/secret123");
-            System.Diagnostics.Debug.WriteLine($"Attempting to fetch tags...");
-            
             var tags = await _activityApi.GetTags();
-            
-            System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Fetched {tags.Count()} tags from API");
-            System.Diagnostics.Debug.WriteLine("=== END API CALL ===");
-            
             return tags.ToList();
         }
         catch (HttpRequestException httpEx)
@@ -47,16 +33,11 @@ public class ApiService
             {
                 errorDetails += $"\nInner Exception: {httpEx.InnerException.Message}";
             }
-            errorDetails += $"\nURL: https://logmyday.tadata.cz/api/tags";
-            errorDetails += $"\nCredentials: admin/secret123";
+            errorDetails += "\nEndpoint: /tags";
             
             LastError = errorDetails;
             
-            System.Diagnostics.Debug.WriteLine("=== HTTP ERROR ===");
-            System.Diagnostics.Debug.WriteLine($"❌ HTTP Error fetching tags: {httpEx.Message}");
-            System.Diagnostics.Debug.WriteLine($"URL: https://logmyday.tadata.cz/api/tags");
-            System.Diagnostics.Debug.WriteLine($"Credentials: admin/secret123");
-            System.Diagnostics.Debug.WriteLine($"HTTP Status: {httpEx.Data}");
+            System.Diagnostics.Debug.WriteLine($"HTTP Error fetching tags: {httpEx.Message}");
             if (httpEx.InnerException != null)
             {
                 System.Diagnostics.Debug.WriteLine($"Inner Exception: {httpEx.InnerException.Message}");
@@ -68,17 +49,12 @@ public class ApiService
         catch (TaskCanceledException tcEx)
         {
             var errorDetails = $"Timeout Error: {tcEx.Message}";
-            errorDetails += $"\nURL: https://logmyday.tadata.cz/api/tags";
+            errorDetails += "\nEndpoint: /tags";
             errorDetails += $"\nThis usually means the server is not responding or network issues";
             
             LastError = errorDetails;
             
-            System.Diagnostics.Debug.WriteLine("=== TIMEOUT ERROR ===");
-            System.Diagnostics.Debug.WriteLine($"❌ Timeout fetching tags: {tcEx.Message}");
-            System.Diagnostics.Debug.WriteLine($"URL: https://logmyday.tadata.cz/api/tags");
-            System.Diagnostics.Debug.WriteLine($"Credentials: admin/secret123");
-            System.Diagnostics.Debug.WriteLine("This usually means the server is not responding or network issues");
-            System.Diagnostics.Debug.WriteLine("=== END TIMEOUT ===");
+            System.Diagnostics.Debug.WriteLine($"Timeout fetching tags: {tcEx.Message}");
             
             return new List<TagResponse>();
         }
@@ -86,7 +62,7 @@ public class ApiService
         {
             var errorDetails = $"General Error: {ex.Message}";
             errorDetails += $"\nException Type: {ex.GetType().Name}";
-            errorDetails += $"\nURL: https://logmyday.tadata.cz/api/tags";
+            errorDetails += "\nEndpoint: /tags";
             if (ex.InnerException != null)
             {
                 errorDetails += $"\nInner Exception: {ex.InnerException.Message}";
@@ -95,13 +71,7 @@ public class ApiService
             
             LastError = errorDetails;
             
-            System.Diagnostics.Debug.WriteLine("=== GENERAL ERROR ===");
-            System.Diagnostics.Debug.WriteLine($"❌ General Error fetching tags: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"URL: https://logmyday.tadata.cz/api/tags");
-            System.Diagnostics.Debug.WriteLine($"Credentials: admin/secret123");
-            System.Diagnostics.Debug.WriteLine($"Exception Type: {ex.GetType().Name}");
-            System.Diagnostics.Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
-            System.Diagnostics.Debug.WriteLine("=== END GENERAL ERROR ===");
+            System.Diagnostics.Debug.WriteLine($"General Error fetching tags: {ex.Message}");
             
             return new List<TagResponse>();
         }

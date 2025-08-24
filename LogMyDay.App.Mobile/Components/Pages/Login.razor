@@ -1,9 +1,9 @@
 @page "/"
 @page "/login"
 @using System.ComponentModel.DataAnnotations
-@inject IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
-@inject LogMyDay.App.Mobile.Services.ServerConfigurationService ServerConfig
+@inject LogMyDay.App.Mobile.Services.IApiContext ApiContext
+@inject LogMyDay.App.Mobile.Services.IApiClientProvider ApiProvider
 @inject NavigationManager Navigation
 @inject ILogger<Login> Logger
 
@@ -113,15 +113,9 @@
             return;
         }
         
-        // Load saved server URL and credentials
-        loginModel.ServerUrl = ServerConfig.CurrentServerUrl;
-        if (string.IsNullOrEmpty(loginModel.ServerUrl))
-        {
-            loginModel.ServerUrl = "https://logmyday.tadata.cz";
-        }
-        
-        // Optionally load saved username (but not password for security)
-        loginModel.Username = Preferences.Get("Username", "");
+    // Load saved config from preferences (without constructing HttpClient prematurely)
+    loginModel.ServerUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
+    loginModel.Username = Preferences.Get("Username", "");
     }
 
     private async Task HandleLogin()
@@ -139,31 +133,33 @@
                 return;
             }
 
-            // Configure server and test connection
-            ServerConfig.UpdateServerConfiguration(serverUrl, loginModel.Username, loginModel.Password);
-            
-            // Test connection
-            bool connectionSuccess = await ServerConfig.TestConnectionAsync();
-            
-            if (connectionSuccess)
+            // Configure context (builds new clients implicitly on first use)
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var serverUri))
             {
-                // Connection successful - set authentication state
-                // MainLayout will automatically handle navigation to /activities
+                errorMessage = "Invalid server URL format.";
+                return;
+            }
+
+            ApiContext.Configure(serverUri, loginModel.Username, loginModel.Password);
+            Preferences.Set("ServerUrl", serverUri.ToString().TrimEnd('/'));
+            Preferences.Set("Username", loginModel.Username);
+            // Do NOT persist password beyond session unless explicitly required
+
+            try
+            {
+                // Simple validation call: fetch tags (or a health endpoint if available)
+                var tags = await ApiProvider.Activity.GetTags();
                 AuthService.SetAuthenticated(true);
             }
-            else
+            catch (Refit.ApiException apiEx) when (apiEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                // Try to get more specific error information
-                var response = await ServerConfig.GetAsync("tags");
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    errorMessage = "Invalid username or password.";
-                }
-                else
-                {
-                    errorMessage = $"Cannot connect to server. Please check your server URL and credentials.";
-                }
-                Logger.LogWarning($"Login failed: {response.StatusCode} {response.ReasonPhrase}");
+                errorMessage = "Invalid username or password.";
+                ApiContext.Clear();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Connection failed: {ex.Message}";
+                ApiContext.Clear();
             }
         }
         catch (UriFormatException)

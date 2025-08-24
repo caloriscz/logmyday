@@ -1,9 +1,7 @@
-using LogMyDay.App.Mobile.Services;
-using LogMyDay.Shared.Interfaces;
-using Refit;
 using CommunityToolkit.Maui;
+using LogMyDay.App.Mobile.Services;
 using Microsoft.AspNetCore.Components.WebView.Maui;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LogMyDay.App.Mobile;
 
@@ -38,8 +36,17 @@ public static class MauiProgram
             System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationService registered");
 
             // Register server configuration service
-            builder.Services.AddSingleton<ServerConfigurationService>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: ServerConfigurationService registered");
+            // Legacy ServerConfigurationService replaced by dynamic context/provider pattern
+            System.Diagnostics.Debug.WriteLine("MauiProgram: (Deprecated) ServerConfigurationService skipped");
+
+            // Dynamic API context & clients
+            builder.Services.Add(new ServiceDescriptor(typeof(IApiContext), typeof(ApiContext), ServiceLifetime.Singleton));
+            builder.Services.Add(new ServiceDescriptor(typeof(DynamicAuthHandler), typeof(DynamicAuthHandler), ServiceLifetime.Transient));
+            builder.Services.AddHttpClient("dynamic-api")
+                .AddHttpMessageHandler<DynamicAuthHandler>();
+            builder.Services.Add(new ServiceDescriptor(typeof(IApiClientProvider), typeof(ApiClientProvider), ServiceLifetime.Singleton));
+            // Adapter so existing pages injecting IActivityApi continue to work
+            builder.Services.AddTransient<LogMyDay.Shared.Interfaces.IActivityApi>(sp => sp.GetRequiredService<IApiClientProvider>().Activity);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>
@@ -49,29 +56,8 @@ public static class MauiProgram
             });
 
             // Register authentication handler
-            builder.Services.AddTransient<AuthenticationHeaderHandler>();
-            builder.Services.AddRefitClient<IActivityApi>()
-                .ConfigureHttpClient(c => 
-                {
-                    // Use a fixed base address - don't rely on Preferences during DI setup
-                    c.BaseAddress = new Uri("https://logmyday.tadata.cz/");
-                    c.Timeout = TimeSpan.FromSeconds(30); // 30 second timeout
-                    
-                    System.Diagnostics.Debug.WriteLine($"========================= [HttpClient] Configured base address: {c.BaseAddress}");
-                    System.Diagnostics.Debug.WriteLine($"========================= [HttpClient] Timeout: {c.Timeout}");
-                })
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
-                {
-                    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
-                    {
-                        // For development - accept all certificates
-                        // In production, you should validate certificates properly
-                        System.Diagnostics.Debug.WriteLine($"[SSL] Certificate validation: {sslPolicyErrors}");
-                        return true;
-                    }
-                })
-                .AddHttpMessageHandler<AuthenticationHeaderHandler>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: Refit API clients registered");
+            // Remove fixed Refit client; dynamic provider builds Refit clients on demand with selected server URL.
+            System.Diagnostics.Debug.WriteLine("MauiProgram: Dynamic API client infrastructure registered");
 
             // Register other services
             builder.Services.AddScoped<ApiService>();

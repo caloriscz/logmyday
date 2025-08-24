@@ -2,6 +2,7 @@
 @inject AuthenticationService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@inject LogMyDay.App.Mobile.Services.IApiContext ApiContext
 
 <!-- Mobile Topbar -->
 <div class="mobile-topbar">
@@ -58,7 +59,8 @@
             {
                 // Clear authentication
                 AuthService.ClearAuthentication();
-                
+                ApiContext.Clear();
+                Preferences.Remove("Username");
                 // Navigate to login
                 Navigation.NavigateTo("/login", true);
             }
