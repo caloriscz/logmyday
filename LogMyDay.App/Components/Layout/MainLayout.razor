@@ -85,6 +85,17 @@ else
                                 <label class="form-label">Value:</label>
                                 <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" tabindex="2" />
                             }
+                            else if (selectedTag.TypeId == 5) // Time
+                            {
+                                <label class="form-label">Value:</label>
+                                <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-control" tabindex="2" />
+                            }
+                            else if (selectedTag.TypeId == 6) // Decimal, precision 2
+                            {
+                                <label class="form-label">Value:</label>
+                                <input type="number" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="form-control" tabindex="2"
+                                    placeholder="Enter decimal value" step="0.01" />
+                            }
                             else
                             {
                                 <label class="form-label">Description:</label>
@@ -176,6 +187,8 @@ else
     private bool booleanValue = false;
     private DateTime? dateValue = null;
     private int? integerValue = null;
+    private TimeOnly? timeValue = null;
+    private decimal? decimalValue = null;
     
     // Keyboard shortcuts
     private bool keyboardListenerAdded = false;
@@ -313,6 +326,8 @@ if (window.layoutKeyboardHandler) {
             integerValue = null; // Reset integer value
             booleanValue = false; // Reset boolean value
             dateValue = null; // Reset date value
+            timeValue = null; // Reset time value
+            decimalValue = null; // Reset decimal value
             errorMessage = null;
 
             // Close the modal after successful submission only if not adding another
@@ -383,6 +398,16 @@ if (window.layoutKeyboardHandler) {
                 dateValue = DateTime.Today;
                 newActivity.Description = DateTime.Today.ToString("yyyy-MM-dd");
             }
+            else if (selectedTag?.TypeId == 5) // Time
+            {
+                timeValue = TimeOnly.FromDateTime(DateTime.Now);
+                newActivity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+            }
+            else if (selectedTag?.TypeId == 6) // Decimal, precision 2
+            {
+                decimalValue = null;
+                newActivity.Description = string.Empty;
+            }
         }
         else
         {
@@ -392,6 +417,8 @@ if (window.layoutKeyboardHandler) {
             integerValue = null;
             booleanValue = false;
             dateValue = null;
+            timeValue = null;
+            decimalValue = null;
         }
     }
     
@@ -408,6 +435,29 @@ if (window.layoutKeyboardHandler) {
     private void OnDateValueChanged()
     {
         newActivity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+    }
+    
+    private void OnTimeValueChanged()
+    {
+        newActivity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+    }
+    
+    private void OnDecimalValueChanged()
+    {
+        // Round to 2 decimal places if value has higher precision
+        if (decimalValue.HasValue)
+        {
+            var rounded = Math.Round(decimalValue.Value, 2);
+            if (rounded != decimalValue.Value)
+            {
+                decimalValue = rounded;
+            }
+            newActivity.Description = rounded.ToString("F2");
+        }
+        else
+        {
+            newActivity.Description = string.Empty;
+        }
     }
 
     private async Task EnsureTagsLoaded()
