@@ -98,4 +98,11 @@ public class ActivitiesController : ControllerBase
         var hasDuplicate = await _activityService.HasActivityForTimeGranularity(tagId, dateStarted);
         return Ok(new DuplicateCheckResponse { HasDuplicate = hasDuplicate });
     }
+
+    [HttpGet("required-daily-tags-unfilled")]
+    public async Task<IActionResult> GetRequiredDailyTagsNotFilledForDate([FromQuery] DateTime date)
+    {
+        var unfilledTags = await _activityService.GetRequiredDailyTagsNotFilledForDate(date);
+        return Ok(unfilledTags);
+    }
 }

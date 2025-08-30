@@ -411,4 +411,43 @@ public class ActivityService : IActivityService
 
         return years;
     }
+
+    public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date)
+    {
+        var startOfDay = date.Date;
+        var endOfDay = date.Date.AddDays(1).AddTicks(-1);
+
+        // Get all required tags with Daily granularity
+        var requiredDailyTags = await _context.Tags
+            .Where(t => t.IsRequired && t.TimeGranularity == TimeGranularity.Daily)
+            .Include(t => t.InputType)
+            .ToListAsync();
+
+        // Find tags that don't have activities for the specified date
+        var unfilled = new List<TagResponse>();
+
+        foreach (var tag in requiredDailyTags)
+        {
+            var hasActivity = await _context.Activities
+                .Where(a => a.TagId == tag.Id && a.DateStarted >= startOfDay && a.DateStarted <= endOfDay)
+                .AnyAsync();
+
+            if (!hasActivity)
+            {
+                unfilled.Add(new TagResponse
+                {
+                    Id = tag.Id,
+                    Title = tag.TagName,
+                    InputTypeId = tag.InputTypeId,
+                    TypeId = tag.InputTypeId,
+                    IsRequired = tag.IsRequired,
+                    IsRepeatable = tag.IsRepeatable,
+                    TimeGranularity = tag.TimeGranularity,
+                    IsRange = tag.IsRange
+                });
+            }
+        }
+
+        return unfilled;
+    }
 }

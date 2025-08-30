@@ -27,7 +27,8 @@ public interface IActivityService
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? descriptionFilter = null
-    );    Task<PagedResult<ActivityResponse>> GetPagedByMonths(
+    );
+    Task<PagedResult<ActivityResponse>> GetPagedByMonths(
         int monthPageNumber,
         int monthsPerPage,
         string orderBy,
@@ -39,4 +40,5 @@ public interface IActivityService
     Task<List<ActivityResponse>> GetByYear(int year, int? tagId = null);
     Task<List<int>> GetAvailableYears(int? tagId = null);
     Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted);
+    Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date);
 }
