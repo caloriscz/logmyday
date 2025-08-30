@@ -1,0 +1,74 @@
+@using LogMyDay.Shared.DTOs
+
+@* Breathing Save Panel Component - Handles saving breathing sessions as activities *@
+
+<div class="blazor-save-section mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,.16)">
+    <div class="field">
+        <label for="tagSelect">Save as Tag</label>
+        <select @bind="SelectedTagId" id="tagSelect" class="form-select" disabled="@(IsLoading || AvailableTags == null)">
+            @if (IsLoading)
+            {
+                <option>Loading tags...</option>
+            }
+            else if (AvailableTags?.Any() == true)
+            {
+                <option value="0">Select a tag to save session</option>
+                @foreach (var tag in AvailableTags)
+                {
+                    <option value="@tag.Id">@tag.Title</option>
+                }
+            }
+            else
+            {
+                <option>No integer tags available</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <button @onclick="HandleSaveClick" class="btn btn-success" style="width:100%;" disabled="@(SelectedTagId == 0 || SessionTime.TotalSeconds < 10 || SaveCountdown > 0)">
+            @if (SaveCountdown > 0)
+            {
+                <span>@SaveCountdown s</span>
+            }
+            else
+            {
+                <i class="bi bi-save me-1"></i>@:Save Session
+            }
+        </button>
+    </div>
+    
+    @if (SessionTime.TotalSeconds > 0)
+    {
+        <div class="session-info">
+            <small class="text-muted">
+                <strong>Session: </strong>@SessionTime.ToString("mm\\:ss")
+                @if (TotalCycles > 0)
+                {
+                    <span class="ms-2"><strong>Cycles: </strong>@TotalCycles</span>
+                }
+            </small>
+        </div>
+    }
+    
+    @if (!string.IsNullOrEmpty(StatusMessage))
+    {
+        <div class="alert alert-info mt-2 small">@StatusMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter] public int SelectedTagId { get; set; }
+    [Parameter] public EventCallback<int> SelectedTagIdChanged { get; set; }
+    [Parameter] public TimeSpan SessionTime { get; set; }
+    [Parameter] public int TotalCycles { get; set; }
+    [Parameter] public int SaveCountdown { get; set; }
+    [Parameter] public string StatusMessage { get; set; } = string.Empty;
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public List<TagResponse>? AvailableTags { get; set; }
+    [Parameter] public EventCallback OnSaveSession { get; set; }
+
+    private async Task HandleSaveClick()
+    {
+        await OnSaveSession.InvokeAsync();
+    }
+}

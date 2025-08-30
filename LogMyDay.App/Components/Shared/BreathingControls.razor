@@ -1,0 +1,69 @@
+@using LogMyDay.Shared.DTOs
+
+@* Breathing Controls Component - Mode selection, timing controls, and main buttons *@
+
+<section class="panel controls" aria-label="Controls">
+    <div class="modeRow" role="radiogroup" aria-label="Mode">
+        <strong style="opacity:.9">Mode:</strong>
+        <label><input type="radio" name="mode" value="triangle" checked> Triangle (4-7-8)</label>
+        <label><input type="radio" name="mode" value="box"> Box (square)</label>
+    </div>
+
+    <div class="btns">
+        <button class="btn primary" id="startBtn">Start</button>
+        <button class="btn" id="pauseBtn" disabled>Pause</button>
+        <button class="btn ghost" id="resetBtn" disabled>Reset</button>
+    </div>
+
+    <div class="rows">
+        <div class="field">
+            <label for="inhaleSec">Inhale (left) seconds</label>
+            <input id="inhaleSec" type="number" min="1" step="0.5" value="4" />
+        </div>
+        <div class="field">
+            <label for="holdSec">Hold (bottom) seconds</label>
+            <input id="holdSec" type="number" min="1" step="0.5" value="7" />
+        </div>
+        <div class="field">
+            <label for="exhaleSec">Exhale (right) seconds</label>
+            <input id="exhaleSec" type="number" min="1" step="0.5" value="8" />
+        </div>
+        <div class="field hidden" id="hold2Field">
+            <label for="hold2Sec">Hold 2 (top) seconds</label>
+            <input id="hold2Sec" type="number" min="0.5" step="0.5" value="4" />
+        </div>
+        <div class="field">
+            <label for="cycles">Cycles</label>
+            <input id="cycles" type="number" min="1" step="1" value="4" />
+        </div>
+    </div>
+
+    @if (ShowSavePanel)
+    {
+        <LogMyDay.App.Components.Shared.BreathingSavePanel SelectedTagId="SelectedTagId"
+                           SelectedTagIdChanged="SelectedTagIdChanged"
+                           SessionTime="SessionTime" 
+                           TotalCycles="TotalCycles"
+                           SaveCountdown="SaveCountdown"
+                           StatusMessage="StatusMessage"
+                           IsLoading="IsLoading"
+                           AvailableTags="AvailableTags"
+                           OnSaveSession="OnSaveSession" />
+    }
+
+    <p class="note">Tip: <span class="kbd">Space</span> pause/resume · <span class="kbd">R</span> reset · <span class="kbd">Enter</span> start.</p>
+    <p class="note" style="opacity:.65">This is a calming breath exercise, not medical advice. Stop if you feel dizzy.</p>
+</section>
+
+@code {
+    [Parameter] public bool ShowSavePanel { get; set; } = true;
+    [Parameter] public int SelectedTagId { get; set; }
+    [Parameter] public EventCallback<int> SelectedTagIdChanged { get; set; }
+    [Parameter] public TimeSpan SessionTime { get; set; }
+    [Parameter] public int TotalCycles { get; set; }
+    [Parameter] public int SaveCountdown { get; set; }
+    [Parameter] public string StatusMessage { get; set; } = string.Empty;
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public List<TagResponse>? AvailableTags { get; set; }
+    [Parameter] public EventCallback OnSaveSession { get; set; }
+}

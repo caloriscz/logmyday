@@ -1,0 +1,708 @@
+﻿@page "/tools/breathing"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@inject IActivityApi ActivityApi
+@inject IJSRuntime JSRuntime
+@inject ILogger<Breathing> Logger
+
+<PageTitle>Advanced Breathing Techniques</PageTitle>
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <div class="text-center mb-4">
+                <h2>Advanced Breathing Techniques</h2>
+                <p class="text-muted">4-7-8 Triangle and Box breathing exercises for deep relaxation and focus</p>
+            </div>
+
+            <div class="app card" id="app">
+                <header>
+                    <div>
+                        <h1>4-7-8 / Box Breathing</h1>
+                        <div class="subtitle">
+                            Triangle: Left=<strong>inhale</strong> · Bottom=<strong>hold</strong> · Right=<strong>exhale</strong> ·
+                            Box: Top=<strong>hold 2</strong> (classic square: up → across → down → back)
+                        </div>
+                    </div>
+                </header>
+
+                <div class="grid" id="grid">
+                    <!-- Visual side -->
+                    <section class="tri-panel">
+                        <div class="viz state-inhale" id="viz">
+                            <!-- One SVG that can show Triangle or Box (square) -->
+                            <svg viewBox="0 0 100 92" preserveAspectRatio="xMidYMid meet" id="shapeSvg" aria-hidden="true">
+                                <!-- Backgrounds -->
+                                <!-- Triangle (points: left-bottom, top, right-bottom) -->
+                                <path id="bg-tri" class="bg" d="M 10 82 L 50 10 L 90 82 Z" />
+                                <!-- Box (square) outline — its 'd' is also set in JS for safety -->
+                                <path id="bg-box" class="bg hidden" d="M 10 82 L 10 10 L 90 10 L 90 82 Z" />
+
+                                <!-- Active sides (we swap their 'd' based on mode) -->
+                                <path id="side-inhale" class="side inhale" d="M 50 10 L 10 82" />
+                                <path id="side-hold" class="side hold" d="M 10 82 L 90 82" />
+                                <path id="side-exhale" class="side exhale" d="M 90 82 L 50 10" />
+                                <path id="side-hold2" class="side hold2" d="M 50 10 L 10 46" style="display:none" />
+                            </svg>
+
+                            <!-- static labels near sides -->
+                            <div class="labels">
+                                <div class="lab-inhale" id="lab-inhale">Inhale</div>
+                                <div class="lab-hold" id="lab-hold">Hold ⏸</div>
+                                <div class="lab-exhale" id="lab-exhale">Exhale</div>
+                                <div class="lab-hold2 hidden" id="lab-hold2">Hold 2 ⏸</div>
+                            </div>
+
+                            <!-- breathing pulse indicator -->
+                            <div class="pulse"><div class="dot" id="pulseDot"></div></div>
+                        </div>
+
+                        <div class="hud" id="hud">
+                            <div class="phase inhale" id="phaseLabel">Inhale</div>
+                            <div class="count" id="countdown">4,0</div>
+                            <div class="cycles" id="cycleReadout">Cycle 0/0</div>
+                        </div>
+                    </section>
+
+                    <!-- Controls side -->
+                    <section class="panel controls" aria-label="Controls">
+                        <div class="modeRow" role="radiogroup" aria-label="Mode">
+                            <strong style="opacity:.9">Mode:</strong>
+                            <label><input type="radio" name="mode" value="triangle" checked> Triangle (4-7-8)</label>
+                            <label><input type="radio" name="mode" value="box"> Box (square)</label>
+                        </div>
+
+                        <div class="btns">
+                            <button class="btn primary" id="startBtn">Start</button>
+                            <button class="btn" id="pauseBtn" disabled>Pause</button>
+                            <button class="btn ghost" id="resetBtn" disabled>Reset</button>
+                        </div>
+
+                        <div class="rows">
+                            <div class="field">
+                                <label for="inhaleSec">Inhale (left) seconds</label>
+                                <input id="inhaleSec" type="number" min="1" step="0.5" value="4" />
+                            </div>
+                            <div class="field">
+                                <label for="holdSec">Hold (bottom) seconds</label>
+                                <input id="holdSec" type="number" min="1" step="0.5" value="7" />
+                            </div>
+                            <div class="field">
+                                <label for="exhaleSec">Exhale (right) seconds</label>
+                                <input id="exhaleSec" type="number" min="1" step="0.5" value="8" />
+                            </div>
+                            <div class="field hidden" id="hold2Field">
+                                <label for="hold2Sec">Hold 2 (top) seconds</label>
+                                <input id="hold2Sec" type="number" min="0.5" step="0.5" value="4" />
+                            </div>
+                            <div class="field">
+                                <label for="cycles">Cycles</label>
+                                <input id="cycles" type="number" min="1" step="1" value="4" />
+                            </div>
+                        </div>
+
+                        <!-- Blazor Save Controls -->
+                        <div class="blazor-save-section mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,.16)">
+                            <div class="field">
+                                <label for="tagSelect">Save as Tag</label>
+                                <select @bind="selectedTagId" id="tagSelect" class="form-select" disabled="@(isLoading || availableTags == null)">
+                                    @if (isLoading)
+                                    {
+                                        <option>Loading tags...</option>
+                                    }
+                                    else if (availableTags?.Any() == true)
+                                    {
+                                        <option value="0">Select a tag to save session</option>
+                                        @foreach (var tag in availableTags)
+                                        {
+                                            <option value="@tag.Id">@tag.Title</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <option>No integer tags available</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="field">
+                                <button @onclick="SaveBreathingSession" class="btn btn-success" style="width:100%;" disabled="@(selectedTagId == 0 || sessionTime.TotalSeconds < 10 || saveCountdown > 0)">
+                                    @if (saveCountdown > 0)
+                                    {
+                                        <span>@saveCountdown s</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-save me-1"></i>@:Save Session
+                                    }
+                                </button>
+                            </div>
+                            
+                            @if (sessionTime.TotalSeconds > 0)
+                            {
+                                <div class="session-info">
+                                    <small class="text-muted">
+                                        <strong>Session: </strong>@sessionTime.ToString("mm\\:ss")
+                                        @if (totalCycles > 0)
+                                        {
+                                            <span class="ms-2"><strong>Cycles: </strong>@totalCycles</span>
+                                        }
+                                    </small>
+                                </div>
+                            }
+                            
+                            @if (!string.IsNullOrEmpty(statusMessage))
+                            {
+                                <div class="alert alert-info mt-2 small">@statusMessage</div>
+                            }
+                        </div>
+
+                        <p class="note">Tip: <span class="kbd">Space</span> pause/resume · <span class="kbd">R</span> reset · <span class="kbd">Enter</span> start.</p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    :root{
+      --bg:#0b1020;
+      --card:#111a33;
+      --muted:#9fb0ff;
+      --text:#e9eeff;
+      --inhale:#42d392;   /* green */
+      --hold:#f6c453;     /* amber  (bottom hold) */
+      --exhale:#61b3ff;   /* blue */
+      --hold2:#d38bff;    /* purple (top hold) */
+    }
+
+    .app{width:min(980px, 100%);}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,.35);
+      padding:1.2rem; backdrop-filter: blur(6px);
+    }
+
+    header{display:flex; gap:1rem; align-items:center; justify-content:space-between; flex-wrap:wrap}
+    h1{font-size:clamp(1.1rem, 1rem + 1.6vw, 1.7rem); margin:0; letter-spacing:.3px}
+    .subtitle{opacity:.8; font-size:.95rem}
+
+    /* Layout: visualization on top, controls below - always */
+    .app .grid{ 
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1.2rem !important;
+    }
+    
+    .app .tri-panel {
+        order: 1 !important;
+        width: 100% !important;
+    }
+    
+    .app .panel.controls {
+        order: 2 !important;
+        width: 100% !important;
+    }
+
+    /* --- Visual --- */
+    .tri-panel{display:grid; gap:.8rem}
+    .viz{
+      position:relative; aspect-ratio: 1.1 / 1; width:100%;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px;
+    }
+    svg{width:100%; height:100%; display:block}
+
+    /* Scope all breathing-specific styles to avoid global conflicts */
+    .app .bg{stroke:#415081; stroke-opacity:.4; stroke-width:3; fill:none}
+    .app .bg.hidden{display:none}
+
+    .app .side{fill:none; stroke-width:6; stroke-linecap:round; filter: drop-shadow(0 0 12px rgba(97,179,255,.25));}
+    .app .side.inhale{stroke:var(--inhale)}
+    .app .side.hold{stroke:var(--hold)}
+    .app .side.exhale{stroke:var(--exhale)}
+    .app .side.hold2{stroke:var(--hold2)}
+
+    .app .labels{position:absolute; inset:0; pointer-events:none; font-weight:600; font-size:clamp(.78rem,.63rem + .6vw,1rem); color:#cfd8ff}
+    .app .labels div{position:absolute; text-shadow:0 2px 8px rgba(0,0,0,.35)}
+    /* Triangle label anchors */
+    .app .lab-inhale{left:8%; top:30%}
+    .app .lab-hold{left:50%; transform:translateX(-50%); bottom:6%}
+    .app .lab-exhale{right:8%; top:30%; text-align:right}
+    /* Box (square) extra label */
+    .app .lab-hold2{left:50%; transform:translateX(-50%); top:2%; opacity:.9}
+
+    .app .pulse{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none }
+    .app .pulse .dot{width:22px; height:22px; border-radius:999px; background:currentColor; opacity:.12;
+      box-shadow:0 0 60px currentColor, inset 0 0 14px rgba(255,255,255,.25);
+      transition:color .2s ease;
+    }
+    .app .state-inhale .dot{color:var(--inhale)}
+    .app .state-hold   .dot{color:var(--hold)}
+    .app .state-exhale .dot{color:var(--exhale)}
+    .app .state-hold2  .dot{color:var(--hold2)}
+
+    .app .hud{ display:flex; gap:1rem; align-items:baseline; justify-content:center; flex-wrap:wrap; padding:.2rem .6rem .8rem; }
+    .app .phase{font-weight:800; letter-spacing:.5px}
+    .app .phase.inhale{color:var(--inhale)}
+    .app .phase.hold{color:var(--hold)}
+    .app .phase.exhale{color:var(--exhale)}
+    .app .phase.hold2{color:var(--hold2)}
+    .app .count{font-variant-numeric:tabular-nums; font-weight:700; font-size:clamp(1.6rem, 1.2rem + 2.2vw, 3rem)}
+    .app .cycles{opacity:.9}
+
+    /* --- Controls --- Scoped to avoid global conflicts */
+    .app .panel{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:1rem}
+    .app .controls{display:grid; gap:.9rem}
+
+    .app .btns{display:flex; gap:.6rem; flex-wrap:wrap}
+    .app .btn{
+      appearance:none; border:none; border-radius:12px; padding:.72rem 1rem; font-weight:700; letter-spacing:.3px; cursor:pointer;
+      background:#223058; color:#e9f1ff; box-shadow:0 6px 16px rgba(19,26,44,.35) inset, 0 1px 0 rgba(255,255,255,.08);
+      transition: transform .08s ease, filter .2s ease, background .2s ease;
+    }
+    .app .btn:hover{filter:brightness(1.08)}
+    .app .btn:active{transform:translateY(1px)}
+    .app .btn.primary{background:linear-gradient(180deg, #5d7cff, #4b66e8)}
+    .app .btn.ghost{background:transparent; border:1px solid rgba(255,255,255,.16)}
+    .app .btn:disabled{opacity:.5; cursor:not-allowed}
+
+    .app .rows{display:grid; grid-template-columns: 1fr 1fr; gap:.8rem}
+    @@media (max-width: 640px){ .app .rows{grid-template-columns:1fr} }
+
+    .app .field{display:grid; gap:.35rem}
+    .app .field label{opacity:.9; font-size:.92rem}
+    .app .field input[type="number"]{
+      width:100%; padding:.6rem .7rem; border-radius:10px; border:1px solid rgba(255,255,255,.12);
+      background:#0f1731; color:var(--text); font:inherit;
+    }
+    .app .field select{
+      width:100%; padding:.6rem .7rem; border-radius:10px; border:1px solid rgba(255,255,255,.12);
+      background:#0f1731; color:var(--text); font:inherit;
+    }
+
+    .app .modeRow{display:flex; gap:1rem; align-items:center; flex-wrap:wrap; padding:.2rem 0 .6rem}
+    .app .modeRow label{display:flex; gap:.4rem; align-items:center; cursor:pointer; opacity:.95}
+    .app .hidden{display:none}
+
+    .app .note{opacity:.8; font-size:.92rem}
+    .app .kbd{padding:.18rem .42rem; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); border-bottom-width:2px; border-radius:6px}
+
+    /* Remove old mobile responsive adjustments - now handled by grid areas */
+    .app .blazor-save-section {
+        margin-top: 1rem;
+        padding-top: 1rem;
+    }
+
+    .app .session-info {
+        margin-top: 0.5rem;
+        text-align: center;
+    }
+</style>
+
+    <script>(function(){
+      const els = {
+        start: document.getElementById('startBtn'),
+        pause: document.getElementById('pauseBtn'),
+        reset: document.getElementById('resetBtn'),
+        inhale: document.getElementById('inhaleSec'),
+        hold: document.getElementById('holdSec'),
+        exhale: document.getElementById('exhaleSec'),
+        hold2: document.getElementById('hold2Sec'),
+        hold2Field: document.getElementById('hold2Field'),
+        cycles: document.getElementById('cycles'),
+        phaseLabel: document.getElementById('phaseLabel'),
+        countdown: document.getElementById('countdown'),
+        cycleReadout: document.getElementById('cycleReadout'),
+        viz: document.getElementById('viz'),
+        pulseDot: document.getElementById('pulseDot'),
+
+        bgTri: document.getElementById('bg-tri'),
+        bgBox: document.getElementById('bg-box'),
+        labs: {
+          inhale: document.getElementById('lab-inhale'),
+          hold:   document.getElementById('lab-hold'),
+          exhale: document.getElementById('lab-exhale'),
+          hold2:  document.getElementById('lab-hold2'),
+        },
+        paths: {
+          inhale: document.getElementById('side-inhale'),
+          hold:   document.getElementById('side-hold'),
+          exhale: document.getElementById('side-exhale'),
+          hold2:  document.getElementById('side-hold2'),
+        },
+        modeInputs: Array.from(document.querySelectorAll('input[name="mode"]')),
+      };
+
+      const titles = { inhale:'Inhale', hold:'Hold', exhale:'Exhale', hold2:'Hold 2' };
+
+      const state = {
+        running:false,
+        paused:false,
+        cycle:0,
+        cyclesTarget:0,
+        phaseIndex:0,
+        t0:0,
+        elapsed:0,
+        durationMs:0,
+        raf:0,
+        mode:'triangle', // 'triangle' | 'box'
+        sessionStartTime: null,
+      };
+
+      // Expose state to Blazor
+      window.breathingState = state;
+
+      function phasesOrder(){
+        // Classic box breathing: inhale up the left, hold across the TOP, exhale down the right, hold across the BOTTOM
+        return state.mode === 'box'
+          ? ['inhale','hold2','exhale','hold']
+          : ['inhale','hold','exhale'];
+      }
+
+      function fmt(t){ return t.toFixed(1).replace('.', ','); }
+
+      function setButtons(){
+        els.start.disabled = state.running && !state.paused;
+        els.pause.disabled = !state.running;
+        els.reset.disabled = !state.running;
+        els.pause.textContent = state.paused ? 'Resume' : 'Pause';
+      }
+
+      function readDurations(){
+        const inh = Math.max(0.5, Number(els.inhale.value) || 4);
+        const h1  = Math.max(0.5, Number(els.hold.value)   || 7);   // bottom hold
+        const exh = Math.max(0.5, Number(els.exhale.value) || 8);
+        const h2  = Math.max(0.5, Number(els.hold2?.value) || 4);   // top hold
+        return state.mode === 'box'
+          ? { inhale: inh, hold: h1, exhale: exh, hold2: h2 }
+          : { inhale: inh, hold: h1, exhale: exh };
+      }
+
+      function readCycles(){
+        return Math.max(1, Math.floor(Number(els.cycles.value) || 4));
+      }
+
+      function preparePath(path){
+        if(!path){ return 0; }
+        const len = path.getTotalLength();
+        path.style.strokeDasharray = String(len);
+        path.style.strokeDashoffset = String(len); // hidden
+        return len;
+      }
+
+      function clearAllStrokes(){
+        Object.values(els.paths).forEach(p=>{
+          if(!p) return;
+          const len = p.getTotalLength();
+          p.style.strokeDasharray = String(len);
+          p.style.strokeDashoffset = String(len);
+        });
+      }
+
+      function setPhaseVisual(which){
+        els.viz.classList.remove('state-inhale','state-hold','state-exhale','state-hold2');
+        els.viz.classList.add('state-' + which);
+        els.phaseLabel.className = 'phase ' + which;
+        els.phaseLabel.textContent = titles[which];
+      }
+
+      function animatePhase(which, seconds, onDone){
+        setPhaseVisual(which);
+        const path = els.paths[which];
+        const len = preparePath(path);
+        state.durationMs = seconds * 1000;
+
+        // pulse
+        const dot = els.pulseDot;
+        if(which==='inhale') dot.animate([{transform:'scale(1)'},{transform:'scale(1.25)'}], {duration:state.durationMs, fill:'forwards'});
+        if(which==='hold'  ) dot.animate([{transform:'scale(1.25)'},{transform:'scale(1.25)'}], {duration:state.durationMs, fill:'forwards'});
+        if(which==='exhale') dot.animate([{transform:'scale(1.25)'},{transform:'scale(0.9)'}], {duration:state.durationMs, fill:'forwards'});
+        if(which==='hold2' ) dot.animate([{transform:'scale(0.9)'},{transform:'scale(0.9)'}], {duration:state.durationMs, fill:'forwards'});
+
+        state.t0 = performance.now() - state.elapsed;
+        cancelAnimationFrame(state.raf);
+
+        const step = (now)=>{
+          if(!state.running) return;
+          if(state.paused){ state.raf = requestAnimationFrame(step); return; }
+          const p = Math.min(1, (now - state.t0) / state.durationMs);
+          if(path) path.style.strokeDashoffset = String(len * (1 - p));
+          const remaining = Math.max(0, state.durationMs - (now - state.t0)) / 1000;
+          els.countdown.textContent = fmt(remaining);
+          if(p >= 1){ state.elapsed = 0; onDone && onDone(); return; }
+          state.raf = requestAnimationFrame(step);
+        };
+        state.raf = requestAnimationFrame(step);
+      }
+
+      function runNextPhase(){
+        const order = phasesOrder();
+        const durations = readDurations();
+        if(state.phaseIndex >= order.length){
+          state.phaseIndex = 0;
+          state.cycle++;
+          els.cycleReadout.textContent = `Cycle ${state.cycle}/${state.cyclesTarget}`;
+          clearAllStrokes(); // Clear lines at end of each full cycle
+          if(state.cycle >= state.cyclesTarget){ stopAll(); return; }
+        }
+        const which = order[state.phaseIndex];
+        const secs = durations[which];
+        animatePhase(which, secs, ()=>{ state.phaseIndex++; runNextPhase(); });
+      }
+
+      function stopAll(){
+        state.running = false; state.paused = false; state.elapsed = 0; cancelAnimationFrame(state.raf);
+        Object.values(els.paths).forEach(p=>{ if(!p) return; p.style.strokeDasharray = '0'; p.style.strokeDashoffset = '0'; });
+        els.countdown.textContent = '0,0';
+        els.phaseLabel.textContent = 'Done';
+        els.viz.classList.remove('state-inhale','state-hold','state-exhale','state-hold2');
+        setButtons();
+      }
+
+      function reset(){
+        state.running = false; state.paused = false; state.elapsed = 0; state.cycle = 0; state.phaseIndex = 0; cancelAnimationFrame(state.raf);
+        clearAllStrokes();
+        els.phaseLabel.textContent = 'Ready'; els.phaseLabel.className = 'phase';
+        const first = phasesOrder()[0];
+        const durs = readDurations();
+        els.countdown.textContent = fmt(durs[first]);
+        els.cycleReadout.textContent = `Cycle 0/${readCycles()}`;
+        els.viz.classList.add('state-inhale');
+        setButtons();
+      }
+
+      function start(){
+        if(state.running && state.paused){ state.paused = false; setButtons(); return; }
+        state.running = true; state.paused = false; state.cycle = 0; state.phaseIndex = 0; state.elapsed = 0;
+        state.cyclesTarget = readCycles();
+        state.sessionStartTime = new Date();
+        els.cycleReadout.textContent = `Cycle 0/${state.cyclesTarget}`;
+        setButtons();
+        runNextPhase();
+      }
+
+      function pauseResume(){
+        if(!state.running) return;
+        state.paused = !state.paused;
+        if(state.paused){ state.elapsed = performance.now() - state.t0; }
+        else{ state.t0 = performance.now() - state.elapsed; }
+        setButtons();
+      }
+
+      // --- Mode handling: Triangle vs Box (square) ---
+      function updateMode(newMode){
+        state.mode = newMode;
+
+        // Toggle backgrounds
+        els.bgTri.classList.toggle('hidden', newMode === 'box');
+        els.bgBox.classList.toggle('hidden', newMode !== 'box');
+
+        // Geometry per mode
+        if(newMode === 'box'){
+          // Ensure the background is a classic square (not diamond)
+          els.bgBox.setAttribute('d', 'M 10 82 L 10 10 L 90 10 L 90 82 Z');
+
+          // Side paths (clockwise loop):
+          // inhale  : left side  bottom -> top
+          // hold2   : top edge   left -> right
+          // exhale  : right side top -> bottom
+          // hold    : bottom edge right -> left
+          els.paths.inhale.setAttribute('d', 'M 10 82 L 10 10');
+          els.paths.hold2 .setAttribute('d', 'M 10 10 L 90 10');
+          els.paths.exhale.setAttribute('d', 'M 90 10 L 90 82');
+          els.paths.hold  .setAttribute('d', 'M 90 82 L 10 82');
+
+          // Show fourth side & label; place labels around the square with arrows
+          els.paths.hold2.style.display = '';
+          els.labs.hold2.classList.remove('hidden');
+
+          els.labs.inhale.textContent = 'Inhale ↑';
+          els.labs.exhale.textContent = 'Exhale ↓';
+          els.labs.hold.textContent   = 'Hold ⏸';
+          els.labs.hold2.textContent  = 'Hold 2 ⏸';
+
+          // Positions
+          els.labs.inhale.style.left = '3%';  els.labs.inhale.style.top = '35%';
+          els.labs.exhale.style.right= '3%';  els.labs.exhale.style.top = '35%'; els.labs.exhale.style.textAlign='right';
+          els.labs.hold2.style.left  = '50%'; els.labs.hold2.style.top  = '2%';  els.labs.hold2.style.transform='translateX(-50%)';
+          els.labs.hold.style.left   = '50%'; els.labs.hold.style.bottom= '4%';  els.labs.hold.style.top=''; els.labs.hold.style.transform='translateX(-50%)';
+        }else{
+          // Triangle geometry
+          els.paths.inhale.setAttribute('d', 'M 50 10 L 10 82');
+          els.paths.hold  .setAttribute('d', 'M 10 82 L 90 82');
+          els.paths.exhale.setAttribute('d', 'M 90 82 L 50 10');
+          els.paths.hold2.style.display = 'none';
+          els.labs.hold2.classList.add('hidden');
+
+          // Reset label text/placement for triangle
+          els.labs.inhale.textContent = '⬅︎ Inhale';
+          els.labs.exhale.textContent = 'Exhale ➡︎';
+          els.labs.hold.textContent   = 'Hold ⏸';
+
+          els.labs.inhale.style.left = '8%';  els.labs.inhale.style.top = '30%';
+          els.labs.exhale.style.right= '8%';  els.labs.exhale.style.top = '30%'; els.labs.exhale.style.textAlign='right';
+          els.labs.hold.style.left   = '50%'; els.labs.hold.style.bottom= '6%'; els.labs.hold.style.top=''; els.labs.hold.style.transform='translateX(-50%)';
+        }
+
+        // Show/hide Hold2 input
+        els.hold2Field.classList.toggle('hidden', newMode !== 'box');
+
+        // Reset visuals to clean slate for new mode
+        reset();
+      }
+
+      // wire up
+      els.start.addEventListener('click', start);
+      els.pause.addEventListener('click', pauseResume);
+      els.reset.addEventListener('click', reset);
+      els.modeInputs.forEach(r=>r.addEventListener('change', (e)=> updateMode(e.target.value)));
+
+      window.addEventListener('keydown', (e)=>{
+        if(e.key === ' '){ e.preventDefault(); if(state.running) pauseResume(); }
+        else if(e.key === 'Enter'){ if(!state.running || state.paused) start(); }
+        else if(e.key.toLowerCase() === 'r'){ reset(); }
+      });
+
+      // initialize
+      updateMode('triangle');
+
+      // keep strokes correct after resize when idle
+      let resizeTimer;
+      window.addEventListener('resize', ()=>{
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(()=>{ if(!state.running){ reset(); } }, 120);
+      });
+    })();
+</script>
+
+@code {
+    // Blazor state variables
+    private int selectedTagId = 0;
+    private bool isLoading = false;
+    private int saveCountdown = 0;
+    private string statusMessage = "";
+    private List<TagResponse>? availableTags;
+    private System.Threading.Timer? cooldownTimer;
+    private DateTime sessionStartTime;
+    private TimeSpan sessionTime = TimeSpan.Zero;
+    private int totalCycles = 0;
+    private System.Threading.Timer? sessionTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            
+            var allTags = await ActivityApi.GetTags();
+            availableTags = allTags?.Where(t => t.TypeId == 1).ToList(); // Integer input type
+            
+            Logger.LogInformation("Loaded {Count} integer tags for advanced breathing techniques", availableTags?.Count ?? 0);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tags for breathing techniques");
+            statusMessage = "Failed to load tags. You won't be able to save sessions.";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Setup session tracking timer and initialize session start time
+            sessionStartTime = DateTime.Now;
+            sessionTimer = new System.Threading.Timer(UpdateSessionTimer, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        }
+    }
+
+    private void UpdateSessionTimer(object? state)
+    {
+        // Update session time from JavaScript if breathing is active
+        InvokeAsync(async () => 
+        {
+            try 
+            {
+                var isRunning = await JSRuntime.InvokeAsync<bool>("eval", "window.breathingState && window.breathingState.running || false");
+                if (isRunning) 
+                {
+                    var jsStartTime = await JSRuntime.InvokeAsync<string>("eval", "window.breathingState && window.breathingState.sessionStartTime ? window.breathingState.sessionStartTime.toISOString() : null");
+                    if (DateTime.TryParse(jsStartTime, out var startTime))
+                    {
+                        sessionStartTime = startTime;
+                        sessionTime = DateTime.Now - sessionStartTime;
+                    }
+                    var currentCycles = await JSRuntime.InvokeAsync<int>("eval", "window.breathingState ? window.breathingState.cycle : 0");
+                    totalCycles = currentCycles;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error updating session timer");
+            }
+        });
+    }
+
+    private async Task SaveBreathingSession()
+    {
+        if (selectedTagId == 0 || sessionTime.TotalSeconds < 10 || saveCountdown > 0)
+            return;
+
+        try
+        {
+            var sessionMinutes = (int)Math.Round(sessionTime.TotalMinutes);
+            if (sessionMinutes < 1) sessionMinutes = 1; // Minimum 1 minute
+            
+            var request = new ActivityRequest
+            {
+                DateStarted = sessionStartTime,
+                Description = sessionMinutes.ToString(), // Store minutes as description for integer tags
+                PrimaryTagId = selectedTagId
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            
+            statusMessage = $"Session saved successfully! Duration: {sessionMinutes} minutes, Cycles: {totalCycles}";
+            Logger.LogInformation("Advanced breathing session saved: {Minutes} minutes, {Cycles} cycles", sessionMinutes, totalCycles);
+            
+            // Start cooldown
+            saveCountdown = 60;
+            cooldownTimer = new System.Threading.Timer(DecrementCooldown, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save breathing session");
+            statusMessage = "Failed to save session. Please try again.";
+        }
+        
+        StateHasChanged();
+    }
+
+    private void DecrementCooldown(object? state)
+    {
+        if (saveCountdown > 0)
+        {
+            saveCountdown--;
+            InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            cooldownTimer?.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        cooldownTimer?.Dispose();
+        sessionTimer?.Dispose();
+    }
+}

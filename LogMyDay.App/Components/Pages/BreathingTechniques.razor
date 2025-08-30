@@ -1,4 +1,4 @@
-@page "/tools/breathing"
+@page "/tools/breathing-techniques"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
 @inject IActivityApi ActivityApi
@@ -60,7 +60,7 @@
                                         <i class="bi bi-play-circle me-1"></i>@:Start
                                     }
                                 </button>
-                                <button @onclick="SaveSession" class="btn btn-primary" disabled="@(selectedTagId == 0 || !canSave || saveCountdown > 0)">
+                                <button @onclick="SaveSession" class="btn btn-primary" disabled="@(selectedTagId == 0 || sessionTime.TotalSeconds < 10 || saveCountdown > 0)">
                                     @if (saveCountdown > 0)
                                     {
                                         <span>@saveCountdown s</span>
@@ -248,7 +248,6 @@
     private int selectedTagId = 0;
     private bool isActive = false;
     private bool isLoading = false;
-    private bool canSave = false;
     private int saveCountdown = 0;
     private string currentInstruction = "Press Start to begin";
     private TimeSpan sessionTime = TimeSpan.Zero;
@@ -303,7 +302,6 @@
     private async Task StartBreathing()
     {
         isActive = true;
-        canSave = false;
         sessionStartTime = DateTime.Now;
         sessionTime = TimeSpan.Zero;
         completedCycles = 0;
@@ -312,15 +310,16 @@
 
         sessionTimer = new System.Threading.Timer(UpdateSessionTime, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
         await StartBreathingCycle();
-    }    private async Task StopBreathing()
+    }    
+
+    private async Task StopBreathing()
     {
         isActive = false;
-        canSave = sessionTime.TotalSeconds >= 30; // Allow saving if session was at least 30 seconds
         breathingTimer?.Dispose();
         sessionTimer?.Dispose();
 
         await ResetVisualization();
-        currentInstruction = canSave ? "Session complete! You can save your results." : "Press Start to begin";
+        currentInstruction = sessionTime.TotalSeconds >= 10 ? "Session complete! You can save your results." : "Press Start to begin";
         currentPhase = 0;
     }
 
@@ -366,7 +365,7 @@
 
     private async Task SaveSession()
     {
-        if (selectedTagId == 0 || !canSave || saveCountdown > 0)
+        if (selectedTagId == 0 || sessionTime.TotalSeconds < 10 || saveCountdown > 0)
             return;
 
         try

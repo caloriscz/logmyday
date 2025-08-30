@@ -1,0 +1,44 @@
+@* Breathing Visualization Component - Shows the animated triangle/box breathing exercise *@
+
+<section class="tri-panel">
+    <div class="viz state-inhale" id="viz">
+        <!-- One SVG that can show Triangle or Box (square) -->
+        <svg viewBox="0 0 100 92" preserveAspectRatio="xMidYMid meet" id="shapeSvg" aria-hidden="true">
+            <!-- Backgrounds -->
+            <!-- Triangle (points: left-bottom, top, right-bottom) -->
+            <path id="bg-tri" class="bg" d="M 10 82 L 50 10 L 90 82 Z" />
+            <!-- Box (square) outline — its 'd' is also set in JS for safety -->
+            <path id="bg-box" class="bg hidden" d="M 10 82 L 10 10 L 90 10 L 90 82 Z" />
+
+            <!-- Active sides (we swap their 'd' based on mode) -->
+            <path id="side-inhale" class="side inhale" d="M 50 10 L 10 82" />
+            <path id="side-hold" class="side hold" d="M 10 82 L 90 82" />
+            <path id="side-exhale" class="side exhale" d="M 90 82 L 50 10" />
+            <path id="side-hold2" class="side hold2" d="M 50 10 L 10 46" style="display:none" />
+        </svg>
+
+        <!-- static labels near sides -->
+        <div class="labels">
+            <div class="lab-inhale" id="lab-inhale">Inhale</div>
+            <div class="lab-hold" id="lab-hold">Hold ⏸</div>
+            <div class="lab-exhale" id="lab-exhale">Exhale</div>
+            <div class="lab-hold2 hidden" id="lab-hold2">Hold 2 ⏸</div>
+        </div>
+
+        <!-- breathing pulse indicator -->
+        <div class="pulse"><div class="dot" id="pulseDot"></div></div>
+    </div>
+
+    <div class="hud" id="hud">
+        <div class="phase inhale" id="phaseLabel">@CurrentPhase</div>
+        <div class="count" id="countdown">@CurrentCountdown</div>
+        <div class="cycles" id="cycleReadout">Cycle @CurrentCycle/@TotalCycles</div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string CurrentPhase { get; set; } = "Inhale";
+    [Parameter] public string CurrentCountdown { get; set; } = "4,0";
+    [Parameter] public int CurrentCycle { get; set; } = 0;
+    [Parameter] public int TotalCycles { get; set; } = 0;
+}
