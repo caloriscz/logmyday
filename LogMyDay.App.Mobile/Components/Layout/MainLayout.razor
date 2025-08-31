@@ -20,6 +20,10 @@
                 <div><i class="bi bi-tags"></i></div>
                 <div>Tags</div>
             </button>
+            <button class="mobile-nav-item @(IsActive("/notifications") ? "active" : "")" @onclick="@(() => NavigateTo("/notifications"))">
+                <div><i class="bi bi-bell"></i></div>
+                <div>Notifications</div>
+            </button>
             <button class="mobile-nav-item @(IsActive("/quick") ? "active" : "")" @onclick="@(() => NavigateTo("/quick"))">
                 <div><i class="bi bi-lightning"></i></div>
                 <div>Quick</div>

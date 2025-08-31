@@ -54,7 +54,7 @@ public interface IActivityApi
     Task<DuplicateCheckResponse> CheckDuplicate(int tagId, DateTime dateStarted);
 
     [Get("/api/activities/required-daily-tags-unfilled")]
-    Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date);
+    Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate([Query] string dateString);
 
     [Get("/api/tags/paged")]
     Task<PagedResult<TagResponse>> GetTagsPaged(

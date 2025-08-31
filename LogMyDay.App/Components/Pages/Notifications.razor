@@ -120,7 +120,7 @@
             errorMessage = null;
             StateHasChanged();
 
-            unfilledRequiredTags = await ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate);
+            unfilledRequiredTags = await ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
         }
         catch (Exception ex)
         {

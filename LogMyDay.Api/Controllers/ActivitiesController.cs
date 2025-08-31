@@ -3,6 +3,7 @@ using LogMyDay.Api.Authentication;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
 
@@ -12,10 +13,12 @@ namespace LogMyDay.Api.Controllers;
 public class ActivitiesController : ControllerBase
 {
     private readonly IActivityService _activityService;
+    private readonly ILogger<ActivitiesController> _logger;
 
-    public ActivitiesController(IActivityService calendarService)
+    public ActivitiesController(IActivityService calendarService, ILogger<ActivitiesController> logger)
     {
         _activityService = calendarService;
+        _logger = logger;
     }
 
     [HttpGet("{id}")]
@@ -100,9 +103,19 @@ public class ActivitiesController : ControllerBase
     }
 
     [HttpGet("required-daily-tags-unfilled")]
-    public async Task<IActionResult> GetRequiredDailyTagsNotFilledForDate([FromQuery] DateTime date)
+    public async Task<IActionResult> GetRequiredDailyTagsNotFilledForDate([FromQuery] string dateString)
     {
+        _logger.LogInformation("GetRequiredDailyTagsNotFilledForDate called with dateString: {DateString}", dateString);
+        
+        if (!DateTime.TryParse(dateString, out var date))
+        {
+            _logger.LogWarning("Invalid date format received: {DateString}", dateString);
+            return BadRequest("Invalid date format. Please use a valid date string like '2025-08-31'.");
+        }
+        
+        _logger.LogInformation("Parsed date: {ParsedDate}", date);
         var unfilledTags = await _activityService.GetRequiredDailyTagsNotFilledForDate(date);
+        _logger.LogInformation("Returning {Count} unfilled required tags", unfilledTags.Count);
         return Ok(unfilledTags);
     }
 }
