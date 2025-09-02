@@ -38,6 +38,9 @@ public class NotificationService : INotificationManagerService
         // Send initial notification
         _notificationCount++;
         SendNotification("LogMyDay Periodic", $"Periodic notification #{_notificationCount} - Timer started");
+        
+        // Show toast that periodic notifications are starting
+        ShowToastNotification($"📱 Periodic notifications started - every 1 minute");
 
         // Set up timer for every 1 minute (60,000 milliseconds)
         _notificationTimer = new System.Timers.Timer(60000); // Changed from 120000 to 60000
@@ -62,7 +65,39 @@ public class NotificationService : INotificationManagerService
     {
         _notificationCount++;
         System.Diagnostics.Debug.WriteLine($"Timer elapsed - sending notification #{_notificationCount}");
+        
+        // Send system notification (to notification panel)
         SendNotification("LogMyDay Timer", $"⏰ Periodic notification #{_notificationCount} - {DateTime.Now:HH:mm:ss}");
+        
+        // Send toast notification (in-app message)
+        ShowToastNotification($"🔔 Timer #{_notificationCount} - {DateTime.Now:HH:mm:ss}");
+    }
+
+    private void ShowToastNotification(string message)
+    {
+        try
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+#if ANDROID
+                var context = Platform.AppContext;
+                if (context != null)
+                {
+                    var toast = Android.Widget.Toast.MakeText(context, message, Android.Widget.ToastLength.Short);
+                    toast?.Show();
+                    System.Diagnostics.Debug.WriteLine($"Toast shown: {message}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("Cannot show toast - Platform.AppContext is null");
+                }
+#endif
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Toast error: {ex.Message}");
+        }
     }
 
     private void OnPlatformNotificationReceived(object? sender, NotificationEventArgs e)
