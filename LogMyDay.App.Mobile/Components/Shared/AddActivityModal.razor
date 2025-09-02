@@ -1,0 +1,319 @@
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using Microsoft.Extensions.Logging
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IJSRuntime JSRuntime
+@inject ILogger<AddActivityModal> Logger
+
+<!-- Add New Activity Modal -->
+<div class="modal fade" id="@modalId" tabindex="-1" aria-labelledby="@($"{modalId}Label")" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="@($"{modalId}Label")">Add New Activity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="Activity" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Primary Tag:</label>
+                        <InputSelect @bind-Value="Activity.PrimaryTagId" class="form-select" @bind-Value:after="OnTagSelectionChanged">
+                            <option value="">-- Select Tag --</option>
+                            @if (AvailableTags != null)
+                            {
+                                @foreach (var tag in AvailableTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-3">
+                        @if (selectedTag?.TypeId.HasValue == true)
+                        {
+                            @switch (selectedTag.TypeId.Value)
+                            {
+                                case 1: // Integer
+                                    <label class="form-label">Value:</label>
+                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="form-control" />
+                                    break;
+                                case 3: // Boolean
+                                    <div class="form-check">
+                                        <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-check-input" id="@($"{modalId}BoolCheck")" />
+                                        <label class="form-check-label" for="@($"{modalId}BoolCheck")">
+                                            @selectedTag.Title
+                                        </label>
+                                    </div>
+                                    break;
+                                case 4: // Date
+                                    <label class="form-label">Date:</label>
+                                    <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" />
+                                    break;
+                                case 5: // Time
+                                    <label class="form-label">Time:</label>
+                                    <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-control" />
+                                    break;
+                                case 6: // Decimal
+                                    <label class="form-label">Value:</label>
+                                    <input type="number" step="0.01" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="form-control" />
+                                    break;
+                                default:
+                                    <label class="form-label">Description:</label>
+                                    <input type="text" @bind="Activity.Description" class="form-control" />
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            <label class="form-label">Description:</label>
+                            <input type="text" @bind="Activity.Description" class="form-control" />
+                        }
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date & Time:</label>
+                            <input type="datetime-local" @bind="Activity.DateStarted" class="form-control" />
+                        </div>
+                        @if (selectedTag?.IsRange == true)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">End Date & Time:</label>
+                                <input type="datetime-local" @bind="Activity.DateFinished" class="form-control" />
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @ErrorMessage
+                        </div>
+                    }
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" @bind="AddAnotherAfterSave" class="form-check-input" id="@($"{modalId}AddAnother")" />
+                            <label class="form-check-label" for="@($"{modalId}AddAnother")">
+                                Add another activity after saving
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Keep the form open with the same tag and date selected for quick entry of multiple activities.
+                        </small>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            Save Activity
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ActivityRequest Activity { get; set; } = new();
+    [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
+    [Parameter] public EventCallback<ActivityRequest> OnActivityCreated { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+    [Parameter] public EventCallback OnFormReset { get; set; }
+    [Parameter] public string ModalId { get; set; } = "addActivityModal";
+
+    private TagResponse? selectedTag;
+    
+    // Input type value helpers
+    private bool booleanValue = false;
+    private DateTime? dateValue = null;
+    private int? integerValue = null;
+    private TimeOnly? timeValue = null;
+    private decimal? decimalValue = null;
+
+    private string modalId => ModalId;
+
+    protected override void OnParametersSet()
+    {
+        // Update selected tag when activity changes
+        OnTagSelectionChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Check for duplicates if tag is selected and not repeatable
+            if (Activity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
+            {
+                // Only skip duplicate check for Exact granularity since it allows precise timing
+                if (selectedTag.TimeGranularity != TimeGranularity.Exact)
+                {
+                    var duplicateCheck = await ActivityApi.CheckDuplicate(Activity.PrimaryTagId.Value, Activity.DateStarted);
+                    if (duplicateCheck.HasDuplicate)
+                    {
+                        var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                        await OnFormReset.InvokeAsync();
+                        // Parent will handle showing error message
+                        return;
+                    }
+                }
+            }
+
+            await ActivityApi.CreateCalendarItem(Activity);
+            await OnActivityCreated.InvokeAsync(Activity);
+
+            // Close the modal after successful submission only if not adding another
+            if (!AddAnotherAfterSave)
+            {
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("eval",
+                        $"bootstrap.Modal.getInstance(document.getElementById('{modalId}'))?.hide()");
+                }
+                catch (InvalidOperationException)
+                {
+                    // Ignore JavaScript interop errors during static rendering
+                }
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // AutoRetryAuthHandler will handle automatic retry and redirect to login if needed
+            await OnFormReset.InvokeAsync();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // Handle validation errors from the server
+            var content = await ex.GetContentAsAsync<string>();
+            Logger.LogWarning("Validation error creating activity: {Content}", content);
+            
+            if (content != null && content.Contains("already exists"))
+            {
+                await OnFormReset.InvokeAsync();
+                // Parent will handle showing duplicate error message
+            }
+            else
+            {
+                await OnFormReset.InvokeAsync();
+                // Parent will handle showing validation error message
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating activity");
+            await OnFormReset.InvokeAsync();
+            // Parent will handle showing general error message
+        }
+    }
+
+    private void OnTagSelectionChanged()
+    {
+        if (Activity.PrimaryTagId.HasValue && AvailableTags != null)
+        {
+            selectedTag = AvailableTags.FirstOrDefault(t => t.Id == Activity.PrimaryTagId.Value);
+            
+            // Clear DateFinished if the selected tag is not a range type
+            if (selectedTag?.IsRange != true)
+            {
+                Activity.DateFinished = null;
+            }
+            
+            // Initialize input type values and clear description
+            Activity.Description = null;
+            if (selectedTag?.TypeId == 1) // Integer
+            {
+                integerValue = null;
+                Activity.Description = string.Empty;
+            }
+            else if (selectedTag?.TypeId == 3) // Boolean
+            {
+                booleanValue = false;
+                Activity.Description = "false";
+            }
+            else if (selectedTag?.TypeId == 4) // Date
+            {
+                dateValue = DateTime.Today;
+                Activity.Description = DateTime.Today.ToString("yyyy-MM-dd");
+            }
+            else if (selectedTag?.TypeId == 5) // Time
+            {
+                timeValue = TimeOnly.FromDateTime(DateTime.Now);
+                Activity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+            }
+            else if (selectedTag?.TypeId == 6) // Decimal, precision 2
+            {
+                decimalValue = null;
+                Activity.Description = string.Empty;
+            }
+        }
+        else
+        {
+            selectedTag = null;
+            Activity.DateFinished = null;
+            Activity.Description = null;
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
+            timeValue = null;
+            decimalValue = null;
+        }
+    }
+    
+    private void OnIntegerValueChanged()
+    {
+        Activity.Description = integerValue?.ToString() ?? string.Empty;
+    }
+    
+    private void OnBooleanValueChanged()
+    {
+        Activity.Description = booleanValue.ToString().ToLower();
+    }
+    
+    private void OnDateValueChanged()
+    {
+        Activity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+    }
+    
+    private void OnTimeValueChanged()
+    {
+        Activity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+    }
+    
+    private void OnDecimalValueChanged()
+    {
+        // Round to 2 decimal places if value has higher precision
+        if (decimalValue.HasValue)
+        {
+            var rounded = Math.Round(decimalValue.Value, 2);
+            if (rounded != decimalValue.Value)
+            {
+                decimalValue = rounded;
+            }
+            Activity.Description = rounded.ToString("F2");
+        }
+        else
+        {
+            Activity.Description = string.Empty;
+        }
+    }
+
+    public void ResetForm()
+    {
+        selectedTag = null;
+        integerValue = null;
+        booleanValue = false;
+        dateValue = null;
+        timeValue = null;
+        decimalValue = null;
+    }
+}

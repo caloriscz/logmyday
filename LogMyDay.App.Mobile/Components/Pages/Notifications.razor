@@ -2,6 +2,7 @@
 @using LogMyDay.Shared.DTOs
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
 <div class="container-fluid">
     <div class="row">
@@ -71,7 +72,7 @@
 
                                     <div class="mt-3">
                                         <button class="btn btn-sm btn-outline-primary w-100"
-                                                @onclick="@(() => NavigateToAddActivity(tag.Id))">
+                                                @onclick="@(() => OpenAddActivityModal(tag.Id))">
                                             <i class="bi bi-plus-circle me-1"></i>
                                             Add Activity
                                         </button>
@@ -101,15 +102,32 @@
     </div>
 </div>
 
+<!-- Shared Add Activity Modal -->
+<AddActivityModal 
+    ModalId="notificationsAddActivityModal"
+    Activity="newActivity" 
+    AvailableTags="allTags" 
+    ErrorMessage="@errorMessage"
+    AddAnotherAfterSave="addAnotherAfterSave"
+    OnActivityCreated="OnActivityCreated"
+    OnCanceled="OnModalCanceled"
+    OnFormReset="OnFormReset" />
+
 @code {
     private List<TagResponse>? unfilledRequiredTags;
+    private IList<TagResponse>? allTags;
     private DateTime selectedDate = DateTime.Today;
     private bool isLoading = true;
     private string? errorMessage;
+    
+    // Modal-related properties
+    private ActivityRequest newActivity = new();
+    private bool addAnotherAfterSave = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadRequiredTags();
+        await LoadAllTags();
     }
 
     private async Task LoadRequiredTags()
@@ -121,6 +139,12 @@
             StateHasChanged();
 
             unfilledRequiredTags = await ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // AutoRetryAuthHandler will handle automatic retry and redirect to login if needed
+            errorMessage = "Authentication expired. Please wait or try again.";
+            unfilledRequiredTags = new List<TagResponse>();
         }
         catch (Exception ex)
         {
@@ -134,13 +158,99 @@
         }
     }
 
+    private async Task LoadAllTags()
+    {
+        try
+        {
+            allTags = await ActivityApi.GetTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // AutoRetryAuthHandler will handle automatic retry and redirect to login if needed
+            errorMessage = "Authentication expired. Please wait or try again.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tags: {ex.Message}";
+        }
+    }
+
     private async Task RefreshNotifications()
     {
         await LoadRequiredTags();
     }
 
-    private void NavigateToAddActivity(int tagId)
+    private async Task OpenAddActivityModal(int tagId)
     {
-        Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
+        // Reset the activity form
+        InitializeNewActivity(tagId);
+        errorMessage = null;
+
+        // Open the modal
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval",
+                "new bootstrap.Modal(document.getElementById('notificationsAddActivityModal')).show()");
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore JavaScript interop errors during static rendering
+        }
+    }
+
+    private void InitializeNewActivity(int? tagId = null)
+    {
+        // Set the DateStarted to the selected date, but keep the current time if it's today
+        if (selectedDate.Date == DateTime.Today)
+        {
+            newActivity.DateStarted = DateTime.Now;
+        }
+        else
+        {
+            // For other dates, set to the beginning of the selected day
+            newActivity.DateStarted = selectedDate.Date;
+        }
+
+        newActivity.PrimaryTagId = tagId;
+        newActivity.Description = null;
+        newActivity.DateFinished = null;
+    }
+
+    private async Task OnActivityCreated(ActivityRequest activity)
+    {
+        // Refresh the notifications list
+        await LoadRequiredTags();
+
+        // Reset the form if not adding another
+        if (!addAnotherAfterSave)
+        {
+            InitializeNewActivity();
+        }
+        else
+        {
+            // Keep the selected tag and date, but reset description
+            var keepTagId = activity.PrimaryTagId;
+            var keepDate = activity.DateStarted;
+            
+            InitializeNewActivity(keepTagId);
+            newActivity.DateStarted = keepDate;
+        }
+
+        errorMessage = null;
+    }
+
+    private Task OnModalCanceled()
+    {
+        InitializeNewActivity();
+        errorMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnFormReset()
+    {
+        // Handle form errors - will be called when validation or API errors occur
+        errorMessage = "Error saving activity. Please try again.";
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 }
