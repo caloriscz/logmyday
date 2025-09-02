@@ -63,6 +63,16 @@ public static class MauiProgram
             builder.Services.AddScoped<ApiService>();
             builder.Services.AddScoped<QuickActivityService>();
 
+            // Register notification services
+#if ANDROID
+            builder.Services.AddSingleton<INotificationManagerService, LogMyDay.App.Mobile.Platforms.Android.NotificationManagerService>();
+#endif
+            // Register the cross-platform wrapper service
+            builder.Services.AddSingleton<NotificationService>();
+
+            // Update App registration to include NotificationService dependency
+            builder.Services.AddSingleton<App>();
+
         }
         catch (Exception ex)
         {
