@@ -129,6 +129,32 @@ LogMyDay features an advanced Quick Activities system designed for one-tap activ
 
 This system transforms quick activity logging from a complex multi-step process into a streamlined, single-tap experience that users actually want to use for frequent activity tracking.
 
+### Smart Notification System
+LogMyDay features an intelligent notification system that reminds users about unfilled required activities:
+
+#### System Architecture
+- **SystemNotificationService**: Core monitoring service that tracks unfilled required activities using the API endpoint `GetRequiredDailyTagsNotFilledForDate`
+- **Authentication Integration**: Automatically starts monitoring after login and stops after logout
+- **Platform Support**: Currently implemented for Android with system notification support
+- **Smart Timing**: Configurable intervals (30 seconds for testing, 5 minutes for production)
+
+#### Intelligent Notifications
+- **Activity Count**: Shows exact number of unfilled required activities (e.g., "You have 3 unfilled required activities for today")
+- **Context Aware**: Only sends notifications when there are actually unfilled activities
+- **Privacy Respectful**: No background monitoring when user is logged out
+
+#### Current Implementation Status
+- ✅ **Active**: System notifications while app is in foreground/active
+- 🚧 **Future**: Background notifications when app is minimized (planned enhancement)
+- ✅ **Integration**: Full integration with authentication and API systems
+- ✅ **Testing**: Comprehensive testing utilities and debug logging
+
+#### Technical Details
+- Uses `INotificationManagerService` for platform-specific implementation
+- Integrates with `AuthenticationService.AuthenticationChanged` events
+- Leverages existing API infrastructure and authentication security
+- Includes extensive debugging and monitoring capabilities
+
 ## Security
 
 ### Client Applications & HTTP Architecture (UPDATED – Aug 2025 Refactor)
@@ -275,13 +301,15 @@ Production settings (stricter security):
   * Prefer planning-first mindset before coding.
   * Write journal notes and intent definitions before actual implementation.
 
-### Recent Refactor Summary (Aug 2025)
+### Recent Refactor Summary (Aug-Sep 2025)
 | Area | Before | After |
 |------|--------|-------|
 | Mobile server selection | Mutated singleton HttpClient (`BaseAddress`, headers) | `ApiContext` + new client instances via factory |
 | Auth header (mobile) | Handler reading `Preferences` every request | Handler reads in-memory context (no password persistence) |
 | Logout failure | Phantom call to invalid host (e.g., 0.0.0.1) + HttpClient mutation exception | Clean context clear; no mutation exceptions |
 | Adding new API endpoints | Risk of coupling to fixed client | Build via provider or add new Refit interface through provider pattern |
+| Notification system | No systematic unfilled activity notifications | Smart system notifications with authentication integration |
+| Authentication events | Limited event-driven architecture | Comprehensive authentication state management with event subscription |
 
 ### Adding New Refit Interfaces (Mobile)
 1. Define interface in `LogMyDay.Shared`.
@@ -322,6 +350,7 @@ Production settings (stricter security):
 - **Security**: Never store user credentials in localStorage, sessionStorage, or any client-side storage. Maintain the current server-side credential management approach to ensure security compliance.
 - **HTTPS Enforcement**: Always use HTTPS for all communications. Never add HTTP-only launch profiles or disable SQL Server encryption. All data in transit must be encrypted.
 - **Rate Limiting**: Maintain rate limiting and brute-force protection. Never disable authentication attempt tracking or remove progressive lockout mechanisms. All authentication failures must be logged and tracked.
+- **Notification System**: Follow the established pattern of authentication-aware services. System notifications should respect user privacy by stopping monitoring when logged out. Use platform-specific implementations through dependency injection.
 
 ## Development and Testing Guidelines
 

@@ -99,7 +99,7 @@
                     
                     <div class="mb-3">
                         <div class="form-check">
-                            <input type="checkbox" @bind="AddAnotherAfterSave" class="form-check-input" id="@($"{modalId}AddAnother")" />
+                            <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="form-check-input" id="@($"{modalId}AddAnother")" />
                             <label class="form-check-label" for="@($"{modalId}AddAnother")">
                                 Add another activity after saving
                             </label>
@@ -126,6 +126,7 @@
     [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
+    [Parameter] public EventCallback<bool> AddAnotherAfterSaveChanged { get; set; }
     [Parameter] public EventCallback<ActivityRequest> OnActivityCreated { get; set; }
     [Parameter] public EventCallback OnCanceled { get; set; }
     [Parameter] public EventCallback OnFormReset { get; set; }
@@ -304,6 +305,14 @@
         else
         {
             Activity.Description = string.Empty;
+        }
+    }
+
+    private async Task OnAddAnotherChanged()
+    {
+        if (AddAnotherAfterSaveChanged.HasDelegate)
+        {
+            await AddAnotherAfterSaveChanged.InvokeAsync(AddAnotherAfterSave);
         }
     }
 

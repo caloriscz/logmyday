@@ -31,9 +31,9 @@ public static class MauiProgram
         {
             System.Diagnostics.Debug.WriteLine("MauiProgram: Starting service registration");
 
-            // Register authentication service
-            builder.Services.AddSingleton<AuthenticationService>();
-            System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationService registered");
+            // Register authentication service - use the singleton instance
+            builder.Services.AddSingleton<AuthenticationService>(provider => AuthenticationService.Instance);
+            System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationService registered as singleton instance");
 
             // Register server configuration service
             // Legacy ServerConfigurationService replaced by dynamic context/provider pattern
@@ -72,6 +72,9 @@ public static class MauiProgram
 #endif
             // Register the cross-platform wrapper service
             builder.Services.AddSingleton<NotificationService>();
+
+            // Register system notification service
+            builder.Services.AddSingleton<ISystemNotificationService, SystemNotificationService>();
 
             // Update App registration to include NotificationService dependency
             builder.Services.AddSingleton<App>();

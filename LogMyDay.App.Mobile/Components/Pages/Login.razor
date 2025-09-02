@@ -149,15 +149,19 @@
             {
                 // Simple validation call: fetch tags (or a health endpoint if available)
                 var tags = await ApiProvider.Activity.GetTags();
+                System.Diagnostics.Debug.WriteLine("Login: API call successful, setting authenticated");
                 AuthService.SetAuthenticated(true);
+                System.Diagnostics.Debug.WriteLine($"Login: Authentication set, current state: {AuthService.IsAuthenticated}");
             }
             catch (Refit.ApiException apiEx) when (apiEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
+                System.Diagnostics.Debug.WriteLine("Login: Authentication failed - unauthorized");
                 errorMessage = "Invalid username or password.";
                 ApiContext.Clear();
             }
             catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Login: Connection failed: {ex.Message}");
                 errorMessage = $"Connection failed: {ex.Message}";
                 ApiContext.Clear();
             }

@@ -23,62 +23,45 @@ public partial class App : Application
         
         System.Diagnostics.Debug.WriteLine("App.OnStart called");
         
-        // Skip permission request for now - just test notifications directly
-        System.Diagnostics.Debug.WriteLine("Skipping permission request - testing direct notifications");
-        
-        // Test direct platform service call
+        // Initialize system notification service 
         try
         {
-#if ANDROID
-            System.Diagnostics.Debug.WriteLine("Testing direct platform service");
-            var platformService = new LogMyDay.App.Mobile.Platforms.Android.NotificationManagerService();
-            System.Diagnostics.Debug.WriteLine("Created platform service directly");
-            platformService.SendNotification("LogMyDay Direct", "Direct platform test notification");
-#endif
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error with direct platform service: {ex.Message}");
-        }
-        
-        // Try to get notification service from DI container
-        try
-        {
-            System.Diagnostics.Debug.WriteLine("Attempting to get NotificationService from DI");
+            System.Diagnostics.Debug.WriteLine("Attempting to get SystemNotificationService from DI");
             var serviceProvider = IPlatformApplication.Current?.Services;
             System.Diagnostics.Debug.WriteLine($"ServiceProvider available: {serviceProvider != null}");
             
-            var notificationService = serviceProvider?.GetService<NotificationService>();
-            System.Diagnostics.Debug.WriteLine($"NotificationService from DI: {notificationService != null}");
+            // Force early construction of SystemNotificationService to ensure event subscription
+            var systemNotificationService = serviceProvider?.GetService<ISystemNotificationService>();
+            System.Diagnostics.Debug.WriteLine($"SystemNotificationService from DI: {systemNotificationService != null}");
             
-            if (notificationService != null)
+            // Also force construction of AuthenticationService to ensure it's ready
+            var authService = serviceProvider?.GetService<AuthenticationService>();
+            System.Diagnostics.Debug.WriteLine($"AuthenticationService from DI: {authService != null}");
+            
+            if (systemNotificationService != null)
             {
-                // Send startup notification
-                System.Diagnostics.Debug.WriteLine("Sending app start notification");
-                notificationService.SendNotification("LogMyDay App", "🚀 App started - Notification sent");
+                System.Diagnostics.Debug.WriteLine("SystemNotificationService initialized - will start monitoring after authentication");
+                System.Diagnostics.Debug.WriteLine($"SystemNotificationService is running: {systemNotificationService.IsRunning}");
                 
-                // Start periodic notifications
-                System.Diagnostics.Debug.WriteLine("Starting periodic notifications");
-                notificationService.StartPeriodicNotifications();
-                
-                // Send a test periodic notification after 10 seconds to verify timer works
-                Task.Run(async () =>
-                {
-                    await Task.Delay(10000); // 10 seconds
-                    System.Diagnostics.Debug.WriteLine("Sending manual test periodic notification");
-                    notificationService.SendNotification("LogMyDay Test", "🔔 Manual test notification after 10 seconds");
-                });
-                
-                System.Diagnostics.Debug.WriteLine("Periodic notification system activated");
+                // Note: The service will automatically start monitoring when user authenticates
+                // via the AuthenticationService.AuthenticationChanged event
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine("NotificationService not found in DI container");
+                System.Diagnostics.Debug.WriteLine("SystemNotificationService not found in DI container");
+            }
+
+            // Also get the platform notification service to test basic notifications
+            var notificationService = serviceProvider?.GetService<NotificationService>();
+            if (notificationService != null)
+            {
+                System.Diagnostics.Debug.WriteLine("Testing basic notification service");
+                notificationService.SendNotification("LogMyDay", "🚀 App started - notification system active");
             }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error starting notifications: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Error initializing SystemNotificationService: {ex.Message}");
             System.Diagnostics.Debug.WriteLine($"Exception details: {ex}");
         }
     }
@@ -86,12 +69,12 @@ public partial class App : Application
     protected override void OnSleep()
     {
         base.OnSleep();
-        // Keep notifications running in background
+        // System notifications continue running in background
     }
 
     protected override void OnResume()
     {
         base.OnResume();
-        // Notifications should continue from where they left off
+        // System notifications should continue from where they left off
     }
 }
