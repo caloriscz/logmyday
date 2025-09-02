@@ -39,11 +39,14 @@ public static class MauiProgram
             // Legacy ServerConfigurationService replaced by dynamic context/provider pattern
             System.Diagnostics.Debug.WriteLine("MauiProgram: (Deprecated) ServerConfigurationService skipped");
 
-            // Dynamic API context & clients
+            // Dynamic API context & clients with auto-retry authentication
             builder.Services.Add(new ServiceDescriptor(typeof(IApiContext), typeof(ApiContext), ServiceLifetime.Singleton));
-            builder.Services.Add(new ServiceDescriptor(typeof(DynamicAuthHandler), typeof(DynamicAuthHandler), ServiceLifetime.Transient));
+            builder.Services.Add(new ServiceDescriptor(typeof(AutoRetryAuthHandler), sp => 
+                new AutoRetryAuthHandler(
+                    sp.GetRequiredService<IApiContext>(), 
+                    sp.GetRequiredService<AuthenticationService>()), ServiceLifetime.Transient));
             builder.Services.AddHttpClient("dynamic-api")
-                .AddHttpMessageHandler<DynamicAuthHandler>();
+                .AddHttpMessageHandler<AutoRetryAuthHandler>();
             builder.Services.Add(new ServiceDescriptor(typeof(IApiClientProvider), typeof(ApiClientProvider), ServiceLifetime.Singleton));
             // Adapter so existing pages injecting IActivityApi continue to work
             builder.Services.AddTransient<LogMyDay.Shared.Interfaces.IActivityApi>(sp => sp.GetRequiredService<IApiClientProvider>().Activity);

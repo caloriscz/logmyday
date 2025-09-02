@@ -58,11 +58,56 @@ public class AuthenticationService : INotifyPropertyChanged
         try
         {
             var username = Preferences.Get("Username", "");
-            var password = Preferences.Get("Password", "");
-            return !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
+            var serverUrl = Preferences.Get("ServerUrl", "");
+            // Note: Password is not persisted for security reasons
+            return !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(serverUrl);
         }
         catch
         {
+            return false;
+        }
+    }
+
+    public async Task<bool> TryAutoReAuthenticate(IApiContext apiContext, IApiClientProvider apiProvider)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("AuthService: TryAutoReAuthenticate started");
+
+            if (!HasStoredCredentials())
+            {
+                System.Diagnostics.Debug.WriteLine("AuthService: No stored credentials available");
+                return false;
+            }
+
+            var storedServerUrl = Preferences.Get("ServerUrl", "");
+            var storedUsername = Preferences.Get("Username", "");
+
+            if (!Uri.TryCreate(storedServerUrl, UriKind.Absolute, out var serverUri))
+            {
+                System.Diagnostics.Debug.WriteLine("AuthService: Invalid stored server URL");
+                return false;
+            }
+
+            // Check if current context has valid credentials for the stored username
+            if (apiContext.Username == storedUsername && !string.IsNullOrEmpty(apiContext.Password))
+            {
+                // Try to make an API call to verify the credentials are still valid
+                var activityApi = apiProvider.Activity;
+                var tags = await activityApi.GetTags();
+
+                // If we get here, credentials are still valid
+                System.Diagnostics.Debug.WriteLine("AuthService: Auto re-authentication successful");
+                SetAuthenticated(true);
+                return true;
+            }
+
+            System.Diagnostics.Debug.WriteLine("AuthService: Context credentials don't match stored username or missing password");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"AuthService: Auto re-authentication failed: {ex.Message}");
             return false;
         }
     }

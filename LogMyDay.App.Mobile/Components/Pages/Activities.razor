@@ -424,7 +424,9 @@
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            Navigation.NavigateTo("/login");
+            // AutoRetryAuthHandler will handle automatic retry and redirect to login if needed
+            // Just show a user-friendly message
+            errorMessage = "Authentication expired. Please wait or try again.";
         }
         catch (Exception ex)
         {
