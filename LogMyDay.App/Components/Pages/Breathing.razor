@@ -215,7 +215,7 @@
     svg{width:100%; height:100%; display:block}
 
     /* Scope all breathing-specific styles to avoid global conflicts */
-    .app .bg{stroke:#415081; stroke-opacity:.4; stroke-width:3; fill:none}
+    .app .bg{stroke: var(--bs-border-color); stroke-opacity:.8; stroke-width:3; fill:none}
     .app .bg.hidden{display:none}
 
     .app .side{fill:none; stroke-width:6; stroke-linecap:round; filter: drop-shadow(0 0 12px rgba(97,179,255,.25));}
@@ -268,8 +268,8 @@
     .app .btn.ghost{background:transparent; border:1px solid rgba(255,255,255,.16)}
     .app .btn:disabled{opacity:.5; cursor:not-allowed}
 
-    .app .rows{display:grid; grid-template-columns: 1fr 1fr; gap:.8rem}
-    @@media (max-width: 640px){ .app .rows{grid-template-columns:1fr} }
+    .app .rows{display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:.8rem}
+    @@media (max-width: 768px){ .app .rows{grid-template-columns:1fr 1fr} }
 
     .app .field{display:grid; gap:.35rem}
     .app .field label{opacity:.9; font-size:.92rem}
