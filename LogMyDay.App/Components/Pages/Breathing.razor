@@ -34,9 +34,9 @@
                             <svg viewBox="0 0 100 92" preserveAspectRatio="xMidYMid meet" id="shapeSvg" aria-hidden="true">
                                 <!-- Backgrounds -->
                                 <!-- Triangle (points: left-bottom, top, right-bottom) -->
-                                <path id="bg-tri" class="bg" d="M 10 82 L 50 10 L 90 82 Z" />
+                                <path id="bg-tri" class="bg" d="M 10 82 L 50 10 L 90 82 Z" stroke="#000000" stroke-opacity="0.28" stroke-width="3" fill="none" stroke-linejoin="round" />
                                 <!-- Box (square) outline — its 'd' is also set in JS for safety -->
-                                <path id="bg-box" class="bg hidden" d="M 10 82 L 10 10 L 90 10 L 90 82 Z" />
+                                <path id="bg-box" class="bg hidden" d="M 10 82 L 10 10 L 90 10 L 90 82 Z" stroke="#000000" stroke-opacity="0.28" stroke-width="3" fill="none" stroke-linejoin="round" />
 
                                 <!-- Active sides (we swap their 'd' based on mode) -->
                                 <path id="side-inhale" class="side inhale" d="M 50 10 L 10 82" />
@@ -211,14 +211,19 @@
       position:relative; aspect-ratio: 1.1 / 1; width:100%;
       background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
       border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px;
+      color: #9fb0ff; /* default currentColor fallback */
     }
+
+    /* In dark mode ensure currentColor is bright enough for pulse and labels */
+    [data-bs-theme="dark"] .app .viz { color: #9fb0ff; }
     svg{width:100%; height:100%; display:block}
 
     /* Scope all breathing-specific styles to avoid global conflicts */
-    .app .bg{stroke: var(--bs-border-color); stroke-opacity:.8; stroke-width:3; fill:none}
+    /* Make outlines visible regardless of global theme variables */
+    .app .bg{stroke: rgba(0,0,0,.28); stroke-opacity:.9; stroke-width:3; fill:none; stroke-dasharray: none !important; stroke-dashoffset: 0 !important}
     .app .bg.hidden{display:none}
 
-    .app .side{fill:none; stroke-width:6; stroke-linecap:round; filter: drop-shadow(0 0 12px rgba(97,179,255,.25));}
+    .app .side{fill:none; stroke-width:6; stroke-linecap:round; filter: drop-shadow(0 0 12px rgba(97,179,255,.25)); stroke-dasharray: none; stroke-dashoffset: 0}
     .app .side.inhale{stroke:var(--inhale)}
     .app .side.hold{stroke:var(--hold)}
     .app .side.exhale{stroke:var(--exhale)}
@@ -299,6 +304,29 @@
         margin-top: 0.5rem;
         text-align: center;
     }
+
+    /* Dark theme hardening: prevent global dark overrides from hiding SVG strokes */
+    [data-bs-theme="dark"] .app svg, 
+    [data-bs-theme="dark"] .app svg * {
+        background-color: transparent !important;
+        color: inherit; /* keep labels using their own colors */
+    }
+
+    /* Ensure background outlines are visible in dark mode regardless of Bootstrap vars */
+    [data-bs-theme="dark"] .app .bg {
+        stroke: #ffffff !important;
+        stroke-opacity: 0.85 !important;
+        stroke-width: 3.25px !important;
+        fill: none !important;
+        display: block !important;
+        visibility: visible !important;
+    }
+
+    /* Reinforce active side colors in dark mode */
+    [data-bs-theme="dark"] .app .side.inhale{stroke:var(--inhale) !important; display:block !important; visibility:visible !important}
+    [data-bs-theme="dark"] .app .side.hold{stroke:var(--hold) !important; display:block !important; visibility:visible !important}
+    [data-bs-theme="dark"] .app .side.exhale{stroke:var(--exhale) !important; display:block !important; visibility:visible !important}
+    [data-bs-theme="dark"] .app .side.hold2{stroke:var(--hold2) !important; display:block !important; visibility:visible !important}
 </style>
 
     <script>(function(){
