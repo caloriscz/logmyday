@@ -106,6 +106,23 @@
             font-size: 1.5rem;
             z-index: 999;
         }
+
+        /* Pull-to-refresh enhancements */
+        .refresh-container {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+        }
+
+        /* Better touch feedback for mobile */
+        .btn, .mobile-nav-item, .card {
+            -webkit-tap-highlight-color: rgba(0,0,0,0.1);
+        }
+
+        /* Enhanced scrolling for mobile */
+        body {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
     </style>
 </head>
 <body>
@@ -138,6 +155,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="_framework/blazor.webview.js"></script>
+    <script src="js/refresh-view.js"></script>
+    <script src="js/refresh-view-test.js"></script>
     <script>
         console.log('LogMyDay Mobile: HTML loaded, waiting for WebView...');
         

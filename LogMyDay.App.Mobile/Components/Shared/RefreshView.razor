@@ -1,0 +1,270 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@implements IAsyncDisposable
+
+<div class="refresh-container" @ref="refreshContainer">
+    <div class="refresh-indicator @(isRefreshing ? "refreshing" : "")" @ref="refreshIndicator">
+        <div class="refresh-spinner">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Refreshing...</span>
+            </div>
+        </div>
+        <div class="refresh-text">
+            @(isRefreshing ? "Refreshing..." : "Pull to refresh")
+        </div>
+    </div>
+    
+    <div class="refresh-content" @ref="refreshContent">
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public Func<Task>? OnRefresh { get; set; }
+    [Parameter] public bool IsEnabled { get; set; } = true;
+    
+    private ElementReference refreshContainer;
+    private ElementReference refreshIndicator;
+    private ElementReference refreshContent;
+    private bool isRefreshing = false;
+    private bool isPulling = false;
+    private double pullDistance = 0;
+    private double startY = 0;
+    private const double PULL_THRESHOLD = 80; // pixels to trigger refresh
+    private const double MAX_PULL = 120; // maximum pull distance
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && IsEnabled)
+        {
+            await InitializeTouchHandlers();
+        }
+    }
+    
+    private async Task InitializeTouchHandlers()
+    {
+        try
+        {
+            // Wait for DOM to be ready and JavaScript to be loaded
+            var maxRetries = 10;
+            var retryDelay = 100;
+            
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    // Check if the JavaScript function is available
+                    var isAvailable = await JSRuntime.InvokeAsync<bool>("eval", 
+                        "typeof window.initializeRefreshView === 'function'");
+                    
+                    if (isAvailable)
+                    {
+                        await JSRuntime.InvokeVoidAsync("initializeRefreshView", refreshContainer, DotNetObjectReference.Create(this));
+                        Console.WriteLine("RefreshView: Touch handlers initialized successfully");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"RefreshView: Attempt {i + 1} failed: {ex.Message}");
+                }
+                
+                // Wait before retrying
+                await Task.Delay(retryDelay);
+                retryDelay *= 2; // Exponential backoff
+            }
+            
+            Console.WriteLine("RefreshView: Failed to initialize touch handlers after all retries");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"RefreshView: Critical initialization error: {ex.Message}");
+        }
+    }
+    
+    [JSInvokable]
+    public void OnTouchStart(double clientY)
+    {
+        Console.WriteLine($"RefreshView: OnTouchStart - clientY={clientY}, isRefreshing={isRefreshing}, IsEnabled={IsEnabled}");
+        
+        if (isRefreshing || !IsEnabled) return;
+        
+        startY = clientY;
+        isPulling = false;
+        pullDistance = 0;
+        
+        Console.WriteLine($"RefreshView: Touch start registered - startY={startY}");
+    }
+    
+    [JSInvokable]
+    public async Task OnTouchMove(double clientY, double scrollTop)
+    {
+        Console.WriteLine($"RefreshView: OnTouchMove - clientY={clientY}, scrollTop={scrollTop}, startY={startY}");
+        
+        if (isRefreshing || !IsEnabled || scrollTop > 0) 
+        {
+            Console.WriteLine($"RefreshView: Touch move blocked - isRefreshing={isRefreshing}, IsEnabled={IsEnabled}, scrollTop={scrollTop}");
+            return;
+        }
+        
+        var deltaY = clientY - startY;
+        Console.WriteLine($"RefreshView: deltaY={deltaY}");
+        
+        if (deltaY > 0 && scrollTop <= 0)
+        {
+            isPulling = true;
+            pullDistance = Math.Min(deltaY * 0.5, MAX_PULL); // Apply resistance
+            
+            Console.WriteLine($"RefreshView: Pulling - distance={pullDistance}, threshold={PULL_THRESHOLD}");
+            
+            // Update visual feedback immediately
+            await UpdatePullIndicator();
+        }
+    }
+    
+    [JSInvokable]
+    public async Task OnTouchEnd()
+    {
+        Console.WriteLine($"RefreshView: OnTouchEnd - isPulling={isPulling}, pullDistance={pullDistance}, threshold={PULL_THRESHOLD}");
+        
+        if (isRefreshing || !IsEnabled) 
+        {
+            Console.WriteLine($"RefreshView: Touch end blocked - isRefreshing={isRefreshing}, IsEnabled={IsEnabled}");
+            return;
+        }
+        
+        if (isPulling && pullDistance >= PULL_THRESHOLD)
+        {
+            Console.WriteLine("RefreshView: Triggering refresh!");
+            await TriggerRefresh();
+        }
+        else
+        {
+            Console.WriteLine("RefreshView: Resetting pull indicator");
+            await ResetPullIndicator();
+        }
+        
+        isPulling = false;
+        pullDistance = 0;
+    }
+    
+    private async Task UpdatePullIndicator()
+    {
+        var opacity = Math.Min(pullDistance / PULL_THRESHOLD, 1.0);
+        var translateY = Math.Min(pullDistance, MAX_PULL);
+        
+        await JSRuntime.InvokeVoidAsync("updateRefreshIndicator", refreshIndicator, translateY, opacity);
+        await JSRuntime.InvokeVoidAsync("updateRefreshContent", refreshContent, translateY * 0.3);
+    }
+    
+    private async Task ResetPullIndicator()
+    {
+        await JSRuntime.InvokeVoidAsync("resetRefreshIndicator", refreshIndicator, refreshContent);
+    }
+    
+    private async Task TriggerRefresh()
+    {
+        Console.WriteLine("RefreshView: TriggerRefresh called");
+        
+        if (isRefreshing || OnRefresh == null) 
+        {
+            Console.WriteLine($"RefreshView: Cannot trigger refresh - isRefreshing={isRefreshing}, OnRefresh={(OnRefresh != null ? "available" : "null")}");
+            return;
+        }
+        
+        Console.WriteLine("RefreshView: Starting refresh operation");
+        
+        isRefreshing = true;
+        StateHasChanged();
+        
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("showRefreshIndicator", refreshIndicator, refreshContent);
+            Console.WriteLine("RefreshView: Calling OnRefresh callback");
+            await OnRefresh();
+            Console.WriteLine("RefreshView: OnRefresh callback completed");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"RefreshView: Error during refresh: {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("RefreshView: Finishing refresh operation");
+            isRefreshing = false;
+            await ResetPullIndicator();
+            StateHasChanged();
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("cleanupRefreshView", refreshContainer);
+        }
+        catch
+        {
+            // Ignore errors during disposal
+        }
+    }
+}
+
+<style>
+    .refresh-container {
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        touch-action: pan-y;
+    }
+    
+    .refresh-indicator {
+        position: absolute;
+        top: -80px;
+        left: 0;
+        right: 0;
+        height: 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bs-light, #f8f9fa);
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 10;
+        transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+        opacity: 0;
+        transform: translateY(0);
+    }
+    
+    .refresh-indicator.refreshing {
+        opacity: 1;
+        transform: translateY(80px);
+        transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    }
+    
+    .refresh-spinner {
+        margin-bottom: 8px;
+    }
+    
+    .refresh-text {
+        font-size: 0.875rem;
+        color: var(--bs-secondary, #6c757d);
+        text-align: center;
+    }
+    
+    .refresh-content {
+        transition: transform 0.2s ease-out;
+        min-height: 100%;
+    }
+    
+    /* Reduced motion support */
+    .refresh-reduced-motion .refresh-indicator,
+    .refresh-reduced-motion .refresh-content {
+        transition: none;
+    }
+</style>
+
+@inject IJSRuntime JSRuntime

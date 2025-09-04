@@ -28,6 +28,10 @@
                 <div><i class="bi bi-lightning"></i></div>
                 <div>Quick</div>
             </button>
+            <button class="mobile-nav-item @(IsActive("/test-refresh") ? "active" : "")" @onclick="@(() => NavigateTo("/test-refresh"))">
+                <div><i class="bi bi-arrow-down-circle"></i></div>
+                <div>Test PTR</div>
+            </button>
         </nav>
     }
 </div>

@@ -8,6 +8,7 @@
 @inject QuickActivityService QuickActivityService
 @inject IActivityApi ActivityApi
 @inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <PageTitle>Quick Activities - LogMyDay</PageTitle>
 
@@ -266,6 +267,9 @@
     private bool isError = false;
     private string? errorMessage;
 
+    // Pull-to-refresh functionality
+    private bool isRefreshing = false;
+
     protected override async Task OnInitializedAsync()
     {
         // Redirect to login if not authenticated
@@ -275,8 +279,26 @@
             return;
         }
 
+        // Subscribe to refresh events
+        RefreshService.RefreshRequested += OnRefreshRequested;
+
         await LoadQuickButtons();
         await LoadTags();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Unsubscribe from refresh events
+        RefreshService.RefreshRequested -= OnRefreshRequested;
+        await Task.CompletedTask;
+    }
+
+    private async void OnRefreshRequested(object? sender, EventArgs e)
+    {
+        if (isRefreshing) return;
+        
+        await RefreshQuickActivities();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadQuickButtons()
@@ -298,6 +320,20 @@
         {
             isLoading = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task RefreshQuickActivities()
+    {
+        isRefreshing = true;
+        
+        try
+        {
+            await LoadQuickButtons();
+        }
+        finally
+        {
+            isRefreshing = false;
         }
     }
 

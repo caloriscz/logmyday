@@ -1,6 +1,7 @@
 @page "/activities"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using LogMyDay.App.Mobile.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject NavigationManager Navigation
@@ -20,13 +21,13 @@
             </div>
         </div>
 
-        <!-- Activities List -->
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
-                        data-bs-target="#filterModal" title="Open filters">
-                        <i class="bi bi-funnel"></i> Filters
+    <!-- Activities List -->
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
+                    data-bs-target="#filterModal" title="Open filters">
+                    <i class="bi bi-funnel"></i> Filters
                     </button>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -363,6 +364,9 @@
     private int totalPages = 1;
     private string orderBy = "desc";
 
+    // Pull-to-refresh functionality
+    private bool isRefreshing = false;
+
     protected override async Task OnInitializedAsync()
     {
         // Redirect to login if not authenticated
@@ -372,6 +376,9 @@
             return;
         }
 
+        // Subscribe to refresh events
+        RefreshService.RefreshRequested += OnRefreshRequested;
+
         selectedDate = DateTime.Today;
         InitializeNewActivity();
         await LoadData();
@@ -379,8 +386,17 @@
 
     public async ValueTask DisposeAsync()
     {
-        // No cleanup needed in mobile version
+        // Unsubscribe from refresh events
+        RefreshService.RefreshRequested -= OnRefreshRequested;
         await Task.CompletedTask;
+    }
+
+    private async void OnRefreshRequested(object? sender, EventArgs e)
+    {
+        if (isRefreshing) return;
+        
+        await RefreshActivities();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadData()
@@ -432,6 +448,20 @@
         {
             Logger.LogError(ex, "Error loading data");
             errorMessage = $"Error loading data: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshActivities()
+    {
+        isRefreshing = true;
+        
+        try
+        {
+            await LoadData();
+        }
+        finally
+        {
+            isRefreshing = false;
         }
     }
 

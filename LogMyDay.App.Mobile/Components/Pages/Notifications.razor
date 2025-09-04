@@ -1,8 +1,10 @@
 ﻿@page "/notifications"
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Mobile.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <div class="container-fluid">
     <div class="row">
@@ -12,10 +14,10 @@
                 <div class="d-flex align-items-center">
                     <input type="date" class="form-control me-2" @bind="selectedDate" @bind:after="LoadRequiredTags" />
                     <button class="btn btn-outline-primary" @onclick="RefreshNotifications">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
             @if (isLoading)
             {
@@ -126,8 +128,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        RefreshService.RefreshRequested += OnRefreshRequested;
         await LoadRequiredTags();
         await LoadAllTags();
+    }
+
+    private async void OnRefreshRequested(object? sender, EventArgs e)
+    {
+        await RefreshNotifications();
     }
 
     private async Task LoadRequiredTags()
@@ -252,5 +260,11 @@
         errorMessage = "Error saving activity. Please try again.";
         StateHasChanged();
         return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        RefreshService.RefreshRequested -= OnRefreshRequested;
+        return ValueTask.CompletedTask;
     }
 }
