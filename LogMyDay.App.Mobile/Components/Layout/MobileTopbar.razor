@@ -6,7 +6,15 @@
 <!-- Mobile Topbar -->
 <div class="mobile-topbar">
     <div class="d-flex align-items-center justify-content-between">
-        <h1 class="h4 mb-0 text-white">@Title</h1>
+        <div class="d-flex align-items-center">
+            @if (ShowBackButton)
+            {
+                <button class="btn btn-link text-white p-1 me-2" @onclick="GoBack" aria-label="Back">
+                    <i class="bi bi-arrow-left fs-5"></i>
+                </button>
+            }
+            <h1 class="h4 mb-0 text-white">@Title</h1>
+        </div>
         <div class="dropdown">
             <button class="btn btn-link text-white p-1" type="button" id="topbarMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-three-dots-vertical fs-5"></i>
@@ -48,6 +56,7 @@
 
 @code {
     [Parameter] public string Title { get; set; } = "LogMyDay";
+    [Parameter] public bool ShowBackButton { get; set; } = false;
 
     private async Task Logout()
     {
@@ -68,6 +77,18 @@
             // Log error silently - we don't have access to ILogger here
             // The exception will be handled by the calling page if needed
             Console.WriteLine($"Logout failed: {ex.Message}");
+        }
+    }
+
+    private async Task GoBack()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", "history.back()");
+        }
+        catch
+        {
+            Navigation.NavigateTo("/quick");
         }
     }
 }
