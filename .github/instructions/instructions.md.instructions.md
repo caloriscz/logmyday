@@ -327,6 +327,35 @@ Production settings (stricter security):
 - Password not persisted.
 - Logout clears context and navigates to `/login`.
 
+### Enhanced Activity Modal System (Sep 2025)
+LogMyDay.App now features a comprehensive modal-based activity creation system that provides a consistent user experience across all pages:
+
+#### Reusable AddActivityModal Component
+- **Mobile-First Design**: Uses `modal-fullscreen-lg-down` for optimal mobile experience
+- **Dynamic Input Types**: Automatically renders appropriate input controls based on tag types (Integer, String, Boolean, Date, Time, Decimal)
+- **Smart Context Awareness**: Pre-fills tag and date information based on where the modal is opened from
+- **Comprehensive Validation**: Full server-side validation with user-friendly error messages and duplicate checking
+- **Add Another Functionality**: Option to keep adding multiple activities with the same tag and date
+
+#### Floating Action Button (FAB)
+- **Consistent Design**: Matches mobile app styling with proper positioning and animations
+- **Mobile Optimized**: Touch-friendly with appropriate sizing and hover effects
+- **Theme Integration**: Uses CSS variables for dark/light theme compatibility
+- **Accessibility**: Proper ARIA labels and keyboard navigation support
+
+#### Cross-Page Integration
+- **Home Page**: FAB button that opens modal and refreshes activities list after creation
+- **Notifications Page**: "Add Activity" buttons that open same modal with preselected tag and date context
+- **Navbar Cleanup**: Removed non-functional "New Activity" button that was causing navigation issues
+
+#### Technical Benefits
+- **Code Reuse**: Single modal component eliminates code duplication
+- **Maintainability**: Centralized activity creation logic with consistent validation
+- **Performance**: No page navigation required, faster workflow
+- **User Experience**: Context preservation and automatic refresh functionality
+
+This system transforms activity creation from a complex multi-page process into a streamlined, single-modal experience that works consistently across desktop and mobile devices.
+
 ## Rules and Conventions
 
 ### Documentation Standards
@@ -354,25 +383,41 @@ Production settings (stricter security):
 
 ## Development and Testing Guidelines
 
-### Server Management
-- **Always stop the development server at the end of each conversation/session** to prevent port conflicts and file locking issues
-- When testing changes, stop any existing `dotnet run` processes before starting new ones
+## Development and Testing Guidelines
+
+### ⚠️ **CRITICAL: Server Management**
+- **ALWAYS stop the development server at the end of each conversation/session** to prevent port conflicts and file locking issues
+- **NEVER leave dotnet processes running** - this causes MSB3026 file locking errors that require VS Code restart
+- When testing changes, **ALWAYS stop any existing `dotnet run` processes before starting new ones**
 - If you encounter file locking errors (MSB3026) during build, it usually means:
   - A development server is still running from a previous session
   - Visual Studio has the project open and running
   - Multiple instances of the application are running simultaneously
 
+### **Mandatory Server Shutdown Commands**
+```powershell
+# Always run this at the end of each session
+Stop-Process -Name "dotnet" -Force -ErrorAction SilentlyContinue
+
+# Or use Ctrl+C in the terminal where dotnet run is executing
+```
+
 ### Resolution Steps for File Locking Issues
-1. Stop all `dotnet run` processes in terminals
+1. **Stop all `dotnet run` processes in terminals** (use `Stop-Process -Name "dotnet" -Force`)
 2. Close any running instances in Visual Studio debugger
-3. Use `Stop-Process -Name "dotnet" -Force` if needed to kill all dotnet processes
-4. Wait a few seconds before restarting the application
+3. Wait a few seconds before restarting the application
+4. If issues persist, restart VS Code as a last resort
 
 ### Testing Workflow
 1. Start the server with `dotnet run` for testing
 2. Test the changes in the browser
-3. **Always terminate the server process before ending the session**
+3. **🚨 MANDATORY: Always terminate the server process before ending the session** 
 4. Document any server management steps taken during development
+
+### **Developer Responsibility**
+- **It is the developer's responsibility to clean up running processes**
+- Leaving servers running causes build failures and requires VS Code restarts
+- This is especially critical when using background processes (`isBackground: true`)
 
 ### Build and Run Commands
 ```bash
