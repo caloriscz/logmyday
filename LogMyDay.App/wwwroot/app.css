@@ -737,6 +737,59 @@ main {
     }
 }
 
+/* Floating Action Button (FAB) */
+.fab {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 8px var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    z-index: 1050; /* Above modals */
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.fab:hover {
+    background-color: #0b5ed7; /* Darker primary */
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.fab:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px var(--shadow);
+}
+
+.fab i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.fab:hover i {
+    transform: scale(1.1);
+}
+
+/* Better touch feedback for mobile */
+@media (hover: none) {
+    .fab:hover {
+        transform: none;
+        background-color: var(--primary-color);
+    }
+    
+    .fab:active {
+        transform: scale(0.95);
+        background-color: #0b5ed7;
+    }
+}
+
 /* Mobile Modal Enhancements */
 @media (max-width: 992px) {
     .modal-fullscreen-lg-down .modal-body {
@@ -753,5 +806,13 @@ main {
     .modal-fullscreen-lg-down .modal-footer {
         border-top: 1px solid var(--border-color);
         background-color: var(--card-bg);
+    }
+    
+    /* Adjust FAB position for mobile navigation */
+    .fab {
+        bottom: 1rem;
+        right: 1rem;
+        width: 56px;
+        height: 56px;
     }
 }

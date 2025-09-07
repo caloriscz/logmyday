@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using LogMyDay.App.Components.Shared
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -125,6 +126,11 @@
     </div>
 </div>
 
+<!-- Floating Action Button -->
+<button class="fab" data-bs-toggle="modal" data-bs-target="#addActivityModal" title="Add Activity">
+    <i class="bi bi-plus-lg"></i>
+</button>
+
 <!-- Filter Modal -->
 <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
@@ -229,8 +235,19 @@
     </div>
 </div>
 
+<!-- Add Activity Modal -->
+<AddActivityModal 
+    Activity="newActivity" 
+    AvailableTags="tags" 
+    ErrorMessage="@errorMessage"
+    OnActivityCreated="OnActivityCreated"
+    OnError="OnError"
+    ModalId="addActivityModal" />
+
 @code {    private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
+    private ActivityRequest newActivity = new();
+    private string? errorMessage;
     
     // Display and filtering
     private string displayType = "daily";
@@ -249,6 +266,13 @@
     {
         selectedDate = DateTime.Today;
         calendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        
+        // Initialize new activity with current date/time
+        newActivity = new ActivityRequest
+        {
+            DateStarted = DateTime.Now
+        };
+        
         await LoadData();
     }
 
@@ -569,5 +593,25 @@
         // Disable if going forward would take us beyond next month
         var nextMonth = DateTime.Today.AddMonths(1);
         return selectedDate.AddMonths(1) > nextMonth;
+    }
+
+    // Add Activity Modal Event Handlers
+    private async Task OnActivityCreated(ActivityRequest activity)
+    {
+        // Refresh the activities list
+        await LoadData();
+        
+        // Reset the form
+        newActivity = new ActivityRequest
+        {
+            DateStarted = DateTime.Now
+        };
+        errorMessage = null;
+    }
+
+    private async Task OnError(string error)
+    {
+        errorMessage = error;
+        await Task.CompletedTask;
     }
 }
