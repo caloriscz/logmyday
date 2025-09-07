@@ -65,25 +65,39 @@
         font-variant-numeric: tabular-nums;
         font-size: 48px;
         font-weight: 800;
-        text-align: center
+        text-align: center;
+        min-width: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .btn {
+    .counter-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin: 8px 0;
+    }
+
+    .frame .btn {
         height: 44px;
         width: 44px;
         border-radius: 10px;
-        display: grid;
-        place-items: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
         user-select: none;
         background: #0f172a;
         color: #fff;
         font-size: 26px;
         border: none;
-        transition: .15s transform ease
+        transition: .15s transform ease;
+        flex-shrink: 0;
     }
 
-        .btn:active {
+        .frame .btn:active {
             transform: scale(.96)
         }
 
@@ -113,24 +127,24 @@
             cursor: pointer
         }
 
-    #settingsFooter {
+    .frame #settingsFooter {
         grid-template-columns: 1fr
     }
 
-        #settingsFooter button {
+        .frame #settingsFooter button {
             background: #4b646d;
             font-size: 20px
         }
 
-    #activeFooter .stop {
+    .frame #activeFooter .stop {
         background: #b91c1c
     }
 
-    #activeFooter .add {
+    .frame #activeFooter .add {
         background: #0f766e
     }
 
-    #activeFooter .pause {
+    .frame #activeFooter .pause {
         background: #374151
     }
 
@@ -192,27 +206,27 @@
             <section id="settings" class="screen settings active">
                 <div class="section">
                     <h3>SETS</h3>
-                    <div class="row">
-                        <button class="btn" id="setsMinus">−</button>
+                    <div class="counter-row">
+                        <button class="btn" id="setsMinus" aria-label="Decrease sets">−</button>
                         <div class="value" id="setsVal">6</div>
-                        <button class="btn" id="setsPlus">+</button>
+                        <button class="btn" id="setsPlus" aria-label="Increase sets">+</button>
                     </div>
                 </div>
                 <div class="section">
                     <h3>WORK</h3>
-                    <div class="row">
-                        <button class="btn" id="workMinus">−</button>
+                    <div class="counter-row">
+                        <button class="btn" id="workMinus" aria-label="Decrease work time">−</button>
                         <div class="value" id="workVal">00:30</div>
-                        <button class="btn" id="workPlus">+</button>
+                        <button class="btn" id="workPlus" aria-label="Increase work time">+</button>
                     </div>
                     <div class="hint">Step: 5s. Tap the time to switch to minute stepping (±60s).</div>
                 </div>
                 <div class="section">
                     <h3>REST</h3>
-                    <div class="row">
-                        <button class="btn" id="restMinus">−</button>
+                    <div class="counter-row">
+                        <button class="btn" id="restMinus" aria-label="Decrease rest time">−</button>
                         <div class="value" id="restVal">00:15</div>
-                        <button class="btn" id="restPlus">+</button>
+                        <button class="btn" id="restPlus" aria-label="Increase rest time">+</button>
                     </div>
                 </div>
                 <div class="footer" id="settingsFooter">
