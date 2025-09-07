@@ -97,6 +97,51 @@
         </div>
     }
 
+    <!-- Wellness Tools Section -->
+    <div class="row g-3 mt-2">
+        <div class="col-12">
+            <h5 class="text-muted mb-3">
+                <i class="bi bi-heart-pulse"></i> Wellness Tools
+            </h5>
+        </div>
+        
+        <!-- Breathing Tool -->
+        <div class="col-12 col-md-6">
+            <div class="card tool-card" @onclick="@(() => NavigateToTool("/breathing"))" style="cursor: pointer;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="tool-icon-container me-3">
+                            <i class="bi bi-lungs text-primary fs-2"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-1">Breathing Exercises</h5>
+                            <small class="text-muted">4-7-8 Triangle and Box breathing techniques</small>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HIIT Timer Tool -->
+        <div class="col-12 col-md-6">
+            <div class="card tool-card" @onclick="@(() => NavigateToTool("/exercise"))" style="cursor: pointer;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="tool-icon-container me-3">
+                            <i class="bi bi-stopwatch text-success fs-2"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="card-title mb-1">HIIT Timer</h5>
+                            <small class="text-muted">High-intensity interval training timer</small>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @if (!string.IsNullOrEmpty(statusMessage))
     {
         <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show mt-3" role="alert">
@@ -254,6 +299,36 @@
 
     .quick-activity-card .card-body {
         padding: 1rem 1.25rem;
+    }
+
+    /* Tool card styles */
+    .tool-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        min-height: 80px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .tool-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        border-color: var(--bs-primary);
+    }
+
+    .tool-card:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+    }
+
+    .tool-icon-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background-color: rgba(var(--bs-primary-rgb), 0.1);
     }
 </style>
 
@@ -505,6 +580,11 @@
         statusMessage = "";
         isError = false;
         StateHasChanged();
+    }
+
+    private void NavigateToTool(string route)
+    {
+        Navigation.NavigateTo(route);
     }
 
     public void Dispose()

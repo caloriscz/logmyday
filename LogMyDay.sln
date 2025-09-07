@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogMyDay.Api.Tests", "LogMy
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogMyDay.App.Mobile", "LogMyDay.App.Mobile\LogMyDay.App.Mobile.csproj", "{36542F73-A3EE-4BD9-210B-0672540A235F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LogMyDay.UI", "LogMyDay.UI\LogMyDay.UI.csproj", "{41423839-1B95-4EE3-8147-925418CEA54F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -106,6 +108,18 @@ Global
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Release|x64.Build.0 = Release|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Release|x86.ActiveCfg = Release|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Release|x86.Build.0 = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|x64.Build.0 = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Debug|x86.Build.0 = Debug|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|x64.ActiveCfg = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|x64.Build.0 = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|x86.ActiveCfg = Release|Any CPU
+		{41423839-1B95-4EE3-8147-925418CEA54F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

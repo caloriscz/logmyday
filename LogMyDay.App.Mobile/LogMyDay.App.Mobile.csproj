@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
+    <ProjectReference Include="..\LogMyDay.UI\LogMyDay.UI.csproj" />
   </ItemGroup>
 
 </Project>
