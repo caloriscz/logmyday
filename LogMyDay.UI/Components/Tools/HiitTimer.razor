@@ -26,7 +26,6 @@
                             <div class="value" id="workVal">00:30</div>
                             <button class="btn" id="workPlus" aria-label="Increase work time">+</button>
                         </div>
-                        <div class="hint">Step: 5s. Tap the time to switch to minute stepping (±60s).</div>
                     </div>
                     <div class="section">
                         <h3>REST</h3>
@@ -101,9 +100,9 @@
                     }
                     
                     <div class="footer" id="activeFooter">
-                        <button class="stop" id="stopBtn">■ STOP</button>
+                        <button class="stop" id="stopBtn">STOP</button>
                         <button class="add" id="addSetBtn">+1 SET</button>
-                        <button class="pause" id="pauseBtn">⏸ PAUSE</button>
+                        <button class="pause" id="pauseBtn">PAUSE</button>
                     </div>
                 </section>
             </main>
@@ -131,11 +130,9 @@
 
     .frame {
         width: 100%;
-        max-width: 460px;
+        max-width: 600px;
         margin: 0 auto;
         background: var(--card);
-        border-radius: 20px;
-        box-shadow: 0 20px 50px rgba(0,0,0,.35);
         overflow: hidden;
         position: relative;
     }
