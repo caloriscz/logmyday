@@ -329,7 +329,8 @@
     ErrorMessage="@errorMessage"
     OnActivityCreated="OnActivityCreated"
     OnError="OnError"
-    ModalId="addActivityModal" />
+    ModalId="addActivityModal"
+    PreselectedDate="@GetPreselectedDate()" />
 
 @code {    private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
@@ -714,5 +715,11 @@
     {
         errorMessage = error;
         await Task.CompletedTask;
+    }
+
+    // Get the preselected date for the AddActivityModal based on display mode and selected date
+    private DateTime? GetPreselectedDate()
+    {
+        return displayType == "daily" ? selectedDate : null;
     }
 }
