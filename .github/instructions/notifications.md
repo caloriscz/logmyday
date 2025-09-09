@@ -205,7 +205,6 @@ The notification system respects user privacy and security:
 
 ### Manual Testing
 1. **App Start**: Should see "🚀 App started - notification system active"
-2. **Login**: Should see "✅ Monitoring started for unfilled activities"
 3. **Periodic Checks**: Notifications appear every 30 seconds (testing mode)
 4. **Activity Content**: Notifications show correct count of unfilled activities
 

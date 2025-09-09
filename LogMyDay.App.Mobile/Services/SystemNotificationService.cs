@@ -45,9 +45,6 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         {
             System.Diagnostics.Debug.WriteLine("SystemNotificationService: User authenticated, starting monitoring");
             StartMonitoring();
-            
-            // Send a test notification to verify the system works
-            _notificationService.SendNotification("LogMyDay", "✅ Monitoring started for unfilled activities");
         }
         else
         {
@@ -60,14 +57,9 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
     {
         if (_isRunning)
         {
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: Already running, ignoring StartMonitoring call");
             return;
         }
 
-        System.Diagnostics.Debug.WriteLine("SystemNotificationService: Starting monitoring for unfilled required tags");
-
-        // Check immediately after starting
-        System.Diagnostics.Debug.WriteLine("SystemNotificationService: Performing immediate check for unfilled tags");
         _ = CheckForUnfilledTags();
 
         // Set up timer for every 30 seconds (30,000 milliseconds) for testing
