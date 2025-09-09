@@ -9,9 +9,15 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="mb-0">Notifications</h3>
-                <div class="d-flex align-items-center">
-                    <input type="date" class="form-control me-2" @bind="selectedDate" @bind:after="LoadRequiredTags" />
-                    <button class="btn btn-outline-primary" @onclick="RefreshNotifications">
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
+                        &lt;
+                    </button>
+                    <input type="date" class="form-control" @bind="selectedDate" @bind:after="LoadRequiredTags" />
+                    <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
+                        &gt;
+                    </button>
+                    <button class="btn btn-outline-primary ms-2" @onclick="RefreshNotifications">
                         <i class="bi bi-arrow-clockwise"></i>
                     </button>
                 </div>
@@ -214,5 +220,17 @@
     {
         errorMessage = error;
         await Task.CompletedTask;
+    }
+
+    private async Task PreviousDay()
+    {
+        selectedDate = selectedDate.AddDays(-1);
+        await LoadRequiredTags();
+    }
+
+    private async Task NextDay()
+    {
+        selectedDate = selectedDate.AddDays(1);
+        await LoadRequiredTags();
     }
 }
