@@ -1,5 +1,5 @@
 ﻿@inject NavigationManager Navigation
-@inject LogMyDay.App.Authentication.CredentialStore Store
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @using System.Reflection
 
@@ -79,10 +79,20 @@
         }
     }
 
-    private void Logout()
+    private async Task Logout()
     {
-        Store.Clear();
-        Navigation.NavigateTo("/login", forceLoad: true);
+        try
+        {
+            await AuthApi.LogoutAsync();
+        }
+        catch (Exception)
+        {
+            // Ignore logout errors - we'll redirect anyway
+        }
+        finally
+        {
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
     }
     
     private string GetAppVersion()

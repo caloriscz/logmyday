@@ -1,0 +1,104 @@
+@page "/register-first"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@inject IAuthApi AuthApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Create First Admin User</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Create First Admin User</h3>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+
+                    <EditForm Model="registerModel" OnValidSubmit="RegisterFirstAdmin">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <InputText id="email" class="form-control" @bind-Value="registerModel.Email" placeholder="admin@example.com" />
+                            <ValidationMessage For="() => registerModel.Email" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <InputText id="password" class="form-control" type="password" @bind-Value="registerModel.Password" placeholder="At least 10 characters" />
+                            <ValidationMessage For="() => registerModel.Password" />
+                            <div class="form-text">Password must be at least 10 characters long.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="displayName" class="form-label">Display Name (Optional)</label>
+                            <InputText id="displayName" class="form-control" @bind-Value="registerModel.DisplayName" placeholder="Your display name" />
+                            <ValidationMessage For="() => registerModel.DisplayName" />
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Creating Admin User...</span>
+                            }
+                            else
+                            {
+                                <span>Create Admin User</span>
+                            }
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterFirstModel registerModel = new();
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    private async Task RegisterFirstAdmin()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            var request = new RegisterFirstDto(
+                registerModel.Email ?? "",
+                registerModel.Password ?? "",
+                string.IsNullOrWhiteSpace(registerModel.DisplayName) ? null : registerModel.DisplayName
+            );
+
+            await AuthApi.RegisterFirstAdminAsync(request);
+            
+            await JSRuntime.InvokeVoidAsync("alert", "First admin user created successfully! You can now log in.");
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class RegisterFirstModel
+    {
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public string? DisplayName { get; set; }
+    }
+}

@@ -1,62 +1,55 @@
 ﻿@page "/login"
 @inject NavigationManager Navigation
-@inject LogMyDay.App.Authentication.CredentialStore Store
-@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<Login> Logger
 
 <PageTitle>Login</PageTitle>
 
 <div class="container d-flex justify-content-center align-items-center min-vh-100">
     <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
         <div class="card-body">
-            <h3 class="card-title text-center mb-4">Login</h3>
-            @if (errorMessage != null)
+            <h3 class="card-title text-center mb-4">Login to LogMyDay</h3>
+            @if (!string.IsNullOrEmpty(ErrorMessage))
             {
-                <div class="alert alert-danger text-center" role="alert">@errorMessage</div>
+                <div class="alert alert-danger text-center" role="alert">@ErrorMessage</div>
             }
-            <EditForm Model="loginModel" OnValidSubmit="OnLogin">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+            <form method="post" action="/api/auth/login-form">
                 <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    <InputText @bind-Value="loginModel.Username" class="form-control" autocomplete="username" />
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-control" name="email" autocomplete="username" placeholder="your-email@example.com" required />
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Password</label>
-                    <InputText @bind-Value="loginModel.Password" type="password" class="form-control" autocomplete="current-password" />
+                    <input type="password" class="form-control" name="password" autocomplete="current-password" placeholder="Your password" required />
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Login</button>
-            </EditForm>
+                <button type="submit" class="btn btn-primary w-100">
+                    <span>Login</span>
+                </button>
+            </form>
+            
+            <div class="text-center mt-3">
+                <a href="/forgot-password" class="text-decoration-none">Forgot Password?</a>
+            </div>
+
+            <div class="text-center mt-2">
+                <small class="text-muted">
+                    No admin user yet? <a href="/register-first" class="text-decoration-none">Create first admin</a>
+                </small>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    private LoginModel loginModel = new();
-    private string? errorMessage;
+    private string? ErrorMessage { get; set; }
 
-    public class LoginModel
+    protected override void OnInitialized()
     {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
-
-    private async Task OnLogin()
-    {
-        Store.Set(loginModel.Username, loginModel.Password);
-        
-        try
+        // Check for error message in query parameters
+        var uri = new Uri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("error", out var error))
         {
-            Navigation.NavigateTo("/");
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            errorMessage = "Invalid credentials. Please check your username and password.";
-            Store.Clear();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Unexpected error: {ex.Message}";
-            Store.Clear();
+            ErrorMessage = error.ToString();
         }
     }
 }

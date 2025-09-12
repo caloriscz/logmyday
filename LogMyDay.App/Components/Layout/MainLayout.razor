@@ -1,9 +1,11 @@
 ﻿@inherits LayoutComponentBase
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
-@inject LogMyDay.App.Authentication.CredentialStore Store
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
 @inject ILogger<MainLayout> Logger
 @implements IAsyncDisposable
@@ -14,8 +16,25 @@
         @Body
     </article>
 }
+else if (IsCheckingAuth)
+{
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Checking authentication...</p>
+        </div>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    // Redirect to login instead of showing error page
+    Navigation.NavigateTo("/login", true);
+}
 else
-{    <div class="page">
+{
+    <div class="page">
         <NavMenu />
         <main>
             <article class="content px-4">
@@ -195,24 +214,59 @@ else
     private InputSelect<int?>? primaryTagSelect;
 
     private bool IsLoginPage => Navigation.Uri.Contains("/login");
+    private bool IsAuthenticated { get; set; } = false;
+    private bool IsCheckingAuth { get; set; } = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         InitializeNewActivity();
+        
+        // Check authentication state if not on login page
+        if (!IsLoginPage)
+        {
+            await CheckAuthenticationState();
+        }
+        else
+        {
+            IsCheckingAuth = false;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !IsLoginPage)
+        if (firstRender && !IsLoginPage && IsAuthenticated)
         {
             await SetupKeyboardShortcuts();
             
-            // Load tags if we have credentials and haven't loaded them yet
-            if (Store.Get() != null && tags == null)
+            // Load tags if user is authenticated and haven't loaded them yet
+            if (tags == null)
             {
                 await LoadTags();
                 StateHasChanged();
             }
+        }
+    }
+
+    private async Task CheckAuthenticationState()
+    {
+        try
+        {
+            Logger.LogInformation("Checking authentication state in MainLayout");
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            IsAuthenticated = authState.User?.Identity?.IsAuthenticated == true;
+            
+            Logger.LogInformation("Authentication state: IsAuthenticated={IsAuthenticated}, User={User}", 
+                IsAuthenticated, authState.User?.Identity?.Name ?? "null");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking authentication state in MainLayout");
+            IsAuthenticated = false;
+        }
+        finally
+        {
+            IsCheckingAuth = false;
+            StateHasChanged();
         }
     }
 
@@ -462,16 +516,27 @@ if (window.layoutKeyboardHandler) {
 
     private async Task EnsureTagsLoaded()
     {
-        if (tags == null && !IsLoginPage && Store.Get() != null)
+        if (tags == null && !IsLoginPage && IsAuthenticated)
         {
             await LoadTags();
             StateHasChanged();
         }
     }
 
-    private void Logout()
+    private async Task Logout()
     {
-        Store.Clear();
-        Navigation.NavigateTo("/login", forceLoad: true);
+        try
+        {
+            await AuthApi.LogoutAsync();
+        }
+        catch (Exception)
+        {
+            // Ignore logout errors - we'll redirect anyway
+        }
+        finally
+        {
+            IsAuthenticated = false;
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
     }
 }

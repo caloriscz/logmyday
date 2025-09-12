@@ -1,11 +1,9 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Services;
-using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
-using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -25,7 +23,6 @@ builder.Host.UseSerilog();
 
 var services = builder.Services;
 
-services.Configure<BasicAuthOptions>(builder.Configuration.GetSection("Auth:Basic"));
 services.AddDbContext<LogMyDayDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -34,10 +31,84 @@ services.AddDbContext<LogMyDayDbContext>(options =>
 // Add memory cache for authentication tracking
 services.AddMemoryCache();
 
-services.AddAuthentication(BasicAuthConstants.Scheme).AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>(
-        BasicAuthConstants.Scheme, null);
+// Add HttpContextAccessor for Blazor components
+services.AddHttpContextAccessor();
 
-services.AddAuthorization();
+// Configure cookie authentication
+services.AddAuthentication("lmd-cookie")
+    .AddCookie("lmd-cookie", options =>
+    {
+        options.Cookie.Name = "lmd.auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+        options.LoginPath = "/login"; // Redirect to Blazor login page
+        options.LogoutPath = "/api/auth/logout";
+        options.AccessDeniedPath = "/access-denied";
+        options.Events.OnRedirectToLogin = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                // For API requests, return 401 instead of redirect
+                context.Response.StatusCode = 401;
+                return Task.CompletedTask;
+            }
+            // For regular requests, redirect to login
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                context.Response.StatusCode = 403;
+                return Task.CompletedTask;
+            }
+            context.Response.Redirect(context.RedirectUri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnSigningIn = context =>
+        {
+            Log.Information("Cookie authentication: User signing in - {Principal}", context.Principal?.Identity?.Name);
+            return Task.CompletedTask;
+        };
+        options.Events.OnSignedIn = context =>
+        {
+            Log.Information("Cookie authentication: User signed in successfully - {Principal}", context.Principal?.Identity?.Name);
+            return Task.CompletedTask;
+        };
+        options.Events.OnSigningOut = context =>
+        {
+            Log.Information("Cookie authentication: User signing out - {User}", context.HttpContext.User?.Identity?.Name);
+            return Task.CompletedTask;
+        };
+        options.Events.OnValidatePrincipal = context =>
+        {
+            Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}", 
+                context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
+            return Task.CompletedTask;
+        };
+    });
+
+// Add authorization with admin policy
+services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireClaim("is_admin", "true"));
+});
+
+// Configure CSRF protection
+services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "lmd.csrf";
+    options.Cookie.HttpOnly = false; // readable by client for double-submit pattern
+    options.HeaderName = "X-CSRF-Token";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
 
 // Configure rate limiting for brute-force protection
 services.AddRateLimiter(options =>
@@ -75,8 +146,14 @@ services.AddScoped<IActivityService, ActivityService>();
 services.AddScoped<ITagService, TagService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExcelExportService>();
-services.AddScoped<LogMyDay.Api.Authentication.AuthAttemptTracker>();
 
+// Authentication and user services
+services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();
+services.AddScoped<IUserService, UserService>();
+services.AddScoped<IAuthService, AuthService>();
+services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+
+// Keep existing credential store for Blazor Server
 services.AddSingleton<CredentialStore>();
 services.AddTransient<AuthenticationHeaderHandler>();
 
@@ -93,22 +170,56 @@ services.AddRefitClient<IActivityApi>()
     })
     .AddHttpMessageHandler<AuthenticationHeaderHandler>();
 
+// Add new authentication API clients
+services.AddRefitClient<IAuthApi>()
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    });
+
+services.AddRefitClient<IUsersApi>()
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    });
+
+services.AddRefitClient<IAccountApi>()
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    });
+
 
 services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "LogMyDay API",
-        Version = "v1"
+        Version = "v1",
+        Description = "LogMyDay API with Cookie Authentication"
     });
 
-    options.AddSecurityDefinition("basic", new OpenApiSecurityScheme
+    options.AddSecurityDefinition("cookie", new OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "basic",
-        In = ParameterLocation.Header,
-        Description = "Enter your username and password for Basic Authentication"
+        Name = "lmd.auth",
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Cookie,
+        Description = "Cookie-based authentication"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -119,7 +230,7 @@ services.AddSwaggerGen(options =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "basic"
+                    Id = "cookie"
                 }
             },
             Array.Empty<string>()
@@ -174,6 +285,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapRazorComponents<LogMyDay.App.Components.App>().AddInteractiveServerRenderMode();
+
+// Seed the database with initial admin user
+using (var scope = app.Services.CreateScope())
+{
+    var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+    await seeder.SeedAsync();
+}
 
 app.Run();
