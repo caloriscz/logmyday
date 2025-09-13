@@ -14,7 +14,7 @@ public class ActivityService : IActivityService
     public ActivityService(LogMyDayDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
-    }    public async Task<ActivityResponse> Create(ActivityRequest calendarRequest)
+    }    public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
     {
         // Get the tag to check if it's repeatable and what its time granularity is
         var tag = await _context.Tags.FindAsync(calendarRequest.PrimaryTagId);
@@ -26,7 +26,7 @@ public class ActivityService : IActivityService
         // Check if tag is not repeatable and there's already an activity for this time granularity
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
         {
-            if (await HasActivityForTimeGranularity(tag.Id, calendarRequest.DateStarted))
+            if (await HasActivityForTimeGranularity(tag.Id, calendarRequest.DateStarted, userId))
             {
                 throw new InvalidOperationException($"An activity for this tag already exists for the selected {tag.TimeGranularity.ToString().ToLower()} period. This tag is not repeatable.");
             }
@@ -39,7 +39,7 @@ public class ActivityService : IActivityService
             DateCreated = DateTime.UtcNow,
             Description = calendarRequest.Description,
             TagId = calendarRequest.PrimaryTagId ?? 0,
-
+            UserId = userId // Add user ID to associate activity with current user
         };
 
         _context.Activities.Add(activity);
@@ -54,9 +54,11 @@ public class ActivityService : IActivityService
         return MapToResponse(activity);
     }
 
-    public async Task<bool> Delete(int id)
+    public async Task<bool> Delete(int id, Guid userId)
     {
-        var activity = await _context.Activities.FindAsync(id);
+        var activity = await _context.Activities
+            .Where(a => a.Id == id && a.UserId == userId)
+            .FirstOrDefaultAsync();
         if (activity == null)
         {
             return false;
@@ -66,19 +68,21 @@ public class ActivityService : IActivityService
         return true;
     }
 
-    public async Task<List<ActivityResponse>> GetAll()
+    public async Task<List<ActivityResponse>> GetAll(Guid userId)
     {
         var activities = await _context.Activities
                .Include(ct => ct.Tag)
                .ThenInclude(t => t.InputType)
+               .Where(a => a.UserId == userId)
                .ToListAsync();
 
         return activities.Select(MapToResponse).ToList();
-    }    public async Task<PagedResult<ActivityResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }    public async Task<PagedResult<ActivityResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
             .ThenInclude(t => t.InputType)
+            .Where(a => a.UserId == userId)
             .AsQueryable();
 
         if (tagId.HasValue)
@@ -120,11 +124,12 @@ public class ActivityService : IActivityService
             PageNumber = pageNumber,
             PageSize = pageSize
         };
-    }    public async Task<PagedResult<ActivityResponse>> GetPagedByWeeks(int weekPageNumber, int weeksPerPage, string orderBy, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }    public async Task<PagedResult<ActivityResponse>> GetPagedByWeeks(int weekPageNumber, int weeksPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
             .ThenInclude(t => t.InputType)
+            .Where(a => a.UserId == userId)
             .AsQueryable();
 
         if (tagId.HasValue)
@@ -196,11 +201,12 @@ public class ActivityService : IActivityService
             PageNumber = weekPageNumber,
             PageSize = weeksPerPage
         };
-    }    public async Task<PagedResult<ActivityResponse>> GetPagedByMonths(int monthPageNumber, int monthsPerPage, string orderBy, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }    public async Task<PagedResult<ActivityResponse>> GetPagedByMonths(int monthPageNumber, int monthsPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
             .ThenInclude(t => t.InputType)
+            .Where(a => a.UserId == userId)
             .AsQueryable();
 
         if (tagId.HasValue)
@@ -272,23 +278,24 @@ public class ActivityService : IActivityService
             PageNumber = monthPageNumber,
             PageSize = monthsPerPage
         };
-    }    public Task<List<ActivityResponse>> GetByDate(ActivityRequest request)
+    }    public Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId)
     {
         throw new NotImplementedException();
     }
 
-    public async Task<ActivityResponse> GetById(int id)
+    public async Task<ActivityResponse> GetById(int id, Guid userId)
     {
         var activity = await _context.Activities
                       .Include(ct => ct.Tag)
                       .ThenInclude(t => t.InputType)
-                      .SingleOrDefaultAsync(c => c.Id == id)
+                      .Where(a => a.Id == id && a.UserId == userId)
+                      .SingleOrDefaultAsync()
                       ?? throw new KeyNotFoundException("Activity not found");
 
         return MapToResponse(activity);
     }
 
-    public Task<ActivityResponse> Update(int id, DateTime dateCreated, DateTime? dateFinished)
+    public Task<ActivityResponse> Update(int id, DateTime dateCreated, DateTime? dateFinished, Guid userId)
     {
         throw new NotImplementedException();
     }    private ActivityResponse MapToResponse(Activity calendar)
@@ -316,7 +323,7 @@ public class ActivityService : IActivityService
         return date.AddDays(-1 * diff).Date;
     }
 
-    public async Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted)
+    public async Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted, Guid userId)
     {
         var tag = await _context.Tags.FindAsync(tagId);
         if (tag == null || tag.TimeGranularity == TimeGranularity.Exact)
@@ -355,11 +362,11 @@ public class ActivityService : IActivityService
 
         // Check if there's already an activity for this tag in the specified range
         return await _context.Activities
-            .Where(a => a.TagId == tagId && a.DateStarted >= startRange && a.DateStarted <= endRange)
+            .Where(a => a.TagId == tagId && a.UserId == userId && a.DateStarted >= startRange && a.DateStarted <= endRange)
             .AnyAsync();
     }
 
-    public async Task<List<ActivityResponse>> GetByYear(int year, int? tagId = null)
+    public async Task<List<ActivityResponse>> GetByYear(int year, Guid userId, int? tagId = null)
     {
         var startDate = new DateTime(year, 1, 1);
         var endDate = new DateTime(year + 1, 1, 1);
@@ -367,7 +374,7 @@ public class ActivityService : IActivityService
         var query = _context.Activities
             .Include(a => a.Tag)
             .ThenInclude(t => t.InputType)
-            .Where(a => a.DateStarted >= startDate && a.DateStarted < endDate);
+            .Where(a => a.UserId == userId && a.DateStarted >= startDate && a.DateStarted < endDate);
 
         if (tagId.HasValue)
         {
@@ -394,9 +401,11 @@ public class ActivityService : IActivityService
         }).ToList();
     }
 
-    public async Task<List<int>> GetAvailableYears(int? tagId = null)
+    public async Task<List<int>> GetAvailableYears(Guid userId, int? tagId = null)
     {
-        var query = _context.Activities.AsQueryable();
+        var query = _context.Activities
+            .Where(a => a.UserId == userId)
+            .AsQueryable();
 
         if (tagId.HasValue)
         {
@@ -412,14 +421,14 @@ public class ActivityService : IActivityService
         return years;
     }
 
-    public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date)
+    public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId)
     {
         var startOfDay = date.Date;
         var endOfDay = date.Date.AddDays(1).AddTicks(-1);
 
-        // Get all required tags with Daily granularity
+        // Get all required tags with Daily granularity for this user
         var requiredDailyTags = await _context.Tags
-            .Where(t => t.IsRequired && t.TimeGranularity == TimeGranularity.Daily)
+            .Where(t => t.UserId == userId && t.IsRequired && t.TimeGranularity == TimeGranularity.Daily)
             .Include(t => t.InputType)
             .ToListAsync();
 
@@ -429,7 +438,7 @@ public class ActivityService : IActivityService
         foreach (var tag in requiredDailyTags)
         {
             var hasActivity = await _context.Activities
-                .Where(a => a.TagId == tag.Id && a.DateStarted >= startOfDay && a.DateStarted <= endOfDay)
+                .Where(a => a.UserId == userId && a.TagId == tag.Id && a.DateStarted >= startOfDay && a.DateStarted <= endOfDay)
                 .AnyAsync();
 
             if (!hasActivity)

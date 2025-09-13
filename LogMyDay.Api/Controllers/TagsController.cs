@@ -13,13 +13,13 @@ namespace LogMyDay.Api.Controllers;
 [Authorize(AuthenticationSchemes = "lmd-cookie")]
 [ApiController]
 [Route("api/[controller]")]
-public class TagsController : ControllerBase
+public class TagsController : BaseApiController
 {
     private readonly ITagService _tagService;
     private readonly ILogger<TagsController> _logger;
     private readonly LogMyDayDbContext _context;
 
-    public TagsController(ITagService tagsService, ILogger<TagsController> logger, LogMyDayDbContext context)
+    public TagsController(ITagService tagsService, ILogger<TagsController> logger, LogMyDayDbContext context, IAuthService authService) : base(authService)
     {
         _tagService = tagsService;
         _logger = logger;
@@ -43,7 +43,8 @@ public class TagsController : ControllerBase
             }
 
             _logger.LogInformation("Creating tag with data: {@TagRequest}", model);
-            return Ok(await _tagService.Create(model));
+            var userId = GetCurrentUserId();
+            return Ok(await _tagService.Create(model, userId));
         }
         catch (Exception ex)
         {
@@ -63,7 +64,8 @@ public class TagsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, TagRequest model)
     {
-        await _tagService.Update(id, model);
+        var userId = GetCurrentUserId();
+        await _tagService.Update(id, model, userId);
 
         return NoContent();
     }
@@ -75,7 +77,8 @@ public class TagsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        return Ok(await _tagService.GetAll());
+        var userId = GetCurrentUserId();
+        return Ok(await _tagService.GetAll(userId));
     }
 
     /// <summary>
@@ -84,7 +87,8 @@ public class TagsController : ControllerBase
     [HttpGet("paged")]
     public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] string orderBy = "asc", [FromQuery] string? filter = null, [FromQuery] string? filterType = null)
     {
-        return Ok(await _tagService.GetPaged(pageNumber, pageSize, orderBy, filter, filterType));
+        var userId = GetCurrentUserId();
+        return Ok(await _tagService.GetPaged(pageNumber, pageSize, orderBy, userId, filter, filterType));
     }
 
     /// <summary>
@@ -95,7 +99,8 @@ public class TagsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetTagById(int id)
     {
-        return Ok(await _tagService.GetTagById(id));
+        var userId = GetCurrentUserId();
+        return Ok(await _tagService.GetTagById(id, userId));
     }
 
     /// <summary>
@@ -105,7 +110,8 @@ public class TagsController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        await _tagService.Delete(id);
+        var userId = GetCurrentUserId();
+        await _tagService.Delete(id, userId);
         return NoContent();
     }
 

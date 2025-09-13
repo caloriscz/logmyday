@@ -19,7 +19,7 @@ public class TagService : ITagService
         _logger = logger;
     }
     
-    public async Task<int> Create(TagRequest createTagRequest)
+    public async Task<int> Create(TagRequest createTagRequest, Guid userId)
     {
         _logger.LogInformation("Creating tag with request: {@CreateTagRequest}", createTagRequest);
 
@@ -30,7 +30,8 @@ public class TagService : ITagService
             IsRequired = createTagRequest.IsRequired, // Map IsRequired
             IsRepeatable = createTagRequest.IsRepeatable,
             TimeGranularity = createTagRequest.TimeGranularity,
-            IsRange = createTagRequest.IsRange
+            IsRange = createTagRequest.IsRange,
+            UserId = userId // Associate tag with current user
         };
 
         _logger.LogInformation("Created tag entity: {@Tag}", tag);
@@ -41,9 +42,12 @@ public class TagService : ITagService
         return tag.Id;
     }
 
-    public async Task<IList<TagResponse>> GetAll()
+    public async Task<IList<TagResponse>> GetAll(Guid userId)
     {
-        var tags = await _context.Tags.OrderBy(x => x.TagName).ToListAsync(); var tagsResponse = tags.Select(tag => new TagResponse
+        var tags = await _context.Tags
+            .Where(t => t.UserId == userId)
+            .OrderBy(x => x.TagName)
+            .ToListAsync(); var tagsResponse = tags.Select(tag => new TagResponse
         {
             Id = tag.Id,
             Title = tag.TagName,
@@ -65,9 +69,18 @@ public class TagService : ITagService
     /// <param name="model"></param>
     /// <returns></returns>
     /// <exception cref="AppException"></exception>
-    public async Task Update(int id, TagRequest model)
+    public async Task Update(int id, TagRequest model, Guid userId)
     {
-        var tag = await _context.Tags.FindAsync(id); tag.TagName = model.Tag;
+        var tag = await _context.Tags
+            .Where(t => t.Id == id && t.UserId == userId)
+            .FirstOrDefaultAsync();
+        
+        if (tag == null)
+        {
+            throw new KeyNotFoundException("Tag not found");
+        }
+        
+        tag.TagName = model.Tag;
         tag.InputTypeId = model.TypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
         tag.IsRepeatable = model.IsRepeatable;
@@ -82,9 +95,11 @@ public class TagService : ITagService
     /// Delete tag by its id
     /// </summary>
     /// <param name="id"></param>
-    public async Task Delete(int id)
+    public async Task Delete(int id, Guid userId)
     {
-        Tag? link = await _context.Tags.SingleOrDefaultAsync(x => x.Id == id);
+        Tag? link = await _context.Tags
+            .Where(t => t.Id == id && t.UserId == userId)
+            .SingleOrDefaultAsync();
 
         if (link != null)
         {
@@ -98,9 +113,18 @@ public class TagService : ITagService
     /// </summary>
     /// <param name="tagId"></param>
     /// <returns></returns>
-    public async Task<TagResponse> GetTagById(int tagId)
+    public async Task<TagResponse> GetTagById(int tagId, Guid userId)
     {
-        Tag? tagResponse = await _context.Tags.FindAsync(tagId); TagResponse response = new()
+        Tag? tagResponse = await _context.Tags
+            .Where(t => t.Id == tagId && t.UserId == userId)
+            .FirstOrDefaultAsync();
+            
+        if (tagResponse == null)
+        {
+            throw new KeyNotFoundException("Tag not found");
+        }
+        
+        TagResponse response = new()
         {
             Id = tagResponse.Id,
             Title = tagResponse.TagName,
@@ -124,9 +148,11 @@ public class TagService : ITagService
     /// <param name="filter"></param>
     /// <param name="filterType"></param>
     /// <returns></returns>
-    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, string? filter = null, string? filterType = null)
+    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null)
     {
-        var query = _context.Tags.AsQueryable();
+        var query = _context.Tags
+            .Where(t => t.UserId == userId)
+            .AsQueryable();
         if (!string.IsNullOrWhiteSpace(filter))
         {
             if (filterType == "exact")
