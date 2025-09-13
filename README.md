@@ -46,3 +46,20 @@ dotnet ef database update --project LogMyDay.Api --startup-project LogMyDay.App
 ```
 dotnet ef migrations script --project LogMyDay.Api --startup-project LogMyDay.App --output InitialCreate.sql
 ```
+
+## Documentation
+
+Comprehensive documentation is available in the `.github/instructions/` folder:
+
+- **[Project Instructions](.github/instructions/instructions.md.instructions.md)**: Complete project structure, architecture, and development guidelines
+- **[Authentication System Fix](.github/instructions/authentication-system-fix-sep-2025.md)**: Details about the September 2025 authentication system fix for Blazor Server
+- **Security Architecture**: Cookie-based authentication for Blazor Server, Basic Auth for mobile
+- **Development Guidelines**: Build processes, testing workflows, and coding standards
+
+## Recent Updates
+
+### September 2025 - Authentication System Fix
+- **Fixed**: Blazor Server authentication loop issue where login would redirect back to login page
+- **Solution**: Implemented `CookieAuthenticationHandler` to forward authentication cookies to API requests
+- **Impact**: Main authentication functionality now works correctly for web application
+- **Status**: Mobile app requires review for compatibility (next conversation)

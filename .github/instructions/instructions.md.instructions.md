@@ -157,16 +157,19 @@ LogMyDay features an intelligent notification system that reminds users about un
 
 ## Security
 
-### Client Applications & HTTP Architecture (UPDATED – Aug 2025 Refactor)
+### Client Applications & HTTP Architecture (UPDATED – Sep 2025 Authentication Fix)
 
 There are now TWO distinct client patterns:
 
-1. Blazor Server (`LogMyDay.App`)
-  - Uses `CredentialStore` (singleton) storing credentials in memory only for the active SignalR circuit.
-  - A typed Refit client is registered at startup with a fixed `BaseAddress` from configuration.
-  - Credentials are injected per request via `AuthenticationHeaderHandler` (no mutation of `HttpClient.BaseAddress`).
+1. Blazor Server (`LogMyDay.App`) - **FIXED Sep 2025**
+  - Uses cookie-based authentication with "lmd-cookie" scheme instead of Basic Auth
+  - **NEW**: `CookieAuthenticationHandler` - DelegatingHandler that forwards authentication cookies from HttpContext to API requests
+  - All Refit clients (`IActivityApi`, `IAuthApi`, `IUsersApi`, `IAccountApi`) configured with `CookieAuthenticationHandler` 
+  - Credentials managed server-side in memory only for the active SignalR circuit
+  - **RESOLVED**: Fixed authentication loop where login would redirect back to login page due to missing cookie forwarding
+  - Security: No localStorage/sessionStorage usage – authentication state only in server memory
 
-2. MAUI Mobile (`LogMyDay.App.Mobile`)
+2. MAUI Mobile (`LogMyDay.App.Mobile`) - **NEEDS REVIEW**
   - Users enter server URL + credentials at login.
   - We DO NOT mutate an existing `HttpClient` after first use (avoids `net_http_operation_started`).
   - Components:
@@ -180,6 +183,10 @@ There are now TWO distinct client patterns:
 ### Deprecated (Mobile)
 - `ServerConfigurationService`: Replaced by `ApiContext` + `ApiClientProvider` + `DynamicAuthHandler`.
 - `AuthenticationHeaderHandler` (mobile variant): Replaced by `DynamicAuthHandler` (context-aware).
+
+### Deprecated (Blazor Server) - **UPDATED Sep 2025**
+- `AuthenticationHeaderHandler` (Blazor Server variant): Replaced by `CookieAuthenticationHandler` for cookie-based authentication
+- Basic Auth pattern: Replaced with cookie authentication using "lmd-cookie" scheme
 
 Remove any new code that attempts to mutate `HttpClient.BaseAddress` or `DefaultRequestHeaders` after requests have been issued. Always build a new client via `IHttpClientFactory` when the server context changes.
 
@@ -195,9 +202,11 @@ LogMyDay uses patterns suited to each runtime to protect user credentials and re
 - Username/server URL persisted in `Preferences` for UX – safe without password.
 - Future: optionally move password to secure platform storage (e.g., `SecureStorage`) – not yet implemented.
 
-#### Implementation Details (Blazor Server)
-- `CredentialStore` singleton
-- `AuthenticationHeaderHandler` sets Basic auth header per request
+#### Implementation Details (Blazor Server) - **UPDATED Sep 2025**
+- Cookie-based authentication using "lmd-cookie" scheme
+- `CookieAuthenticationHandler` - DelegatingHandler that forwards authentication cookies from HttpContext to Refit clients
+- All API requests automatically include authentication cookies from the current user session
+- No credential storage required - authentication state managed by ASP.NET Core cookie authentication
 
 #### Implementation Details (Mobile)
 - `ApiContext` + `DynamicAuthHandler` + `ApiClientProvider`
@@ -304,6 +313,9 @@ Production settings (stricter security):
 ### Recent Refactor Summary (Aug-Sep 2025)
 | Area | Before | After |
 |------|--------|-------|
+| Blazor Server Authentication | Basic Auth with AuthenticationHeaderHandler | Cookie-based authentication with CookieAuthenticationHandler |
+| Authentication Loop Issue | Login redirects back to login due to missing cookie forwarding | Fixed: Cookies automatically forwarded to API calls |
+| Refit Client Configuration | Static configuration without authentication handling | All clients configured with CookieAuthenticationHandler |
 | Mobile server selection | Mutated singleton HttpClient (`BaseAddress`, headers) | `ApiContext` + new client instances via factory |
 | Auth header (mobile) | Handler reading `Preferences` every request | Handler reads in-memory context (no password persistence) |
 | Logout failure | Phantom call to invalid host (e.g., 0.0.0.1) + HttpClient mutation exception | Clean context clear; no mutation exceptions |
@@ -319,6 +331,14 @@ Production settings (stricter security):
 ### Migration Cleanup Tasks
 - Remove any lingering references to `ServerConfigurationService` when no longer used.
 - Delete obsolete mobile `AuthenticationHeaderHandler` after ensuring all code uses `DynamicAuthHandler`.
+- **Blazor Server**: Remove old `CredentialStore` and `AuthenticationHeaderHandler` references once cookie authentication is fully verified.
+
+### Validation Checklist (Blazor Server) - **NEW Sep 2025**
+- Cookie authentication scheme ("lmd-cookie") configured correctly
+- `CookieAuthenticationHandler` registered and configured with all Refit clients
+- Login/logout flow works without redirect loops
+- API calls automatically include authentication cookies
+- No credential storage in browser localStorage/sessionStorage
 
 ### Validation Checklist (Mobile Login)
 - URL is absolute & HTTPS.

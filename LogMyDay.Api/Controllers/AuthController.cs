@@ -113,56 +113,60 @@ public class AuthController : ControllerBase
     {
         try
         {
+            _logger.LogInformation("=== LOGIN FORM ATTEMPT START ===");
             _logger.LogInformation("Form login attempt for email: {Email}", email);
+            _logger.LogInformation("Request URL: {RequestPath}", HttpContext.Request.Path);
+            _logger.LogInformation("Request Method: {RequestMethod}", HttpContext.Request.Method);
+            _logger.LogInformation("Request Headers: {Headers}", string.Join(", ", HttpContext.Request.Headers.Select(h => $"{h.Key}={h.Value}")));
             
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
             {
                 _logger.LogWarning("Form login attempt with missing credentials for email: {Email}", email);
+                _logger.LogInformation("=== LOGIN FORM ATTEMPT END (Missing Credentials) ===");
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            _logger.LogInformation("Looking up user with email: {Email}", email);
             var user = await _userService.FindByEmailAsync(email, cancellationToken);
             if (user == null)
             {
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
+                _logger.LogInformation("=== LOGIN FORM ATTEMPT END (User Not Found) ===");
                 return Redirect("/login?error=Invalid email or password");
             }
             
+            _logger.LogInformation("User found: {UserId}, verifying password", user.Id);
             if (!_passwordHasher.Verify(password, user.PasswordHash))
             {
                 _logger.LogWarning("Form login attempt with invalid password for email: {Email}", email);
+                _logger.LogInformation("=== LOGIN FORM ATTEMPT END (Invalid Password) ===");
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            _logger.LogInformation("Password verified successfully for User {UserId} ({Email})", user.Id, user.Email);
             _logger.LogInformation("User {UserId} ({Email}) authenticated successfully via form, signing in...", user.Id, user.Email);
             
             // Log cookie settings before sign in
             _logger.LogInformation("Cookie authentication settings: Scheme=lmd-cookie, Path={Path}, Domain={Domain}", 
                 HttpContext.Request.PathBase, HttpContext.Request.Host.Host);
             
+            _logger.LogInformation("Calling AuthService.SignInAsync...");
             await _authService.SignInAsync(HttpContext, user);
-            
-            // Check if authentication was successful
-            var isAuthenticated = HttpContext.User?.Identity?.IsAuthenticated == true;
-            _logger.LogInformation("User {UserId} ({Email}) sign in complete. IsAuthenticated: {IsAuthenticated}, User: {UserName}", 
-                user.Id, user.Email, isAuthenticated, HttpContext.User?.Identity?.Name ?? "null");
+            _logger.LogInformation("AuthService.SignInAsync completed successfully");
             
             // Log cookie information
             var setCookieHeader = HttpContext.Response.Headers["Set-Cookie"].FirstOrDefault();
             _logger.LogInformation("Set-Cookie header: {CookieHeader}", setCookieHeader ?? "No cookie set");
-            
-            if (!isAuthenticated)
-            {
-                _logger.LogError("Authentication failed even after successful sign in for user {UserId} ({Email})", user.Id, user.Email);
-                return Redirect("/login?error=Authentication system error");
-            }
+            _logger.LogInformation("Response status code: {StatusCode}", HttpContext.Response.StatusCode);
             
             _logger.LogInformation("User {UserId} ({Email}) signed in successfully, redirecting to home", user.Id, user.Email);
+            _logger.LogInformation("=== LOGIN FORM ATTEMPT END (Success - Redirecting to /) ===");
             return Redirect("/");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during form login for email: {Email}", email);
+            _logger.LogInformation("=== LOGIN FORM ATTEMPT END (Exception) ===");
             return Redirect("/login?error=An error occurred during login");
         }
     }

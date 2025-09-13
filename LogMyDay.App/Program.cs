@@ -3,6 +3,7 @@ using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
+using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -153,10 +154,11 @@ services.AddScoped<IUserService, UserService>();
 services.AddScoped<IAuthService, AuthService>();
 services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
 
-// Keep existing credential store for Blazor Server
+// Keep existing credential store for Blazor Server (for backwards compatibility)
 services.AddSingleton<CredentialStore>();
-services.AddTransient<AuthenticationHeaderHandler>();
 
+// Register the cookie authentication handler for forwarding cookies to API calls
+services.AddScoped<CookieAuthenticationHandler>();
 
 services.AddRefitClient<IActivityApi>()
     .ConfigureHttpClient(c =>
@@ -168,7 +170,7 @@ services.AddRefitClient<IActivityApi>()
         }
         c.BaseAddress = new Uri(baseAddress);
     })
-    .AddHttpMessageHandler<AuthenticationHeaderHandler>();
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 // Add new authentication API clients
 services.AddRefitClient<IAuthApi>()
@@ -180,7 +182,8 @@ services.AddRefitClient<IAuthApi>()
             throw new InvalidOperationException("API base address is not configured.");
         }
         c.BaseAddress = new Uri(baseAddress);
-    });
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 services.AddRefitClient<IUsersApi>()
     .ConfigureHttpClient(c =>
@@ -191,7 +194,8 @@ services.AddRefitClient<IUsersApi>()
             throw new InvalidOperationException("API base address is not configured.");
         }
         c.BaseAddress = new Uri(baseAddress);
-    });
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 services.AddRefitClient<IAccountApi>()
     .ConfigureHttpClient(c =>
@@ -202,7 +206,8 @@ services.AddRefitClient<IAccountApi>()
             throw new InvalidOperationException("API base address is not configured.");
         }
         c.BaseAddress = new Uri(baseAddress);
-    });
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 
 services.AddSwaggerGen(options =>
@@ -257,6 +262,33 @@ else
 // Force HTTPS redirection for all environments
 app.UseHttpsRedirection();
 
+// Add comprehensive request logging middleware
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("=== HTTP REQUEST ===");
+    logger.LogInformation("Method: {Method}", context.Request.Method);
+    logger.LogInformation("Path: {Path}", context.Request.Path);
+    logger.LogInformation("QueryString: {QueryString}", context.Request.QueryString);
+    logger.LogInformation("Headers: {Headers}", string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
+    
+    if (context.Request.HasFormContentType && context.Request.Method == "POST")
+    {
+        // Read form data for POST requests
+        var form = await context.Request.ReadFormAsync();
+        logger.LogInformation("Form Data: {FormData}", string.Join(", ", form.Select(f => $"{f.Key}={f.Value}")));
+    }
+    
+    logger.LogInformation("User Authenticated: {IsAuthenticated}", context.User?.Identity?.IsAuthenticated);
+    logger.LogInformation("User Name: {UserName}", context.User?.Identity?.Name ?? "null");
+    
+    await next();
+    
+    logger.LogInformation("Response Status: {StatusCode}", context.Response.StatusCode);
+    logger.LogInformation("Response Headers: {ResponseHeaders}", string.Join(", ", context.Response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
+    logger.LogInformation("=== HTTP REQUEST END ===");
+});
+
 // Enable rate limiting
 app.UseRateLimiter();
 
@@ -285,7 +317,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapRazorComponents<LogMyDay.App.Components.App>().AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 // Seed the database with initial admin user
 using (var scope = app.Services.CreateScope())

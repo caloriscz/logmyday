@@ -12,7 +12,7 @@
             {
                 <div class="alert alert-danger text-center" role="alert">@ErrorMessage</div>
             }
-            <form method="post" action="/api/auth/login-form">
+            <form method="post" action="/api/auth/login-form" onsubmit="console.log('Form submitted to /api/auth/login-form'); return true;">
                 <div class="mb-3">
                     <label class="form-label">Email Address</label>
                     <input type="email" class="form-control" name="email" autocomplete="username" placeholder="your-email@example.com" required />
@@ -44,12 +44,21 @@
 
     protected override void OnInitialized()
     {
+        Logger.LogInformation("Login.OnInitialized: Starting login page initialization. Current URL: {Url}", Navigation.Uri);
+        
         // Check for error message in query parameters
         var uri = new Uri(Navigation.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
         if (query.TryGetValue("error", out var error))
         {
             ErrorMessage = error.ToString();
+            Logger.LogWarning("Login.OnInitialized: Error message found in query parameters: {ErrorMessage}", ErrorMessage);
         }
+        else
+        {
+            Logger.LogInformation("Login.OnInitialized: No error message in query parameters");
+        }
+        
+        Logger.LogInformation("Login.OnInitialized: Login page initialization completed");
     }
 }

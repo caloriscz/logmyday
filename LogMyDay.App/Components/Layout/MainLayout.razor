@@ -12,12 +12,14 @@
 
 @if (IsLoginPage)
 {
+    Logger.LogInformation("MainLayout: Rendering login page. Current URL: {Url}", Navigation.Uri);
     <article class="content px-4">
         @Body
     </article>
 }
 else if (IsCheckingAuth)
 {
+    Logger.LogInformation("MainLayout: Checking authentication state. Current URL: {Url}", Navigation.Uri);
     <div class="container d-flex justify-content-center align-items-center min-vh-100">
         <div class="text-center">
             <div class="spinner-border text-primary" role="status">
@@ -29,11 +31,13 @@ else if (IsCheckingAuth)
 }
 else if (!IsAuthenticated)
 {
+    Logger.LogWarning("MainLayout: User not authenticated, redirecting to login. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
     // Redirect to login instead of showing error page
     Navigation.NavigateTo("/login", true);
 }
 else
 {
+    Logger.LogInformation("MainLayout: User authenticated, rendering main app. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
     <div class="page">
         <NavMenu />
         <main>
@@ -213,23 +217,49 @@ else
     private bool keyboardListenerAdded = false;
     private InputSelect<int?>? primaryTagSelect;
 
-    private bool IsLoginPage => Navigation.Uri.Contains("/login");
+    private bool IsLoginPage 
+    {
+        get
+        {
+            var isLogin = Navigation.Uri.Contains("/login");
+            Logger.LogDebug("MainLayout.IsLoginPage: URL='{Url}', IsLoginPage={IsLoginPage}", Navigation.Uri, isLogin);
+            return isLogin;
+        }
+    }
     private bool IsAuthenticated { get; set; } = false;
     private bool IsCheckingAuth { get; set; } = true;
 
     protected override async Task OnInitializedAsync()
     {
+        Logger.LogInformation("MainLayout.OnInitializedAsync: Starting initialization. Current URL: {Url}", Navigation.Uri);
+        
         InitializeNewActivity();
         
         // Check authentication state if not on login page
         if (!IsLoginPage)
         {
+            Logger.LogInformation("MainLayout.OnInitializedAsync: Not on login page, checking authentication state. URL: {Url}", Navigation.Uri);
+            
+            // Check if this is a redirect from login (URL contains no query parameters and is just "/")
+            var uri = new Uri(Navigation.Uri);
+            var isLoginRedirect = uri.PathAndQuery == "/" || (uri.LocalPath == "/" && string.IsNullOrEmpty(uri.Query));
+            
+            if (isLoginRedirect)
+            {
+                Logger.LogInformation("MainLayout.OnInitializedAsync: Detected potential login redirect, giving extra time for auth state");
+                // Give more time for authentication state to be processed after login redirect
+                await Task.Delay(250);
+            }
+            
             await CheckAuthenticationState();
         }
         else
         {
+            Logger.LogInformation("MainLayout.OnInitializedAsync: On login page, skipping authentication check. URL: {Url}", Navigation.Uri);
             IsCheckingAuth = false;
         }
+        
+        Logger.LogInformation("MainLayout.OnInitializedAsync: Completed initialization. IsAuthenticated: {IsAuthenticated}, IsCheckingAuth: {IsCheckingAuth}", IsAuthenticated, IsCheckingAuth);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -252,11 +282,28 @@ else
         try
         {
             Logger.LogInformation("Checking authentication state in MainLayout");
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            IsAuthenticated = authState.User?.Identity?.IsAuthenticated == true;
             
-            Logger.LogInformation("Authentication state: IsAuthenticated={IsAuthenticated}, User={User}", 
-                IsAuthenticated, authState.User?.Identity?.Name ?? "null");
+            // Try up to 3 times with a small delay to handle timing issues after login
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                IsAuthenticated = authState.User?.Identity?.IsAuthenticated == true;
+                
+                Logger.LogInformation("Authentication state check (attempt {Attempt}): IsAuthenticated={IsAuthenticated}, User={User}", 
+                    attempt, IsAuthenticated, authState.User?.Identity?.Name ?? "null");
+                
+                // If authenticated, break out of retry loop
+                if (IsAuthenticated)
+                {
+                    break;
+                }
+                
+                // If not authenticated and this isn't the last attempt, wait and retry
+                if (attempt < 3)
+                {
+                    await Task.Delay(100); // Small delay to allow cookie processing
+                }
+            }
         }
         catch (Exception ex)
         {
