@@ -63,3 +63,9 @@ Comprehensive documentation is available in the `.github/instructions/` folder:
 - **Solution**: Implemented `CookieAuthenticationHandler` to forward authentication cookies to API requests
 - **Impact**: Main authentication functionality now works correctly for web application
 - **Status**: Mobile app requires review for compatibility (next conversation)
+
+### September 2025 - Backup & Restore Fix
+- **Fixed**: Backup restore process assigned `null` UserID to restored entities (Activities, Tags).
+- **Root Cause**: The Blazor UI called the `BackupService` directly, bypassing the HTTP request pipeline that provides the authenticated user's context. The service call was missing the `userId`.
+- **Solution**: Modified the `Backup.razor` component to inject `IAuthApi`, retrieve the current authenticated user's ID, and pass it to the `ImportDataAsync` service method. This ensures all restored data is correctly associated with the user.
+- **Impact**: Backup and restore functionality now correctly handles user-specific data scoping.

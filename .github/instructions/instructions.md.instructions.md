@@ -231,7 +231,7 @@ LogMyDay uses patterns suited to each runtime to protect user credentials and re
 - Cookie-based authentication using "lmd-cookie" scheme
 - `CookieAuthenticationHandler` - DelegatingHandler that forwards authentication cookies from HttpContext to Refit clients
 - All API requests automatically include authentication cookies from the current user session
-- No credential storage required - authentication state managed by ASP.NET Core cookie authentication
+- No credential storage in browser localStorage/sessionStorage
 
 #### Implementation Details (Mobile)
 - `ApiContext` + `DynamicAuthHandler` + `ApiClientProvider`
@@ -400,6 +400,31 @@ LogMyDay.App now features a comprehensive modal-based activity creation system t
 - **User Experience**: Context preservation and automatic refresh functionality
 
 This system transforms activity creation from a complex multi-page process into a streamlined, single-modal experience that works consistently across desktop and mobile devices.
+
+### Backup & Restore System (Blazor Server) - **NEW Sep 2025**
+
+A critical bug was identified and fixed in the backup and restore functionality for the Blazor Server application.
+
+#### The Problem
+When a user performed a data import from a backup file, the restored entities (`Activities`, `Tags`, etc.) were created with a `null` `UserId`. This broke the multi-user data separation, as the imported data was not associated with the user who initiated the restore.
+
+#### Root Cause Analysis
+The issue stemmed from the architecture of the Blazor Server UI. The `Backup.razor` component was using dependency injection to call the `IBackupService` directly on the server.
+
+- **Incorrect Path**: `Backup.razor` -> `@inject IBackupService` -> `BackupService.ImportDataAsync(data, clear)`
+- **Missing Context**: This direct service call completely bypassed the ASP.NET Core HTTP pipeline. As a result, the `HttpContext` containing the user's authentication cookie and claims was not available to the service.
+- **Flawed Logic**: The `ImportDataAsync` method had an optional `userId` parameter that was `null` in this scenario. The service's logic (`userId ?? entity.UserId`) failed because the `userId` from the service was `null` and the `UserId` from the backup file could also be `null` or incorrect.
+
+#### The Solution
+The fix involved modifying the Blazor component to explicitly fetch the user's identity and pass it down to the service layer.
+
+1.  **Inject `IAuthApi`**: The `Backup.razor` component was modified to inject the `IAuthApi` Refit client.
+2.  **Fetch Current User**: Before calling the import method, the component now makes an API call to `AuthApi.GetCurrentUserAsync()` to retrieve the details of the authenticated user. This call goes through the proper HTTP pipeline, so it is successfully authenticated.
+3.  **Pass UserID to Service**: The authenticated `userId` is then explicitly passed to the `BackupService.ImportDataAsync(data, clear, userId)` method.
+
+- **Corrected Path**: `Backup.razor` -> `@inject IAuthApi` -> `GetCurrentUserAsync()` -> `userId` -> `@inject IBackupService` -> `BackupService.ImportDataAsync(data, clear, userId)`
+
+This ensures that even though the primary operation is a direct service call, the user's identity is first verified through a standard, authenticated API call, and then that identity is used to correctly scope the data operation. This maintains security and data integrity.
 
 ## Rules and Conventions
 

@@ -84,6 +84,13 @@ This DelegatingHandler automatically forwards authentication cookies from the cu
    using LogMyDay.App.Components;
    ```
 
+### 3. Fixed Backup & Restore User ID Bug
+
+- **Problem**: The backup restore process was assigning a `null` UserID to restored entities (`Activities`, `Tags`), breaking multi-user data separation.
+- **Root Cause**: The Blazor UI was calling the `BackupService` directly via dependency injection, bypassing the HTTP pipeline that provides the authenticated user's context. The service call was missing the `userId`.
+- **Solution**: Modified the `Backup.razor` component to inject `IAuthApi`, retrieve the current authenticated user's ID, and pass it to the `ImportDataAsync` service method. This ensures all restored data is correctly associated with the user.
+- **Impact**: Backup and restore functionality now correctly handles user-specific data scoping.
+
 ## Architecture Pattern
 
 This solution follows Microsoft's documented pattern for Blazor Server applications that need to forward authentication context to HTTP clients:
