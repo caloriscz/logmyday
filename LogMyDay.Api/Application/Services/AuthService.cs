@@ -51,6 +51,18 @@ public sealed class AuthService : IAuthService
 
     public Guid? GetUserId(ClaimsPrincipal principal)
     {
+        _logger.LogDebug("🔍 DEBUG: AuthService.GetUserId called");
+        _logger.LogDebug("🔍 DEBUG: Principal is null: {IsNull}", principal == null);
+        if (principal != null)
+        {
+            _logger.LogDebug("🔍 DEBUG: Principal.Identity.IsAuthenticated: {IsAuthenticated}", principal.Identity?.IsAuthenticated);
+            _logger.LogDebug("🔍 DEBUG: Principal claims count: {ClaimsCount}", principal.Claims.Count());
+            foreach (var claim in principal.Claims)
+            {
+                _logger.LogDebug("🔍 DEBUG: Claim - Type: {Type}, Value: {Value}", claim.Type, claim.Value);
+            }
+        }
+        
         var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userId = Guid.TryParse(userIdClaim, out var id) ? (Guid?)id : null;
         _logger.LogDebug("AuthService.GetUserId: UserIdClaim='{UserIdClaim}', ParsedUserId={UserId}", userIdClaim, userId);

@@ -10,12 +10,12 @@ namespace LogMyDay.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BackupController : ControllerBase
+public class BackupController : BaseApiController
 {
     private readonly IBackupService _backupService;
     private readonly ILogger<BackupController> _logger;
 
-    public BackupController(IBackupService backupService, ILogger<BackupController> logger)
+    public BackupController(IBackupService backupService, ILogger<BackupController> logger, IAuthService authService) : base(authService)
     {
         _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -62,16 +62,19 @@ public class BackupController : ControllerBase
     /// </summary>
     /// <param name="file">JSON backup file</param>
     /// <param name="clearExisting">Whether to clear existing data before import</param>
-    /// <param name="userId">Optional user ID to associate imported data with</param>
     /// <returns>Import result</returns>
     [HttpPost("import")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> ImportData(
         IFormFile file, 
-        [FromQuery] bool clearExisting = false, 
-        [FromQuery] Guid? userId = null)
+        [FromQuery] bool clearExisting = false)
     {
         try
         {
+            // Always use the current authenticated user's ID for security and data ownership
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("🔍 DEBUG: Import using authenticated user ID: {UserId}", userId);
+            
             if (file == null || file.Length == 0)
             {
                 return BadRequest(new { message = "No file provided" });
@@ -83,7 +86,7 @@ public class BackupController : ControllerBase
             }
 
             _logger.LogInformation("Import request received. File: {FileName}, Size: {FileSize}, Clear: {ClearExisting}, User: {UserId}",
-                file.FileName, file.Length, clearExisting, userId?.ToString() ?? "All users");
+                file.FileName, file.Length, clearExisting, userId.ToString());
 
             string jsonContent;
             using (var reader = new StreamReader(file.OpenReadStream()))
@@ -240,6 +243,116 @@ public class BackupController : ControllerBase
         {
             _logger.LogError(ex, "Error getting backup info");
             return StatusCode(500, new { message = "Failed to get backup info", error = ex.Message });
+        }
+    }
+
+    // NEW: Secure user-scoped backup endpoints (v2.0)
+
+    /// <summary>
+    /// Create a secure backup of current user's activities and tags (excluding user credentials)
+    /// Requires authentication - only backs up data for the authenticated user
+    /// </summary>
+    [HttpGet("secure/export")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    public async Task<ActionResult<SecureBackupDto>> CreateSecureBackup()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("Secure backup export request from user: {UserId}", userId);
+
+            var backup = await _backupService.CreateSecureBackupAsync(userId);
+            
+            return Ok(backup);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during secure backup export");
+            return StatusCode(500, new { message = "Failed to create secure backup", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Restore activities and tags from secure backup, assigning them to the current authenticated user
+    /// Requires authentication - all restored data will be assigned to the authenticated user
+    /// </summary>
+    [HttpPost("secure/restore")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    public async Task<ActionResult<BackupImportResult>> RestoreSecureBackup([FromBody] SecureBackupDto backup)
+    {
+        if (backup == null)
+        {
+            return BadRequest("Backup data is required");
+        }
+
+        try
+        {
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("🔍 DEBUG: Controller GetCurrentUserId() returned: {UserId} (Type: {Type}, IsEmpty: {IsEmpty})", 
+                userId, userId.GetType().Name, userId == Guid.Empty);
+            _logger.LogInformation("🔍 DEBUG: User.Identity.IsAuthenticated: {IsAuthenticated}", User.Identity?.IsAuthenticated);
+            _logger.LogInformation("🔍 DEBUG: User claims count: {ClaimsCount}", User.Claims.Count());
+            foreach (var claim in User.Claims)
+            {
+                _logger.LogInformation("🔍 DEBUG: Claim - Type: {Type}, Value: {Value}", claim.Type, claim.Value);
+            }
+            _logger.LogInformation("Secure backup restore request from user: {UserId}", userId);
+
+            var result = await _backupService.RestoreSecureBackupAsync(backup, userId);
+
+            if (result.Success)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during secure backup restore");
+            return StatusCode(500, new { message = "Failed to restore secure backup", error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Clear ALL data for the current authenticated user only (activities, tags, etc.)
+    /// Requires authentication - only clears data for the authenticated user, preserves other users' data
+    /// </summary>
+    [HttpDelete("secure/clear-user-data")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    public async Task<ActionResult> ClearCurrentUserData()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("Secure user data clear request from user: {UserId}", userId);
+
+            var recordsCleared = await _backupService.ClearUserDataAsync(userId);
+            
+            return Ok(new { 
+                message = "All your data has been cleared successfully. Other users' data remains intact.", 
+                recordsCleared = recordsCleared,
+                userId = userId.ToString()
+            });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during secure user data clearing");
+            return StatusCode(500, new { message = "Failed to clear user data", error = ex.Message });
         }
     }
 }

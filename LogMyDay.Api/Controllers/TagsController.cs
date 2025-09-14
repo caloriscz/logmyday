@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
 
-[Authorize(AuthenticationSchemes = "lmd-cookie")]
 [ApiController]
 [Route("api/[controller]")]
 public class TagsController : BaseApiController

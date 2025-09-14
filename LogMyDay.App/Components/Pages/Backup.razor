@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject IBackupService BackupService
 @inject IExcelExportService ExcelExportService
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @inject ILogger<Backup> Logger
 
@@ -563,12 +564,15 @@
     {
         try
         {
-            var backupData = await BackupService.ExportDataAsync();
+            // Get the current authenticated user ID
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            var backupData = await BackupService.ExportDataAsync(currentUser?.Id);
+            
             backupInfo = new BackupInfoResponse
             {
                 Metadata = backupData.Metadata,
                 CurrentDateTime = DateTime.UtcNow,
-                UserId = "All users"
+                UserId = currentUser?.Email ?? "Unknown user"
             };
         }
         catch (Exception ex)
@@ -582,7 +586,9 @@
 
         try
         {
-            var backupData = await BackupService.ExportDataAsync();
+            // Get the current authenticated user ID
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            var backupData = await BackupService.ExportDataAsync(currentUser?.Id);
             
             var jsonOptions = new JsonSerializerOptions
             {
@@ -705,7 +711,15 @@
                 return;
             }
 
-            importResult = await BackupService.ImportDataAsync(backupData, clearExistingData);
+            // Get the current authenticated user ID
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            if (currentUser?.Id == null)
+            {
+                SetStatus("Failed to get current user information", true);
+                return;
+            }
+
+            importResult = await BackupService.ImportDataAsync(backupData, clearExistingData, currentUser.Id);
 
             if (importResult.Success)
             {

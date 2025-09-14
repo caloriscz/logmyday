@@ -14,10 +14,10 @@ public interface IAuthApi
     [Post("/api/auth/logout")]
     Task LogoutAsync(CancellationToken cancellationToken = default);
 
-    [Get("/api/me")]
+    [Get("/api/auth/me")]
     Task<CurrentUserDto> GetCurrentUserAsync(CancellationToken cancellationToken = default);
 
-    [Get("/api/csrf")]
+    [Get("/api/auth/csrf")]
     Task<CsrfTokenDto> GetCsrfTokenAsync(CancellationToken cancellationToken = default);
 }
 

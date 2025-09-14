@@ -33,4 +33,28 @@ public interface IBackupService
     /// <param name="backupData">The backup data to validate</param>
     /// <returns>Validation result</returns>
     Task<BackupValidationResult> ValidateBackupDataAsync(BackupData backupData);
+
+    // NEW: Secure user-scoped backup methods (v2.0)
+    
+    /// <summary>
+    /// Creates a secure backup of the current user's data (activities and tags only, no user credentials)
+    /// </summary>
+    /// <param name="userId">The authenticated user's ID</param>
+    /// <returns>Secure backup data</returns>
+    Task<SecureBackupDto> CreateSecureBackupAsync(Guid userId);
+    
+    /// <summary>
+    /// Restores data from secure backup and assigns it to the specified user
+    /// </summary>
+    /// <param name="backup">The secure backup data to restore</param>
+    /// <param name="userId">The authenticated user's ID to assign restored data to</param>
+    /// <returns>Restore operation result</returns>
+    Task<BackupImportResult> RestoreSecureBackupAsync(SecureBackupDto backup, Guid userId);
+    
+    /// <summary>
+    /// Clears all data for the specified user only (preserves other users' data)
+    /// </summary>
+    /// <param name="userId">The authenticated user's ID</param>
+    /// <returns>Number of records cleared</returns>
+    Task<int> ClearUserDataAsync(Guid userId);
 }

@@ -8,7 +8,7 @@ namespace LogMyDay.Api.Controllers;
 /// <summary>
 /// Base controller for API endpoints that require user authentication and provide user context.
 /// </summary>
-[Authorize]
+[Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
 [ApiController]
 public abstract class BaseApiController : ControllerBase
 {

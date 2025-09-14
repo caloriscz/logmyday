@@ -5,12 +5,15 @@ using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
+using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Security;
 
 namespace LogMyDay.Api.Authentication;
 
 public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private readonly IConfiguration _config;
+    private readonly IUserService _userService;
+    private readonly IPasswordHasher _passwordHasher;
     private readonly AuthAttemptTracker _attemptTracker;
 
     public BasicAuthHandler(
@@ -18,58 +21,71 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         ILoggerFactory logger,
         UrlEncoder encoder,
         ISystemClock clock,
-        IConfiguration config,
+        IUserService userService,
+        IPasswordHasher passwordHasher,
         AuthAttemptTracker attemptTracker)
         : base(options, logger, encoder, clock)
     {
-        _config = config;
+        _userService = userService;
+        _passwordHasher = passwordHasher;
         _attemptTracker = attemptTracker;
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         Logger.LogInformation("[BasicAuth] Handling request for {Path}", Request.Path);
 
         if (!Request.Headers.ContainsKey("Authorization"))
         {
             Logger.LogWarning("[BasicAuth] Missing Authorization header");
-            return Task.FromResult(AuthenticateResult.Fail("Missing Authorization Header"));
+            return AuthenticateResult.Fail("Missing Authorization Header");
         }
 
         try
         {
             var authHeader = Request.Headers["Authorization"].ToString();
+            Logger.LogInformation("[BasicAuth] 🔐 Authorization header received: '{AuthHeader}'", authHeader);
+            
             if (!authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
-                return Task.FromResult(AuthenticateResult.Fail("Invalid Authorization Header"));
+                return AuthenticateResult.Fail("Invalid Authorization Header");
 
             var encodedCredentials = authHeader.Substring("Basic ".Length).Trim();
+            Logger.LogInformation("[BasicAuth] 🔐 Encoded credentials: '{EncodedCredentials}'", encodedCredentials);
+            Logger.LogInformation("[BasicAuth] 🔐 Encoded credentials length: {Length}", encodedCredentials.Length);
+            
             var decodedBytes = Convert.FromBase64String(encodedCredentials);
-            var credentials = Encoding.UTF8.GetString(decodedBytes).Split(':');
+            var decodedString = Encoding.UTF8.GetString(decodedBytes);
+            Logger.LogInformation("[BasicAuth] 🔐 Decoded credentials string: '{DecodedString}'", decodedString);
+            Logger.LogInformation("[BasicAuth] 🔐 Decoded string length: {Length}", decodedString.Length);
+            
+            var credentials = decodedString.Split(':');
+            Logger.LogInformation("[BasicAuth] 🔐 Split credentials count: {Count}", credentials.Length);
 
             if (credentials.Length != 2)
-                return Task.FromResult(AuthenticateResult.Fail("Invalid Basic Authentication format"));
+                return AuthenticateResult.Fail("Invalid Basic Authentication format");
 
-            var username = credentials[0];
+            var email = credentials[0];
             var password = credentials[1];
+            Logger.LogInformation("[BasicAuth] 🔐 Parsed email: '{Email}' (length: {Length})", email, email.Length);
+            Logger.LogInformation("[BasicAuth] 🔐 Parsed password: '{Password}' (length: {Length})", password, password.Length);
+            
             var clientIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var identifier = $"{clientIp}:{username}";
+            var identifier = $"{clientIp}:{email}";
 
-            // Check if this IP/username combination is currently blocked
+            // Check if this IP/email combination is currently blocked
             if (_attemptTracker.IsBlocked(identifier))
             {
                 Logger.LogWarning("[BasicAuth] Authentication blocked for {Identifier} due to too many failed attempts", identifier);
-                return Task.FromResult(AuthenticateResult.Fail("Too many failed attempts. Please try again later."));
+                return AuthenticateResult.Fail("Too many failed attempts. Please try again later.");
             }
 
-            var expectedUsername = _config["Auth:Basic:Username"];
-            var expectedPassword = _config["Auth:Basic:Password"];
-            var userId = _config["Auth:Basic:UserId"] ?? Guid.Empty.ToString();
-
-            if (username != expectedUsername || password != expectedPassword)
+            // Validate credentials against database
+            var user = await _userService.FindByEmailAsync(email, CancellationToken.None);
+            if (user == null || !_passwordHasher.Verify(password, user.PasswordHash))
             {
-                Logger.LogWarning("[BasicAuth] Invalid credentials for user: {User} from IP: {ClientIp}", username, clientIp);
+                Logger.LogWarning("[BasicAuth] Invalid credentials for user: {Email} from IP: {ClientIp}", email, clientIp);
                 _attemptTracker.RecordFailedAttempt(identifier);
-                return Task.FromResult(AuthenticateResult.Fail("Invalid Username or Password"));
+                return AuthenticateResult.Fail("Invalid Email or Password");
             }
 
             // Successful authentication - clear any failed attempts
@@ -77,21 +93,22 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, userId),
-                new Claim(ClaimTypes.Name, username),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Email),
+                new Claim(ClaimTypes.Email, user.Email),
             };
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-            Logger.LogInformation("[BasicAuth] User '{User}' from IP '{ClientIp}' authenticated successfully", username, clientIp);
-            return Task.FromResult(AuthenticateResult.Success(ticket));
+            Logger.LogInformation("[BasicAuth] User '{Email}' (ID: {UserId}) from IP '{ClientIp}' authenticated successfully", user.Email, user.Id, clientIp);
+            return AuthenticateResult.Success(ticket);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[BasicAuth] Exception during authentication");
-            return Task.FromResult(AuthenticateResult.Fail("Invalid Authorization Header"));
+            return AuthenticateResult.Fail("Invalid Authorization Header");
         }
     }
 }

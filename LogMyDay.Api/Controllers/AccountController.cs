@@ -25,7 +25,7 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("password/change")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request, CancellationToken cancellationToken)
     {
         try

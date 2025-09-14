@@ -172,7 +172,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> Logout()
     {
         try
@@ -190,7 +190,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("me")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
         try
@@ -218,7 +218,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("csrf")]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public IActionResult GetCsrfToken()
     {
         try

@@ -1,10 +1,12 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Services;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -35,7 +37,7 @@ services.AddMemoryCache();
 // Add HttpContextAccessor for Blazor components
 services.AddHttpContextAccessor();
 
-// Configure cookie authentication
+// Configure cookie authentication (default scheme) and basic auth for mobile
 services.AddAuthentication("lmd-cookie")
     .AddCookie("lmd-cookie", options =>
     {
@@ -91,7 +93,11 @@ services.AddAuthentication("lmd-cookie")
                 context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
             return Task.CompletedTask;
         };
-    });
+    })
+    .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", options => { });
+
+// Add authentication attempt tracking service
+services.AddSingleton<LogMyDay.Api.Authentication.AuthAttemptTracker>();
 
 // Add authorization with admin policy
 services.AddAuthorization(options =>
@@ -198,6 +204,18 @@ services.AddRefitClient<IUsersApi>()
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 services.AddRefitClient<IAccountApi>()
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+services.AddRefitClient<ISecureBackupApi>()
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];

@@ -7,7 +7,7 @@ using LogMyDay.Api.Infrastructure.Data;
 
 namespace LogMyDay.Api.Controllers;
 
-[Authorize]
+[Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
 [ApiController]
 [Route("api/input-types")]
 public class InputTypesController : ControllerBase

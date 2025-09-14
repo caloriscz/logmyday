@@ -2,6 +2,31 @@
 applyTo: '**'
 ---
 
+## ⚠️ **CRITICAL: Mobile App Testing Warning** ⚠️
+
+**BEFORE attempting any complex debugging or "100s of nonsense missions" to fix mobile authentication issues:**
+
+1. **FIRST** - Test if the server/API is actually running and accessible
+2. **SECOND** - Verify what credentials actually exist in the database
+3. **THIRD** - Check if mobile app is connecting to the correct server URL (localhost vs production)
+
+**Common mobile authentication failure scenarios:**
+- ✅ **Server not running**: Start `dotnet run --project LogMyDay.App` first
+- ✅ **Wrong server URL**: Mobile app defaults may point to production instead of localhost
+- ✅ **Wrong credentials**: Development database may have different test users than production
+- ✅ **Database not seeded**: Local development database may be empty or have different users
+
+**Debugging workflow:**
+1. Start the server: `dotnet run --project LogMyDay.App`
+2. Test API directly with PowerShell/curl to verify server works
+3. Check what users exist in database (query Users table)
+4. Verify mobile app server URL matches running server
+5. Only THEN debug mobile authentication code
+
+**Remember: Mobile app depends on server-side changes - always test server compatibility first!**
+
+---
+
 ## Project Structure Overview
 
 This repository is organized as follows:

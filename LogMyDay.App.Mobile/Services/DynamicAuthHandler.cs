@@ -13,11 +13,35 @@ public class DynamicAuthHandler : DelegatingHandler
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        System.Diagnostics.Debug.WriteLine("=== DYNAMIC AUTH HANDLER DEBUG ===");
+        System.Diagnostics.Debug.WriteLine($"🔐 Request URL: {request.RequestUri}");
+        System.Diagnostics.Debug.WriteLine($"🔐 Request Method: {request.Method}");
+        
         if (_ctx.Username is { } u && _ctx.Password is { } p)
         {
-            var bytes = Encoding.ASCII.GetBytes($"{u}:{p}");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(bytes));
+            System.Diagnostics.Debug.WriteLine($"🔐 Username from context: '{u}'");
+            System.Diagnostics.Debug.WriteLine($"🔐 Password from context: '{p}'");
+            System.Diagnostics.Debug.WriteLine($"🔐 Username length: {u.Length}");
+            System.Diagnostics.Debug.WriteLine($"🔐 Password length: {p.Length}");
+            
+            var credentials = $"{u}:{p}";
+            System.Diagnostics.Debug.WriteLine($"🔐 Combined credentials: '{credentials}'");
+            System.Diagnostics.Debug.WriteLine($"🔐 Combined length: {credentials.Length}");
+            
+            var bytes = Encoding.ASCII.GetBytes(credentials);
+            var base64 = Convert.ToBase64String(bytes);
+            System.Diagnostics.Debug.WriteLine($"🔐 Base64 encoded: '{base64}'");
+            System.Diagnostics.Debug.WriteLine($"🔐 Base64 length: {base64.Length}");
+            
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64);
+            System.Diagnostics.Debug.WriteLine($"🔐 Authorization header set: 'Basic {base64}'");
         }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"🚫 No credentials in context - Username: '{_ctx.Username}', Password: '{_ctx.Password}'");
+        }
+        
+        System.Diagnostics.Debug.WriteLine("=== END DYNAMIC AUTH HANDLER DEBUG ===");
         return base.SendAsync(request, cancellationToken);
     }
 }

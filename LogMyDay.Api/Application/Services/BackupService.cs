@@ -426,4 +426,261 @@ public class BackupService : IBackupService
 
         await _context.SaveChangesAsync();
     }
+
+    // NEW: Secure user-scoped backup methods (v2.0)
+    
+    /// <summary>
+    /// Creates a secure backup of the current user's data (activities and tags only, no user credentials)
+    /// </summary>
+    public async Task<SecureBackupDto> CreateSecureBackupAsync(Guid userId)
+    {
+        _logger.LogInformation("Creating secure backup for user: {UserId}", userId);
+
+        try
+        {
+            // Export user's tags (excluding sensitive data, user IDs)
+            var userTags = await _context.Tags
+                .Include(t => t.InputType)
+                .Include(t => t.Pattern)
+                .Where(t => t.UserId == userId)
+                .Select(t => new SecureTagBackupDto
+                {
+                    Id = t.Id,
+                    TagName = t.TagName,
+                    InputTypeName = t.InputType != null ? t.InputType.Name : null,
+                    IsRequired = t.IsRequired,
+                    TimeGranularity = t.TimeGranularity.ToString(),
+                    IsRepeatable = t.IsRepeatable,
+                    IsRange = t.IsRange,
+                    PatternName = t.Pattern != null ? t.Pattern.Name : null
+                    // Note: UserId explicitly excluded for security
+                })
+                .ToListAsync();
+
+            // Export user's activities (excluding sensitive data, user IDs)
+            var userActivities = await _context.Activities
+                .Include(a => a.Tag)
+                .Where(a => a.UserId == userId)
+                .Select(a => new SecureActivityBackupDto
+                {
+                    Id = a.Id,
+                    Description = a.Description,
+                    DateCreated = a.DateCreated,
+                    DateStarted = a.DateStarted,
+                    DateFinished = a.DateFinished,
+                    TagName = a.Tag.TagName // For restoration matching
+                    // Note: UserId explicitly excluded for security
+                })
+                .ToListAsync();
+
+            var secureBackup = new SecureBackupDto
+            {
+                CreatedAt = DateTime.UtcNow,
+                Version = "2.0", // New secure backup format version
+                Activities = userActivities,
+                Tags = userTags
+                // Note: Explicitly NO user data, credentials, or sensitive information
+            };
+
+            _logger.LogInformation("Secure backup created successfully. Tags: {TagCount}, Activities: {ActivityCount}", 
+                userTags.Count, userActivities.Count);
+
+            return secureBackup;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred during secure backup creation for user: {UserId}", userId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Restores data from secure backup and assigns it to the specified user
+    /// </summary>
+    public async Task<BackupImportResult> RestoreSecureBackupAsync(SecureBackupDto backup, Guid userId)
+    {
+        _logger.LogInformation("🚀 STARTING secure backup restore for user: {UserId}", userId);
+        _logger.LogInformation("� DEBUG: UserId parameter type: {Type}, Value: {Value}, IsEmpty: {IsEmpty}", 
+            userId.GetType().Name, userId, userId == Guid.Empty);
+        _logger.LogInformation("�📦 Backup contains {TagCount} tags and {ActivityCount} activities", backup.Tags.Count, backup.Activities.Count);
+        
+        var result = new BackupImportResult { Success = true };
+        
+        try
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            
+            try
+            {
+                // Step 1: Import tags with current user ID
+                foreach (var tagDto in backup.Tags)
+                {
+                    // Check if tag already exists for this user
+                    var existingTag = await _context.Tags
+                        .FirstOrDefaultAsync(t => t.TagName == tagDto.TagName && t.UserId == userId);
+                    
+                    if (existingTag == null)
+                    {
+                        // Get input type if specified
+                        int? inputTypeId = null;
+                        if (!string.IsNullOrEmpty(tagDto.InputTypeName))
+                        {
+                            var inputType = await _context.InputTypes
+                                .FirstOrDefaultAsync(it => it.Name == tagDto.InputTypeName);
+                            inputTypeId = inputType?.Id;
+                        }
+
+                        // Get pattern if specified
+                        int? patternId = null;
+                        if (!string.IsNullOrEmpty(tagDto.PatternName))
+                        {
+                            var pattern = await _context.Patterns
+                                .FirstOrDefaultAsync(p => p.Name == tagDto.PatternName);
+                            patternId = pattern?.Id;
+                        }
+
+                        // Parse TimeGranularity enum
+                        var timeGranularity = Domain.Enums.TimeGranularity.Exact;
+                        if (!string.IsNullOrEmpty(tagDto.TimeGranularity))
+                        {
+                            Enum.TryParse<Domain.Enums.TimeGranularity>(tagDto.TimeGranularity, out timeGranularity);
+                        }
+
+                        // Create new tag - SIMPLE VERSION
+                        var newTag = new Tag
+                        {
+                            TagName = tagDto.TagName,
+                            InputTypeId = inputTypeId,
+                            IsRequired = tagDto.IsRequired,
+                            TimeGranularity = timeGranularity,
+                            IsRepeatable = tagDto.IsRepeatable,
+                            IsRange = tagDto.IsRange,
+                            PatternId = patternId,
+                            UserId = userId  // Simple assignment
+                        };
+                        
+                        _context.Tags.Add(newTag);
+                        result.Statistics.TagsImported++;
+                        
+                        _logger.LogInformation("✅ Adding tag '{TagName}' for user {UserId}", tagDto.TagName, userId);
+                    }
+                    else
+                    {
+                        result.Statistics.TagsSkipped++;
+                    }
+                }
+
+                // Save tags first
+                await _context.SaveChangesAsync();
+
+                // Step 2: Import activities with current user ID
+                foreach (var activityDto in backup.Activities)
+                {
+                    // Find the tag by name in the current user's tags
+                    var tag = await _context.Tags
+                        .FirstOrDefaultAsync(t => t.TagName == activityDto.TagName && t.UserId == userId);
+                    
+                    if (tag != null)
+                    {
+                        // Create new activity - SIMPLE VERSION
+                        var newActivity = new Activity
+                        {
+                            Description = activityDto.Description,
+                            DateCreated = activityDto.DateCreated,
+                            DateStarted = activityDto.DateStarted,
+                            DateFinished = activityDto.DateFinished,
+                            TagId = tag.Id,
+                            UserId = userId  // Simple assignment
+                        };
+                        
+                        _context.Activities.Add(newActivity);
+                        result.Statistics.ActivitiesImported++;
+                        
+                        _logger.LogInformation("✅ Adding activity '{Description}' for user {UserId}", activityDto.Description, userId);
+                    }
+                    else
+                    {
+                        result.Warnings.Add($"Skipping activity with unknown tag: {activityDto.TagName}");
+                        result.Statistics.ActivitiesSkipped++;
+                    }
+                }
+
+                // Save activities
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                
+                result.Message = "Secure backup restored successfully. All data has been assigned to your user account.";
+                
+                _logger.LogInformation("✅ Secure backup restore completed successfully for user: {UserId}. Tags: {TagsImported}, Activities: {ActivitiesImported}", 
+                    userId, result.Statistics.TagsImported, result.Statistics.ActivitiesImported);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = $"Secure backup restore failed: {ex.Message}";
+            result.Errors.Add(ex.Message);
+            _logger.LogError(ex, "Secure backup restore failed for user: {UserId}", userId);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Clears all data for the specified user only (preserves other users' data)
+    /// </summary>
+    public async Task<int> ClearUserDataAsync(Guid userId)
+    {
+        _logger.LogInformation("Clearing all data for user: {UserId}", userId);
+
+        int recordsCleared = 0;
+
+        try
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            
+            try
+            {
+                // 🎯 ONLY clear specified user's data - NOT all users!
+                
+                // Clear user's activities first (due to foreign key constraints)
+                var userActivities = await _context.Activities
+                    .Where(a => a.UserId == userId)
+                    .ToListAsync();
+                
+                _context.Activities.RemoveRange(userActivities);
+                recordsCleared += userActivities.Count;
+
+                // Clear user's tags
+                var userTags = await _context.Tags
+                    .Where(t => t.UserId == userId)
+                    .ToListAsync();
+                
+                _context.Tags.RemoveRange(userTags);
+                recordsCleared += userTags.Count;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Cleared {RecordsCleared} records for user: {UserId}", recordsCleared, userId);
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred during user data clearing for user: {UserId}", userId);
+            throw;
+        }
+
+        return recordsCleared;
+    }
 }
