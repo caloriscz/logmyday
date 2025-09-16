@@ -1,6 +1,8 @@
-﻿@inject NavigationManager Navigation
+@inject NavigationManager Navigation
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using Microsoft.AspNetCore.Components.Authorization
 @using System.Reflection
 
 <nav class="navbar navbar-expand-lg top-navigation">
@@ -49,6 +51,14 @@
                         <i class="bi bi-cloud-download"></i> Backup
                     </NavLink>
                 </li>
+                @if (isAdminUser)
+                {
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="users">
+                            <i class="bi bi-people"></i> Users
+                        </NavLink>
+                    </li>
+                }
             </ul>
 
             <!-- Theme toggle and logout -->
@@ -64,8 +74,17 @@
     </div>
 </nav>
 
+@implements IDisposable
+
 @code {
     private bool isDarkMode = false;
+    private bool isAdminUser = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        await DetermineAdminAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -76,6 +95,40 @@
             isDarkMode = savedTheme == "dark";
             await ApplyTheme();
             StateHasChanged();
+        }
+    }
+
+    private async Task DetermineAdminAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            isAdminUser = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
+        }
+        catch
+        {
+            isAdminUser = false;
+        }
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            var authState = await task;
+            var user = authState.User;
+            var isAdmin = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
+            if (isAdmin != isAdminUser)
+            {
+                isAdminUser = isAdmin;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+            isAdminUser = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -94,7 +147,7 @@
             Navigation.NavigateTo("/login", forceLoad: true);
         }
     }
-    
+
     private string GetAppVersion()
     {
         var assembly = Assembly.GetExecutingAssembly();
@@ -114,5 +167,9 @@
         var theme = isDarkMode ? "dark" : "light";
         await JSRuntime.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-bs-theme', '{theme}')");
     }
-}
 
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+}
