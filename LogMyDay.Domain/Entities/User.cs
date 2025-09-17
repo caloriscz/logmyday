@@ -7,6 +7,8 @@ public sealed class User
     public string? DisplayName { get; set; }
     public required string PasswordHash { get; set; } // Argon2id encoded string with salt
     public bool IsAdmin { get; set; }
+    public string Culture { get; set; } = "en-US";
+    public string TimeZone { get; set; } = "Europe/Vienna";
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 }
