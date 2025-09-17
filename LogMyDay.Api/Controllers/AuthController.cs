@@ -52,7 +52,7 @@ public class AuthController : ControllerBase
                 return BadRequest("Password must be at least 10 characters long.");
             }
 
-            var user = await _userService.CreateFirstAdminAsync(request.Email, request.Password, request.DisplayName, cancellationToken);
+            var user = await _userService.CreateFirstAdmin(request.Email, request.Password, request.DisplayName, cancellationToken);
             return CreatedAtAction(nameof(GetCurrentUser), new { }, new { message = "First admin user created successfully" });
         }
         catch (InvalidOperationException ex)
@@ -79,7 +79,7 @@ public class AuthController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            var user = await _userService.FindByEmailAsync(request.Email, cancellationToken);
+            var user = await _userService.FindByEmail(request.Email, cancellationToken);
             if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             {
                 _logger.LogWarning("Login attempt with invalid credentials for email: {Email}", request.Email);
@@ -127,7 +127,7 @@ public class AuthController : ControllerBase
             }
 
             _logger.LogInformation("Looking up user with email: {Email}", email);
-            var user = await _userService.FindByEmailAsync(email, cancellationToken);
+            var user = await _userService.FindByEmail(email, cancellationToken);
             if (user == null)
             {
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
@@ -201,7 +201,7 @@ public class AuthController : ControllerBase
                 return Unauthorized();
             }
 
-            var user = await _userService.GetAsync(userId.Value, cancellationToken);
+            var user = await _userService.Get(userId.Value, cancellationToken);
             if (user == null)
             {
                 return NotFound();

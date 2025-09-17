@@ -80,7 +80,7 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
             }
 
             // Validate credentials against database
-            var user = await _userService.FindByEmailAsync(email, CancellationToken.None);
+            var user = await _userService.FindByEmail(email, CancellationToken.None);
             if (user == null || !_passwordHasher.Verify(password, user.PasswordHash))
             {
                 Logger.LogWarning("[BasicAuth] Invalid credentials for user: {Email} from IP: {ClientIp}", email, clientIp);

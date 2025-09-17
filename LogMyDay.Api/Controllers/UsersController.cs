@@ -30,7 +30,7 @@ public class UsersController : ControllerBase
     {
         try
         {
-            var users = await _userService.ListAsync(cancellationToken);
+            var users = await _userService.List(cancellationToken);
             var userDtos = users
                 .Select(u => new UserDto(u.Id, u.Email, u.DisplayName, u.IsAdmin, u.CreatedUtc, u.UpdatedUtc, u.Culture, u.TimeZone))
                 .ToList();
@@ -79,7 +79,7 @@ public class UsersController : ControllerBase
                 return Unauthorized();
             }
 
-            var user = await _userService.CreateUserAsync(
+            var user = await _userService.CreateUser(
                 request.Email,
                 request.Password,
                 request.DisplayName,
@@ -134,7 +134,7 @@ public class UsersController : ControllerBase
                 return Unauthorized();
             }
 
-            var user = await _userService.UpdateAsync(
+            var user = await _userService.Update(
                 id,
                 request.Email,
                 request.DisplayName,
@@ -177,7 +177,7 @@ public class UsersController : ControllerBase
                 return Unauthorized();
             }
 
-            await _userService.DeleteAsync(id, actorId.Value, cancellationToken);
+            await _userService.Delete(id, actorId.Value, cancellationToken);
             return NoContent();
         }
         catch (ArgumentException)

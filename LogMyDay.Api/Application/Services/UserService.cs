@@ -25,14 +25,14 @@ public sealed class UserService : IUserService
         _emailSender = emailSender;
     }
 
-    public async Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
+    public async Task<User?> FindByEmail(string email, CancellationToken cancellationToken)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
         return await _context.Users
             .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
     }
 
-    public async Task<User> CreateFirstAdminAsync(string email, string password, string? displayName, CancellationToken cancellationToken)
+    public async Task<User> CreateFirstAdmin(string email, string password, string? displayName, CancellationToken cancellationToken)
     {
         var userCount = await _context.Users.CountAsync(cancellationToken);
         if (userCount > 0)
@@ -63,7 +63,7 @@ public sealed class UserService : IUserService
         return user;
     }
 
-    public async Task<User> CreateUserAsync(string email, string password, string? displayName, bool isAdmin, string culture, string timeZone, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> CreateUser(string email, string password, string? displayName, bool isAdmin, string culture, string timeZone, Guid actorId, CancellationToken cancellationToken)
     {
         _ = await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
 
@@ -82,7 +82,7 @@ public sealed class UserService : IUserService
         var normalizedCulture = NormalizeCultureOrThrow(culture);
         var normalizedTimeZone = NormalizeTimeZoneOrThrow(timeZone);
 
-        var existingUser = await FindByEmailAsync(normalizedEmail, cancellationToken);
+        var existingUser = await FindByEmail(normalizedEmail, cancellationToken);
         if (existingUser != null)
         {
             throw new InvalidOperationException("A user with this email already exists.");
@@ -107,19 +107,19 @@ public sealed class UserService : IUserService
         return user;
     }
 
-    public async Task<User?> GetAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<User?> Get(Guid id, CancellationToken cancellationToken)
     {
         return await _context.Users.FindAsync([id], cancellationToken);
     }
 
-    public async Task<List<User>> ListAsync(CancellationToken cancellationToken)
+    public async Task<List<User>> List(CancellationToken cancellationToken)
     {
         return await _context.Users
             .OrderBy(u => u.Email)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<User> UpdateAsync(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
     {
         var user = await GetUserAsync(id, cancellationToken);
         var actor = await GetUserAsync(actorId, cancellationToken);
@@ -139,7 +139,7 @@ public sealed class UserService : IUserService
         if (!string.IsNullOrWhiteSpace(email))
         {
             var normalizedEmail = email.ToLowerInvariant().Trim();
-            var existingUser = await FindByEmailAsync(normalizedEmail, cancellationToken);
+            var existingUser = await FindByEmail(normalizedEmail, cancellationToken);
             if (existingUser != null && existingUser.Id != user.Id)
             {
                 throw new InvalidOperationException("A user with this email already exists.");
@@ -184,7 +184,7 @@ public sealed class UserService : IUserService
         return user;
     }
 
-    public async Task DeleteAsync(Guid id, Guid actorId, CancellationToken cancellationToken)
+    public async Task Delete(Guid id, Guid actorId, CancellationToken cancellationToken)
     {
         var actor = await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
         
@@ -201,7 +201,7 @@ public sealed class UserService : IUserService
         _logger.LogInformation("User {UserId} deleted by admin {ActorId}", id, actorId);
     }
 
-    public async Task ChangePasswordAsync(Guid id, string currentPassword, string newPassword, Guid actorId, CancellationToken cancellationToken)
+    public async Task ChangePassword(Guid id, string currentPassword, string newPassword, Guid actorId, CancellationToken cancellationToken)
     {
         var user = await GetUserAsync(id, cancellationToken);
         var actor = await GetUserAsync(actorId, cancellationToken);
@@ -225,7 +225,7 @@ public sealed class UserService : IUserService
         _logger.LogInformation("Password changed for user {UserId} by {ActorId}", id, actorId);
     }
 
-    public async Task AdminResetPasswordAsync(Guid id, string newPassword, Guid actorId, CancellationToken cancellationToken)
+    public async Task AdminResetPassword(Guid id, string newPassword, Guid actorId, CancellationToken cancellationToken)
     {
         await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
         var user = await GetUserAsync(id, cancellationToken);
@@ -237,10 +237,10 @@ public sealed class UserService : IUserService
         _logger.LogInformation("Password reset for user {UserId} by admin {ActorId}", id, actorId);
     }
 
-    public async Task BeginForgotAsync(string email, CancellationToken cancellationToken)
+    public async Task BeginForgot(string email, CancellationToken cancellationToken)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        var user = await FindByEmailAsync(normalizedEmail, cancellationToken);
+        var user = await FindByEmail(normalizedEmail, cancellationToken);
         if (user == null)
         {
             // Don't reveal if email exists or not
@@ -276,7 +276,7 @@ public sealed class UserService : IUserService
         }
     }
 
-    public async Task CompleteForgotAsync(string token, string newPassword, CancellationToken cancellationToken)
+    public async Task CompleteForgot(string token, string newPassword, CancellationToken cancellationToken)
     {
         var passwordReset = await _context.PasswordResets
             .Include(pr => pr.User)
@@ -301,7 +301,7 @@ public sealed class UserService : IUserService
 
     private async Task<User> GetUserAsync(Guid id, CancellationToken cancellationToken)
     {
-        var user = await GetAsync(id, cancellationToken);
+        var user = await Get(id, cancellationToken);
         if (user == null)
         {
             throw new ArgumentException($"User with ID {id} not found.", nameof(id));

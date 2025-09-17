@@ -46,7 +46,7 @@ public class AccountController : ControllerBase
                 return Unauthorized();
             }
 
-            await _userService.ChangePasswordAsync(
+            await _userService.ChangePassword(
                 userId.Value,
                 request.CurrentPassword,
                 request.NewPassword,
@@ -92,7 +92,7 @@ public class AccountController : ControllerBase
                 return Unauthorized();
             }
 
-            await _userService.AdminResetPasswordAsync(id, request.NewPassword, actorId.Value, cancellationToken);
+            await _userService.AdminResetPassword(id, request.NewPassword, actorId.Value, cancellationToken);
             return NoContent();
         }
         catch (ArgumentException)
@@ -125,7 +125,7 @@ public class AccountController : ControllerBase
                 return BadRequest("Valid email is required.");
             }
 
-            await _userService.BeginForgotAsync(request.Email, cancellationToken);
+            await _userService.BeginForgot(request.Email, cancellationToken);
 
             var response = new ForgotResponseDto("If an account exists for the provided email, a password reset link has been sent.");
             return Accepted(response);
@@ -152,7 +152,7 @@ public class AccountController : ControllerBase
                 return BadRequest("New password must be at least 10 characters long.");
             }
 
-            await _userService.CompleteForgotAsync(request.Token, request.NewPassword, cancellationToken);
+            await _userService.CompleteForgot(request.Token, request.NewPassword, cancellationToken);
             return NoContent();
         }
         catch (InvalidOperationException ex)
