@@ -9,6 +9,15 @@
       "UserId": "11111111-1111-1111-1111-111111111111"
     }
   },
+  "Security": {
+    "RateLimit": {
+      "MaxAttemptsPerWindow": 3,
+      "WindowMinutes": 10,
+      "LockoutMinutes": 5,
+      "TrackByIP": true,
+      "TrackByUsername": true
+    }
+  },
   "Api": {
     "BaseAddress": "https://localhost:7064"
   },

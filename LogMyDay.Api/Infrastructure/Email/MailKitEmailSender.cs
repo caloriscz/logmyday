@@ -33,7 +33,8 @@ public class MailKitEmailSender : IEmailSender
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var secureOption = _options.UseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+            // Determine the correct secure socket option based on port and configuration
+            var secureOption = DetermineSecureSocketOption(_options.SmtpPort, _options.UseSsl);
             await client.ConnectAsync(_options.SmtpServer, _options.SmtpPort, secureOption, cancellationToken);
 
             var userName = string.IsNullOrWhiteSpace(_options.UserName) ? _options.SenderEmail : _options.UserName;
@@ -97,12 +98,13 @@ public class MailKitEmailSender : IEmailSender
 
         var builder = new BodyBuilder
         {
-            TextBody = $"We received a request to reset your LogMyDay password.\n\n" +
-                       $"To choose a new password, open the link below in your browser:\n{resetLink}\n\n" +
-                       "If you did not request this reset, you can safely ignore this email.",
-            HtmlBody = $"<p>We received a request to reset your <strong>LogMyDay</strong> password.</p>" +
-                       $"<p><a href=\"{resetLink}\">Click here to reset your password</a></p>" +
-                       $"<p>If you did not request this reset, you can safely ignore this email.</p>"
+            TextBody = $"We received a request to reset your LogMyDay password.\n\n"
+                + $"To choose a new password, open the link below in your browser:\n{resetLink}\n\n"
+                + "If you did not request this reset, you can safely ignore this email.",
+            
+            HtmlBody = $"<p>We received a request to reset your <strong>LogMyDay</strong> password.</p>"
+                + $"<p><a href=\"{resetLink}\">Click here to reset your password</a></p>"
+                + $"<p>If you did not request this reset, you can safely ignore this email.</p>",
         };
 
         message.Body = builder.ToMessageBody();
@@ -113,5 +115,23 @@ public class MailKitEmailSender : IEmailSender
     {
         var separator = _options.PasswordResetUrl.Contains('?') ? '&' : '?';
         return $"{_options.PasswordResetUrl}{separator}token={Uri.EscapeDataString(token)}";
+    }
+
+    private static SecureSocketOptions DetermineSecureSocketOption(int port, bool useSsl)
+    {
+        // Port 587 typically uses STARTTLS (explicit TLS)
+        // Port 465 typically uses SSL/TLS (implicit TLS)
+        // Port 25 typically uses plain text or STARTTLS when available
+        
+        return port switch
+        {
+            587 => SecureSocketOptions.StartTls, // Force STARTTLS for port 587
+            465 => SecureSocketOptions.SslOnConnect, // SSL/TLS for port 465
+            25 when useSsl => SecureSocketOptions.StartTlsWhenAvailable, // STARTTLS when available for port 25
+            25 => SecureSocketOptions.None, // Plain text for port 25 when SSL not requested
+            _ => useSsl
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTlsWhenAvailable,
+        };
     }
 }
