@@ -13,6 +13,6 @@ public interface IUserService
     Task DeleteAsync(Guid id, Guid actorId, CancellationToken cancellationToken);
     Task ChangePasswordAsync(Guid id, string currentPassword, string newPassword, Guid actorId, CancellationToken cancellationToken);
     Task AdminResetPasswordAsync(Guid id, string newPassword, Guid actorId, CancellationToken cancellationToken);
-    Task<string> BeginForgotAsync(string email, CancellationToken cancellationToken);
+    Task BeginForgotAsync(string email, CancellationToken cancellationToken);
     Task CompleteForgotAsync(string token, string newPassword, CancellationToken cancellationToken);
 }

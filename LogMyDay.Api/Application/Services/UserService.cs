@@ -13,12 +13,14 @@ public sealed class UserService : IUserService
     private readonly LogMyDayDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<UserService> _logger;
+    private readonly IEmailSender _emailSender;
 
-    public UserService(LogMyDayDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger)
+    public UserService(LogMyDayDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger, IEmailSender emailSender)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _logger = logger;
+        _emailSender = emailSender;
     }
 
     public async Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)
@@ -193,14 +195,16 @@ public sealed class UserService : IUserService
         _logger.LogInformation("Password reset for user {UserId} by admin {ActorId}", id, actorId);
     }
 
-    public async Task<string> BeginForgotAsync(string email, CancellationToken cancellationToken)
+    public async Task BeginForgotAsync(string email, CancellationToken cancellationToken)
     {
-        var user = await FindByEmailAsync(email, cancellationToken);
+        var normalizedEmail = email.ToLowerInvariant().Trim();
+        var user = await FindByEmailAsync(normalizedEmail, cancellationToken);
         if (user == null)
         {
             // Don't reveal if email exists or not
-            _logger.LogInformation("Password reset requested for non-existent email: {Email}", email);
-            return GenerateSecureToken();
+            _ = GenerateSecureToken();
+            _logger.LogInformation("Password reset requested for non-existent email: {Email}", normalizedEmail);
+            return;
         }
 
         // Generate a secure token
@@ -217,8 +221,17 @@ public sealed class UserService : IUserService
         _context.PasswordResets.Add(passwordReset);
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Password reset token generated for user {UserId}. Token: {Token}", user.Id, token);
-        return token;
+        try
+        {
+            await _emailSender.SendPasswordResetEmailAsync(user.Email, user.DisplayName, token, cancellationToken);
+            _logger.LogInformation("Password reset token generated and email sent for user {UserId}", user.Id);
+        }
+        catch
+        {
+            _context.PasswordResets.Remove(passwordReset);
+            await _context.SaveChangesAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task CompleteForgotAsync(string token, string newPassword, CancellationToken cancellationToken)

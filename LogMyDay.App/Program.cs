@@ -2,6 +2,7 @@
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Api.Infrastructure.Email;
 using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
@@ -159,6 +160,8 @@ services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();
 services.AddScoped<IUserService, UserService>();
 services.AddScoped<IAuthService, AuthService>();
 services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+services.AddScoped<IEmailSender, MailKitEmailSender>();
 
 // Keep existing credential store for Blazor Server (for backwards compatibility)
 services.AddSingleton<CredentialStore>();

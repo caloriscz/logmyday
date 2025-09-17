@@ -125,11 +125,10 @@ public class AccountController : ControllerBase
                 return BadRequest("Valid email is required.");
             }
 
-            var token = await _userService.BeginForgotAsync(request.Email, cancellationToken);
-            
-            // In v1, we return the token directly. In production, this would be sent via email.
-            var response = new ForgotResponseDto(token);
-            return Ok(response);
+            await _userService.BeginForgotAsync(request.Email, cancellationToken);
+
+            var response = new ForgotResponseDto("If an account exists for the provided email, a password reset link has been sent.");
+            return Accepted(response);
         }
         catch (Exception ex)
         {

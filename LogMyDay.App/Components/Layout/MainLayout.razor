@@ -217,11 +217,15 @@ else
     private bool keyboardListenerAdded = false;
     private InputSelect<int?>? primaryTagSelect;
 
-    private bool IsLoginPage 
+    private bool IsLoginPage
     {
         get
         {
-            var isLogin = Navigation.Uri.Contains("/login");
+            var uri = new Uri(Navigation.Uri);
+            var path = uri.AbsolutePath.Trim('/');
+            var isLogin = path.Equals("login", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("forgot-password", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("reset-password", StringComparison.OrdinalIgnoreCase);
             Logger.LogDebug("MainLayout.IsLoginPage: URL='{Url}', IsLoginPage={IsLoginPage}", Navigation.Uri, isLogin);
             return isLogin;
         }
