@@ -2,6 +2,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Shared.Preferences;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -43,6 +44,8 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
                 DisplayName = "Administrator",
                 PasswordHash = _passwordHasher.Hash("secret123"), // Same password as Basic Auth
                 IsAdmin = true,
+                Culture = PreferencesFactory.DefaultCulture,
+                TimeZone = PreferencesFactory.DefaultTimeZoneId,
                 CreatedUtc = DateTime.UtcNow,
                 UpdatedUtc = DateTime.UtcNow
             };

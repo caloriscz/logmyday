@@ -31,7 +31,9 @@ public class UsersController : ControllerBase
         try
         {
             var users = await _userService.ListAsync(cancellationToken);
-            var userDtos = users.Select(u => new UserDto(u.Id, u.Email, u.DisplayName, u.IsAdmin, u.CreatedUtc, u.UpdatedUtc)).ToList();
+            var userDtos = users
+                .Select(u => new UserDto(u.Id, u.Email, u.DisplayName, u.IsAdmin, u.CreatedUtc, u.UpdatedUtc, u.Culture, u.TimeZone))
+                .ToList();
             return Ok(userDtos);
         }
         catch (Exception ex)
@@ -61,6 +63,16 @@ public class UsersController : ControllerBase
                 return BadRequest("Password must be at least 10 characters long.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.Culture))
+            {
+                return BadRequest("Culture is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.TimeZone))
+            {
+                return BadRequest("Time zone is required.");
+            }
+
             var actorId = _authService.GetUserId(User);
             if (actorId == null)
             {
@@ -72,10 +84,12 @@ public class UsersController : ControllerBase
                 request.Password,
                 request.DisplayName,
                 request.IsAdmin,
+                request.Culture.Trim(),
+                request.TimeZone.Trim(),
                 actorId.Value,
                 cancellationToken);
 
-            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc);
+            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc, user.Culture, user.TimeZone);
             return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, userDto);
         }
         catch (InvalidOperationException ex)
@@ -104,6 +118,16 @@ public class UsersController : ControllerBase
                 return BadRequest("Valid email is required.");
             }
 
+            if (request.Culture != null && string.IsNullOrWhiteSpace(request.Culture))
+            {
+                return BadRequest("Culture is required.");
+            }
+
+            if (request.TimeZone != null && string.IsNullOrWhiteSpace(request.TimeZone))
+            {
+                return BadRequest("Time zone is required.");
+            }
+
             var actorId = _authService.GetUserId(User);
             if (actorId == null)
             {
@@ -115,10 +139,12 @@ public class UsersController : ControllerBase
                 request.Email,
                 request.DisplayName,
                 request.IsAdmin,
+                request.Culture?.Trim(),
+                request.TimeZone?.Trim(),
                 actorId.Value,
                 cancellationToken);
 
-            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc);
+            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc, user.Culture, user.TimeZone);
             return Ok(userDto);
         }
         catch (ArgumentException)

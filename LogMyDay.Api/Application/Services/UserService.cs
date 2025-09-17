@@ -2,8 +2,10 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Shared.Preferences;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Security.Cryptography;
 
 namespace LogMyDay.Api.Application.Services;
@@ -41,12 +43,17 @@ public sealed class UserService : IUserService
         var normalizedEmail = email.ToLowerInvariant().Trim();
         var passwordHash = _passwordHasher.Hash(password);
 
+        var defaultCulture = NormalizeCultureOrThrow(null);
+        var defaultTimeZone = NormalizeTimeZoneOrThrow(null);
+
         var user = new User
         {
             Email = normalizedEmail,
-            DisplayName = displayName,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim(),
             PasswordHash = passwordHash,
-            IsAdmin = true
+            IsAdmin = true,
+            Culture = defaultCulture,
+            TimeZone = defaultTimeZone
         };
 
         _context.Users.Add(user);
@@ -56,12 +63,25 @@ public sealed class UserService : IUserService
         return user;
     }
 
-    public async Task<User> CreateUserAsync(string email, string password, string? displayName, bool isAdmin, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> CreateUserAsync(string email, string password, string? displayName, bool isAdmin, string culture, string timeZone, Guid actorId, CancellationToken cancellationToken)
     {
-        var actor = await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
+        _ = await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
 
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        
+
+        if (string.IsNullOrWhiteSpace(culture))
+        {
+            throw new InvalidOperationException("Culture is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(timeZone))
+        {
+            throw new InvalidOperationException("Time zone is required.");
+        }
+
+        var normalizedCulture = NormalizeCultureOrThrow(culture);
+        var normalizedTimeZone = NormalizeTimeZoneOrThrow(timeZone);
+
         var existingUser = await FindByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser != null)
         {
@@ -73,9 +93,11 @@ public sealed class UserService : IUserService
         var user = new User
         {
             Email = normalizedEmail,
-            DisplayName = displayName,
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim(),
             PasswordHash = passwordHash,
-            IsAdmin = isAdmin
+            IsAdmin = isAdmin,
+            Culture = normalizedCulture,
+            TimeZone = normalizedTimeZone
         };
 
         _context.Users.Add(user);
@@ -97,7 +119,7 @@ public sealed class UserService : IUserService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<User> UpdateAsync(Guid id, string? email, string? displayName, bool? isAdmin, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> UpdateAsync(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
     {
         var user = await GetUserAsync(id, cancellationToken);
         var actor = await GetUserAsync(actorId, cancellationToken);
@@ -133,6 +155,26 @@ public sealed class UserService : IUserService
         if (isAdmin.HasValue && actor.IsAdmin)
         {
             user.IsAdmin = isAdmin.Value;
+        }
+
+        if (culture != null)
+        {
+            if (string.IsNullOrWhiteSpace(culture))
+            {
+                throw new InvalidOperationException("Culture is required.");
+            }
+
+            user.Culture = NormalizeCultureOrThrow(culture);
+        }
+
+        if (timeZone != null)
+        {
+            if (string.IsNullOrWhiteSpace(timeZone))
+            {
+                throw new InvalidOperationException("Time zone is required.");
+            }
+
+            user.TimeZone = NormalizeTimeZoneOrThrow(timeZone);
         }
 
         user.UpdatedUtc = DateTime.UtcNow;
@@ -276,6 +318,36 @@ public sealed class UserService : IUserService
         }
         return user;
     }
+
+    private static string NormalizeCultureOrThrow(string? culture)
+    {
+        try
+        {
+            return PreferencesFactory.NormalizeCulture(culture);
+        }
+        catch (CultureNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Culture '{FormatPreferenceValue(culture)}' is not supported.", ex);
+        }
+    }
+
+    private static string NormalizeTimeZoneOrThrow(string? timeZone)
+    {
+        try
+        {
+            return PreferencesFactory.NormalizeTimeZone(timeZone);
+        }
+        catch (TimeZoneNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Time zone '{FormatPreferenceValue(timeZone)}' is not supported.", ex);
+        }
+        catch (InvalidTimeZoneException ex)
+        {
+            throw new InvalidOperationException($"Time zone '{FormatPreferenceValue(timeZone)}' is not valid.", ex);
+        }
+    }
+
+    private static string FormatPreferenceValue(string? value) => string.IsNullOrWhiteSpace(value) ? "<empty>" : value;
 
     private static string GenerateSecureToken()
     {

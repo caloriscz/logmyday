@@ -207,7 +207,7 @@ public class AuthController : ControllerBase
                 return NotFound();
             }
 
-            var userDto = new CurrentUserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin);
+            var userDto = new CurrentUserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.Culture, user.TimeZone);
             return Ok(userDto);
         }
         catch (Exception ex)
