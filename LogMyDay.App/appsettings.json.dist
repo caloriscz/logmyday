@@ -12,6 +12,16 @@
   "Api": {
     "BaseAddress": "https://logmyday.tadata.cz"
   },
+  "Email": {
+    "SmtpServer": "smtp.your-provider.com",
+    "SmtpPort": 587,
+    "UseSsl": true,
+    "UserName": "smtp-user",
+    "Password": "smtp-password",
+    "SenderEmail": "no-reply@your-domain.com",
+    "SenderName": "LogMyDay",
+    "PasswordResetUrl": "https://logmyday.tadata.cz/reset-password"
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",

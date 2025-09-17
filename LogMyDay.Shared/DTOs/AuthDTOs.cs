@@ -20,6 +20,6 @@ public record UserDto(Guid Id, string Email, string? DisplayName, bool IsAdmin, 
 
 public record CurrentUserDto(Guid Id, string Email, string? DisplayName, bool IsAdmin);
 
-public record ForgotResponseDto(string Token);
+public record ForgotResponseDto(string Message);
 
 public record CsrfTokenDto(string Token);
