@@ -1,0 +1,324 @@
+@page "/profile"
+@using System.ComponentModel.DataAnnotations
+@using System.Net
+@using Refit
+@inject IAuthApi AuthApi
+@inject IUsersApi UsersApi
+@inject IAccountApi AccountApi
+@inject ILogger<Profile> Logger
+
+<PageTitle>My Profile</PageTitle>
+
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
+        <h2 class="mb-0">My Profile</h2>
+        <div class="text-muted small">
+            Manage your personal information and password.
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>Loading profile...</span>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @loadErrorMessage
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-12 col-xl-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">Profile Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(profileStatusMessage))
+                        {
+                            <div class="alert @(profileStatusIsError ? "alert-danger" : "alert-success")" role="alert">
+                                @profileStatusMessage
+                            </div>
+                        }
+
+                        <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="profileEmail">Email</label>
+                                <InputText id="profileEmail" @bind-Value="profile.Email" class="form-control" autocomplete="email" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="profileDisplayName">Display Name (optional)</label>
+                                <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="form-control" autocomplete="name" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="profileCulture">Culture</label>
+                                <InputText id="profileCulture" @bind-Value="profile.Culture" class="form-control" />
+                                <div class="form-text">Examples: en-US, de-AT.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="profileTimeZone">Time Zone</label>
+                                <InputText id="profileTimeZone" @bind-Value="profile.TimeZone" class="form-control" />
+                                <div class="form-text">Use IANA identifiers like Europe/Vienna.</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" disabled="@isSavingProfile">
+                                @if (isSavingProfile)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <span><i class="bi bi-save me-1"></i>Save Changes</span>
+                                }
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">Change Password</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(passwordStatusMessage))
+                        {
+                            <div class="alert @(passwordStatusIsError ? "alert-danger" : "alert-success")" role="alert">
+                                @passwordStatusMessage
+                            </div>
+                        }
+
+                        <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="currentPassword">Current Password</label>
+                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="form-control" autocomplete="current-password" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newPassword">New Password</label>
+                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="form-control" autocomplete="new-password" />
+                                <div class="form-text">Minimum 10 characters.</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" disabled="@isChangingPassword">
+                                @if (isChangingPassword)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Updating...</span>
+                                }
+                                else
+                                {
+                                    <span><i class="bi bi-shield-lock me-1"></i>Update Password</span>
+                                }
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private Guid? userId;
+    private bool isLoading = true;
+    private string? loadErrorMessage;
+
+    private ProfileModel profile = new();
+    private bool isSavingProfile;
+    private string? profileStatusMessage;
+    private bool profileStatusIsError;
+
+    private ChangePasswordModel passwordModel = new();
+    private bool isChangingPassword;
+    private string? passwordStatusMessage;
+    private bool passwordStatusIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loadErrorMessage = null;
+            isLoading = true;
+
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            userId = currentUser.Id;
+            profile = new ProfileModel
+            {
+                Email = currentUser.Email,
+                DisplayName = currentUser.DisplayName ?? string.Empty,
+                Culture = currentUser.Culture,
+                TimeZone = currentUser.TimeZone
+            };
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            Logger.LogWarning(ex, "User is not authorized to access profile page");
+            loadErrorMessage = "You are not authorized to view this page.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load profile information");
+            loadErrorMessage = "Failed to load profile information. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (userId == null || isSavingProfile)
+        {
+            return;
+        }
+
+        isSavingProfile = true;
+        SetProfileStatus(null);
+
+        try
+        {
+            var request = new UpdateUserDto(
+                profile.Email.Trim(),
+                string.IsNullOrWhiteSpace(profile.DisplayName) ? null : profile.DisplayName.Trim(),
+                null,
+                profile.Culture.Trim(),
+                profile.TimeZone.Trim());
+
+            var updatedUser = await UsersApi.UpdateUserAsync(userId.Value, request);
+            profile.Email = updatedUser.Email;
+            profile.DisplayName = updatedUser.DisplayName ?? string.Empty;
+            profile.Culture = updatedUser.Culture;
+            profile.TimeZone = updatedUser.TimeZone;
+
+            SetProfileStatus("Profile updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to update profile");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update profile.";
+            SetProfileStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while updating profile");
+            SetProfileStatus("An unexpected error occurred while saving your profile.", true);
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (isChangingPassword)
+        {
+            return;
+        }
+
+        isChangingPassword = true;
+        SetPasswordStatus(null);
+
+        try
+        {
+            var request = new ChangePasswordDto(
+                passwordModel.CurrentPassword,
+                passwordModel.NewPassword);
+
+            await AccountApi.ChangePasswordAsync(request);
+            passwordModel = new ChangePasswordModel();
+
+            SetPasswordStatus("Password updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to change password");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to change password.";
+            SetPasswordStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while changing password");
+            SetPasswordStatus("An unexpected error occurred while changing your password.", true);
+        }
+        finally
+        {
+            isChangingPassword = false;
+        }
+    }
+
+    private void SetProfileStatus(string? message, bool isError = false)
+    {
+        profileStatusMessage = message;
+        profileStatusIsError = isError;
+    }
+
+    private void SetPasswordStatus(string? message, bool isError = false)
+    {
+        passwordStatusMessage = message;
+        passwordStatusIsError = isError;
+    }
+
+    private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
+    {
+        if (!string.IsNullOrWhiteSpace(exception.Content))
+        {
+            return exception.Content;
+        }
+
+        try
+        {
+            var problemDetails = await exception.GetContentAsAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+            return problemDetails?.Detail ?? problemDetails?.Title;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed class ProfileModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = string.Empty;
+
+        [Required]
+        public string TimeZone { get; set; } = string.Empty;
+    }
+
+    private sealed class ChangePasswordModel
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(10, ErrorMessage = "New password must be at least 10 characters long.")]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+}

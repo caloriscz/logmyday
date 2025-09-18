@@ -3,7 +3,10 @@
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @using Microsoft.AspNetCore.Components.Authorization
+@using Refit
+@using System.Net
 @using System.Reflection
+@using System.Security.Claims
 
 <nav class="navbar navbar-expand-lg top-navigation">
     <div class="container-fluid">
@@ -61,14 +64,35 @@
                 }
             </ul>
 
-            <!-- Theme toggle and logout -->
+            <!-- Theme toggle and account menu -->
             <div class="navbar-nav d-flex flex-row align-items-center gap-2">
                 <button class="theme-toggle" @onclick="ToggleTheme" title="Toggle theme">
                     <i class="bi @(isDarkMode ? "bi-sun" : "bi-moon")"></i>
                 </button>
-                <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
-                    <i class="bi bi-box-arrow-right"></i> Logout
-                </button>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-2 text-truncate"
+                            type="button"
+                            id="userMenuButton"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            title="@DisplayEmail"
+                            style="max-width: 18rem;">
+                        <i class="bi bi-person-circle"></i>
+                        <span class="text-truncate">@DisplayEmail</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
+                        <li>
+                            <NavLink class="dropdown-item" href="profile">
+                                <i class="bi bi-person-lines-fill me-2"></i> Profile
+                            </NavLink>
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger" type="button" @onclick="Logout">
+                                <i class="bi bi-box-arrow-right me-2"></i> Logout
+                            </button>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -79,11 +103,12 @@
 @code {
     private bool isDarkMode = false;
     private bool isAdminUser = false;
+    private string? currentUserEmail;
 
     protected override async Task OnInitializedAsync()
     {
         AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
-        await DetermineAdminAsync();
+        await RefreshUserInfoAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -98,37 +123,51 @@
         }
     }
 
-    private async Task DetermineAdminAsync()
-    {
-        try
-        {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            isAdminUser = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
-        }
-        catch
-        {
-            isAdminUser = false;
-        }
-    }
-
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
     {
         try
         {
             var authState = await task;
+            await RefreshUserInfoAsync(authState);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            isAdminUser = false;
+            currentUserEmail = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshUserInfoAsync(AuthenticationState? authState = null)
+    {
+        try
+        {
+            authState ??= await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
-            var isAdmin = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
-            if (isAdmin != isAdminUser)
+            isAdminUser = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
+
+            if (user?.Identity?.IsAuthenticated == true)
             {
-                isAdminUser = isAdmin;
-                await InvokeAsync(StateHasChanged);
+                try
+                {
+                    var currentUser = await AuthApi.GetCurrentUserAsync();
+                    currentUserEmail = currentUser.Email;
+                }
+                catch (Refit.ApiException apiEx) when (apiEx.StatusCode == HttpStatusCode.Unauthorized || apiEx.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    currentUserEmail = user.FindFirst(ClaimTypes.Email)?.Value ?? user.Identity?.Name;
+                }
+            }
+            else
+            {
+                currentUserEmail = null;
             }
         }
         catch
         {
             isAdminUser = false;
-            await InvokeAsync(StateHasChanged);
+            currentUserEmail = null;
         }
     }
 
@@ -154,6 +193,8 @@
         var version = assembly.GetName().Version;
         return version?.ToString(3) ?? "Unknown"; // Returns major.minor.build
     }
+
+    private string DisplayEmail => string.IsNullOrWhiteSpace(currentUserEmail) ? "Account" : currentUserEmail;
 
     private async Task ToggleTheme()
     {
