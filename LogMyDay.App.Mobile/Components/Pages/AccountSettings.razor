@@ -1,6 +1,6 @@
 @page "/settings/account"
 @using System.ComponentModel.DataAnnotations
-@using Microsoft.AspNetCore.Mvc
+@using LogMyDay.App.Mobile.Models
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
 @inject ILogger<AccountSettings> Logger
@@ -184,7 +184,7 @@
 
         try
         {
-            var problem = await exception.GetContentAsAsync<ProblemDetails>();
+            var problem = await exception.GetContentAsAsync<ApiError>();
             return problem?.Detail ?? problem?.Title;
         }
         catch
