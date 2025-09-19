@@ -29,8 +29,10 @@ public class ActivityServiceTests
             PrimaryTagId = tag.Id
         };
 
+        var userId = Guid.NewGuid(); // Add a userId for the required parameter
+
         // Act
-        var response = await service.Create(request);
+        var response = await service.Create(request, userId);
 
         // Assert
         Assert.NotNull(response);

@@ -21,9 +21,10 @@ public class TagServiceTests
         var loggerMock = new Mock<ILogger<TagService>>();
         var service = new TagService(context, loggerMock.Object);
         var tagRequest = new TagRequest { Tag = "TestTag", TypeId = 1 };
+        var userId = Guid.NewGuid(); // Add a userId for the required parameter
 
         // Act
-        var tagId = await service.Create(tagRequest);
+        var tagId = await service.Create(tagRequest, userId);
 
         // Assert
         var tag = await context.Tags.FindAsync(tagId);

@@ -140,7 +140,8 @@ public class BackupControllerTests
         // Arrange
         var mockBackupService = new Mock<IBackupService>();
         var mockLogger = new Mock<ILogger<BackupController>>();
-        
+        var mockAuthService = new Mock<IAuthService>(); // Add this line
+
         var backupData = new BackupData
         {
             Metadata = new BackupMetadata
@@ -155,7 +156,7 @@ public class BackupControllerTests
         mockBackupService.Setup(s => s.ExportDataAsync(It.IsAny<Guid?>()))
                         .ReturnsAsync(backupData);
 
-        var controller = new BackupController(mockBackupService.Object, mockLogger.Object);
+        var controller = new BackupController(mockBackupService.Object, mockLogger.Object, mockAuthService.Object); // Add mockAuthService.Object
 
         // Act
         var result = await controller.GetBackupInfo();
@@ -163,7 +164,7 @@ public class BackupControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
-        
+
         // Verify the service was called
         mockBackupService.Verify(s => s.ExportDataAsync(null), Times.Once);
     }
@@ -174,11 +175,12 @@ public class BackupControllerTests
         // Arrange
         var mockBackupService = new Mock<IBackupService>();
         var mockLogger = new Mock<ILogger<BackupController>>();
-        
+        var mockAuthService = new Mock<IAuthService>(); // Add this line
+
         mockBackupService.Setup(s => s.ClearDataAsync(It.IsAny<Guid?>()))
                         .ReturnsAsync(42);
 
-        var controller = new BackupController(mockBackupService.Object, mockLogger.Object);
+        var controller = new BackupController(mockBackupService.Object, mockLogger.Object, mockAuthService.Object); // Add mockAuthService.Object
 
         // Act
         var result = await controller.ClearData();
@@ -186,7 +188,7 @@ public class BackupControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
-        
+
         // Verify the service was called
         mockBackupService.Verify(s => s.ClearDataAsync(null), Times.Once);
     }

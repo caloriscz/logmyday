@@ -7,12 +7,12 @@ using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Application.Services;
 
-public class ExcelExportService : IExcelExportService
+public class ExportService : IExcelExportService
 {
     private readonly LogMyDayDbContext _context;
-    private readonly ILogger<ExcelExportService> _logger;
+    private readonly ILogger<ExportService> _logger;
 
-    public ExcelExportService(LogMyDayDbContext context, ILogger<ExcelExportService> logger)
+    public ExportService(LogMyDayDbContext context, ILogger<ExportService> logger)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -70,14 +70,14 @@ public class ExcelExportService : IExcelExportService
             var activities = await activitiesQuery
                 .Select(a => new
                 {
-                    Date = a.DateStarted.Date,
-                    TagId = a.TagId,
-                    TagName = a.Tag.TagName,
+                    a.DateStarted.Date,
+                    a.TagId,
+                    a.Tag.TagName,
                     Description = a.Description ?? "",
-                    DateStarted = a.DateStarted,
-                    DateFinished = a.DateFinished,
-                    Duration = a.DateFinished != null 
-                        ? (a.DateFinished.Value - a.DateStarted).TotalMinutes 
+                    a.DateStarted,
+                    a.DateFinished,
+                    Duration = a.DateFinished != null
+                        ? (a.DateFinished.Value - a.DateStarted).TotalMinutes
                         : (double?)null
                 })
                 .OrderBy(a => a.Date)
@@ -86,12 +86,12 @@ public class ExcelExportService : IExcelExportService
 
             // Generate Excel file
             using var workbook = new XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("Daily Overview");            // Create headers
+            var worksheet = workbook.Worksheets.Add("Daily Overview");
             worksheet.Cell(1, 1).Value = "Date";
             worksheet.Cell(1, 1).Style.Font.Bold = true;
             worksheet.Cell(1, 1).Style.Fill.BackgroundColor = XLColor.LightGray;
             worksheet.Cell(1, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            worksheet.Cell(1, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;var columnIndex = 2;
+            worksheet.Cell(1, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center; var columnIndex = 2;
             var tagColumnMap = new Dictionary<int, int>();
 
             foreach (var tag in selectedTags)
@@ -102,14 +102,15 @@ public class ExcelExportService : IExcelExportService
                 worksheet.Cell(1, columnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 worksheet.Cell(1, columnIndex).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 tagColumnMap[tag.Id] = columnIndex;
-                columnIndex++;            }// Group activities by date, then create one row per date with combined values
+                columnIndex++;
+            }// Group activities by date, then create one row per date with combined values
             var groupedActivities = activities
                 .GroupBy(a => a.Date)
                 .OrderBy(g => g.Key)
                 .ToList();
 
             var rowIndex = 2;
-            var statisticsData = new Dictionary<string, int>();            foreach (var dayGroup in groupedActivities)
+            var statisticsData = new Dictionary<string, int>(); foreach (var dayGroup in groupedActivities)
             {
                 // Date column
                 worksheet.Cell(rowIndex, 1).Value = dayGroup.Key;
@@ -118,21 +119,21 @@ public class ExcelExportService : IExcelExportService
                 // Group activities by tag for this day
                 var tagActivities = dayGroup
                     .GroupBy(a => a.TagId)
-                    .ToDictionary(g => g.Key, g => g.ToList());                // Fill in tag columns
+                    .ToDictionary(g => g.Key, g => g.ToList());
                 foreach (var tagCol in tagColumnMap)
                 {
                     var tagId = tagCol.Key;
                     var tagColumnIndex = tagCol.Value;
-                    
+
                     if (tagActivities.ContainsKey(tagId))
                     {
                         var activitiesForTag = tagActivities[tagId];
                         var values = new List<string>();
-                        
+
                         foreach (var activity in activitiesForTag.OrderBy(a => a.DateStarted))
                         {
                             string cellValue = "";
-                            
+
                             // Try to determine the best value to display
                             if (!string.IsNullOrWhiteSpace(activity.Description))
                             {
@@ -146,21 +147,21 @@ public class ExcelExportService : IExcelExportService
                             {
                                 cellValue = "1";
                             }
-                            
+
                             values.Add(cellValue);
                         }
-                        
+
                         // Join multiple values with semicolon
                         var combinedValue = string.Join("; ", values);
                         worksheet.Cell(rowIndex, tagColumnIndex).Value = combinedValue;
-                        
+
                         // Check if all values are numeric for right alignment
                         bool allNumeric = values.All(v => double.TryParse(v, out _));
                         if (allNumeric)
                         {
                             worksheet.Cell(rowIndex, tagColumnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
                         }
-                        
+
                         // Update statistics
                         foreach (var activity in activitiesForTag)
                         {
@@ -186,14 +187,15 @@ public class ExcelExportService : IExcelExportService
             worksheet.Row(1).Height = 50; // More height for headers
             var headerRange = worksheet.Range(1, 1, 1, columnIndex - 1);
             headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            headerRange.Style.Font.Bold = true;            // Set data row height
+            headerRange.Style.Font.Bold = true;
+
             if (rowIndex > 2)
             {
                 for (int r = 2; r < rowIndex; r++)
                 {
                     worksheet.Row(r).Height = 30; // Approximately 40 pixels
                 }
-                
+
                 // Set vertical alignment for all data cells
                 var dataRange = worksheet.Range(2, 1, rowIndex - 1, columnIndex - 1);
                 dataRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
@@ -205,6 +207,7 @@ public class ExcelExportService : IExcelExportService
                 {
                     column.Width = 12; // Minimum column width
                 }
+
                 if (column.Width > 25)
                 {
                     column.Width = 25; // Maximum column width
@@ -219,7 +222,7 @@ public class ExcelExportService : IExcelExportService
                 tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }// Create summary sheet
             var summarySheet = workbook.Worksheets.Add("Summary");
-            
+
             summarySheet.Cell(1, 1).Value = "LogMyDay Activities Overview Report";
             summarySheet.Cell(1, 1).Style.Font.Bold = true;
             summarySheet.Cell(1, 1).Style.Font.FontSize = 16;
@@ -238,7 +241,7 @@ public class ExcelExportService : IExcelExportService
 
             summarySheet.Cell(6, 1).Value = "Total Days with Data:";
             summarySheet.Cell(6, 1).Style.Font.Bold = true;
-            summarySheet.Cell(6, 2).Value = groupedActivities.Count;            summarySheet.Cell(7, 1).Value = "Report Format:";
+            summarySheet.Cell(6, 2).Value = groupedActivities.Count; summarySheet.Cell(7, 1).Value = "Report Format:";
             summarySheet.Cell(7, 1).Style.Font.Bold = true;
             summarySheet.Cell(7, 2).Value = "One row per date, multiple values per tag separated by semicolons";
 
@@ -250,7 +253,7 @@ public class ExcelExportService : IExcelExportService
             summarySheet.Cell(10, 1).Value = "Tag";
             summarySheet.Cell(10, 1).Style.Font.Bold = true;
             summarySheet.Cell(10, 2).Value = "Activity Count";
-            summarySheet.Cell(10, 2).Style.Font.Bold = true;            var summaryRowIndex = 11;
+            summarySheet.Cell(10, 2).Style.Font.Bold = true; var summaryRowIndex = 11;
             foreach (var tagStat in statisticsData.OrderByDescending(kvp => kvp.Value))
             {
                 summarySheet.Cell(summaryRowIndex, 1).Value = tagStat.Key;
@@ -286,7 +289,7 @@ public class ExcelExportService : IExcelExportService
 
             result.Message = $"Excel overview report generated successfully with {activities.Count} activities across {groupedActivities.Count} days";
 
-            _logger.LogInformation("Excel report generated successfully: {FileName}, {ActivityCount} activities", 
+            _logger.LogInformation("Excel report generated successfully: {FileName}, {ActivityCount} activities",
                 result.FileName, activities.Count);
 
             return result;

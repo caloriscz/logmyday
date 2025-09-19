@@ -23,8 +23,7 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         ISystemClock clock,
         IUserService userService,
         IPasswordHasher passwordHasher,
-        AuthAttemptTracker attemptTracker)
-        : base(options, logger, encoder, clock)
+        AuthAttemptTracker attemptTracker) : base(options, logger, encoder, clock)
     {
         _userService = userService;
         _passwordHasher = passwordHasher;
@@ -44,31 +43,31 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         try
         {
             var authHeader = Request.Headers["Authorization"].ToString();
-            Logger.LogInformation("[BasicAuth] 🔐 Authorization header received: '{AuthHeader}'", authHeader);
-            
+            Logger.LogInformation("[BasicAuth] Authorization header received: '{AuthHeader}'", authHeader);
+
             if (!authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
                 return AuthenticateResult.Fail("Invalid Authorization Header");
 
             var encodedCredentials = authHeader.Substring("Basic ".Length).Trim();
-            Logger.LogInformation("[BasicAuth] 🔐 Encoded credentials: '{EncodedCredentials}'", encodedCredentials);
-            Logger.LogInformation("[BasicAuth] 🔐 Encoded credentials length: {Length}", encodedCredentials.Length);
-            
+            Logger.LogInformation("[BasicAuth] Encoded credentials: '{EncodedCredentials}'", encodedCredentials);
+            Logger.LogInformation("[BasicAuth] Encoded credentials length: {Length}", encodedCredentials.Length);
+
             var decodedBytes = Convert.FromBase64String(encodedCredentials);
             var decodedString = Encoding.UTF8.GetString(decodedBytes);
-            Logger.LogInformation("[BasicAuth] 🔐 Decoded credentials string: '{DecodedString}'", decodedString);
-            Logger.LogInformation("[BasicAuth] 🔐 Decoded string length: {Length}", decodedString.Length);
-            
+            Logger.LogInformation("[BasicAuth] Decoded credentials string: '{DecodedString}'", decodedString);
+            Logger.LogInformation("[BasicAuth] Decoded string length: {Length}", decodedString.Length);
+
             var credentials = decodedString.Split(':');
-            Logger.LogInformation("[BasicAuth] 🔐 Split credentials count: {Count}", credentials.Length);
+            Logger.LogInformation("[BasicAuth] Split credentials count: {Count}", credentials.Length);
 
             if (credentials.Length != 2)
                 return AuthenticateResult.Fail("Invalid Basic Authentication format");
 
             var email = credentials[0];
             var password = credentials[1];
-            Logger.LogInformation("[BasicAuth] 🔐 Parsed email: '{Email}' (length: {Length})", email, email.Length);
-            Logger.LogInformation("[BasicAuth] 🔐 Parsed password: '{Password}' (length: {Length})", password, password.Length);
-            
+            Logger.LogInformation("[BasicAuth] Parsed email: '{Email}' (length: {Length})", email, email.Length);
+            Logger.LogInformation("[BasicAuth] Parsed password: '{Password}' (length: {Length})", password, password.Length);
+
             var clientIp = Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var identifier = $"{clientIp}:{email}";
 
@@ -103,11 +102,13 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
             Logger.LogInformation("[BasicAuth] User '{Email}' (ID: {UserId}) from IP '{ClientIp}' authenticated successfully", user.Email, user.Id, clientIp);
+            
             return AuthenticateResult.Success(ticket);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "[BasicAuth] Exception during authentication");
+            
             return AuthenticateResult.Fail("Invalid Authorization Header");
         }
     }

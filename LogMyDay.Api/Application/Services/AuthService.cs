@@ -16,11 +16,10 @@ public sealed class AuthService : IAuthService
     {
         _logger = logger;
     }
-
     public async Task SignInAsync(HttpContext httpContext, User user)
     {
-        _logger.LogInformation("AuthService.SignInAsync: Starting sign-in for User {UserId} ({Email})", user.Id, user.Email);
-        
+        _logger.LogInformation("AuthService: Starting sign-in for User {UserId} ({Email})", user.Id, user.Email);
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -29,16 +28,16 @@ public sealed class AuthService : IAuthService
             new Claim("is_admin", user.IsAdmin.ToString().ToLowerInvariant())
         };
 
-        _logger.LogInformation("AuthService.SignInAsync: Created claims for User {UserId}: {Claims}", 
+        _logger.LogInformation("AuthService.SignInAsync: Created claims for User {UserId}: {Claims}",
             user.Id, string.Join(", ", claims.Select(c => $"{c.Type}={c.Value}")));
 
         var identity = new ClaimsIdentity(claims, AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
-        _logger.LogInformation("AuthService.SignInAsync: Calling httpContext.SignInAsync with scheme '{Scheme}'", AuthenticationScheme);
-        
+        _logger.LogInformation("AuthService: Calling httpContext.SignInAsync with scheme '{Scheme}'", AuthenticationScheme);
+
         await httpContext.SignInAsync(AuthenticationScheme, principal);
-        
+
         _logger.LogInformation("AuthService.SignInAsync: Successfully signed in User {UserId} ({Email})", user.Id, user.Email);
     }
 
@@ -62,7 +61,7 @@ public sealed class AuthService : IAuthService
                 _logger.LogDebug("🔍 DEBUG: Claim - Type: {Type}, Value: {Value}", claim.Type, claim.Value);
             }
         }
-        
+
         var userIdClaim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var userId = Guid.TryParse(userIdClaim, out var id) ? (Guid?)id : null;
         _logger.LogDebug("AuthService.GetUserId: UserIdClaim='{UserIdClaim}', ParsedUserId={UserId}", userIdClaim, userId);

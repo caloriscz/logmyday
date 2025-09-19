@@ -28,8 +28,8 @@ public sealed class UserService : IUserService
     public async Task<User?> FindByEmail(string email, CancellationToken cancellationToken)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
-        return await _context.Users
-            .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+
+        return await _context.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
     }
 
     public async Task<User> CreateFirstAdmin(string email, string password, string? displayName, CancellationToken cancellationToken)
@@ -60,6 +60,7 @@ public sealed class UserService : IUserService
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("First admin user created with email: {Email}", normalizedEmail);
+
         return user;
     }
 
@@ -102,8 +103,8 @@ public sealed class UserService : IUserService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);
-
         _logger.LogInformation("User created with email: {Email} by admin: {ActorId}", normalizedEmail, actorId);
+
         return user;
     }
 
@@ -114,9 +115,7 @@ public sealed class UserService : IUserService
 
     public async Task<List<User>> List(CancellationToken cancellationToken)
     {
-        return await _context.Users
-            .OrderBy(u => u.Email)
-            .ToListAsync(cancellationToken);
+        return await _context.Users.OrderBy(u => u.Email).ToListAsync(cancellationToken);
     }
 
     public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
@@ -187,14 +186,14 @@ public sealed class UserService : IUserService
     public async Task Delete(Guid id, Guid actorId, CancellationToken cancellationToken)
     {
         var actor = await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
-        
+
         if (actor.Id == id)
         {
             throw new InvalidOperationException("You cannot delete yourself.");
         }
 
         var user = await GetUserAsync(id, cancellationToken);
-        
+
         _context.Users.Remove(user);
         await _context.SaveChangesAsync(cancellationToken);
 

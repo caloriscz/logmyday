@@ -13,7 +13,7 @@ public class NotificationManagerService : INotificationManagerService
     const string channelId = "logmyday_notifications";
     const string channelName = "LogMyDay Notifications";
     const string channelDescription = "Notifications for LogMyDay app.";
-    
+
     const string periodicChannelId = "logmyday_periodic";
     const string periodicChannelName = "LogMyDay Periodic";
     const string periodicChannelDescription = "Periodic notifications from LogMyDay app.";
@@ -36,30 +36,17 @@ public class NotificationManagerService : INotificationManagerService
     public NotificationManagerService()
     {
         System.Diagnostics.Debug.WriteLine("NotificationManagerService constructor called");
-        
+
         if (Instance == null)
         {
             System.Diagnostics.Debug.WriteLine("Initializing NotificationManagerService instance");
             CreateNotificationChannel();
-            
+
             if (Platform.AppContext != null)
             {
                 compatManager = NotificationManagerCompat.From(Platform.AppContext);
-                System.Diagnostics.Debug.WriteLine("NotificationManagerCompat initialized successfully");
-                
-                // Send immediate test notification
-                Task.Run(async () =>
-                {
-                    await Task.Delay(300); // Wait only 0.3 seconds
-                    System.Diagnostics.Debug.WriteLine("Sending constructor test notification");
-                    Show("Constructor Test", "NotificationManagerService initialized successfully");
-                });
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("Platform.AppContext is null during initialization");
-            }
-            
+
             Instance = this;
         }
     }
@@ -67,7 +54,7 @@ public class NotificationManagerService : INotificationManagerService
     public void SendNotification(string title, string message, DateTime? notifyTime = null)
     {
         System.Diagnostics.Debug.WriteLine($"Android NotificationManagerService.SendNotification called: {title} - {message}");
-        
+
         if (!channelInitialized)
         {
             CreateNotificationChannel();
@@ -121,7 +108,7 @@ public class NotificationManagerService : INotificationManagerService
     public void Show(string title, string message)
     {
         System.Diagnostics.Debug.WriteLine($"Android NotificationManagerService.Show called: {title} - {message}");
-        
+
         var context = Platform.AppContext;
         if (context == null || compatManager == null)
         {
@@ -132,7 +119,7 @@ public class NotificationManagerService : INotificationManagerService
         // Ensure notification channel is created
         bool isPeriodicNotification = title?.Contains("Timer") == true || title?.Contains("Periodic") == true;
         string notificationChannelId = isPeriodicNotification ? periodicChannelId : channelId;
-        
+
         if (isPeriodicNotification && !periodicChannelInitialized)
         {
             CreatePeriodicNotificationChannel();
@@ -152,14 +139,14 @@ public class NotificationManagerService : INotificationManagerService
             : PendingIntentFlags.UpdateCurrent;
 
         PendingIntent? pendingIntent = PendingIntent.GetActivity(context, pendingIntentId++, intent, pendingIntentFlags);
-        if (pendingIntent == null) 
+        if (pendingIntent == null)
             return;
-        
+
         var builder = new NotificationCompat.Builder(context, notificationChannelId);
         builder.SetContentIntent(pendingIntent);
         builder.SetContentTitle(title ?? "LogMyDay");
         builder.SetContentText(message ?? "Notification");
-        
+
         // Make notifications more visible
         if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
         {
@@ -172,11 +159,11 @@ public class NotificationManagerService : INotificationManagerService
         {
             builder.SetPriority(NotificationCompat.PriorityDefault);
         }
-        
+
         // Use the custom notification icon
         var iconResourceId = context.Resources?.GetIdentifier("notification_icon", "drawable", context.PackageName);
         System.Diagnostics.Debug.WriteLine($"Notification icon resource ID: {iconResourceId}");
-        
+
         if (iconResourceId != null && iconResourceId > 0)
         {
             builder.SetSmallIcon(iconResourceId.Value);
@@ -188,11 +175,11 @@ public class NotificationManagerService : INotificationManagerService
             builder.SetSmallIcon(17301659); // android.R.drawable.ic_dialog_info
             System.Diagnostics.Debug.WriteLine("Using system icon for notification");
         }
-        
+
         builder.SetAutoCancel(true);
 
         var notification = builder.Build();
-        
+
         // Use different notification IDs to prevent Android from grouping them
         int notificationId = messageId++;
         if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
@@ -200,7 +187,7 @@ public class NotificationManagerService : INotificationManagerService
             _notificationCount++;
             notificationId = 2000 + _notificationCount; // Use different range for periodic notifications
         }
-        
+
         System.Diagnostics.Debug.WriteLine($"Built notification, about to notify with ID: {notificationId}");
         compatManager.Notify(notificationId, notification);
         System.Diagnostics.Debug.WriteLine("Notification sent successfully");
@@ -227,7 +214,7 @@ public class NotificationManagerService : INotificationManagerService
         {
             System.Diagnostics.Debug.WriteLine("Notification channel not needed for API < 26");
         }
-        
+
         // Mark as initialized regardless of API level
         channelInitialized = true;
     }
@@ -253,7 +240,7 @@ public class NotificationManagerService : INotificationManagerService
         {
             System.Diagnostics.Debug.WriteLine("Periodic notification channel not needed for API < 26");
         }
-        
+
         // Mark as initialized regardless of API level
         periodicChannelInitialized = true;
     }

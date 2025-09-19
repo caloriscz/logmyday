@@ -68,13 +68,13 @@ public class AuthAttemptTracker
                 {
                     var lockoutDuration = CalculateLockoutDuration(existingInfo.FailedAttempts);
                     existingInfo.LockoutUntil = now.Add(lockoutDuration);
-                    
-                    _logger.LogWarning("[AuthTracker] Account locked for {Identifier}. Attempts: {Attempts}, Lockout until: {LockoutUntil}", 
+
+                    _logger.LogWarning("[AuthTracker] Account locked for {Identifier}. Attempts: {Attempts}, Lockout until: {LockoutUntil}",
                         identifier, existingInfo.FailedAttempts, existingInfo.LockoutUntil);
                 }
                 else
                 {
-                    _logger.LogInformation("[AuthTracker] Failed attempt {Attempts}/{MaxAttempts} for {Identifier}", 
+                    _logger.LogInformation("[AuthTracker] Failed attempt {Attempts}/{MaxAttempts} for {Identifier}",
                         existingInfo.FailedAttempts, _maxAttempts, identifier);
                 }
             }

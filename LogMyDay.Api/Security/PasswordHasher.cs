@@ -74,8 +74,10 @@ public sealed class Argon2IdPasswordHasher : IPasswordHasher
     private static byte[] HashPassword(string password, byte[] salt, int memorySize = MemorySize, int iterations = Iterations, int parallelism = -1)
     {
         if (parallelism == -1)
+        {
             parallelism = DegreeOfParallelism;
-            
+        }
+
         using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password));
         argon2.Salt = salt;
         argon2.DegreeOfParallelism = parallelism;

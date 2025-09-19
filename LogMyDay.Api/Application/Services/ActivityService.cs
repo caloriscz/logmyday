@@ -14,7 +14,8 @@ public class ActivityService : IActivityService
     public ActivityService(LogMyDayDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
-    }    public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
+    }
+    public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
     {
         // Get the tag to check if it's repeatable and what its time granularity is
         var tag = await _context.Tags.FindAsync(calendarRequest.PrimaryTagId);
@@ -39,7 +40,7 @@ public class ActivityService : IActivityService
             DateCreated = DateTime.UtcNow,
             Description = calendarRequest.Description,
             TagId = calendarRequest.PrimaryTagId ?? 0,
-            UserId = userId // Add user ID to associate activity with current user
+            UserId = userId
         };
 
         _context.Activities.Add(activity);
@@ -65,6 +66,7 @@ public class ActivityService : IActivityService
         }
         _context.Activities.Remove(activity);
         await _context.SaveChangesAsync();
+
         return true;
     }
 
@@ -77,7 +79,8 @@ public class ActivityService : IActivityService
                .ToListAsync();
 
         return activities.Select(MapToResponse).ToList();
-    }    public async Task<PagedResult<ActivityResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }
+    public async Task<PagedResult<ActivityResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
@@ -124,7 +127,8 @@ public class ActivityService : IActivityService
             PageNumber = pageNumber,
             PageSize = pageSize
         };
-    }    public async Task<PagedResult<ActivityResponse>> GetPagedByWeeks(int weekPageNumber, int weeksPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }
+    public async Task<PagedResult<ActivityResponse>> GetPagedByWeeks(int weekPageNumber, int weeksPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
@@ -154,7 +158,7 @@ public class ActivityService : IActivityService
 
         // Get all activities first to calculate week ranges
         var allActivities = await query.ToListAsync();
-        
+
         if (!allActivities.Any())
         {
             return new PagedResult<ActivityResponse>
@@ -201,7 +205,8 @@ public class ActivityService : IActivityService
             PageNumber = weekPageNumber,
             PageSize = weeksPerPage
         };
-    }    public async Task<PagedResult<ActivityResponse>> GetPagedByMonths(int monthPageNumber, int monthsPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
+    }
+    public async Task<PagedResult<ActivityResponse>> GetPagedByMonths(int monthPageNumber, int monthsPerPage, string orderBy, Guid userId, int? tagId = null, DateTime? startDate = null, DateTime? endDate = null, string? descriptionFilter = null)
     {
         var query = _context.Activities
             .Include(ct => ct.Tag)
@@ -231,7 +236,7 @@ public class ActivityService : IActivityService
 
         // Get all activities first to calculate month ranges
         var allActivities = await query.ToListAsync();
-        
+
         if (!allActivities.Any())
         {
             return new PagedResult<ActivityResponse>
@@ -278,7 +283,8 @@ public class ActivityService : IActivityService
             PageNumber = monthPageNumber,
             PageSize = monthsPerPage
         };
-    }    public Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId)
+    }
+    public Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId)
     {
         throw new NotImplementedException();
     }
@@ -298,7 +304,8 @@ public class ActivityService : IActivityService
     public Task<ActivityResponse> Update(int id, DateTime dateCreated, DateTime? dateFinished, Guid userId)
     {
         throw new NotImplementedException();
-    }    private ActivityResponse MapToResponse(Activity calendar)
+    }
+    private ActivityResponse MapToResponse(Activity calendar)
     {
         var primaryTag = calendar;
 
@@ -316,7 +323,8 @@ public class ActivityService : IActivityService
             ElementName = primaryTag?.Tag?.InputType?.Name ?? string.Empty,
             TagRequired = primaryTag?.Tag?.IsRequired ?? false
         };
-    }private DateTime GetStartOfWeek(DateTime date)
+    }
+    private DateTime GetStartOfWeek(DateTime date)
     {
         // Assuming Monday is the start of the week
         int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;

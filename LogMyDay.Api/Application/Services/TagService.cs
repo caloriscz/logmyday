@@ -4,7 +4,6 @@ using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Refit;
 
 namespace LogMyDay.Api.Application.Services;
 
@@ -18,7 +17,7 @@ public class TagService : ITagService
         _context = context;
         _logger = logger;
     }
-    
+
     public async Task<int> Create(TagRequest createTagRequest, Guid userId)
     {
         _logger.LogInformation("Creating tag with request: {@CreateTagRequest}", createTagRequest);
@@ -42,22 +41,27 @@ public class TagService : ITagService
         return tag.Id;
     }
 
+    /// <summary>
+    /// Returns all tags for a specific user
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <returns></returns>
     public async Task<IList<TagResponse>> GetAll(Guid userId)
     {
         var tags = await _context.Tags
             .Where(t => t.UserId == userId)
             .OrderBy(x => x.TagName)
             .ToListAsync(); var tagsResponse = tags.Select(tag => new TagResponse
-        {
-            Id = tag.Id,
-            Title = tag.TagName,
-            InputTypeId = tag?.InputType?.Id,
-            TypeId = tag.InputTypeId,
-            IsRequired = tag.IsRequired, // Map IsRequired
-            IsRepeatable = tag.IsRepeatable,
-            TimeGranularity = tag.TimeGranularity,
-            IsRange = tag.IsRange
-        }).ToList();
+            {
+                Id = tag.Id,
+                Title = tag.TagName,
+                InputTypeId = tag?.InputType?.Id,
+                TypeId = tag.InputTypeId,
+                IsRequired = tag.IsRequired, // Map IsRequired
+                IsRepeatable = tag.IsRepeatable,
+                TimeGranularity = tag.TimeGranularity,
+                IsRange = tag.IsRange
+            }).ToList();
 
         return tagsResponse;
     }
@@ -74,12 +78,12 @@ public class TagService : ITagService
         var tag = await _context.Tags
             .Where(t => t.Id == id && t.UserId == userId)
             .FirstOrDefaultAsync();
-        
+
         if (tag == null)
         {
             throw new KeyNotFoundException("Tag not found");
         }
-        
+
         tag.TagName = model.Tag;
         tag.InputTypeId = model.TypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
@@ -118,12 +122,12 @@ public class TagService : ITagService
         Tag? tagResponse = await _context.Tags
             .Where(t => t.Id == tagId && t.UserId == userId)
             .FirstOrDefaultAsync();
-            
+
         if (tagResponse == null)
         {
             throw new KeyNotFoundException("Tag not found");
         }
-        
+
         TagResponse response = new()
         {
             Id = tagResponse.Id,

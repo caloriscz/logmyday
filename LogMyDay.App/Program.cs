@@ -153,7 +153,7 @@ services.AddEndpointsApiExplorer();
 services.AddScoped<IActivityService, ActivityService>();
 services.AddScoped<ITagService, TagService>();
 services.AddScoped<IBackupService, BackupService>();
-services.AddScoped<IExcelExportService, ExcelExportService>();
+services.AddScoped<IExcelExportService, ExportService>();
 
 // Authentication and user services
 services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();
