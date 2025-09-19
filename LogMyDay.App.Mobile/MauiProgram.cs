@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using LogMyDay.App.Mobile.Services;
+using LogMyDay.Shared.Interfaces;
 using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,8 +46,11 @@ public static class MauiProgram
             builder.Services.AddHttpClient("dynamic-api")
                 .AddHttpMessageHandler<DynamicAuthHandler>();
             builder.Services.Add(new ServiceDescriptor(typeof(IApiClientProvider), typeof(ApiClientProvider), ServiceLifetime.Singleton));
-            // Adapter so existing pages injecting IActivityApi continue to work
-            builder.Services.AddTransient<LogMyDay.Shared.Interfaces.IActivityApi>(sp => sp.GetRequiredService<IApiClientProvider>().Activity);
+            // Adapter so existing pages injecting API interfaces continue to work
+            builder.Services.AddTransient<IActivityApi>(sp => sp.GetRequiredService<IApiClientProvider>().Activity);
+            builder.Services.AddTransient<IAuthApi>(sp => sp.GetRequiredService<IApiClientProvider>().Auth);
+            builder.Services.AddTransient<IUsersApi>(sp => sp.GetRequiredService<IApiClientProvider>().Users);
+            builder.Services.AddTransient<IAccountApi>(sp => sp.GetRequiredService<IApiClientProvider>().Account);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>

@@ -7,6 +7,9 @@ namespace LogMyDay.App.Mobile.Services;
 public interface IApiClientProvider
 {
     IActivityApi Activity { get; }
+    IAuthApi Auth { get; }
+    IUsersApi Users { get; }
+    IAccountApi Account { get; }
     void Invalidate();
 }
 
@@ -15,6 +18,9 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IApiContext _ctx;
     private IActivityApi? _activity;
+    private IAuthApi? _auth;
+    private IUsersApi? _users;
+    private IAccountApi? _account;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -24,6 +30,9 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     }
 
     public IActivityApi Activity => _activity ??= Build<IActivityApi>();
+    public IAuthApi Auth => _auth ??= Build<IAuthApi>();
+    public IUsersApi Users => _users ??= Build<IUsersApi>();
+    public IAccountApi Account => _account ??= Build<IAccountApi>();
 
     private T Build<T>()
     {
@@ -40,6 +49,9 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public void Invalidate()
     {
         _activity = null;
+        _auth = null;
+        _users = null;
+        _account = null;
     }
 
     public void Dispose()
