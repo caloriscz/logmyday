@@ -66,29 +66,40 @@
 
             <!-- Theme toggle and account menu -->
             <div class="navbar-nav d-flex flex-row align-items-center gap-2">
-                <button class="theme-toggle" @onclick="ToggleTheme" title="Toggle theme">
-                    <i class="bi @(isDarkMode ? "bi-sun" : "bi-moon")"></i>
-                </button>
-                <div class="dropdown">
-                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle d-flex align-items-center gap-2 text-truncate"
+                <div class="dropdown account-dropdown">
+                    <button class="btn account-menu-toggle dropdown-toggle"
                             type="button"
                             id="userMenuButton"
                             data-bs-toggle="dropdown"
                             aria-expanded="false"
-                            title="@DisplayEmail"
-                            style="max-width: 18rem;">
+                            aria-label="Account menu"
+                            title="@DisplayEmail">
                         <i class="bi bi-person-circle"></i>
-                        <span class="text-truncate">@DisplayEmail</span>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuButton">
+                    <ul class="dropdown-menu dropdown-menu-end account-dropdown-menu" aria-labelledby="userMenuButton">
+                        <li>
+                            <NavLink class="dropdown-item account-email-item" href="profile">
+                                <i class="bi bi-envelope-open me-2"></i>
+                                <span class="text-break">@DisplayEmail</span>
+                            </NavLink>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
                         <li>
                             <NavLink class="dropdown-item" href="profile">
-                                <i class="bi bi-person-lines-fill me-2"></i> Profile
+                                <i class="bi bi-person-lines-fill me-2"></i>
+                                Profile
                             </NavLink>
                         </li>
                         <li>
-                            <button class="dropdown-item text-danger" type="button" @onclick="Logout">
-                                <i class="bi bi-box-arrow-right me-2"></i> Logout
+                            <button class="dropdown-item d-flex align-items-center gap-2" type="button" @onclick="ToggleTheme">
+                                <i class="bi @(ThemeToggleIcon)"></i>
+                                <span>@ThemeToggleText</span>
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger d-flex align-items-center gap-2" type="button" @onclick="Logout">
+                                <i class="bi bi-box-arrow-right"></i>
+                                <span>Logout</span>
                             </button>
                         </li>
                     </ul>
@@ -195,6 +206,8 @@
     }
 
     private string DisplayEmail => string.IsNullOrWhiteSpace(currentUserEmail) ? "Account" : currentUserEmail;
+    private string ThemeToggleText => isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode";
+    private string ThemeToggleIcon => isDarkMode ? "bi-sun" : "bi-moon";
 
     private async Task ToggleTheme()
     {
