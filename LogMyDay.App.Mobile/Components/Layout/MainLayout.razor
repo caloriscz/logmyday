@@ -28,6 +28,10 @@
                 <div><i class="bi bi-lightning"></i></div>
                 <div>Quick</div>
             </button>
+            <button class="mobile-nav-item @(IsActive("/settings") ? "active" : "")" @onclick="@(() => NavigateTo("/settings"))">
+                <div><i class="bi bi-gear"></i></div>
+                <div>Settings</div>
+            </button>
         </nav>
     }
 </div>
@@ -37,12 +41,24 @@
 
     private bool IsActive(string path)
     {
-        try 
+        try
         {
             var currentPath = GetCurrentPath();
-            return string.Equals(currentPath, path.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+            var targetPath = path.TrimStart('/');
+
+            if (string.Equals(currentPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                return false;
+            }
+
+            return currentPath.StartsWith(targetPath + "/", StringComparison.OrdinalIgnoreCase);
         }
-        catch 
+        catch
         {
             return false;
         }

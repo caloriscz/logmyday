@@ -1,0 +1,51 @@
+@page "/settings"
+@inject NavigationManager Navigation
+
+<PageTitle>Settings - LogMyDay</PageTitle>
+
+<MobileTopbar Title="Settings" />
+
+<div class="container-fluid p-3">
+    <div class="list-group shadow-sm rounded-4 overflow-hidden">
+        <button type="button"
+                class="list-group-item list-group-item-action d-flex align-items-center justify-content-between"
+                @onclick="@(() => NavigateTo("/settings/account"))">
+            <div class="d-flex align-items-center">
+                <span class="me-3 text-primary">
+                    <i class="bi bi-person-gear fs-4"></i>
+                </span>
+                <div class="text-start">
+                    <div class="fw-semibold">Account settings</div>
+                    <small class="text-muted">Update your profile information</small>
+                </div>
+            </div>
+            <i class="bi bi-chevron-right text-muted"></i>
+        </button>
+
+        <button type="button"
+                class="list-group-item list-group-item-action d-flex align-items-center justify-content-between"
+                @onclick="@(() => NavigateTo("/settings/password"))">
+            <div class="d-flex align-items-center">
+                <span class="me-3 text-success">
+                    <i class="bi bi-shield-lock fs-4"></i>
+                </span>
+                <div class="text-start">
+                    <div class="fw-semibold">Password</div>
+                    <small class="text-muted">Change your account password securely</small>
+                </div>
+            </div>
+            <i class="bi bi-chevron-right text-muted"></i>
+        </button>
+    </div>
+
+    <div class="mt-4 text-muted small">
+        Manage the same information available on the web profile page, organised into focused mobile-friendly screens.
+    </div>
+</div>
+
+@code {
+    private void NavigateTo(string url)
+    {
+        Navigation.NavigateTo(url);
+    }
+}

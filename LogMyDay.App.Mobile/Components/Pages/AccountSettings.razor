@@ -1,0 +1,210 @@
+@page "/settings/account"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Mvc
+@inject IAuthApi AuthApi
+@inject IUsersApi UsersApi
+@inject ILogger<AccountSettings> Logger
+
+<PageTitle>Account Settings - LogMyDay</PageTitle>
+
+<MobileTopbar Title="Account settings" ShowBackButton="true" />
+
+<div class="container-fluid p-3">
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2 py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="text-muted">Loading your profile...</span>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @loadErrorMessage
+        </div>
+    }
+    else
+    {
+        <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="alert @(statusIsError ? "alert-danger" : "alert-success")" role="alert">
+                    @statusMessage
+                </div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label" for="email">Email</label>
+                <InputText id="email" @bind-Value="profile.Email" class="form-control" autocomplete="email" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="displayName">Display name</label>
+                <InputText id="displayName" @bind-Value="profile.DisplayName" class="form-control" autocomplete="name" />
+                <div class="form-text">Optional. This is shown in the app when available.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="culture">Culture</label>
+                <InputText id="culture" @bind-Value="profile.Culture" class="form-control" />
+                <div class="form-text">Examples: en-US, de-AT</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="timezone">Time zone</label>
+                <InputText id="timezone" @bind-Value="profile.TimeZone" class="form-control" />
+                <div class="form-text">Use IANA identifiers like Europe/Vienna.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-save me-2"></i>Save changes</span>
+                }
+            </button>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private Guid? userId;
+    private AccountSettingsModel profile = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? statusMessage;
+    private bool statusIsError;
+    private string? loadErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            isLoading = true;
+            loadErrorMessage = null;
+
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            userId = currentUser.Id;
+
+            profile = new AccountSettingsModel
+            {
+                Email = currentUser.Email,
+                DisplayName = currentUser.DisplayName ?? string.Empty,
+                Culture = currentUser.Culture,
+                TimeZone = currentUser.TimeZone
+            };
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized || ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Logger.LogWarning(ex, "User is not authorized to load account settings");
+            loadErrorMessage = "You are not authorized to view this page.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load account settings");
+            loadErrorMessage = "Failed to load profile information. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (userId == null || isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        SetStatus(null);
+
+        try
+        {
+            var request = new UpdateUserDto(
+                profile.Email.Trim(),
+                string.IsNullOrWhiteSpace(profile.DisplayName) ? null : profile.DisplayName.Trim(),
+                null,
+                profile.Culture.Trim(),
+                profile.TimeZone.Trim());
+
+            var updatedUser = await UsersApi.UpdateUserAsync(userId.Value, request);
+
+            profile.Email = updatedUser.Email;
+            profile.DisplayName = updatedUser.DisplayName ?? string.Empty;
+            profile.Culture = updatedUser.Culture;
+            profile.TimeZone = updatedUser.TimeZone;
+
+            SetStatus("Profile updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to update profile");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update profile.";
+            SetStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while updating profile");
+            SetStatus("An unexpected error occurred while saving your profile.", true);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void SetStatus(string? message, bool isError = false)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
+    {
+        if (!string.IsNullOrWhiteSpace(exception.Content))
+        {
+            return exception.Content;
+        }
+
+        try
+        {
+            var problem = await exception.GetContentAsAsync<ProblemDetails>();
+            return problem?.Detail ?? problem?.Title;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed class AccountSettingsModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = string.Empty;
+
+        [Required]
+        public string TimeZone { get; set; } = string.Empty;
+    }
+}
