@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Microsoft.Maui.Storage;
 
 namespace LogMyDay.App.Mobile.Services;
 
@@ -73,10 +74,18 @@ public class AuthenticationService : INotifyPropertyChanged
         try
         {
             Preferences.Remove("ServerUrl");
-            Preferences.Remove("Username");  
+            Preferences.Remove("Username");
             Preferences.Remove("Password");
+            try
+            {
+                SecureStorage.Default.Remove("Password");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error removing password from secure storage: {ex.Message}");
+            }
             SetAuthenticated(false);
-            
+
             // MainLayout will automatically handle navigation to /login when authentication state changes
             System.Diagnostics.Debug.WriteLine("Authentication cleared - MainLayout will handle navigation to login");
         }

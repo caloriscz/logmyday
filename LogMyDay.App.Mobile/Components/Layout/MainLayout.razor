@@ -1,7 +1,13 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject IApiContext ApiContext
+@inject IApiClientProvider ApiProvider
+@inject ILogger<Layout.MainLayout> Logger
 @implements IDisposable
+@using System.Net
+@using Microsoft.Maui.Storage
+@using Refit
 
 <div class="mobile-container">
     <div class="mobile-content">
@@ -91,10 +97,12 @@
         }
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
         System.Diagnostics.Debug.WriteLine("MainLayout: Conditional layout initialized");
         AuthService.AuthenticationChanged += OnAuthenticationChanged;
+        await TryRestoreSessionAsync();
     }
 
     private void OnAuthenticationChanged(bool isAuthenticated)
@@ -116,5 +124,82 @@
     public void Dispose()
     {
         AuthService.AuthenticationChanged -= OnAuthenticationChanged;
+    }
+
+    private bool _restoreAttempted;
+
+    private async Task TryRestoreSessionAsync()
+    {
+        if (_restoreAttempted || AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        _restoreAttempted = true;
+
+        try
+        {
+            var serverUrl = Preferences.Get("ServerUrl", string.Empty);
+            var username = Preferences.Get("Username", string.Empty);
+
+            if (string.IsNullOrWhiteSpace(serverUrl) || string.IsNullOrWhiteSpace(username))
+            {
+                Logger?.LogDebug("No stored server URL or username found for session restoration.");
+                return;
+            }
+
+            string? password = null;
+
+            try
+            {
+                password = await SecureStorage.Default.GetAsync("Password");
+            }
+            catch (Exception storageEx)
+            {
+                Logger?.LogWarning(storageEx, "Failed to access secure storage while restoring session.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(password))
+            {
+                Logger?.LogDebug("No stored password available for session restoration.");
+                return;
+            }
+
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var serverUri))
+            {
+                Logger?.LogWarning("Stored server URL '{ServerUrl}' is invalid and cannot be used to restore the session.", serverUrl);
+                return;
+            }
+
+            ApiContext.Configure(serverUri, username, password);
+
+            if (ApiProvider is not null)
+            {
+                try
+                {
+                    await ApiProvider.Activity.GetTags();
+                }
+                catch (ApiException apiEx) when (apiEx.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    Logger?.LogWarning(apiEx, "Stored credentials are no longer valid. Clearing stored password.");
+                    ApiContext.Clear();
+                    Preferences.Remove("Password");
+                    SecureStorage.Default.Remove("Password");
+                    AuthService.SetAuthenticated(false);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogWarning(ex, "Failed to validate stored credentials. Proceeding with optimistic authentication.");
+                }
+            }
+
+            AuthService.SetAuthenticated(true);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Unexpected error while attempting to restore authentication state.");
+        }
     }
 }
