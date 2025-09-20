@@ -2,13 +2,6 @@
   "ConnectionStrings": {
     "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=False"
   },
-  "Auth": {
-    "Basic": {
-      "Username": "admin",
-      "Password": "secret123",
-      "UserId": "11111111-1111-1111-1111-111111111111"
-    }
-  },
   "Security": {
     "RateLimit": {
       "MaxAttemptsPerWindow": 5,
