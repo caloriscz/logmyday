@@ -143,7 +143,6 @@
             ApiContext.Configure(serverUri, loginModel.Username, loginModel.Password);
             Preferences.Set("ServerUrl", serverUri.ToString().TrimEnd('/'));
             Preferences.Set("Username", loginModel.Username);
-            // Do NOT persist password beyond session unless explicitly required
 
             // DEBUG: Log the exact credentials being configured
             System.Diagnostics.Debug.WriteLine("=== LOGIN CREDENTIALS DEBUG ===");
@@ -160,6 +159,15 @@
                 // Simple validation call: fetch tags (or a health endpoint if available)
                 var tags = await ApiProvider.Activity.GetTags();
                 System.Diagnostics.Debug.WriteLine("Login: API call successful, setting authenticated");
+
+                try
+                {
+                    await SecureStorage.Default.SetAsync("Password", loginModel.Password);
+                }
+                catch (Exception storageEx)
+                {
+                    Logger.LogWarning(storageEx, "Failed to persist password for automatic login");
+                }
                 AuthService.SetAuthenticated(true);
                 System.Diagnostics.Debug.WriteLine($"Login: Authentication set, current state: {AuthService.IsAuthenticated}");
             }
