@@ -2,6 +2,7 @@
 
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using System.Globalization
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject ILogger<TagEdit> Logger
@@ -36,7 +37,8 @@
                         <option value="@type.Id">@type.Name</option>
                     }
                 </InputSelect>
-            </div>            <div class="mb-3">
+            </div>
+            <div class="mb-3">
                 <label class="form-label">Required:</label>
                 <InputCheckbox @bind-Value="editTag.IsRequired" class="form-check-input" />
             </div>
@@ -60,6 +62,131 @@
             <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
             <button type="button" class="btn btn-secondary ms-2" @onclick="GoBack" disabled="@isSaving">Cancel</button>
         </EditForm>
+
+        <hr class="my-4" />
+
+        <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">Notifications</h4>
+                <button class="btn btn-sm btn-primary" type="button" @onclick="StartAddNotification">Add Notification</button>
+            </div>
+
+            @if (isNotificationFormVisible && editingNotification != null)
+            {
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <EditForm Model="editingNotification" OnValidSubmit="SaveNotificationAsync">
+                            <DataAnnotationsValidator />
+                            <div class="mb-3">
+                                <label class="form-label">Notification Text</label>
+                                <InputText @bind-Value="editingNotification.NotificationText" class="form-control" />
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Not Before Time</label>
+                                    <input type="time" class="form-control" @bind="editingNotification.NotBeforeTime" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Not After Time</label>
+                                    <input type="time" class="form-control" @bind="editingNotification.NotAfterTime" />
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Max Nudges</label>
+                                    <InputNumber @bind-Value="editingNotification.MaxNudges" class="form-control" min="0" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nudge Interval (minutes)</label>
+                                    <InputNumber @bind-Value="editingNotification.NudgeIntervalMinutes" class="form-control" min="0" />
+                                </div>
+                            </div>
+                            <div class="form-check mb-3">
+                                <InputCheckbox @bind-Value="editingNotification.IsActive" class="form-check-input" id="notificationActive" />
+                                <label class="form-check-label" for="notificationActive">Active</label>
+                            </div>
+                            @if (!string.IsNullOrEmpty(notificationErrorMessage))
+                            {
+                                <div class="text-danger mb-3">@notificationErrorMessage</div>
+                            }
+                            <button type="submit" class="btn btn-primary me-2" disabled="@isNotificationSaving">Save</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">Cancel</button>
+                        </EditForm>
+                    </div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(notificationErrorMessage))
+            {
+                <div class="alert alert-danger">@notificationErrorMessage</div>
+            }
+
+            @if (notifications.Count == 0)
+            {
+                <p class="text-muted mb-0">No notifications configured for this tag yet.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Text</th>
+                                <th>Time Window</th>
+                                <th>Max Nudges</th>
+                                <th>Nudge Interval (min)</th>
+                                <th>Active</th>
+                                <th>Created</th>
+                                <th style="width: 140px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var notification in notifications)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (string.IsNullOrWhiteSpace(notification.NotificationText))
+                                        {
+                                            <em>(Default)</em>
+                                        }
+                                        else
+                                        {
+                                            @notification.NotificationText
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(notification.NotBeforeTime) || !string.IsNullOrWhiteSpace(notification.NotAfterTime))
+                                        {
+                                            <span>@(notification.NotBeforeTime ?? "-") - @(notification.NotAfterTime ?? "-")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                    <td>@notification.MaxNudges</td>
+                                    <td>@(notification.NudgeIntervalMinutes?.ToString() ?? "-")</td>
+                                    <td>
+                                        @if (notification.IsActive)
+                                        {
+                                            <span class="badge bg-success">Yes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">No</span>
+                                        }
+                                    </td>
+                                    <td>@notification.DateCreated.ToLocalTime().ToString("g")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary me-2" @onclick="() => EditNotification(notification)">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="async () => await DeleteNotificationAsync(notification.Id)">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
     }
 </div>
 
@@ -73,12 +200,20 @@
     private bool isLoading = true;
     private bool isSaving = false;
 
+    private List<NotificationViewModel> notifications = new();
+    private NotificationEditModel? editingNotification;
+    private bool isNotificationFormVisible;
+    private string? notificationErrorMessage;
+    private bool isNotificationSaving;
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
             inputTypes = await ActivityApi.GetInputTypesAsync();
-            var tag = await ActivityApi.GetTagById(Id);            editTag = new TagRequest
+            var tag = await ActivityApi.GetTagById(Id);
+
+            editTag = new TagRequest
             {
                 Tag = tag.Title,
                 TypeId = tag.TypeId ?? 0,
@@ -87,14 +222,210 @@
                 TimeGranularity = tag.TimeGranularity,
                 IsRange = tag.IsRange
             };
+
+            await LoadNotifications();
         }
         catch (Exception ex)
         {
             errorMessage = $"Error loading tag: {ex.Message}";
             Logger.LogError(ex, "Error loading tag");
         }
-        isLoading = false;
+        finally
+        {
+            isLoading = false;
+        }
     }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            var items = await ActivityApi.GetNotificationsByTag(Id);
+            notifications = items.Select(MapToViewModel).ToList();
+            notificationErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            notificationErrorMessage = $"Error loading notifications: {ex.Message}";
+            Logger.LogError(ex, "Error loading notifications for tag {TagId}", Id);
+        }
+    }
+
+    private void StartAddNotification()
+    {
+        editingNotification = new NotificationEditModel
+        {
+            TagId = Id,
+            MaxNudges = 3,
+            NudgeIntervalMinutes = 15,
+            IsActive = true
+        };
+        notificationErrorMessage = null;
+        isNotificationFormVisible = true;
+    }
+
+    private void EditNotification(NotificationViewModel notification)
+    {
+        editingNotification = new NotificationEditModel
+        {
+            Id = notification.Id,
+            TagId = notification.TagId,
+            NotificationText = notification.NotificationText,
+            NotBeforeTime = notification.NotBeforeTime,
+            NotAfterTime = notification.NotAfterTime,
+            MaxNudges = notification.MaxNudges,
+            NudgeIntervalMinutes = notification.NudgeIntervalMinutes,
+            IsActive = notification.IsActive
+        };
+        notificationErrorMessage = null;
+        isNotificationFormVisible = true;
+    }
+
+    private void CancelNotificationEdit()
+    {
+        editingNotification = null;
+        isNotificationFormVisible = false;
+        notificationErrorMessage = null;
+    }
+
+    private async Task SaveNotificationAsync()
+    {
+        if (editingNotification is null)
+        {
+            return;
+        }
+
+        notificationErrorMessage = null;
+
+        if (!TryBuildRequest(editingNotification, out var request, out var error))
+        {
+            notificationErrorMessage = error;
+            return;
+        }
+
+        isNotificationSaving = true;
+
+        try
+        {
+            if (editingNotification.Id.HasValue)
+            {
+                await ActivityApi.UpdateNotification(editingNotification.Id.Value, request);
+            }
+            else
+            {
+                await ActivityApi.CreateNotification(request);
+            }
+
+            await LoadNotifications();
+            CancelNotificationEdit();
+        }
+        catch (Exception ex)
+        {
+            notificationErrorMessage = $"Error saving notification: {ex.Message}";
+            Logger.LogError(ex, "Error saving notification");
+        }
+        finally
+        {
+            isNotificationSaving = false;
+        }
+    }
+
+    private async Task DeleteNotificationAsync(int notificationId)
+    {
+        try
+        {
+            await ActivityApi.DeleteNotification(notificationId);
+            notifications.RemoveAll(n => n.Id == notificationId);
+            notificationErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            notificationErrorMessage = $"Error deleting notification: {ex.Message}";
+            Logger.LogError(ex, "Error deleting notification {NotificationId}", notificationId);
+        }
+    }
+
+    private NotificationViewModel MapToViewModel(NotificationResponse response)
+    {
+        return new NotificationViewModel
+        {
+            Id = response.Id,
+            TagId = response.TagId,
+            NotificationText = response.NotificationText,
+            NotBeforeTime = FormatTimeSpan(response.NotBeforeTime),
+            NotAfterTime = FormatTimeSpan(response.NotAfterTime),
+            MaxNudges = response.MaxNudges,
+            NudgeIntervalMinutes = response.NudgeInterval.HasValue
+                ? (int?)Math.Round(response.NudgeInterval.Value.TotalMinutes)
+                : null,
+            IsActive = response.IsActive,
+            DateCreated = response.DateCreated
+        };
+    }
+
+    private bool TryBuildRequest(NotificationEditModel model, out NotificationRequest request, out string? error)
+    {
+        request = new NotificationRequest
+        {
+            TagId = Id,
+            NotificationText = string.IsNullOrWhiteSpace(model.NotificationText) ? null : model.NotificationText.Trim(),
+            MaxNudges = model.MaxNudges,
+            IsActive = model.IsActive
+        };
+
+        if (!TryParseTime(model.NotBeforeTime, out var notBefore, out error))
+        {
+            return false;
+        }
+
+        if (!TryParseTime(model.NotAfterTime, out var notAfter, out error))
+        {
+            return false;
+        }
+
+        if (model.MaxNudges < 0)
+        {
+            error = "Max nudges must be zero or greater.";
+            return false;
+        }
+
+        if (model.NudgeIntervalMinutes.HasValue && model.NudgeIntervalMinutes.Value < 0)
+        {
+            error = "Nudge interval must be zero or greater.";
+            return false;
+        }
+
+        request.NotBeforeTime = notBefore;
+        request.NotAfterTime = notAfter;
+        request.NudgeInterval = model.NudgeIntervalMinutes.HasValue
+            ? TimeSpan.FromMinutes(model.NudgeIntervalMinutes.Value)
+            : null;
+
+        return true;
+    }
+
+    private static bool TryParseTime(string? value, out TimeSpan? time, out string? error)
+    {
+        time = null;
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed))
+        {
+            time = parsed;
+            return true;
+        }
+
+        error = "Time values must use HH:mm format.";
+        return false;
+    }
+
+    private static string? FormatTimeSpan(TimeSpan? timeSpan) =>
+        timeSpan?.ToString(@"hh\\:mm");
 
     private async Task HandleValidSubmit()
     {
@@ -109,11 +440,39 @@
             errorMessage = $"Error saving tag: {ex.Message}";
             Logger.LogError(ex, "Error saving tag");
         }
-        isSaving = false;
+        finally
+        {
+            isSaving = false;
+        }
     }
 
     private void GoBack()
     {
         Navigation.NavigateTo("/tags");
+    }
+
+    private sealed class NotificationViewModel
+    {
+        public int Id { get; set; }
+        public int TagId { get; set; }
+        public string? NotificationText { get; set; }
+        public string? NotBeforeTime { get; set; }
+        public string? NotAfterTime { get; set; }
+        public int MaxNudges { get; set; }
+        public int? NudgeIntervalMinutes { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime DateCreated { get; set; }
+    }
+
+    private sealed class NotificationEditModel
+    {
+        public int? Id { get; set; }
+        public int TagId { get; set; }
+        public string? NotificationText { get; set; }
+        public string? NotBeforeTime { get; set; }
+        public string? NotAfterTime { get; set; }
+        public int MaxNudges { get; set; } = 3;
+        public int? NudgeIntervalMinutes { get; set; } = 15;
+        public bool IsActive { get; set; } = true;
     }
 }

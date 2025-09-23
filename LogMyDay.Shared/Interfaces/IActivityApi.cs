@@ -81,5 +81,17 @@ public interface IActivityApi
 
     [Get("/api/input-types")]
     Task<List<InputTypeDto>> GetInputTypesAsync();
+
+    [Get("/api/notifications/tag/{tagId}")]
+    Task<IList<NotificationResponse>> GetNotificationsByTag(int tagId);
+
+    [Post("/api/notifications")]
+    Task<NotificationResponse> CreateNotification([Body] NotificationRequest request);
+
+    [Put("/api/notifications/{id}")]
+    Task<NotificationResponse> UpdateNotification(int id, [Body] NotificationRequest request);
+
+    [Delete("/api/notifications/{id}")]
+    Task DeleteNotification(int id);
 }
 

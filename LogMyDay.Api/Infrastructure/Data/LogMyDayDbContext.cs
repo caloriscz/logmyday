@@ -14,6 +14,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Pattern> Patterns => Set<Pattern>();
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,6 +38,26 @@ public class LogMyDayDbContext : DbContext
 
             entity.HasIndex(e => e.Token)
                 .HasDatabaseName("IX_PasswordResets_Token");
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasOne(n => n.Tag)
+                .WithMany(t => t.Notifications)
+                .HasForeignKey(n => n.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(n => n.MaxNudges)
+                .HasDefaultValue(3);
+
+            entity.Property(n => n.IsActive)
+                .HasDefaultValue(true);
+
+            entity.Property(n => n.DateCreated)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(n => n.NudgeInterval)
+                .HasDefaultValue(new TimeSpan(0, 15, 0));
         });
 
         modelBuilder.SeedData();
