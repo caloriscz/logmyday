@@ -84,11 +84,11 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Not Before Time</label>
-                                    <input type="time" class="form-control" @bind="editingNotification.NotBeforeTime" />
+                                    <input type="time" class="form-control" value="@editingNotification.NotBeforeTime" @onchange="@((ChangeEventArgs e) => editingNotification.NotBeforeTime = e.Value?.ToString())" />
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">Not After Time</label>
-                                    <input type="time" class="form-control" @bind="editingNotification.NotAfterTime" />
+                                    <input type="time" class="form-control" value="@editingNotification.NotAfterTime" @onchange="@((ChangeEventArgs e) => editingNotification.NotAfterTime = e.Value?.ToString())" />
                                 </div>
                             </div>
                             <div class="row">

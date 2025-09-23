@@ -62,12 +62,12 @@ public class NotificationsController : BaseApiController
             var created = await _notificationService.CreateAsync(request, userId);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
-        catch (ArgumentException ex)
+        catch (ArgumentOutOfRangeException ex)
         {
             _logger.LogWarning(ex, "Invalid notification create request for tag {TagId}", request.TagId);
             return BadRequest(ex.Message);
         }
-        catch (ArgumentOutOfRangeException ex)
+        catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Invalid notification create request for tag {TagId}", request.TagId);
             return BadRequest(ex.Message);
@@ -88,12 +88,12 @@ public class NotificationsController : BaseApiController
             var updated = await _notificationService.UpdateAsync(id, request, userId);
             return Ok(updated);
         }
-        catch (ArgumentException ex)
+        catch (ArgumentOutOfRangeException ex)
         {
             _logger.LogWarning(ex, "Invalid notification update request for notification {NotificationId}", id);
             return BadRequest(ex.Message);
         }
-        catch (ArgumentOutOfRangeException ex)
+        catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Invalid notification update request for notification {NotificationId}", id);
             return BadRequest(ex.Message);
