@@ -1,5 +1,6 @@
 using LogMyDay.Domain.Enums;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -29,4 +30,6 @@ public class Tag
     [ForeignKey(nameof(PatternId))]
     public Pattern? Pattern { get; set; }
     public Guid? UserId { get; set; }
+
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }
