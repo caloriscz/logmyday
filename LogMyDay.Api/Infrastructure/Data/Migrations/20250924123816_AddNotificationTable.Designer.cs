@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LogMyDay.Api.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(LogMyDayDbContext))]
-    [Migration("20251015000000_AddNotifications")]
-    partial class AddNotifications
+    [Migration("20250924123816_AddNotificationTable")]
+    partial class AddNotificationTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -105,6 +105,53 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                             Id = 6,
                             Name = "Decimal, precision 2"
                         });
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("DateCreated")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("MaxNudges")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(3);
+
+                    b.Property<TimeSpan?>("NotAfterTime")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan?>("NotBeforeTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("NotificationText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<TimeSpan?>("NudgeInterval")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("time")
+                        .HasDefaultValue(new TimeSpan(0, 0, 15, 0, 0));
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.PasswordReset", b =>
@@ -205,53 +252,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.Notification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("DateCreated")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("MaxNudges")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(3);
-
-                    b.Property<TimeSpan?>("NotAfterTime")
-                        .HasColumnType("time");
-
-                    b.Property<TimeSpan?>("NotBeforeTime")
-                        .HasColumnType("time");
-
-                    b.Property<string>("NotificationText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<TimeSpan?>("NudgeInterval")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("time")
-                        .HasDefaultValue(new TimeSpan(0, 15, 0));
-
-                    b.Property<int>("TagId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TagId");
-
-                    b.ToTable("Notifications");
-                });
-
             modelBuilder.Entity("LogMyDay.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -306,6 +306,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Notification", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
+                        .WithMany("Notifications")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tag");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.PasswordReset", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.User", "User")
@@ -329,20 +340,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
                     b.Navigation("InputType");
 
-                    b.Navigation("Notifications");
-
                     b.Navigation("Pattern");
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.Notification", b =>
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Tag", b =>
                 {
-                    b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
-                        .WithMany("Notifications")
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tag");
+                    b.Navigation("Notifications");
                 });
 #pragma warning restore 612, 618
         }
