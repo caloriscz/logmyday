@@ -1,4 +1,5 @@
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.Shared.Serialization;
 using Refit;
 using System.Net.Http;
 
@@ -34,6 +35,11 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IUsersApi Users => _users ??= Build<IUsersApi>();
     public IAccountApi Account => _account ??= Build<IAccountApi>();
 
+    private static readonly RefitSettings SharedRefitSettings = new()
+    {
+        ContentSerializer = new SystemTextJsonContentSerializer(JsonSerializationSettings.CreateDefault())
+    };
+
     private T Build<T>()
     {
         if (_ctx.Server is null)
@@ -43,7 +49,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
 
         var client = _httpClientFactory.CreateClient("dynamic-api");
         client.BaseAddress = _ctx.Server; // set once per instance
-        return RestService.For<T>(client);
+        return RestService.For<T>(client, SharedRefitSettings);
     }
 
     public void Invalidate()

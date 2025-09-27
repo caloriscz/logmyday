@@ -7,6 +7,7 @@ using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,12 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 var services = builder.Services;
+
+var refitSerializerOptions = JsonSerializationSettings.CreateDefault();
+var refitSettings = new RefitSettings
+{
+    ContentSerializer = new SystemTextJsonContentSerializer(refitSerializerOptions)
+};
 
 services.AddDbContext<LogMyDayDbContext>(options =>
 {
@@ -146,7 +153,7 @@ services.AddRazorComponents().AddInteractiveServerComponents();
 services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        JsonSerializationSettings.Configure(options.JsonSerializerOptions);
     });
 services.AddEndpointsApiExplorer();
 
@@ -170,7 +177,7 @@ services.AddSingleton<CredentialStore>();
 // Register the cookie authentication handler for forwarding cookies to API calls
 services.AddScoped<CookieAuthenticationHandler>();
 
-services.AddRefitClient<IActivityApi>()
+services.AddRefitClient<IActivityApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
@@ -183,7 +190,7 @@ services.AddRefitClient<IActivityApi>()
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 // Add new authentication API clients
-services.AddRefitClient<IAuthApi>()
+services.AddRefitClient<IAuthApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
@@ -195,7 +202,7 @@ services.AddRefitClient<IAuthApi>()
     })
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
-services.AddRefitClient<IUsersApi>()
+services.AddRefitClient<IUsersApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
@@ -207,7 +214,7 @@ services.AddRefitClient<IUsersApi>()
     })
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
-services.AddRefitClient<IAccountApi>()
+services.AddRefitClient<IAccountApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
@@ -219,7 +226,7 @@ services.AddRefitClient<IAccountApi>()
     })
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
-services.AddRefitClient<ISecureBackupApi>()
+services.AddRefitClient<ISecureBackupApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
