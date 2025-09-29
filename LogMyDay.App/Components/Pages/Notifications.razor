@@ -1,8 +1,10 @@
 ﻿@page "/notifications"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Components.Shared
+@using LogMyDay.App.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
 
 <div class="container-fluid">
     <div class="row">
@@ -132,6 +134,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PageTitleService.SetTitle("Notifications");
+        
         // Initialize new activity with current date/time
         newActivity = new ActivityRequest
         {

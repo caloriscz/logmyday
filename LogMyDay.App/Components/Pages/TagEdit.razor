@@ -3,11 +3,11 @@
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using System.Globalization
+@using LogMyDay.App.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject ILogger<TagEdit> Logger
-
-<PageTitle>Edit Tag</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container mt-4">
     <h3>Edit Tag</h3>
@@ -208,6 +208,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PageTitleService.SetTitle("Edit Tag");
+        
         try
         {
             inputTypes = await ActivityApi.GetInputTypesAsync();

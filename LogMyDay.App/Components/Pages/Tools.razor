@@ -3,12 +3,12 @@
 @using LogMyDay.Api.Application.Interfaces
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
+@using LogMyDay.App.Services
 @inject IBackupService BackupService
 @inject IExcelExportService ExcelExportService
 @inject IJSRuntime JSRuntime
 @inject ILogger<Tools> Logger
-
-<PageTitle>Tools</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container mt-4">
     <h2 class="mb-4">Tools & Utilities</h2>
@@ -80,5 +80,8 @@
 </div>
 
 @code {
-
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Tools");
+    }
 }

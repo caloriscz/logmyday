@@ -1,11 +1,11 @@
 @page "/register-first"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
+@using LogMyDay.App.Services
 @inject IAuthApi AuthApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
-
-<PageTitle>Create First Admin User</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container mt-5">
     <div class="row justify-content-center">
@@ -66,6 +66,11 @@
     private RegisterFirstModel registerModel = new();
     private bool isLoading = false;
     private string? errorMessage;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Create First Admin User");
+    }
 
     private async Task RegisterFirstAdmin()
     {

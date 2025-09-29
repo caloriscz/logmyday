@@ -2,6 +2,7 @@
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using Microsoft.AspNetCore.Components.Authorization
+@using LogMyDay.App.Components.Shared
 @inject NavigationManager Navigation
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
@@ -13,6 +14,7 @@
 @if (IsLoginPage)
 {
     Logger.LogInformation("MainLayout: Rendering login page. Current URL: {Url}", Navigation.Uri);
+    <DynamicPageTitle />
     <article class="content px-4">
         @Body
     </article>
@@ -20,6 +22,7 @@
 else if (IsCheckingAuth)
 {
     Logger.LogInformation("MainLayout: Checking authentication state. Current URL: {Url}", Navigation.Uri);
+    <DynamicPageTitle />
     <div class="container d-flex justify-content-center align-items-center min-vh-100">
         <div class="text-center">
             <div class="spinner-border text-primary" role="status">
@@ -38,6 +41,7 @@ else if (!IsAuthenticated)
 else
 {
     Logger.LogInformation("MainLayout: User authenticated, rendering main app. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
+    <DynamicPageTitle />
     <div class="page">
         <NavMenu />
         <main>

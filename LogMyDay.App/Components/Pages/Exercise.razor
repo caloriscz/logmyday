@@ -1,6 +1,13 @@
 @page "/tools/exercise"
 @using LogMyDay.UI.Components.Tools
-
-<PageTitle>HIIT Timer</PageTitle>
+@using LogMyDay.App.Services
+@inject IPageTitleService PageTitleService
 
 <HiitTimer ShowSaveControls="true" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("HIIT Timer");
+    }
+}

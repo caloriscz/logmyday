@@ -1,7 +1,9 @@
 ﻿@page "/calendar"
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
 
 <style>
     .calendar-table th, .calendar-table td {
@@ -170,6 +172,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PageTitleService.SetTitle("Calendar");
         await LoadTags();
     }
 

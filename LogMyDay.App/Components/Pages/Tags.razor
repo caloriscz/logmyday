@@ -2,11 +2,11 @@
 
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using LogMyDay.App.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject ILogger<Tags> Logger
-
-<PageTitle>Tags</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container-fluid px-4">
     <div class="row">
@@ -284,6 +284,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        PageTitleService.SetTitle("Tags");
+        
         try
         {
             inputTypes = await ActivityApi.GetInputTypesAsync();

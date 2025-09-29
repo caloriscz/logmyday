@@ -381,6 +381,7 @@ MigrationBackup/
 /TadataNet/TadataNet.Web/appsettings.json
 /.build/build-ftp.json
 /.build
+/.build/local.env
 /LogMyDay.App/appsettings.json
 /LogMyDay.App/appsettings.Development.json
 .vscode/launch.json

@@ -1,0 +1,13 @@
+{
+  "solution": {
+    "path": "LogMyDay.sln",
+    "projects": [
+      "LogMyDay.Api\\LogMyDay.Api.csproj",
+      "LogMyDay.App\\LogMyDay.App.csproj",
+      "LogMyDay.Domain\\LogMyDay.Domain.csproj",
+      "LogMyDay.Shared\\LogMyDay.Shared.csproj",
+      "LogMyDay.UI\\LogMyDay.UI.csproj",
+      "LogMyDay.Api.Tests\\LogMyDay.Api.Tests.csproj"
+    ]
+  }
+}

@@ -3,13 +3,13 @@
 @using LogMyDay.Api.Application.Interfaces
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
+@using LogMyDay.App.Services
 @inject IBackupService BackupService
 @inject IExcelExportService ExcelExportService
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @inject ILogger<Backup> Logger
-
-<PageTitle>Backup & Restore - LogMyDay</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container-fluid">
     <div class="row">
@@ -447,6 +447,7 @@
 
     private BackupInfoResponse? backupInfo;    protected override async Task OnInitializedAsync()
     {
+        PageTitleService.SetTitle("Backup & Restore");
         await LoadBackupInfo();
         await LoadAvailableTags();
     }

@@ -1,6 +1,13 @@
 ﻿@page "/tools/breathing"
 @using LogMyDay.UI.Components.Tools
-
-<PageTitle>Advanced Breathing Techniques</PageTitle>
+@using LogMyDay.App.Services
+@inject IPageTitleService PageTitleService
 
 <AdvancedBreathing ShowSaveControls="true" />
+
+@code {
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Advanced Breathing Techniques");
+    }
+}

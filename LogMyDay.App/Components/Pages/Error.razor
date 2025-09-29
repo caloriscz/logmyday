@@ -1,7 +1,7 @@
 ﻿@page "/Error"
 @using System.Diagnostics
-
-<PageTitle>Error</PageTitle>
+@using LogMyDay.App.Services
+@inject IPageTitleService PageTitleService
 
 <h1 class="text-danger">Error.</h1>
 <h2 class="text-danger">An error occurred while processing your request.</h2>
@@ -31,6 +31,9 @@
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Error");
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
 }

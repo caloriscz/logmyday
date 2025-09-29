@@ -1,8 +1,8 @@
 ﻿@page "/login"
+@using LogMyDay.App.Services
 @inject NavigationManager Navigation
 @inject ILogger<Login> Logger
-
-<PageTitle>Login</PageTitle>
+@inject IPageTitleService PageTitleService
 
 <div class="container d-flex justify-content-center align-items-center min-vh-100">
     <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
@@ -44,6 +44,8 @@
 
     protected override void OnInitialized()
     {
+        PageTitleService.SetTitle("Login");
+        
         Logger.LogInformation("Login.OnInitialized: Starting login page initialization. Current URL: {Url}", Navigation.Uri);
         
         // Check for error message in query parameters
