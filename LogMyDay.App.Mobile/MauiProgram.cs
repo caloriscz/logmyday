@@ -3,6 +3,7 @@ using LogMyDay.App.Mobile.Services;
 using LogMyDay.Shared.Interfaces;
 using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.App.Mobile;
 
@@ -22,6 +23,10 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
+
+        builder.Logging.ClearProviders();
+        builder.Logging.AddDebug();
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
         // Add Blazor WebView
         builder.Services.AddMauiBlazorWebView();
@@ -73,6 +78,7 @@ public static class MauiProgram
 #endif
             // Register the cross-platform wrapper service
             builder.Services.AddSingleton<NotificationService>();
+            builder.Services.AddSingleton<INotificationStateStore, NotificationStateStore>();
 
             // Register system notification service
             builder.Services.AddSingleton<ISystemNotificationService, SystemNotificationService>();

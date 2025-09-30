@@ -53,11 +53,13 @@ public partial class App : Application
 
             // Also get the platform notification service to test basic notifications
             var notificationService = serviceProvider?.GetService<NotificationService>();
+#if DEBUG
             if (notificationService != null)
             {
                 System.Diagnostics.Debug.WriteLine("Testing basic notification service");
                 notificationService.SendNotification("LogMyDay", "🚀 App started - notification system active");
             }
+#endif
         }
         catch (Exception ex)
         {

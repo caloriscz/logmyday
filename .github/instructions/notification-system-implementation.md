@@ -4,6 +4,8 @@
 
 Successfully implemented a comprehensive in-app notification system for the MAUI mobile application with the following features:
 
+> **Status update (Sep 2025):** The legacy "required activity" reminder loop that polled the `GetRequiredDailyTagsNotFilledForDate` endpoint is now disabled. Notifications are delivered exclusively through the user-configured notification rules attached to tags. Keep the endpoint available for future use, but do not rely on it for mobile alerts.
+
 ## Components Implemented
 
 ### 1. Cross-Platform Interface

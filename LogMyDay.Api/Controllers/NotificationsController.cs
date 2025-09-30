@@ -21,6 +21,14 @@ public class NotificationsController : BaseApiController
         _logger = logger;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IList<NotificationResponse>>> GetAll()
+    {
+        var userId = GetCurrentUserId();
+        var notifications = await _notificationService.GetAllAsync(userId);
+        return Ok(notifications);
+    }
+
     [HttpGet("tag/{tagId:int}")]
     public async Task<ActionResult<IList<NotificationResponse>>> GetByTag(int tagId)
     {

@@ -54,6 +54,7 @@ public interface IActivityApi
     Task<DuplicateCheckResponse> CheckDuplicate(int tagId, DateTime dateStarted);
 
     [Get("/api/activities/required-daily-tags-unfilled")]
+    // Legacy endpoint: kept for future experiments with required-tag reminders.
     Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate([Query] string dateString);
 
     [Get("/api/tags/paged")]
@@ -81,6 +82,9 @@ public interface IActivityApi
 
     [Get("/api/input-types")]
     Task<List<InputTypeDto>> GetInputTypesAsync();
+
+    [Get("/api/notifications")]
+    Task<IList<NotificationResponse>> GetNotifications();
 
     [Get("/api/notifications/tag/{tagId}")]
     Task<IList<NotificationResponse>> GetNotificationsByTag(int tagId);

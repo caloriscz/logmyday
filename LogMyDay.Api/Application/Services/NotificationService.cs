@@ -2,6 +2,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -18,12 +19,26 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
+    public async Task<IList<NotificationResponse>> GetAllAsync(Guid userId)
+    {
+        var notifications = await _context.Notifications
+            .AsNoTracking()
+            .Include(n => n.Tag)
+            .Where(n => n.Tag != null && n.Tag.UserId == userId)
+            .OrderBy(n => n.Tag!.TagName)
+            .ThenBy(n => n.Id)
+            .ToListAsync();
+
+        return notifications.Select(MapToResponse).ToList();
+    }
+
     public async Task<IList<NotificationResponse>> GetByTagAsync(int tagId, Guid userId)
     {
         await EnsureTagAccessible(tagId, userId);
 
         var notifications = await _context.Notifications
             .AsNoTracking()
+            .Include(n => n.Tag)
             .Where(n => n.TagId == tagId)
             .OrderBy(n => n.Id)
             .ToListAsync();
@@ -140,9 +155,17 @@ public class NotificationService : INotificationService
             throw new ArgumentOutOfRangeException(nameof(request.MaxNudges), "Max nudges cannot be negative");
         }
 
-        if (request.NudgeInterval.HasValue && request.NudgeInterval.Value < TimeSpan.Zero)
+        if (request.NudgeInterval.HasValue)
         {
-            throw new ArgumentOutOfRangeException(nameof(request.NudgeInterval), "Nudge interval must be positive");
+            if (request.NudgeInterval.Value < TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.NudgeInterval), "Nudge interval must be positive");
+            }
+
+            if (request.NudgeInterval.Value < TimeSpan.FromMinutes(NotificationScheduleCalculator.MinimumIntervalMinutes))
+            {
+                throw new ArgumentOutOfRangeException(nameof(request.NudgeInterval), $"Nudge interval must be at least {NotificationScheduleCalculator.MinimumIntervalMinutes} minutes");
+            }
         }
 
         if (request.NotBeforeTime.HasValue && request.NotAfterTime.HasValue && request.NotAfterTime < request.NotBeforeTime)
@@ -157,6 +180,7 @@ public class NotificationService : INotificationService
         {
             Id = notification.Id,
             TagId = notification.TagId,
+            TagName = notification.Tag?.TagName,
             NotificationText = notification.NotificationText,
             NotBeforeTime = notification.NotBeforeTime,
             NotAfterTime = notification.NotAfterTime,

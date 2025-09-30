@@ -1,6 +1,11 @@
+using System.Diagnostics;
+using System.Linq;
 using System.Timers;
-using LogMyDay.App.Mobile.Services;
+using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.Shared.Notifications;
+using Microsoft.Extensions.Logging;
+using Refit;
 
 namespace LogMyDay.App.Mobile.Services;
 
@@ -17,38 +22,54 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
     private readonly INotificationManagerService _notificationService;
     private readonly IApiContext _apiContext;
     private readonly AuthenticationService _authService;
+    private readonly INotificationStateStore _stateStore;
+    private readonly ILogger<SystemNotificationService> _logger;
     private System.Timers.Timer? _checkTimer;
     private bool _isRunning;
+    private readonly SemaphoreSlim _checkLock = new(1, 1);
+    private readonly List<NotificationResponse> _cachedNotifications = new();
+    private DateTime _lastRefreshUtc = DateTime.MinValue;
+    private bool _isDisposed;
+    private const string LogPrefix = "SystemNotificationService";
+
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(15);
 
     public SystemNotificationService(
         IApiClientProvider apiClientProvider,
         INotificationManagerService notificationService,
         IApiContext apiContext,
-        AuthenticationService authService)
+        AuthenticationService authService,
+        INotificationStateStore stateStore,
+        ILogger<SystemNotificationService> logger)
     {
         _apiClientProvider = apiClientProvider;
         _notificationService = notificationService;
         _apiContext = apiContext;
         _authService = authService;
+        _stateStore = stateStore;
+        _logger = logger;
 
         // Listen to authentication changes
         _authService.AuthenticationChanged += OnAuthenticationChanged;
+
+        _logger.LogDebug("SystemNotificationService constructed; awaiting authentication events");
+        WriteDebug("Constructed and subscribed to authentication events");
     }
 
     public bool IsRunning => _isRunning;
 
     private void OnAuthenticationChanged(bool isAuthenticated)
     {
-        System.Diagnostics.Debug.WriteLine($"SystemNotificationService: AuthenticationChanged event received - isAuthenticated: {isAuthenticated}");
-        
+        _logger.LogInformation("Authentication state changed. Authenticated: {IsAuthenticated}", isAuthenticated);
+        WriteDebug($"AuthenticationChanged received (isAuthenticated={isAuthenticated})");
+
         if (isAuthenticated)
         {
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: User authenticated, starting monitoring");
             StartMonitoring();
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: User logged out, stopping monitoring");
             StopMonitoring();
         }
     }
@@ -60,17 +81,18 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
             return;
         }
 
-        _ = CheckForUnfilledTags();
+        _logger.LogInformation("Starting notification monitoring loop");
+        WriteDebug("Starting notification monitoring loop");
 
-        // Set up timer for every 30 seconds (30,000 milliseconds) for testing
-        // TODO: Change back to 5 minutes (300,000 milliseconds) for production
-        _checkTimer = new System.Timers.Timer(30000);
+        _ = CheckNotificationsAsync(forceRefresh: true);
+
+        _checkTimer = new System.Timers.Timer(CheckInterval.TotalMilliseconds);
         _checkTimer.Elapsed += OnTimerElapsed;
         _checkTimer.AutoReset = true;
         _checkTimer.Enabled = true;
         _isRunning = true;
-
-        System.Diagnostics.Debug.WriteLine("SystemNotificationService: Timer started - checking every 30 seconds (testing mode)");
+        _logger.LogInformation("Notification timer started; interval {Interval}", CheckInterval);
+        WriteDebug($"Notification timer started; interval {CheckInterval}");
     }
 
     public void StopMonitoring()
@@ -80,80 +102,221 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
             return;
         }
 
-        System.Diagnostics.Debug.WriteLine("SystemNotificationService: Stopping monitoring");
+        _logger.LogInformation("Stopping notification monitoring loop");
+        WriteDebug("Stopping notification monitoring loop");
 
         _checkTimer?.Stop();
         _checkTimer?.Dispose();
         _checkTimer = null;
         _isRunning = false;
+
+        _cachedNotifications.Clear();
+        _lastRefreshUtc = DateTime.MinValue;
+        _stateStore.ClearAll();
     }
 
     private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        await CheckForUnfilledTags();
+        WriteDebug("Timer tick received from System.Timers.Timer");
+        await CheckNotificationsAsync();
     }
 
-    private async Task CheckForUnfilledTags()
+    private async Task CheckNotificationsAsync(bool forceRefresh = false)
     {
+        WriteDebug("Timer elapsed – triggering notification check");
+
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        if (!_apiContext.IsConfigured)
+        {
+            _logger.LogDebug("API context not configured; skipping notification poll");
+            WriteDebug("API context not configured; skipping notification poll");
+            return;
+        }
+
+        if (!await _checkLock.WaitAsync(0))
+        {
+            _logger.LogDebug("Previous notification poll still in progress; skipping");
+            WriteDebug("Previous poll still in progress; skipping");
+            return;
+        }
+
         try
         {
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: CheckForUnfilledTags started");
-            
-            // Check if user is authenticated
-            if (!_apiContext.IsConfigured)
+            _logger.LogDebug("Running notification poll (forceRefresh={ForceRefresh})", forceRefresh);
+            WriteDebug($"Running notification poll (forceRefresh={forceRefresh})");
+
+            await RefreshNotificationsAsync(forceRefresh);
+
+            if (_cachedNotifications.Count == 0)
             {
-                System.Diagnostics.Debug.WriteLine("SystemNotificationService: User not authenticated, skipping check");
+                _logger.LogDebug("No notifications configured; skipping poll");
+                WriteDebug("No notifications configured; skipping poll");
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: User authenticated, checking for unfilled required tags");
+            var pruneThreshold = DateOnly.FromDateTime(DateTime.Today.AddDays(-7));
+            _stateStore.PruneOlderThan(pruneThreshold);
 
-            var activityApi = _apiClientProvider.Activity;
-            var today = DateTime.Today;
-            var dateString = today.ToString("yyyy-MM-dd");
-
-            System.Diagnostics.Debug.WriteLine($"SystemNotificationService: Checking date: {dateString}");
-
-            var unfilledTags = await activityApi.GetRequiredDailyTagsNotFilledForDate(dateString);
-
-            System.Diagnostics.Debug.WriteLine($"SystemNotificationService: API call completed, unfilled tags count: {unfilledTags?.Count ?? 0}");
-
-            if (unfilledTags != null && unfilledTags.Count > 0)
+            var now = DateTime.Now;
+            foreach (var notification in _cachedNotifications)
             {
-                var message = unfilledTags.Count == 1
-                    ? "You have 1 unfilled required activity for today"
-                    : $"You have {unfilledTags.Count} unfilled required activities for today";
+                if (!notification.IsActive)
+                {
+                    continue;
+                }
 
-                System.Diagnostics.Debug.WriteLine($"SystemNotificationService: Found {unfilledTags.Count} unfilled required tags, sending notification");
-
-                _notificationService.SendNotification("LogMyDay", message);
-                System.Diagnostics.Debug.WriteLine($"SystemNotificationService: Notification sent: {message}");
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine("SystemNotificationService: No unfilled required tags found");
-                
-                // Send a debug notification to verify the system is working
-                _notificationService.SendNotification("LogMyDay Debug", "✅ Check completed - no unfilled activities");
+                ProcessNotification(notification, now);
             }
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            System.Diagnostics.Debug.WriteLine("SystemNotificationService: Authentication failed, will retry on next check");
-            // Don't stop the service, just skip this check - authentication might recover
+            _logger.LogWarning(ex, "Notification poll unauthorized; will retry later");
+            WriteDebug($"Notification poll unauthorized ({ex.StatusCode}); will retry later");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"SystemNotificationService: Error checking for unfilled tags: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"SystemNotificationService: Exception details: {ex}");
+            _logger.LogError(ex, "Unexpected error during notification poll");
+            WriteDebug($"Unexpected error during notification poll - {ex.Message}");
         }
+        finally
+        {
+            _checkLock.Release();
+            WriteDebug("Notification poll completed");
+        }
+    }
+
+    private async Task RefreshNotificationsAsync(bool forceRefresh)
+    {
+        if (!forceRefresh && DateTime.UtcNow - _lastRefreshUtc < RefreshInterval)
+        {
+            _logger.LogDebug("Skipping notification refresh – cache still fresh (next refresh in {Remaining} seconds)",
+                (RefreshInterval - (DateTime.UtcNow - _lastRefreshUtc)).TotalSeconds);
+            WriteDebug($"Skipping notification refresh – cache interval not reached; cached notifications = {_cachedNotifications.Count}");
+            return;
+        }
+
+        var activityApi = _apiClientProvider.Activity;
+        var notifications = await activityApi.GetNotifications();
+
+        _cachedNotifications.Clear();
+        if (notifications != null)
+        {
+            _cachedNotifications.AddRange(notifications);
+        }
+
+        _lastRefreshUtc = DateTime.UtcNow;
+        _stateStore.RemoveObsoleteNotifications(_cachedNotifications.Select(n => n.Id));
+        _logger.LogInformation("Loaded {Count} notifications for scheduling", _cachedNotifications.Count);
+        WriteDebug($"Loaded {_cachedNotifications.Count} notifications for scheduling");
+    }
+
+    private void ProcessNotification(NotificationResponse notification, DateTime now)
+    {
+        if (!notification.IsActive)
+        {
+            WriteDebug($"Notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) inactive; skipping");
+            return;
+        }
+
+        WriteDebug($"Evaluating notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) at {now:O}");
+
+        var windows = NotificationScheduleCalculator.BuildWindows(notification, now);
+        foreach (var window in windows)
+        {
+            if (!window.Contains(now))
+            {
+                WriteDebug($"Window {window.BaseDate}: current time {now:HH:mm:ss} outside range {window.Start:HH:mm:ss} - {window.End?.ToString("HH:mm:ss") ?? "(no end)"}; skipped");
+                continue;
+            }
+
+            var state = _stateStore.GetState(notification.Id, window.BaseDate);
+            WriteDebug($"Window {window.BaseDate}: total occurrences={window.TotalOccurrences}, already sent={state.NudgesSent}");
+
+            var occurrencesToSend = CalculateOccurrencesToSend(window, state, now);
+            if (occurrencesToSend <= 0)
+            {
+                var nextIndex = Math.Min(state.NudgesSent, window.TotalOccurrences - 1);
+                var nextTime = nextIndex >= 0 ? window.GetOccurrenceTime(nextIndex) : (DateTime?)null;
+                WriteDebug($"Window {window.BaseDate}: no notifications to send (next scheduled at {nextTime:O})");
+                continue;
+            }
+
+            WriteDebug($"Dispatching {occurrencesToSend} occurrence(s) for notification {notification.Id} on {window.BaseDate}");
+
+            for (int i = 0; i < occurrencesToSend; i++)
+            {
+                SendNotification(notification);
+                state = state.IncrementNudges(DateTime.UtcNow);
+            }
+
+            _stateStore.SaveState(notification.Id, state);
+        }
+    }
+
+    private static int CalculateOccurrencesToSend(NotificationWindow window, NotificationStateSnapshot state, DateTime now)
+    {
+        var occurrencesSent = state.NudgesSent;
+        if (occurrencesSent >= window.TotalOccurrences)
+        {
+            return 0;
+        }
+
+        var occurrences = 0;
+
+        while (occurrencesSent < window.TotalOccurrences)
+        {
+            var scheduledTime = window.GetOccurrenceTime(occurrencesSent);
+            if (window.End.HasValue && scheduledTime > window.End.Value)
+            {
+                break;
+            }
+
+            if (scheduledTime > now)
+            {
+                break;
+            }
+
+            occurrences++;
+            occurrencesSent++;
+        }
+
+        return occurrences;
+    }
+
+    private void SendNotification(NotificationResponse notification)
+    {
+        var message = string.IsNullOrWhiteSpace(notification.NotificationText)
+            ? NotificationScheduleCalculator.BuildDefaultMessage(notification)
+            : notification.NotificationText!;
+
+        _notificationService.SendNotification("LogMyDay", message);
+        _logger.LogDebug("Notification dispatched for tag {TagId}", notification.TagId);
+        WriteDebug($"Notification dispatched for tag {notification.TagId}");
     }
 
     public void Dispose()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         // Unhook from authentication events
         _authService.AuthenticationChanged -= OnAuthenticationChanged;
-        
         StopMonitoring();
+        _checkLock.Dispose();
+        _isDisposed = true;
+
+        _logger.LogDebug("SystemNotificationService disposed");
+        WriteDebug("Disposed and detached from authentication events");
+    }
+
+    private void WriteDebug(string message)
+    {
+        Debug.WriteLine($"{LogPrefix}: {message}");
     }
 }
