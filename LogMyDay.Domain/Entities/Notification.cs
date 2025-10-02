@@ -24,4 +24,27 @@ public class Notification
     public bool IsActive { get; set; } = true;
 
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// The last date (in the user's local context) when this notification was delivered.
+    /// Used to reset delivery counts daily across clients.
+    /// </summary>
+    public DateOnly? LastDeliveryDate { get; set; }
+
+    /// <summary>
+    /// Number of deliveries that have occurred on <see cref="LastDeliveryDate"/>.
+    /// Includes the initial send and any nudges so clients stay in sync.
+    /// </summary>
+    public int DeliveriesOnLastDate { get; set; }
+
+    /// <summary>
+    /// Absolute timestamp (UTC) of the most recent delivery, used for auditing.
+    /// </summary>
+    public DateTime? LastDeliverySentAtUtc { get; set; }
+
+    /// <summary>
+    /// Next eligible send timestamp (UTC). Schedulers must not fire before this moment
+    /// to respect nudge intervals across devices.
+    /// </summary>
+    public DateTime? NextEligibleSendAfterUtc { get; set; }
 }

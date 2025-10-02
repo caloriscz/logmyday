@@ -2,6 +2,8 @@
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using LogMyDay.App.Mobile.Services
+@using Microsoft.AspNetCore.Components
+@using System.Globalization
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject NavigationManager Navigation
@@ -260,10 +262,26 @@
                   ErrorMessage="@errorMessage" />
 
 @code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tagId")]
+    public int? QueryTagId { get; set; }
+
     private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
     private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
     private string? errorMessage;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "date")]
+    public string? QueryDate { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "source")]
+    public string? QuerySource { get; set; }
+
+    private bool _pendingNotificationModal;
+    private int? _pendingNotificationTagId;
+    private DateOnly? _pendingNotificationDate;
 
     // Display and filtering
     private string displayType = "daily";
@@ -295,6 +313,16 @@
         selectedDate = DateTime.Today;
         InitializeNewActivity();
         await LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(QuerySource, "notification", StringComparison.OrdinalIgnoreCase) && QueryTagId.HasValue)
+        {
+            _pendingNotificationTagId = QueryTagId;
+            _pendingNotificationDate = ParseDateFromQuery(QueryDate);
+            _pendingNotificationModal = true;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -361,6 +389,8 @@
             Logger.LogError(ex, "Error loading data");
             errorMessage = $"Error loading data: {ex.Message}";
         }
+
+        await ProcessPendingNotificationIntentAsync();
     }
 
     private async Task RefreshActivities()
@@ -376,6 +406,21 @@
             isRefreshing = false;
         }
     }
+
+        private static DateOnly? ParseDateFromQuery(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
+        }
 
     private async Task OnDisplayTypeChanged(ChangeEventArgs e)
     {
@@ -490,18 +535,83 @@
         InitializeNewActivity();
     }
 
-    private void InitializeNewActivity()
+    private async Task ProcessPendingNotificationIntentAsync()
     {
-        // Set the DateStarted to the selected date, but keep the current time if it's today
-        if (selectedDate.Date == DateTime.Today)
+        if (!_pendingNotificationModal)
         {
-            newActivity.DateStarted = DateTime.Now;
+            return;
         }
-        else
+
+        if (tags == null || tags.Count == 0)
         {
-            // For other dates, set to the beginning of the selected day
-            newActivity.DateStarted = selectedDate.Date;
+            return;
         }
+
+        var tagId = _pendingNotificationTagId;
+        if (tagId.HasValue && !tags.Any(t => t.Id == tagId.Value))
+        {
+            _pendingNotificationModal = false;
+            _pendingNotificationTagId = null;
+            _pendingNotificationDate = null;
+            return;
+        }
+
+        var targetDate = _pendingNotificationDate ?? DateOnly.FromDateTime(DateTime.Today);
+        selectedDate = targetDate.ToDateTime(TimeOnly.MinValue);
+
+        InitializeNewActivity(tagId, targetDate);
+        StateHasChanged();
+        await ShowAddActivityModalAsync();
+
+        _pendingNotificationModal = false;
+        _pendingNotificationTagId = null;
+        _pendingNotificationDate = null;
+
+        Navigation.NavigateTo("/activities", forceLoad: false, replace: true);
+    }
+
+    private async Task ShowAddActivityModalAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval",
+                "new bootstrap.Modal(document.getElementById('addActivityModal')).show()");
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore JavaScript interop errors during static rendering
+        }
+    }
+
+    private void InitializeNewActivity(int? tagId = null, DateOnly? targetDate = null)
+    {
+        var referenceDate = DetermineActivityDate(targetDate);
+
+        newActivity ??= new LogMyDay.Shared.DTOs.ActivityRequest();
+        newActivity.DateStarted = referenceDate;
+        newActivity.DateFinished = null;
+        newActivity.Description = null;
+
+        if (tagId.HasValue)
+        {
+            newActivity.PrimaryTagId = tagId.Value;
+        }
+
+        selectedDate = referenceDate.Date;
+    }
+
+    private DateTime DetermineActivityDate(DateOnly? targetDate)
+    {
+        if (targetDate.HasValue)
+        {
+            return targetDate.Value == DateOnly.FromDateTime(DateTime.Today)
+                ? DateTime.Now
+                : targetDate.Value.ToDateTime(TimeOnly.MinValue);
+        }
+
+        return selectedDate.Date == DateTime.Today
+            ? DateTime.Now
+            : selectedDate.Date;
     }
 
     private async Task DeleteActivity(int id)

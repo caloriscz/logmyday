@@ -4,8 +4,10 @@
 @inject IApiContext ApiContext
 @inject IApiClientProvider ApiProvider
 @inject ILogger<Layout.MainLayout> Logger
+@inject NotificationNavigationService NotificationNavigation
 @implements IDisposable
 @using System.Net
+@using System.Collections.Generic
 @using Microsoft.Maui.Storage
 @using Refit
 
@@ -102,7 +104,9 @@
         await base.OnInitializedAsync();
         System.Diagnostics.Debug.WriteLine("MainLayout: Conditional layout initialized");
         AuthService.AuthenticationChanged += OnAuthenticationChanged;
+        NotificationNavigation.NavigationRequested += OnNotificationNavigationRequested;
         await TryRestoreSessionAsync();
+        await HandlePendingNotificationAsync();
     }
 
     private void OnAuthenticationChanged(bool isAuthenticated)
@@ -118,12 +122,14 @@
         {
             // If user just logged in, navigate to activities page
             Navigation.NavigateTo("/activities");
+            _ = InvokeAsync(HandlePendingNotificationAsync);
         }
     }
 
     public void Dispose()
     {
         AuthService.AuthenticationChanged -= OnAuthenticationChanged;
+        NotificationNavigation.NavigationRequested -= OnNotificationNavigationRequested;
     }
 
     private bool _restoreAttempted;
@@ -201,5 +207,52 @@
         {
             Logger?.LogError(ex, "Unexpected error while attempting to restore authentication state.");
         }
+    }
+
+    private async Task HandlePendingNotificationAsync()
+    {
+        var pending = NotificationNavigation.PeekPendingIntent();
+        if (pending != null)
+        {
+            await HandleNotificationNavigationAsync(pending);
+        }
+    }
+
+    private void OnNotificationNavigationRequested(object? sender, NotificationPayload payload)
+    {
+        InvokeAsync(() => HandleNotificationNavigationAsync(payload));
+    }
+
+    private Task HandleNotificationNavigationAsync(NotificationPayload payload)
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return Task.CompletedTask;
+        }
+
+        var targetUri = BuildNotificationTargetUri(payload);
+        Navigation.NavigateTo(targetUri, forceLoad: false);
+        NotificationNavigation.ClearPendingIntent();
+        return Task.CompletedTask;
+    }
+
+    private static string BuildNotificationTargetUri(NotificationPayload payload)
+    {
+        var parameters = new List<string> { "source=notification" };
+
+        if (payload.TagId.HasValue)
+        {
+            parameters.Add($"tagId={payload.TagId.Value}");
+        }
+
+        if (payload.LocalDate.HasValue)
+        {
+            parameters.Add($"date={payload.LocalDate.Value:yyyy-MM-dd}");
+        }
+
+        return parameters.Count > 0
+            ? "/activities?" + string.Join("&", parameters)
+            : "/activities";
     }
 }

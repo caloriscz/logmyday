@@ -22,7 +22,6 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
     private readonly INotificationManagerService _notificationService;
     private readonly IApiContext _apiContext;
     private readonly AuthenticationService _authService;
-    private readonly INotificationStateStore _stateStore;
     private readonly ILogger<SystemNotificationService> _logger;
     private System.Timers.Timer? _checkTimer;
     private bool _isRunning;
@@ -40,14 +39,12 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         INotificationManagerService notificationService,
         IApiContext apiContext,
         AuthenticationService authService,
-        INotificationStateStore stateStore,
         ILogger<SystemNotificationService> logger)
     {
         _apiClientProvider = apiClientProvider;
         _notificationService = notificationService;
         _apiContext = apiContext;
         _authService = authService;
-        _stateStore = stateStore;
         _logger = logger;
 
         // Listen to authentication changes
@@ -112,7 +109,6 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
 
         _cachedNotifications.Clear();
         _lastRefreshUtc = DateTime.MinValue;
-        _stateStore.ClearAll();
     }
 
     private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
@@ -158,18 +154,20 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
                 return;
             }
 
-            var pruneThreshold = DateOnly.FromDateTime(DateTime.Today.AddDays(-7));
-            _stateStore.PruneOlderThan(pruneThreshold);
+            var nowLocal = DateTime.Now;
+            var nowUtc = DateTime.UtcNow;
 
-            var now = DateTime.Now;
-            foreach (var notification in _cachedNotifications)
+            foreach (var notification in _cachedNotifications.ToList())
             {
-                if (!notification.IsActive)
+                try
                 {
-                    continue;
+                    await ProcessNotificationAsync(notification, nowLocal, nowUtc);
                 }
-
-                ProcessNotification(notification, now);
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to process notification {NotificationId}", notification.Id);
+                    WriteDebug($"Error processing notification {notification.Id}: {ex.Message}");
+                }
             }
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -209,12 +207,11 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         }
 
         _lastRefreshUtc = DateTime.UtcNow;
-        _stateStore.RemoveObsoleteNotifications(_cachedNotifications.Select(n => n.Id));
         _logger.LogInformation("Loaded {Count} notifications for scheduling", _cachedNotifications.Count);
         WriteDebug($"Loaded {_cachedNotifications.Count} notifications for scheduling");
     }
 
-    private void ProcessNotification(NotificationResponse notification, DateTime now)
+    private async Task ProcessNotificationAsync(NotificationResponse notification, DateTime nowLocal, DateTime nowUtc)
     {
         if (!notification.IsActive)
         {
@@ -222,80 +219,130 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
             return;
         }
 
-        WriteDebug($"Evaluating notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) at {now:O}");
+        WriteDebug($"Evaluating notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) at {nowLocal:O}");
 
-        var windows = NotificationScheduleCalculator.BuildWindows(notification, now);
-        foreach (var window in windows)
+        var windows = NotificationScheduleCalculator.BuildWindows(notification, nowLocal);
+        if (windows.Count == 0)
         {
-            if (!window.Contains(now))
-            {
-                WriteDebug($"Window {window.BaseDate}: current time {now:HH:mm:ss} outside range {window.Start:HH:mm:ss} - {window.End?.ToString("HH:mm:ss") ?? "(no end)"}; skipped");
-                continue;
-            }
-
-            var state = _stateStore.GetState(notification.Id, window.BaseDate);
-            WriteDebug($"Window {window.BaseDate}: total occurrences={window.TotalOccurrences}, already sent={state.NudgesSent}");
-
-            var occurrencesToSend = CalculateOccurrencesToSend(window, state, now);
-            if (occurrencesToSend <= 0)
-            {
-                var nextIndex = Math.Min(state.NudgesSent, window.TotalOccurrences - 1);
-                var nextTime = nextIndex >= 0 ? window.GetOccurrenceTime(nextIndex) : (DateTime?)null;
-                WriteDebug($"Window {window.BaseDate}: no notifications to send (next scheduled at {nextTime:O})");
-                continue;
-            }
-
-            WriteDebug($"Dispatching {occurrencesToSend} occurrence(s) for notification {notification.Id} on {window.BaseDate}");
-
-            for (int i = 0; i < occurrencesToSend; i++)
-            {
-                SendNotification(notification);
-                state = state.IncrementNudges(DateTime.UtcNow);
-            }
-
-            _stateStore.SaveState(notification.Id, state);
-        }
-    }
-
-    private static int CalculateOccurrencesToSend(NotificationWindow window, NotificationStateSnapshot state, DateTime now)
-    {
-        var occurrencesSent = state.NudgesSent;
-        if (occurrencesSent >= window.TotalOccurrences)
-        {
-            return 0;
+            WriteDebug($"Notification {notification.Id}: no windows available");
+            return;
         }
 
-        var occurrences = 0;
-
-        while (occurrencesSent < window.TotalOccurrences)
+        var activeWindow = windows.FirstOrDefault(window => window.Contains(nowLocal));
+        if (activeWindow is null)
         {
-            var scheduledTime = window.GetOccurrenceTime(occurrencesSent);
-            if (window.End.HasValue && scheduledTime > window.End.Value)
+            WriteDebug($"Notification {notification.Id}: current time outside active windows");
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(nowLocal);
+        var deliveriesToday = notification.LastDeliveryDate == today ? notification.DeliveriesOnLastDate : 0;
+        var totalOccurrences = Math.Max(0, notification.MaxNudges) + 1;
+
+        if (deliveriesToday >= totalOccurrences)
+        {
+            WriteDebug($"Notification {notification.Id}: daily limit reached ({deliveriesToday}/{totalOccurrences})");
+            return;
+        }
+
+        var nextOccurrenceIndex = deliveriesToday;
+        var scheduledTime = activeWindow.GetOccurrenceTime(nextOccurrenceIndex);
+        if (nowLocal < scheduledTime)
+        {
+            WriteDebug($"Notification {notification.Id}: waiting for next occurrence at {scheduledTime:O}");
+            return;
+        }
+
+        if (notification.NextEligibleSendAfterUtc.HasValue && notification.NextEligibleSendAfterUtc.Value > nowUtc)
+        {
+            WriteDebug($"Notification {notification.Id}: cooldown active until {notification.NextEligibleSendAfterUtc.Value:O}");
+            return;
+        }
+
+        // Catch up on overdue occurrences while conditions allow.
+        while (deliveriesToday < totalOccurrences)
+        {
+            nextOccurrenceIndex = deliveriesToday;
+            scheduledTime = activeWindow.GetOccurrenceTime(nextOccurrenceIndex);
+
+            if (nowLocal < scheduledTime)
             {
+                WriteDebug($"Notification {notification.Id}: next occurrence at {scheduledTime:O}; stopping");
                 break;
             }
 
-            if (scheduledTime > now)
+            if (notification.NextEligibleSendAfterUtc.HasValue && notification.NextEligibleSendAfterUtc.Value > nowUtc)
             {
+                WriteDebug($"Notification {notification.Id}: cooldown now extends to {notification.NextEligibleSendAfterUtc.Value:O}; stopping");
                 break;
             }
 
-            occurrences++;
-            occurrencesSent++;
-        }
+            await DispatchAndPersistAsync(notification, today, deliveriesToday + 1);
 
-        return occurrences;
+            // After API call, notification reference is updated with latest counters
+            deliveriesToday = notification.LastDeliveryDate == today ? notification.DeliveriesOnLastDate : 0;
+            nowUtc = DateTime.UtcNow;
+        }
     }
 
-    private void SendNotification(NotificationResponse notification)
+    private async Task DispatchAndPersistAsync(NotificationResponse notification, DateOnly today, int deliveriesOnDate)
     {
         var message = string.IsNullOrWhiteSpace(notification.NotificationText)
             ? NotificationScheduleCalculator.BuildDefaultMessage(notification)
             : notification.NotificationText!;
 
-        _notificationService.SendNotification("LogMyDay", message);
+        var payload = new NotificationPayload
+        {
+            NotificationId = notification.Id,
+            TagId = notification.TagId,
+            TagName = notification.TagName,
+            LocalDate = today
+        };
+
+        _notificationService.SendNotification("LogMyDay", message, notifyTime: null, payload: payload);
         _logger.LogDebug("Notification dispatched for tag {TagId}", notification.TagId);
         WriteDebug($"Notification dispatched for tag {notification.TagId}");
+
+        var activityApi = _apiClientProvider.Activity;
+        var occurredUtc = DateTime.UtcNow;
+        var sanitizedInterval = NotificationScheduleCalculator.SanitizeInterval(notification.NudgeInterval);
+        var nextEligibleUtc = occurredUtc.Add(sanitizedInterval);
+
+        var request = new NotificationDeliveryRequest
+        {
+            OccurredAtUtc = occurredUtc,
+            LocalDate = today,
+            DeliveriesOnDate = deliveriesOnDate,
+            NextEligibleSendAfterUtc = nextEligibleUtc
+        };
+
+        try
+        {
+            var updated = await activityApi.RecordNotificationDelivery(notification.Id, request);
+            notification.LastDeliveryDate = updated.LastDeliveryDate;
+            notification.DeliveriesOnLastDate = updated.DeliveriesOnLastDate;
+            notification.LastDeliverySentAtUtc = updated.LastDeliverySentAtUtc;
+            notification.NextEligibleSendAfterUtc = updated.NextEligibleSendAfterUtc;
+            UpdateCachedNotification(updated);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist delivery for notification {NotificationId}", notification.Id);
+            WriteDebug($"Error persisting delivery for notification {notification.Id}: {ex.Message}");
+            throw;
+        }
+    }
+
+    private void UpdateCachedNotification(NotificationResponse updated)
+    {
+        for (var i = 0; i < _cachedNotifications.Count; i++)
+        {
+            if (_cachedNotifications[i].Id == updated.Id)
+            {
+                _cachedNotifications[i] = updated;
+                break;
+            }
+        }
     }
 
     public void Dispose()

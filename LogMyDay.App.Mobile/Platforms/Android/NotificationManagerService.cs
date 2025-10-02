@@ -1,3 +1,4 @@
+using System;
 using Android.App;
 using Android.Content;
 using Android.Graphics;
@@ -20,6 +21,10 @@ public class NotificationManagerService : INotificationManagerService
 
     public const string TitleKey = "title";
     public const string MessageKey = "message";
+    public const string NotificationIdKey = "notification_id";
+    public const string TagIdKey = "tag_id";
+    public const string TagNameKey = "tag_name";
+    public const string LocalDateKey = "local_date";
 
     bool channelInitialized = false;
     bool periodicChannelInitialized = false;
@@ -51,7 +56,7 @@ public class NotificationManagerService : INotificationManagerService
         }
     }
 
-    public void SendNotification(string title, string message, DateTime? notifyTime = null)
+    public void SendNotification(string title, string message, DateTime? notifyTime = null, NotificationPayload? payload = null)
     {
         System.Diagnostics.Debug.WriteLine($"Android NotificationManagerService.SendNotification called: {title} - {message}");
 
@@ -65,6 +70,19 @@ public class NotificationManagerService : INotificationManagerService
             Intent intent = new Intent(Platform.AppContext, typeof(AlarmHandler));
             intent.PutExtra(TitleKey, title);
             intent.PutExtra(MessageKey, message);
+            if (payload != null)
+            {
+                intent.PutExtra(NotificationIdKey, payload.NotificationId);
+                if (payload.TagId.HasValue)
+                {
+                    intent.PutExtra(TagIdKey, payload.TagId.Value);
+                }
+                intent.PutExtra(TagNameKey, payload.TagName ?? string.Empty);
+                if (payload.LocalDate.HasValue)
+                {
+                    intent.PutExtra(LocalDateKey, payload.LocalDate.Value.ToString("yyyy-MM-dd"));
+                }
+            }
             intent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 
             var pendingIntentFlags = (Build.VERSION.SdkInt >= BuildVersionCodes.S)
@@ -81,16 +99,17 @@ public class NotificationManagerService : INotificationManagerService
         }
         else
         {
-            Show(title, message);
+            Show(title, message, payload);
         }
     }
 
-    public void ReceiveNotification(string title, string message)
+    public void ReceiveNotification(string title, string message, NotificationPayload? payload = null)
     {
         var args = new NotificationEventArgs()
         {
             Title = title,
             Message = message,
+            Payload = payload,
         };
         NotificationReceived?.Invoke(null, args);
     }
@@ -105,7 +124,7 @@ public class NotificationManagerService : INotificationManagerService
         // This will be handled by the cross-platform NotificationService
     }
 
-    public void Show(string title, string message)
+    public void Show(string title, string message, NotificationPayload? payload = null)
     {
         System.Diagnostics.Debug.WriteLine($"Android NotificationManagerService.Show called: {title} - {message}");
 
@@ -132,6 +151,19 @@ public class NotificationManagerService : INotificationManagerService
         Intent intent = new Intent(context, typeof(MainActivity));
         intent.PutExtra(TitleKey, title ?? string.Empty);
         intent.PutExtra(MessageKey, message ?? string.Empty);
+        if (payload != null)
+        {
+            intent.PutExtra(NotificationIdKey, payload.NotificationId);
+            if (payload.TagId.HasValue)
+            {
+                intent.PutExtra(TagIdKey, payload.TagId.Value);
+            }
+            intent.PutExtra(TagNameKey, payload.TagName ?? string.Empty);
+            if (payload.LocalDate.HasValue)
+            {
+                intent.PutExtra(LocalDateKey, payload.LocalDate.Value.ToString("yyyy-MM-dd"));
+            }
+        }
         intent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 
         var pendingIntentFlags = (Build.VERSION.SdkInt >= BuildVersionCodes.S)
@@ -191,6 +223,42 @@ public class NotificationManagerService : INotificationManagerService
         System.Diagnostics.Debug.WriteLine($"Built notification, about to notify with ID: {notificationId}");
         compatManager.Notify(notificationId, notification);
         System.Diagnostics.Debug.WriteLine("Notification sent successfully");
+    }
+
+    internal static NotificationPayload? BuildPayloadFromIntent(Intent intent)
+    {
+        if (!intent.HasExtra(NotificationIdKey))
+        {
+            return null;
+        }
+
+        var notificationId = intent.GetIntExtra(NotificationIdKey, -1);
+        if (notificationId < 0)
+        {
+            return null;
+        }
+
+        int? tagId = null;
+        if (intent.HasExtra(TagIdKey))
+        {
+            tagId = intent.GetIntExtra(TagIdKey, 0);
+        }
+
+        string? tagName = intent.GetStringExtra(TagNameKey);
+        var localDateRaw = intent.GetStringExtra(LocalDateKey);
+        DateOnly? localDate = null;
+        if (!string.IsNullOrWhiteSpace(localDateRaw) && DateOnly.TryParse(localDateRaw, out var parsed))
+        {
+            localDate = parsed;
+        }
+
+        return new NotificationPayload
+        {
+            NotificationId = notificationId,
+            TagId = tagId,
+            TagName = string.IsNullOrWhiteSpace(tagName) ? null : tagName,
+            LocalDate = localDate
+        };
     }
 
     void CreateNotificationChannel()

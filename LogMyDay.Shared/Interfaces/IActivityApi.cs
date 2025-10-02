@@ -97,5 +97,8 @@ public interface IActivityApi
 
     [Delete("/api/notifications/{id}")]
     Task DeleteNotification(int id);
+
+    [Post("/api/notifications/{id}/deliveries")]
+    Task<NotificationResponse> RecordNotificationDelivery(int id, [Body] NotificationDeliveryRequest request);
 }
 

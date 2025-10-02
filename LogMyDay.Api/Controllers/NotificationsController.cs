@@ -120,4 +120,26 @@ public class NotificationsController : BaseApiController
         await _notificationService.DeleteAsync(id, userId);
         return NoContent();
     }
+
+    [HttpPost("{id:int}/deliveries")]
+    public async Task<ActionResult<NotificationResponse>> RecordDelivery(int id, NotificationDeliveryRequest request)
+    {
+        var userId = GetCurrentUserId();
+
+        try
+        {
+            var updated = await _notificationService.RecordDeliveryAsync(id, request, userId);
+            return Ok(updated);
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            _logger.LogWarning(ex, "Invalid delivery record for notification {NotificationId}", id);
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Notification {NotificationId} not found for user {UserId}", id, userId);
+            return NotFound(ex.Message);
+        }
+    }
 }

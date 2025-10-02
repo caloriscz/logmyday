@@ -46,7 +46,8 @@ public class MainActivity : MauiAppCompatActivity
             if (title != null && message != null)
             {
                 var service = IPlatformApplication.Current?.Services?.GetService<INotificationManagerService>();
-                service?.ReceiveNotification(title, message);
+                var payload = NotificationManagerService.BuildPayloadFromIntent(intent);
+                service?.ReceiveNotification(title, message, payload);
             }
         }
     }

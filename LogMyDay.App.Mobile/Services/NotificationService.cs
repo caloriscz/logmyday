@@ -5,28 +5,36 @@ namespace LogMyDay.App.Mobile.Services;
 public class NotificationService : INotificationManagerService
 {
     private readonly INotificationManagerService _platformService;
+    private readonly NotificationNavigationService _navigationService;
     
     public event EventHandler<NotificationEventArgs>? NotificationReceived;
 
-    public NotificationService(INotificationManagerService platformService)
+    public NotificationService(INotificationManagerService platformService, NotificationNavigationService navigationService)
     {
         _platformService = platformService;
+        _navigationService = navigationService;
         _platformService.NotificationReceived += OnPlatformNotificationReceived;
     }
 
-    public void SendNotification(string title, string message, DateTime? notifyTime = null)
+    public void SendNotification(string title, string message, DateTime? notifyTime = null, NotificationPayload? payload = null)
     {
         System.Diagnostics.Debug.WriteLine($"NotificationService.SendNotification called: {title} - {message}");
-        _platformService.SendNotification(title, message, notifyTime);
+        _platformService.SendNotification(title, message, notifyTime, payload);
     }
 
-    public void ReceiveNotification(string title, string message)
+    public void ReceiveNotification(string title, string message, NotificationPayload? payload = null)
     {
         NotificationReceived?.Invoke(this, new NotificationEventArgs 
         { 
             Title = title, 
-            Message = message 
+            Message = message,
+            Payload = payload
         });
+
+        if (payload != null)
+        {
+            _navigationService.SetPendingIntent(payload);
+        }
     }
 
     // Deprecated methods - use SystemNotificationService instead
@@ -43,5 +51,10 @@ public class NotificationService : INotificationManagerService
     private void OnPlatformNotificationReceived(object? sender, NotificationEventArgs e)
     {
         NotificationReceived?.Invoke(this, e);
+
+        if (e.Payload != null)
+        {
+            _navigationService.SetPendingIntent(e.Payload);
+        }
     }
 }

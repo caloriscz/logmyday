@@ -17,7 +17,8 @@ public class AlarmHandler : BroadcastReceiver
             if (title != null && message != null)
             {
                 NotificationManagerService? manager = NotificationManagerService.Instance ?? new NotificationManagerService();
-                manager.Show(title, message);
+                var payload = NotificationManagerService.BuildPayloadFromIntent(intent);
+                manager.Show(title, message, payload);
             }
         }
     }

@@ -10,4 +10,5 @@ public interface INotificationService
     Task<NotificationResponse> CreateAsync(NotificationRequest request, Guid userId);
     Task<NotificationResponse> UpdateAsync(int id, NotificationRequest request, Guid userId);
     Task DeleteAsync(int id, Guid userId);
+    Task<NotificationResponse> RecordDeliveryAsync(int id, NotificationDeliveryRequest request, Guid userId);
 }

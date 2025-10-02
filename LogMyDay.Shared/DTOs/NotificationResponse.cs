@@ -12,4 +12,8 @@ public class NotificationResponse
     public TimeSpan? NudgeInterval { get; set; }
     public bool IsActive { get; set; }
     public DateTime DateCreated { get; set; }
+    public DateOnly? LastDeliveryDate { get; set; }
+    public int DeliveriesOnLastDate { get; set; }
+    public DateTime? LastDeliverySentAtUtc { get; set; }
+    public DateTime? NextEligibleSendAfterUtc { get; set; }
 }

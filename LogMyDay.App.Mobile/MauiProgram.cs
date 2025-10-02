@@ -76,9 +76,9 @@ public static class MauiProgram
 #if ANDROID
             builder.Services.AddSingleton<INotificationManagerService, LogMyDay.App.Mobile.Platforms.Android.NotificationManagerService>();
 #endif
+            builder.Services.AddSingleton<NotificationNavigationService>();
             // Register the cross-platform wrapper service
             builder.Services.AddSingleton<NotificationService>();
-            builder.Services.AddSingleton<INotificationStateStore, NotificationStateStore>();
 
             // Register system notification service
             builder.Services.AddSingleton<ISystemNotificationService, SystemNotificationService>();

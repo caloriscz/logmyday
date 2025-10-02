@@ -137,6 +137,65 @@ public class NotificationService : INotificationService
         _logger.LogInformation("Deleted notification {NotificationId}", id);
     }
 
+    public async Task<NotificationResponse> RecordDeliveryAsync(int id, NotificationDeliveryRequest request, Guid userId)
+    {
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        if (request.DeliveriesOnDate < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.DeliveriesOnDate), "DeliveriesOnDate cannot be negative");
+        }
+
+        var notification = await _context.Notifications
+            .Include(n => n.Tag)
+            .FirstOrDefaultAsync(n => n.Id == id && n.Tag.UserId == userId);
+
+        if (notification == null)
+        {
+            throw new KeyNotFoundException("Notification not found");
+        }
+
+        var occurredAtUtc = request.OccurredAtUtc == default
+            ? DateTime.UtcNow
+            : DateTime.SpecifyKind(request.OccurredAtUtc, DateTimeKind.Utc);
+
+        if (notification.LastDeliveryDate != request.LocalDate)
+        {
+            notification.LastDeliveryDate = request.LocalDate;
+            notification.DeliveriesOnLastDate = request.DeliveriesOnDate;
+        }
+        else
+        {
+            notification.DeliveriesOnLastDate = Math.Max(notification.DeliveriesOnLastDate, request.DeliveriesOnDate);
+        }
+
+        notification.LastDeliverySentAtUtc = occurredAtUtc;
+
+        var sanitizedInterval = NotificationScheduleCalculator.SanitizeInterval(notification.NudgeInterval);
+        var minimumNext = occurredAtUtc.Add(sanitizedInterval);
+
+        var nextEligible = request.NextEligibleSendAfterUtc;
+        if (!nextEligible.HasValue || nextEligible.Value < minimumNext)
+        {
+            nextEligible = minimumNext;
+        }
+
+        notification.NextEligibleSendAfterUtc = DateTime.SpecifyKind(nextEligible.Value, DateTimeKind.Utc);
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Recorded delivery for notification {NotificationId} on {DeliveryDate} (deliveries={Deliveries})",
+            notification.Id,
+            request.LocalDate,
+            notification.DeliveriesOnLastDate);
+
+        return MapToResponse(notification);
+    }
+
     private async Task<Tag> EnsureTagAccessible(int tagId, Guid userId)
     {
         var tag = await _context.Tags.FirstOrDefaultAsync(t => t.Id == tagId && t.UserId == userId);
@@ -187,7 +246,11 @@ public class NotificationService : INotificationService
             MaxNudges = notification.MaxNudges,
             NudgeInterval = notification.NudgeInterval,
             IsActive = notification.IsActive,
-            DateCreated = notification.DateCreated
+            DateCreated = notification.DateCreated,
+            LastDeliveryDate = notification.LastDeliveryDate,
+            DeliveriesOnLastDate = notification.DeliveriesOnLastDate,
+            LastDeliverySentAtUtc = notification.LastDeliverySentAtUtc,
+            NextEligibleSendAfterUtc = notification.NextEligibleSendAfterUtc
         };
     }
 }
