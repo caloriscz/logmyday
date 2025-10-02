@@ -28,20 +28,6 @@
     }
     else
     {
-        <datalist id="account-culture-options">
-            @foreach (var option in CultureOptions)
-            {
-                <option value="@option.Value" label="@option.Label"></option>
-            }
-        </datalist>
-
-        <datalist id="account-timezone-options">
-            @foreach (var option in TimeZoneOptions)
-            {
-                <option value="@option.Value" label="@option.Label"></option>
-            }
-        </datalist>
-
         <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
             <DataAnnotationsValidator />
             <ValidationSummary />
@@ -66,14 +52,24 @@
 
             <div class="mb-3">
                 <label class="form-label" for="culture">Culture</label>
-                <InputText id="culture" @bind-Value="profile.Culture" class="form-control" list="account-culture-options" />
-                <div class="form-text">Search or select a culture (e.g., en-US, de-AT).</div>
+                <SearchableSelect @bind-Value="profile.Culture"
+                                  Id="culture"
+                                  Options="CultureOptions"
+                                  Placeholder="Select culture"
+                                  SearchPlaceholder="Search cultures"
+                                  ShowValueInList="true" />
+                <div class="form-text">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
             </div>
 
             <div class="mb-3">
                 <label class="form-label" for="timezone">Time zone</label>
-                <InputText id="timezone" @bind-Value="profile.TimeZone" class="form-control" list="account-timezone-options" />
-                <div class="form-text">Search or select an IANA time zone (e.g., Europe/Vienna).</div>
+                <SearchableSelect @bind-Value="profile.TimeZone"
+                                  Id="timezone"
+                                  Options="TimeZoneOptions"
+                                  Placeholder="Select time zone"
+                                  SearchPlaceholder="Search time zones"
+                                  ShowValueInList="true" />
+                <div class="form-text">Pick an IANA time zone (e.g., Europe/Vienna).</div>
             </div>
 
             <button type="submit" class="btn btn-primary w-100" disabled="@isSaving">

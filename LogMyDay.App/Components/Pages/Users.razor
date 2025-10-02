@@ -43,20 +43,6 @@
     }
     else
     {
-        <datalist id="users-culture-options">
-            @foreach (var option in CultureOptions)
-            {
-                <option value="@option.Value" label="@option.Label"></option>
-            }
-        </datalist>
-
-        <datalist id="users-timezone-options">
-            @foreach (var option in TimeZoneOptions)
-            {
-                <option value="@option.Value" label="@option.Label"></option>
-            }
-        </datalist>
-
         <div class="row g-4">
             <div class="col-12 col-xl-4">
                 <div class="card shadow-sm">
@@ -75,14 +61,24 @@
 
                             <div class="mb-3">
                                 <label class="form-label" for="newUserCulture">Culture</label>
-                                <InputText id="newUserCulture" @bind-Value="newUser.Culture" class="form-control" list="users-culture-options" />
-                                <div class="form-text">Search or select a culture (e.g., en-US, de-AT).</div>
+                                <SearchableSelect @bind-Value="newUser.Culture"
+                                                  Id="newUserCulture"
+                                                  Options="CultureOptions"
+                                                  Placeholder="Select culture"
+                                                  SearchPlaceholder="Search cultures"
+                                                  ShowValueInList="true" />
+                                <div class="form-text">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label" for="newUserTimeZone">Time Zone</label>
-                                <InputText id="newUserTimeZone" @bind-Value="newUser.TimeZone" class="form-control" list="users-timezone-options" />
-                                <div class="form-text">Search or select an IANA time zone (e.g., Europe/Vienna).</div>
+                                <SearchableSelect @bind-Value="newUser.TimeZone"
+                                                  Id="newUserTimeZone"
+                                                  Options="TimeZoneOptions"
+                                                  Placeholder="Select time zone"
+                                                  SearchPlaceholder="Search time zones"
+                                                  ShowValueInList="true" />
+                                <div class="form-text">Pick an IANA time zone (e.g., Europe/Vienna).</div>
                             </div>
 
                             <div class="mb-3">
@@ -205,11 +201,21 @@
                                                                 </div>
                                                                 <div class="col-md-6 col-lg-3">
                                                                     <label class="form-label" for="editCulture">Culture</label>
-                                                                    <InputText id="editCulture" @bind-Value="editUser.Culture" class="form-control" list="users-culture-options" />
+                                                                    <SearchableSelect @bind-Value="editUser.Culture"
+                                                                                      Id="editCulture"
+                                                                                      Options="CultureOptions"
+                                                                                      Placeholder="Select culture"
+                                                                                      SearchPlaceholder="Search cultures"
+                                                                                      ShowValueInList="true" />
                                                                 </div>
                                                                 <div class="col-md-6 col-lg-3">
                                                                     <label class="form-label" for="editTimeZone">Time Zone</label>
-                                                                    <InputText id="editTimeZone" @bind-Value="editUser.TimeZone" class="form-control" list="users-timezone-options" />
+                                                                    <SearchableSelect @bind-Value="editUser.TimeZone"
+                                                                                      Id="editTimeZone"
+                                                                                      Options="TimeZoneOptions"
+                                                                                      Placeholder="Select time zone"
+                                                                                      SearchPlaceholder="Search time zones"
+                                                                                      ShowValueInList="true" />
                                                                 </div>
                                                                 <div class="col-12 col-lg-3">
                                                                     <div class="form-check mt-2 mt-lg-4">

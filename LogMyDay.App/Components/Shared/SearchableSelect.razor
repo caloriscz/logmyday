@@ -1,0 +1,50 @@
+@inherits SearchableSelectBase
+
+<div class="searchable-select" tabindex="-1" @onfocusout="HandleFocusOut">
+    <button type="button"
+            id="@Id"
+            class="form-select text-start @FieldClass"
+            disabled="@Disabled"
+            @onclick="ToggleDropdown"
+            @onkeydown="HandleToggleKeyDown">
+        <span>@SelectedLabel</span>
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="searchable-select-menu card shadow-sm" @ref="menuRef" @onclick:stopPropagation="true">
+            <div class="card-body p-2 border-bottom">
+                <input type="text"
+                       class="form-control form-control-sm"
+                       placeholder="@SearchPlaceholder"
+                       @bind="searchText"
+                       @bind:event="oninput"
+                       @bind:after="OnSearchChanged"
+                       @onkeydown="HandleSearchKeyDown"
+                       @ref="searchInputRef" />
+            </div>
+            <div class="list-group list-group-flush searchable-select-options">
+                @if (FilteredOptions.Count == 0)
+                {
+                    <div class="list-group-item text-muted small">No matches</div>
+                }
+                else
+                {
+                    @foreach (var option in FilteredOptions)
+                    {
+                        var isSelected = option.Value == CurrentValueAsString;
+                        <button type="button"
+                                class="list-group-item list-group-item-action d-flex flex-column gap-1 @(isSelected ? "active" : string.Empty)"
+                                @onclick="() => SelectOption(option)">
+                            <span>@option.Label</span>
+                            @if (ShowValueInList)
+                            {
+                                <span class="small text-muted">@option.Value</span>
+                            }
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>

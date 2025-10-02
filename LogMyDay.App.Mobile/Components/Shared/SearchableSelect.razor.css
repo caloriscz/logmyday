@@ -1,0 +1,35 @@
+.searchable-select {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-select > .form-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.searchable-select-menu {
+    position: absolute;
+    inset: auto 0 auto 0;
+    z-index: 1050;
+    max-height: 22rem;
+    overflow: hidden;
+    margin-top: 0.25rem;
+}
+
+.searchable-select-options {
+    max-height: 18rem;
+    overflow-y: auto;
+}
+
+.searchable-select-options .list-group-item {
+    cursor: pointer;
+}
+
+.searchable-select-options .list-group-item.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+}
