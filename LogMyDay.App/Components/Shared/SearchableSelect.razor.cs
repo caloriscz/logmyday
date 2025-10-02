@@ -125,15 +125,10 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
 
     protected void HandleSearchKeyDown(KeyboardEventArgs args)
     {
-        if (args.Key is "Escape")
+        if (args.Key is "Escape" or "Tab")
         {
             _ = CloseDropdownAsync();
         }
-    }
-
-    protected void HandleFocusOut(FocusEventArgs args)
-    {
-        _ = CloseDropdownAsync();
     }
 
     protected void OnSearchChanged()

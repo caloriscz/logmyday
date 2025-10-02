@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using LogMyDay.Shared.Preferences;
-using WebFocusEventArgs = Microsoft.AspNetCore.Components.Web.FocusEventArgs;
 
 namespace LogMyDay.App.Mobile.Components.Shared;
 
@@ -126,15 +125,10 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
 
     protected void HandleSearchKeyDown(KeyboardEventArgs args)
     {
-        if (args.Key is "Escape")
+        if (args.Key is "Escape" or "Tab")
         {
             _ = CloseDropdownAsync();
         }
-    }
-
-    protected void HandleFocusOut(WebFocusEventArgs args)
-    {
-        _ = CloseDropdownAsync();
     }
 
     protected void OnSearchChanged()
