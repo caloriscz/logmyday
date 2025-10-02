@@ -3,6 +3,7 @@
 @using System.Net
 @using Refit
 @using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
 @inject IAccountApi AccountApi
@@ -64,14 +65,26 @@
 
                             <div class="mb-3">
                                 <label class="form-label" for="profileCulture">Culture</label>
-                                <InputText id="profileCulture" @bind-Value="profile.Culture" class="form-control" />
-                                <div class="form-text">Examples: en-US, de-AT.</div>
+                                <InputText id="profileCulture" @bind-Value="profile.Culture" class="form-control" list="profile-culture-options" />
+                                <datalist id="profile-culture-options">
+                                    @foreach (var option in CultureOptions)
+                                    {
+                                        <option value="@option.Value" label="@option.Label"></option>
+                                    }
+                                </datalist>
+                                <div class="form-text">Search or select a culture (e.g., en-US, de-AT).</div>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label" for="profileTimeZone">Time Zone</label>
-                                <InputText id="profileTimeZone" @bind-Value="profile.TimeZone" class="form-control" />
-                                <div class="form-text">Use IANA identifiers like Europe/Vienna.</div>
+                                <InputText id="profileTimeZone" @bind-Value="profile.TimeZone" class="form-control" list="profile-timezone-options" />
+                                <datalist id="profile-timezone-options">
+                                    @foreach (var option in TimeZoneOptions)
+                                    {
+                                        <option value="@option.Value" label="@option.Label"></option>
+                                    }
+                                </datalist>
+                                <div class="form-text">Search or select an IANA time zone (e.g., Europe/Vienna).</div>
                             </div>
 
                             <button type="submit" class="btn btn-primary" disabled="@isSavingProfile">
@@ -138,6 +151,9 @@
 </div>
 
 @code {
+    private static readonly IReadOnlyList<SelectOption> CultureOptions = CultureCatalog.All;
+    private static readonly IReadOnlyList<SelectOption> TimeZoneOptions = TimeZoneCatalog.All;
+
     private Guid? userId;
     private bool isLoading = true;
     private string? loadErrorMessage;

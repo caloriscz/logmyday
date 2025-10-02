@@ -17,3 +17,4 @@ public class NotificationResponse
     public DateTime? LastDeliverySentAtUtc { get; set; }
     public DateTime? NextEligibleSendAfterUtc { get; set; }
 }
+ 
