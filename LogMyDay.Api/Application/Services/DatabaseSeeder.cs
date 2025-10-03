@@ -75,22 +75,27 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
         _logger.LogInformation("Seeding default quantities and units");
 
         var timeQuantity = new Quantity { Key = "time" };
+        var massQuantity = new Quantity { Key = "mass" };
+        var countQuantity = new Quantity { Key = "count" };
+
+        _context.Quantities.AddRange(timeQuantity, massQuantity, countQuantity);
+        await _context.SaveChangesAsync();
+
         var second = new Unit
         {
             Key = "second",
             Symbol = "s",
-            Quantity = timeQuantity,
+            QuantityId = timeQuantity.Id,
             AToBase = 1,
             BToBase = 0,
             Decimals = 0
         };
-        timeQuantity.BaseUnit = second;
 
         var minute = new Unit
         {
             Key = "minute",
             Symbol = "min",
-            Quantity = timeQuantity,
+            QuantityId = timeQuantity.Id,
             AToBase = 60,
             BToBase = 0,
             Decimals = 0
@@ -100,49 +105,43 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
         {
             Key = "hour",
             Symbol = "h",
-            Quantity = timeQuantity,
+            QuantityId = timeQuantity.Id,
             AToBase = 3600,
             BToBase = 0,
             Decimals = 1
         };
 
-        var massQuantity = new Quantity { Key = "mass" };
         var kilogram = new Unit
         {
             Key = "kilogram",
             Symbol = "kg",
-            Quantity = massQuantity,
+            QuantityId = massQuantity.Id,
             AToBase = 1,
             BToBase = 0,
             Decimals = 2
         };
-        massQuantity.BaseUnit = kilogram;
 
         var gram = new Unit
         {
             Key = "gram",
             Symbol = "g",
-            Quantity = massQuantity,
+            QuantityId = massQuantity.Id,
             AToBase = 0.001,
             BToBase = 0,
             Decimals = 0
         };
 
-        var countQuantity = new Quantity { Key = "count" };
         var count = new Unit
         {
             Key = "count",
             Symbol = "ct",
-            Quantity = countQuantity,
+            QuantityId = countQuantity.Id,
             AToBase = 1,
             BToBase = 0,
             Decimals = 0
         };
-        countQuantity.BaseUnit = count;
 
-        _context.Quantities.AddRange(timeQuantity, massQuantity, countQuantity);
         _context.Units.AddRange(second, minute, hour, kilogram, gram, count);
-
         await _context.SaveChangesAsync();
 
         timeQuantity.BaseUnitId = second.Id;
