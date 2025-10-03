@@ -1,0 +1,352 @@
+@page "/units"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using System.Net
+@using System.Linq
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<Units> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-lg-5">
+            <h3>@(isEditing ? "Edit Unit" : "Add Unit")</h3>
+            <EditForm Model="unitForm" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                @if (!string.IsNullOrEmpty(unitError))
+                {
+                    <div class="alert alert-danger">@unitError</div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Key</label>
+                    <InputText @bind-Value="unitForm.Key" class="form-control" />
+                    <div class="form-text">Internal identifier (e.g. minute, kilogram).</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Symbol</label>
+                    <InputText @bind-Value="unitForm.Symbol" class="form-control" />
+                    <div class="form-text">What users will see (e.g. min, kg).</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity</label>
+                    <InputSelect @bind-Value="unitForm.QuantityId" class="form-select">
+                        <option value="0">Select a quantity…</option>
+                        @foreach (var quantity in quantities)
+                        {
+                            <option value="@quantity.Id">@quantity.Key</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Multiplier to base</label>
+                        <InputNumber @bind-Value="unitForm.AToBase" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Offset to base</label>
+                        <InputNumber @bind-Value="unitForm.BToBase" class="form-control" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Display decimals</label>
+                    <InputNumber @bind-Value="unitForm.Decimals" class="form-control" />
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="isBusy">@(isEditing ? "Save" : "Add")</button>
+                    @if (isEditing)
+                    {
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="isBusy">Cancel</button>
+                    }
+                </div>
+            </EditForm>
+        </div>
+        <div class="col-lg-7 mt-5 mt-lg-0">
+            <h3>Units</h3>
+            @if (isLoading)
+            {
+                <p><em>Loading units…</em></p>
+            }
+            else if (!string.IsNullOrEmpty(loadError))
+            {
+                <div class="alert alert-danger">@loadError</div>
+            }
+            else if (units.Count == 0)
+            {
+                <p class="text-muted">No units available yet. Seed defaults or add your first unit.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Symbol</th>
+                                <th>Quantity</th>
+                                <th>Multiplier</th>
+                                <th>Offset</th>
+                                <th>Decimals</th>
+                                <th style="width: 130px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var unit in units)
+                            {
+                                <tr>
+                                    <td>
+                                        @unit.Key
+                                        @if (unit.IsBaseUnit)
+                                        {
+                                            <span class="badge bg-secondary ms-1">Base</span>
+                                        }
+                                    </td>
+                                    <td>@unit.Symbol</td>
+                                    <td>@unit.QuantityKey</td>
+                                    <td>@unit.AToBase</td>
+                                    <td>@unit.BToBase</td>
+                                    <td>@unit.Decimals</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(unit)" disabled="isBusy">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(unit)" disabled="isBusy || unit.IsBaseUnit">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (unitPendingDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete unit</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Delete unit <strong>@unitPendingDelete.Key</strong>? This cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="isBusy">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteUnit" disabled="isBusy">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<UnitResponse> units = new();
+    private readonly List<QuantityResponse> quantities = new();
+    private UnitRequest unitForm = new()
+    {
+        Key = string.Empty,
+        Symbol = string.Empty,
+        QuantityId = 0,
+        AToBase = 1,
+        BToBase = 0,
+        Decimals = 0
+    };
+
+    private string? loadError;
+    private string? unitError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingUnitId;
+    private UnitResponse? unitPendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Units");
+        await LoadUnitsAsync();
+    }
+
+    private async Task LoadUnitsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var quantityResults = await ActivityApi.GetQuantitiesAsync();
+            quantities.Clear();
+            quantities.AddRange(quantityResults);
+
+            var unitResults = await ActivityApi.GetUnitsAsync();
+            units.Clear();
+            units.AddRange(unitResults.OrderBy(u => u.QuantityKey).ThenBy(u => u.Key));
+
+            if (unitForm.QuantityId == 0 && quantities.Count > 0)
+            {
+                unitForm.QuantityId = quantities[0].Id;
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view units.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load units: {ex.Message}";
+            Logger.LogError(ex, "Failed to load units");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!ValidateUnitForm())
+        {
+            return;
+        }
+
+        isBusy = true;
+        unitError = null;
+
+        try
+        {
+            if (editingUnitId.HasValue)
+            {
+                await ActivityApi.UpdateUnit(editingUnitId.Value, unitForm);
+            }
+            else
+            {
+                await ActivityApi.CreateUnit(unitForm);
+            }
+
+            await LoadUnitsAsync();
+            ResetForm();
+        }
+        catch (Refit.ApiException ex)
+        {
+            unitError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Unit API error");
+        }
+        catch (Exception ex)
+        {
+            unitError = ex.Message;
+            Logger.LogError(ex, "Unexpected error saving unit");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private bool ValidateUnitForm()
+    {
+        if (string.IsNullOrWhiteSpace(unitForm.Key))
+        {
+            unitError = "Key is required.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(unitForm.Symbol))
+        {
+            unitError = "Symbol is required.";
+            return false;
+        }
+
+        if (unitForm.QuantityId == 0)
+        {
+            unitError = "Select a quantity.";
+            return false;
+        }
+
+        if (Math.Abs(unitForm.AToBase) < double.Epsilon)
+        {
+            unitError = "Multiplier to base must not be zero.";
+            return false;
+        }
+
+        unitError = null;
+        return true;
+    }
+
+    private void BeginEdit(UnitResponse unit)
+    {
+        isEditing = true;
+        editingUnitId = unit.Id;
+        unitForm = new UnitRequest
+        {
+            Key = unit.Key,
+            Symbol = unit.Symbol,
+            QuantityId = unit.QuantityId,
+            AToBase = unit.AToBase,
+            BToBase = unit.BToBase,
+            Decimals = unit.Decimals
+        };
+    }
+
+    private void CancelEdit()
+    {
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        isEditing = false;
+        editingUnitId = null;
+        unitForm = new UnitRequest
+        {
+            Key = string.Empty,
+            Symbol = string.Empty,
+            QuantityId = quantities.FirstOrDefault()?.Id ?? 0,
+            AToBase = 1,
+            BToBase = 0,
+            Decimals = 0
+        };
+    }
+
+    private void ConfirmDelete(UnitResponse unit)
+    {
+        unitPendingDelete = unit;
+    }
+
+    private void CancelDelete()
+    {
+        unitPendingDelete = null;
+    }
+
+    private async Task DeleteUnit()
+    {
+        if (unitPendingDelete == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        unitError = null;
+
+        try
+        {
+            await ActivityApi.DeleteUnit(unitPendingDelete.Id);
+            await LoadUnitsAsync();
+        }
+        catch (Refit.ApiException ex)
+        {
+            unitError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Failed to delete unit");
+        }
+        catch (Exception ex)
+        {
+            unitError = ex.Message;
+            Logger.LogError(ex, "Unexpected error deleting unit");
+        }
+        finally
+        {
+            isBusy = false;
+            unitPendingDelete = null;
+        }
+    }
+}

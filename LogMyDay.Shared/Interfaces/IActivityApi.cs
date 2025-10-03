@@ -80,6 +80,33 @@ public interface IActivityApi
     [Delete("/api/tags/{id}")]
     Task DeleteTag(int id);
 
+    [Get("/api/units")]
+    Task<IList<UnitResponse>> GetUnitsAsync();
+
+    [Get("/api/units/quantities")]
+    Task<IList<QuantityResponse>> GetQuantitiesAsync();
+
+    [Post("/api/units")]
+    Task<int> CreateUnit([Body] UnitRequest request);
+
+    [Put("/api/units/{id}")]
+    Task UpdateUnit(int id, [Body] UnitRequest request);
+
+    [Delete("/api/units/{id}")]
+    Task DeleteUnit(int id);
+
+    [Get("/api/tagoptionlists")]
+    Task<IList<TagOptionListResponse>> GetTagOptionListsAsync();
+
+    [Post("/api/tagoptionlists")]
+    Task<int> CreateTagOptionList([Body] TagOptionListRequest request);
+
+    [Put("/api/tagoptionlists/{id}")]
+    Task UpdateTagOptionList(int id, [Body] TagOptionListRequest request);
+
+    [Delete("/api/tagoptionlists/{id}")]
+    Task DeleteTagOptionList(int id);
+
     [Get("/api/input-types")]
     Task<List<InputTypeDto>> GetInputTypesAsync();
 

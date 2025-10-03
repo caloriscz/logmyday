@@ -3,6 +3,8 @@
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using LogMyDay.App.Services
+@using System.Linq
+@using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject ILogger<Tags> Logger
@@ -49,10 +51,6 @@
                     <label class="form-label">Is Range:</label>
                     <InputCheckbox @bind-Value="newTag.IsRange" class="form-check-input" />
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Unit Id (optional):</label>
-                    <InputNumber @bind-Value="newTag.UnitId" class="form-control" TValue="int?" />
-                </div>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Min Value:</label>
@@ -72,8 +70,42 @@
                     <InputText @bind-Value="newTag.DefaultValue" class="form-control" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Option List Id (optional):</label>
-                    <InputNumber @bind-Value="newTag.OptionListId" class="form-control" TValue="int?" />
+                    <label class="form-label">Unit (optional):</label>
+                    @if (availableUnits.Count > 0)
+                    {
+                        <InputSelect @bind-Value="newTag.UnitId" class="form-select" TValue="int?">
+                            <option value="">(None)</option>
+                            @foreach (var unit in availableUnits)
+                            {
+                                <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
+                            }
+                        </InputSelect>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-0">
+                            No units yet. <a href="/units">Let's create your first unit.</a>
+                        </div>
+                    }
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Option List (optional):</label>
+                    @if (availableOptionLists.Count > 0)
+                    {
+                        <InputSelect @bind-Value="newTag.OptionListId" class="form-select" TValue="int?">
+                            <option value="">(None)</option>
+                            @foreach (var list in availableOptionLists)
+                            {
+                                <option value="@list.Id">@list.Name</option>
+                            }
+                        </InputSelect>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mb-0">
+                            No option lists yet. <a href="/option-lists">Let's create your first list.</a>
+                        </div>
+                    }
                 </div>
                 <button type="submit" class="btn btn-primary">Add Tag</button>
                 @if (!string.IsNullOrEmpty(errorMessage))
@@ -352,6 +384,8 @@
     };
     private string? errorMessage;
     private List<InputTypeDto> inputTypes = new();
+    private List<UnitResponse> availableUnits = new();
+    private List<TagOptionListResponse> availableOptionLists = new();
 
     private int? tagIdToDelete = null;
     private bool isDeleting = false;
@@ -363,6 +397,7 @@
         try
         {
             inputTypes = await ActivityApi.GetInputTypesAsync();
+            await LoadSupportingData();
         }
         catch (Exception ex)
         {
@@ -370,6 +405,40 @@
         }
 
         await LoadTags();
+    }
+
+    private async Task LoadSupportingData()
+    {
+        try
+        {
+            availableUnits = (await ActivityApi.GetUnitsAsync())
+                .OrderBy(u => u.QuantityKey)
+                .ThenBy(u => u.Key)
+                .ToList();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Logger.LogWarning(ex, "Not authorized to load units");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load units");
+        }
+
+        try
+        {
+            availableOptionLists = (await ActivityApi.GetTagOptionListsAsync())
+                .OrderBy(l => l.Name)
+                .ToList();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Logger.LogWarning(ex, "Not authorized to load option lists");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load option lists");
+        }
     }
 
     private async Task LoadTags()

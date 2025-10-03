@@ -1,0 +1,344 @@
+@page "/option-lists"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using System.Net
+@using System.Linq
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<OptionLists> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-lg-5">
+            <h3>@(isEditing ? "Edit Option List" : "Add Option List")</h3>
+            <EditForm Model="listForm" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <InputText @bind-Value="listForm.Name" class="form-control" />
+                </div>
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <label class="form-label mb-0">Options</label>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddOption" disabled="isBusy">Add Option</button>
+                </div>
+                @if (listForm.Options.Count == 0)
+                {
+                    <p class="text-muted">Add at least one option.</p>
+                }
+                else
+                {
+                    <div class="list-group mb-3">
+                        @for (var i = 0; i < listForm.Options.Count; i++)
+                        {
+                            <div class="list-group-item">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label">Value</label>
+                                        <InputText @bind-Value="listForm.Options[i].Value" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label">Display Name</label>
+                                        <InputText @bind-Value="listForm.Options[i].DisplayName" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2 text-md-end">
+                                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => RemoveOption(i)" disabled="isBusy">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="isBusy">@(isEditing ? "Save" : "Add")</button>
+                    @if (isEditing)
+                    {
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="isBusy">Cancel</button>
+                    }
+                </div>
+            </EditForm>
+        </div>
+        <div class="col-lg-7 mt-5 mt-lg-0">
+            <h3>Option Lists</h3>
+            @if (isLoading)
+            {
+                <p><em>Loading lists…</em></p>
+            }
+            else if (!string.IsNullOrEmpty(loadError))
+            {
+                <div class="alert alert-danger">@loadError</div>
+            }
+            else if (lists.Count == 0)
+            {
+                <p class="text-muted">No option lists yet. Create your first list to reuse values in tags.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Scope</th>
+                                <th>Options</th>
+                                <th style="width: 130px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var list in lists)
+                            {
+                                <tr>
+                                    <td>@list.Name</td>
+                                    <td>@(list.IsGlobal ? "Global" : "Personal")</td>
+                                    <td>@list.Options.Count</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(list)" disabled="isBusy || list.IsGlobal">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(list)" disabled="isBusy || list.IsGlobal">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (listPendingDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete option list</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Delete <strong>@listPendingDelete.Name</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="isBusy">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteList" disabled="isBusy">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<TagOptionListResponse> lists = new();
+    private TagOptionListRequest listForm = new()
+    {
+        Name = string.Empty,
+        Options = new List<TagOptionRequest>
+        {
+            new() { Value = string.Empty, DisplayName = string.Empty }
+        }
+    };
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingListId;
+    private TagOptionListResponse? listPendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Option Lists");
+        await LoadListsAsync();
+    }
+
+    private async Task LoadListsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var results = await ActivityApi.GetTagOptionListsAsync();
+            lists.Clear();
+            lists.AddRange(results.OrderBy(l => l.Name));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view option lists.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load option lists: {ex.Message}";
+            Logger.LogError(ex, "Failed to load option lists");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!ValidateForm())
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            if (editingListId.HasValue)
+            {
+                await ActivityApi.UpdateTagOptionList(editingListId.Value, listForm);
+            }
+            else
+            {
+                await ActivityApi.CreateTagOptionList(listForm);
+            }
+
+            await LoadListsAsync();
+            ResetForm();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Option list API error");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error saving option list");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(listForm.Name))
+        {
+            formError = "Name is required.";
+            return false;
+        }
+
+        if (listForm.Options.Count == 0)
+        {
+            formError = "Add at least one option.";
+            return false;
+        }
+
+        if (listForm.Options.Any(o => string.IsNullOrWhiteSpace(o.Value)))
+        {
+            formError = "Each option must have a value.";
+            return false;
+        }
+
+        formError = null;
+        return true;
+    }
+
+    private void AddOption()
+    {
+        listForm.Options.Add(new TagOptionRequest { Value = string.Empty, DisplayName = string.Empty });
+    }
+
+    private void RemoveOption(int index)
+    {
+        if (index >= 0 && index < listForm.Options.Count)
+        {
+            listForm.Options.RemoveAt(index);
+        }
+    }
+
+    private void BeginEdit(TagOptionListResponse list)
+    {
+        if (list.IsGlobal)
+        {
+            return;
+        }
+
+        isEditing = true;
+        editingListId = list.Id;
+        listForm = new TagOptionListRequest
+        {
+            Name = list.Name,
+            Options = list.Options
+                .Select(o => new TagOptionRequest { Id = o.Id, Value = o.Value, DisplayName = o.DisplayName })
+                .ToList()
+        };
+    }
+
+    private void CancelEdit()
+    {
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        isEditing = false;
+        editingListId = null;
+        listForm = new TagOptionListRequest
+        {
+            Name = string.Empty,
+            Options = new List<TagOptionRequest>
+            {
+                new() { Value = string.Empty, DisplayName = string.Empty }
+            }
+        };
+    }
+
+    private void ConfirmDelete(TagOptionListResponse list)
+    {
+        if (list.IsGlobal)
+        {
+            return;
+        }
+
+        listPendingDelete = list;
+    }
+
+    private void CancelDelete()
+    {
+        listPendingDelete = null;
+    }
+
+    private async Task DeleteList()
+    {
+        if (listPendingDelete == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            await ActivityApi.DeleteTagOptionList(listPendingDelete.Id);
+            await LoadListsAsync();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Failed to delete option list");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error deleting option list");
+        }
+        finally
+        {
+            isBusy = false;
+            listPendingDelete = null;
+        }
+    }
+}

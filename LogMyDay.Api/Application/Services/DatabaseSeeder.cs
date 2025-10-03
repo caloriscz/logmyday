@@ -28,11 +28,13 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             // Ensure database is created
             await _context.Database.EnsureCreatedAsync();
 
+            await EnsureDefaultUnitsAsync();
+
             // Check if any users exist
             var userCount = await _context.Users.CountAsync();
             if (userCount > 0)
             {
-                _logger.LogInformation("Users already exist in database. Skipping seeding.");
+                _logger.LogInformation("Users already exist in database. Skipping admin user seeding.");
                 return;
             }
 
@@ -53,7 +55,7 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             _context.Users.Add(adminUser);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}", 
+            _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}",
                 adminUser.Email, adminUser.Id);
         }
         catch (Exception ex)
@@ -61,5 +63,92 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             _logger.LogError(ex, "Error occurred while seeding database");
             throw;
         }
+    }
+
+    private async Task EnsureDefaultUnitsAsync()
+    {
+        if (await _context.Units.AnyAsync())
+        {
+            return;
+        }
+
+        _logger.LogInformation("Seeding default quantities and units");
+
+        var timeQuantity = new Quantity { Key = "time" };
+        var second = new Unit
+        {
+            Key = "second",
+            Symbol = "s",
+            Quantity = timeQuantity,
+            AToBase = 1,
+            BToBase = 0,
+            Decimals = 0
+        };
+        timeQuantity.BaseUnit = second;
+
+        var minute = new Unit
+        {
+            Key = "minute",
+            Symbol = "min",
+            Quantity = timeQuantity,
+            AToBase = 60,
+            BToBase = 0,
+            Decimals = 0
+        };
+
+        var hour = new Unit
+        {
+            Key = "hour",
+            Symbol = "h",
+            Quantity = timeQuantity,
+            AToBase = 3600,
+            BToBase = 0,
+            Decimals = 1
+        };
+
+        var massQuantity = new Quantity { Key = "mass" };
+        var kilogram = new Unit
+        {
+            Key = "kilogram",
+            Symbol = "kg",
+            Quantity = massQuantity,
+            AToBase = 1,
+            BToBase = 0,
+            Decimals = 2
+        };
+        massQuantity.BaseUnit = kilogram;
+
+        var gram = new Unit
+        {
+            Key = "gram",
+            Symbol = "g",
+            Quantity = massQuantity,
+            AToBase = 0.001,
+            BToBase = 0,
+            Decimals = 0
+        };
+
+        var countQuantity = new Quantity { Key = "count" };
+        var count = new Unit
+        {
+            Key = "count",
+            Symbol = "ct",
+            Quantity = countQuantity,
+            AToBase = 1,
+            BToBase = 0,
+            Decimals = 0
+        };
+        countQuantity.BaseUnit = count;
+
+        _context.Quantities.AddRange(timeQuantity, massQuantity, countQuantity);
+        _context.Units.AddRange(second, minute, hour, kilogram, gram, count);
+
+        await _context.SaveChangesAsync();
+
+        timeQuantity.BaseUnitId = second.Id;
+        massQuantity.BaseUnitId = kilogram.Id;
+        countQuantity.BaseUnitId = count.Id;
+
+        await _context.SaveChangesAsync();
     }
 }

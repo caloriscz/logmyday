@@ -159,6 +159,8 @@ services.AddEndpointsApiExplorer();
 
 services.AddScoped<IActivityService, ActivityService>();
 services.AddScoped<ITagService, TagService>();
+services.AddScoped<IUnitService, UnitService>();
+services.AddScoped<ITagOptionListService, TagOptionListService>();
 services.AddScoped<INotificationService, NotificationService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExportService>();
