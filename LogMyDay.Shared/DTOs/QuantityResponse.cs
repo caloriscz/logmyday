@@ -6,7 +6,7 @@ public class QuantityResponse
 
     public required string Key { get; set; }
 
-    public int BaseUnitId { get; set; }
+    public int? BaseUnitId { get; set; }
 
     public required string BaseUnitKey { get; set; }
 
