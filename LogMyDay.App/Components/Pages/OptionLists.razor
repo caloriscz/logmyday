@@ -25,7 +25,7 @@
                 </div>
                 <div class="mb-2 d-flex justify-content-between align-items-center">
                     <label class="form-label mb-0">Options</label>
-                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddOption" disabled="isBusy">Add Option</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddOption" disabled="@isBusy">Add Option</button>
                 </div>
                 @if (listForm.Options.Count == 0)
                 {
@@ -34,20 +34,20 @@
                 else
                 {
                     <div class="list-group mb-3">
-                        @for (var i = 0; i < listForm.Options.Count; i++)
+                        @foreach (var option in listForm.Options)
                         {
-                            <div class="list-group-item">
+                            <div class="list-group-item" @key="option">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12 col-md-5">
                                         <label class="form-label">Value</label>
-                                        <InputText @bind-Value="listForm.Options[i].Value" class="form-control" />
+                                        <InputText @bind-Value="option.Value" class="form-control" />
                                     </div>
                                     <div class="col-12 col-md-5">
                                         <label class="form-label">Display Name</label>
-                                        <InputText @bind-Value="listForm.Options[i].DisplayName" class="form-control" />
+                                        <InputText @bind-Value="option.DisplayName" class="form-control" />
                                     </div>
                                     <div class="col-12 col-md-2 text-md-end">
-                                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => RemoveOption(i)" disabled="isBusy">Remove</button>
+                                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => RemoveOption(option)" disabled="@isBusy">Remove</button>
                                     </div>
                                 </div>
                             </div>
@@ -55,10 +55,10 @@
                     </div>
                 }
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" disabled="isBusy">@(isEditing ? "Save" : "Add")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@isBusy">@(isEditing ? "Save" : "Add")</button>
                     @if (isEditing)
                     {
-                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="isBusy">Cancel</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="@isBusy">Cancel</button>
                     }
                 </div>
             </EditForm>
@@ -97,8 +97,8 @@
                                     <td>@(list.IsGlobal ? "Global" : "Personal")</td>
                                     <td>@list.Options.Count</td>
                                     <td>
-                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(list)" disabled="isBusy || list.IsGlobal">Edit</button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(list)" disabled="isBusy || list.IsGlobal">Delete</button>
+                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(list)" disabled="@(isBusy || list.IsGlobal)">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">Delete</button>
                                     </td>
                                 </tr>
                             }
@@ -122,8 +122,8 @@
                     <p>Delete <strong>@listPendingDelete.Name</strong>?</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="isBusy">Cancel</button>
-                    <button class="btn btn-danger" @onclick="DeleteList" disabled="isBusy">Delete</button>
+                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="@isBusy">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteList" disabled="@isBusy">Delete</button>
                 </div>
             </div>
         </div>
@@ -250,11 +250,11 @@
         listForm.Options.Add(new TagOptionRequest { Value = string.Empty, DisplayName = string.Empty });
     }
 
-    private void RemoveOption(int index)
+    private void RemoveOption(TagOptionRequest option)
     {
-        if (index >= 0 && index < listForm.Options.Count)
+        if (listForm.Options.Contains(option))
         {
-            listForm.Options.RemoveAt(index);
+            listForm.Options.Remove(option);
         }
     }
 

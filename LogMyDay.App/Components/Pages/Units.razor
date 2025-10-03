@@ -54,10 +54,10 @@
                     <InputNumber @bind-Value="unitForm.Decimals" class="form-control" />
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" disabled="isBusy">@(isEditing ? "Save" : "Add")</button>
+                    <button type="submit" class="btn btn-primary" disabled="@isBusy">@(isEditing ? "Save" : "Add")</button>
                     @if (isEditing)
                     {
-                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="isBusy">Cancel</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="@isBusy">Cancel</button>
                     }
                 </div>
             </EditForm>
@@ -108,8 +108,8 @@
                                     <td>@unit.BToBase</td>
                                     <td>@unit.Decimals</td>
                                     <td>
-                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(unit)" disabled="isBusy">Edit</button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(unit)" disabled="isBusy || unit.IsBaseUnit">Delete</button>
+                                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => BeginEdit(unit)" disabled="@isBusy">Edit</button>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(unit)" disabled="@(isBusy || unit.IsBaseUnit)">Delete</button>
                                     </td>
                                 </tr>
                             }
@@ -133,8 +133,8 @@
                     <p>Delete unit <strong>@unitPendingDelete.Key</strong>? This cannot be undone.</p>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="isBusy">Cancel</button>
-                    <button class="btn btn-danger" @onclick="DeleteUnit" disabled="isBusy">Delete</button>
+                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="@isBusy">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteUnit" disabled="@isBusy">Delete</button>
                 </div>
             </div>
         </div>
