@@ -60,6 +60,32 @@
                 <label class="form-label">Is Range:</label>
                 <InputCheckbox @bind-Value="editTag.IsRange" class="form-check-input" />
             </div>
+            <div class="mb-3">
+                <label class="form-label">Unit Id (optional):</label>
+                <InputNumber @bind-Value="editTag.UnitId" class="form-control" TValue="int?" />
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Min Value:</label>
+                    <InputNumber @bind-Value="editTag.MinValue" class="form-control" TValue="double?" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Max Value:</label>
+                    <InputNumber @bind-Value="editTag.MaxValue" class="form-control" TValue="double?" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Step:</label>
+                    <InputNumber @bind-Value="editTag.Step" class="form-control" TValue="double?" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Default Value:</label>
+                <InputText @bind-Value="editTag.DefaultValue" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Option List Id (optional):</label>
+                <InputNumber @bind-Value="editTag.OptionListId" class="form-control" TValue="int?" />
+            </div>
             <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
             <button type="button" class="btn btn-secondary ms-2" @onclick="GoBack" disabled="@isSaving">Cancel</button>
         </EditForm>
@@ -224,7 +250,13 @@
                 IsRequired = tag.IsRequired,
                 IsRepeatable = tag.IsRepeatable,
                 TimeGranularity = tag.TimeGranularity,
-                IsRange = tag.IsRange
+                IsRange = tag.IsRange,
+                UnitId = tag.UnitId,
+                MinValue = tag.MinValue,
+                MaxValue = tag.MaxValue,
+                Step = tag.Step,
+                DefaultValue = tag.DefaultValue,
+                OptionListId = tag.OptionListId
             };
 
             await LoadNotifications();

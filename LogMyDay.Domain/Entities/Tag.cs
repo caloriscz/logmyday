@@ -1,9 +1,11 @@
+using System;
+using System.Collections.Generic;
 using LogMyDay.Domain.Enums;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LogMyDay.Domain.Entities;
+
 public class Tag
 {
     [Key]
@@ -20,7 +22,7 @@ public class Tag
     public bool IsRequired { get; set; } = false;
 
     public TimeGranularity TimeGranularity { get; set; } = TimeGranularity.Exact;
-    
+
     public bool IsRepeatable { get; set; } = true;
     public bool IsRange { get; set; } = false;
 
@@ -28,7 +30,24 @@ public class Tag
 
     [ForeignKey(nameof(PatternId))]
     public Pattern? Pattern { get; set; }
+
     public Guid? UserId { get; set; }
+
+    public int? UnitId { get; set; }
+
+    [ForeignKey(nameof(UnitId))]
+    public Unit? Unit { get; set; }
+
+    public double? MinValue { get; set; }
+    public double? MaxValue { get; set; }
+    public double? Step { get; set; }
+
+    public string? DefaultValue { get; set; }
+
+    public int? OptionListId { get; set; }
+
+    [ForeignKey(nameof(OptionListId))]
+    public TagOptionList? OptionList { get; set; }
 
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

@@ -30,6 +30,12 @@ public class TagService : ITagService
             IsRepeatable = createTagRequest.IsRepeatable,
             TimeGranularity = createTagRequest.TimeGranularity,
             IsRange = createTagRequest.IsRange,
+            UnitId = createTagRequest.UnitId,
+            MinValue = createTagRequest.MinValue,
+            MaxValue = createTagRequest.MaxValue,
+            Step = createTagRequest.Step,
+            DefaultValue = createTagRequest.DefaultValue,
+            OptionListId = createTagRequest.OptionListId,
             UserId = userId // Associate tag with current user
         };
 
@@ -49,18 +55,30 @@ public class TagService : ITagService
     public async Task<IList<TagResponse>> GetAll(Guid userId)
     {
         var tags = await _context.Tags
+            .Include(t => t.Unit)
+            .Include(t => t.OptionList)
             .Where(t => t.UserId == userId)
             .OrderBy(x => x.TagName)
-            .ToListAsync(); var tagsResponse = tags.Select(tag => new TagResponse
+            .ToListAsync();
+
+        var tagsResponse = tags.Select(tag => new TagResponse
             {
                 Id = tag.Id,
                 Title = tag.TagName,
-                InputTypeId = tag?.InputType?.Id,
+                InputTypeId = tag.InputTypeId,
                 TypeId = tag.InputTypeId,
                 IsRequired = tag.IsRequired, // Map IsRequired
                 IsRepeatable = tag.IsRepeatable,
                 TimeGranularity = tag.TimeGranularity,
-                IsRange = tag.IsRange
+                IsRange = tag.IsRange,
+                UnitId = tag.UnitId,
+                UnitSymbol = tag.Unit?.Symbol,
+                MinValue = tag.MinValue,
+                MaxValue = tag.MaxValue,
+                Step = tag.Step,
+                DefaultValue = tag.DefaultValue,
+                OptionListId = tag.OptionListId,
+                OptionListName = tag.OptionList?.Name
             }).ToList();
 
         return tagsResponse;
@@ -85,11 +103,17 @@ public class TagService : ITagService
         }
 
         tag.TagName = model.Tag;
-        tag.InputTypeId = model.TypeId;
+        tag.InputTypeId = model.TypeId == 0 ? null : model.TypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
         tag.IsRepeatable = model.IsRepeatable;
         tag.TimeGranularity = model.TimeGranularity;
         tag.IsRange = model.IsRange;
+        tag.UnitId = model.UnitId;
+        tag.MinValue = model.MinValue;
+        tag.MaxValue = model.MaxValue;
+        tag.Step = model.Step;
+        tag.DefaultValue = model.DefaultValue;
+        tag.OptionListId = model.OptionListId;
 
         _context.Tags.Update(tag);
         await _context.SaveChangesAsync();
@@ -120,6 +144,8 @@ public class TagService : ITagService
     public async Task<TagResponse> GetTagById(int tagId, Guid userId)
     {
         Tag? tagResponse = await _context.Tags
+            .Include(t => t.Unit)
+            .Include(t => t.OptionList)
             .Where(t => t.Id == tagId && t.UserId == userId)
             .FirstOrDefaultAsync();
 
@@ -132,12 +158,20 @@ public class TagService : ITagService
         {
             Id = tagResponse.Id,
             Title = tagResponse.TagName,
-            InputTypeId = tagResponse?.InputType?.Id,
+            InputTypeId = tagResponse.InputTypeId,
             TypeId = tagResponse.InputTypeId,
             IsRequired = tagResponse.IsRequired, // Map IsRequired
             IsRepeatable = tagResponse.IsRepeatable,
             TimeGranularity = tagResponse.TimeGranularity,
-            IsRange = tagResponse.IsRange
+            IsRange = tagResponse.IsRange,
+            UnitId = tagResponse.UnitId,
+            UnitSymbol = tagResponse.Unit?.Symbol,
+            MinValue = tagResponse.MinValue,
+            MaxValue = tagResponse.MaxValue,
+            Step = tagResponse.Step,
+            DefaultValue = tagResponse.DefaultValue,
+            OptionListId = tagResponse.OptionListId,
+            OptionListName = tagResponse.OptionList?.Name
         };
 
         return response;
@@ -155,6 +189,8 @@ public class TagService : ITagService
     public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null)
     {
         var query = _context.Tags
+            .Include(t => t.Unit)
+            .Include(t => t.OptionList)
             .Where(t => t.UserId == userId)
             .AsQueryable();
         if (!string.IsNullOrWhiteSpace(filter))
@@ -181,7 +217,15 @@ public class TagService : ITagService
                 IsRequired = t.IsRequired, // Map IsRequired
                 IsRepeatable = t.IsRepeatable,
                 TimeGranularity = t.TimeGranularity,
-                IsRange = t.IsRange
+                IsRange = t.IsRange,
+                UnitId = t.UnitId,
+                UnitSymbol = t.Unit?.Symbol,
+                MinValue = t.MinValue,
+                MaxValue = t.MaxValue,
+                Step = t.Step,
+                DefaultValue = t.DefaultValue,
+                OptionListId = t.OptionListId,
+                OptionListName = t.OptionList?.Name
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,

@@ -12,4 +12,11 @@ public class TagBackup
     public bool IsRange { get; set; }
     public string? PatternName { get; set; }
     public Guid? UserId { get; set; }
+    public string? UnitKey { get; set; }
+    public string? UnitSymbol { get; set; }
+    public double? MinValue { get; set; }
+    public double? MaxValue { get; set; }
+    public double? Step { get; set; }
+    public string? DefaultValue { get; set; }
+    public string? OptionListKey { get; set; }
 }

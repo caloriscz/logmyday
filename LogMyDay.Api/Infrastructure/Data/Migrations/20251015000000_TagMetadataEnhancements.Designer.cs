@@ -4,6 +4,7 @@ using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LogMyDay.Api.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(LogMyDayDbContext))]
-    partial class LogMyDayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251015000000_TagMetadataEnhancements")]
+    partial class TagMetadataEnhancements : Migration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

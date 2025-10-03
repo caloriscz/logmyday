@@ -15,6 +15,10 @@ public class LogMyDayDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Quantity> Quantities => Set<Quantity>();
+    public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
+    public DbSet<TagOption> TagOptions => Set<TagOption>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +74,43 @@ public class LogMyDayDbContext : DbContext
 
             entity.Property(n => n.NextEligibleSendAfterUtc)
                 .HasColumnType("datetime2");
+        });
+
+        modelBuilder.Entity<Quantity>(entity =>
+        {
+            entity.HasOne(q => q.BaseUnit)
+                .WithMany()
+                .HasForeignKey(q => q.BaseUnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Unit>(entity =>
+        {
+            entity.HasOne(u => u.Quantity)
+                .WithMany()
+                .HasForeignKey(u => u.QuantityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TagOptionList>(entity =>
+        {
+            entity.HasMany(l => l.Options)
+                .WithOne(o => o.OptionList)
+                .HasForeignKey(o => o.OptionListId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.HasOne(t => t.Unit)
+                .WithMany()
+                .HasForeignKey(t => t.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(t => t.OptionList)
+                .WithMany()
+                .HasForeignKey(t => t.OptionListId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.SeedData();

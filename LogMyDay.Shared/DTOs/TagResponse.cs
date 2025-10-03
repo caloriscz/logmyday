@@ -12,4 +12,12 @@ public class TagResponse
     public bool IsRepeatable { get; set; }
     public TimeGranularity TimeGranularity { get; set; }
     public bool IsRange { get; set; }
+    public int? UnitId { get; set; }
+    public string? UnitSymbol { get; set; }
+    public double? MinValue { get; set; }
+    public double? MaxValue { get; set; }
+    public double? Step { get; set; }
+    public string? DefaultValue { get; set; }
+    public int? OptionListId { get; set; }
+    public string? OptionListName { get; set; }
 }
