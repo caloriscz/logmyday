@@ -113,9 +113,10 @@
 </div>
 
 <!-- Add Activity Modal -->
-<AddActivityModal 
-    Activity="newActivity" 
-    AvailableTags="allTags" 
+<AddActivityModal
+    Activity="newActivity"
+    AvailableTags="allTags"
+    OptionLists="optionLists"
     ErrorMessage="@errorMessage"
     PreselectedTagId="preselectedTagId"
     PreselectedDate="selectedDate"
@@ -126,6 +127,7 @@
 @code {
     private List<TagResponse>? unfilledRequiredTags;
     private IList<TagResponse>? allTags;
+    private IList<TagOptionListResponse>? optionLists;
     private DateTime selectedDate = DateTime.Today;
     private bool isLoading = true;
     private string? errorMessage;
@@ -158,11 +160,13 @@
             // Load both unfilled required tags and all tags for the modal
             var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
             var allTagsTask = ActivityApi.GetTags();
-            
-            await Task.WhenAll(unfilledTask, allTagsTask);
-            
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+
+            await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
+
             unfilledRequiredTags = await unfilledTask;
             allTags = await allTagsTask;
+            optionLists = await optionListsTask;
             
             // Update new activity with the selected date
             newActivity.DateStarted = selectedDate.Date == DateTime.Today 
@@ -174,6 +178,7 @@
             errorMessage = $"Error loading notifications: {ex.Message}";
             unfilledRequiredTags = new List<TagResponse>();
             allTags = new List<TagResponse>();
+            optionLists = new List<TagOptionListResponse>();
         }
         finally
         {

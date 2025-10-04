@@ -167,6 +167,7 @@ services.AddScoped<IExcelExportService, ExportService>();
 
 // UI services
 services.AddScoped<LogMyDay.App.Services.IPageTitleService, LogMyDay.App.Services.PageTitleService>();
+services.AddScoped<IUserPreferencesService, UserPreferencesService>();
 
 // Authentication and user services
 services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();

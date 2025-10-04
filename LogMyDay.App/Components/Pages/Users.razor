@@ -1,13 +1,14 @@
 @page "/users"
 @using System.ComponentModel.DataAnnotations
+@using System.Globalization
 @using LogMyDay.Shared.Preferences
 @using Microsoft.AspNetCore.Authorization
 @using LogMyDay.App.Services
 @inject IUsersApi UsersApi
-@inject IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @inject ILogger<Users> Logger
 @inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
 
 @attribute [Authorize(Policy = "AdminOnly")]
 
@@ -143,7 +144,7 @@
                                             <tr>
                                                 <td>
                                                     <div class="fw-semibold">@user.Email</div>
-                                                    <div class="text-muted small">Created @user.CreatedUtc.ToLocalTime().ToString("g")</div>
+                                                    <div class="text-muted small">Created @FormatUserDate(user.CreatedUtc)</div>
                                                 </td>
                                                 <td>
                                                     <div class="fw-semibold">@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</div>
@@ -164,7 +165,7 @@
                                                     }
                                                 </td>
                                                 <td>
-                                                    <span class="small text-muted">@user.UpdatedUtc.ToLocalTime().ToString("g")</span>
+                                                    <span class="small text-muted">@FormatUserDate(user.UpdatedUtc)</span>
                                                 </td>
                                                 <td class="text-end">
                                                     <button class="btn btn-outline-secondary btn-sm me-2" @onclick="() => BeginEdit(user)" disabled="@isCreating">
@@ -272,6 +273,10 @@
     private Guid? deletingUserId;
     private string? statusMessage;
     private bool statusIsError;
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private EffectivePreferences? effectivePreferences;
 
     protected override async Task OnInitializedAsync()
     {
@@ -284,12 +289,15 @@
 
             try
             {
-                var currentUser = await AuthApi.GetCurrentUserAsync();
-                currentUserId = currentUser?.Id;
+                userPreferences = await UserPreferencesService.GetAsync();
+                currentUserId = userPreferences.CurrentUser.Id;
+                displayCulture = userPreferences.Culture;
+                displayTimeZone = userPreferences.TimeZone;
+                effectivePreferences = userPreferences.Preferences;
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "Failed to load current user information");
+                Logger.LogWarning(ex, "Failed to load current user preferences");
             }
 
             await LoadUsersAsync();
@@ -478,6 +486,15 @@
     private void SortUsers()
     {
         users.Sort((a, b) => string.Compare(a.Email, b.Email, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string FormatUserDate(DateTime utc)
+    {
+        var utcValue = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utcValue, displayTimeZone);
+        var datePart = local.ToString(effectivePreferences?.ShortDatePattern ?? displayCulture.DateTimeFormat.ShortDatePattern, displayCulture);
+        var timePart = local.ToString(effectivePreferences?.ShortTimePattern ?? displayCulture.DateTimeFormat.ShortTimePattern, displayCulture);
+        return string.IsNullOrEmpty(timePart) ? datePart : $"{datePart} {timePart}";
     }
 
     private void SetStatus(string? message, bool isError = false)
