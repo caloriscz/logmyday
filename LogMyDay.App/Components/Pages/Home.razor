@@ -1,4 +1,5 @@
 ﻿@page "/"
+@using System.Collections.Generic
 @using System.Globalization
 @using System.Linq
 @using LogMyDay.Shared.DTOs
@@ -60,7 +61,7 @@
                         <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
                             &lt;
                         </button>
-                        <input type="date" @bind="selectedDate" @bind:after="LoadData" class="form-control" style="width: auto;" />
+                        <input type="date" @bind="selectedDate" @bind:after="LoadData" class="form-control" style="width: auto;" lang="@InputLanguage" />
                         <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
                             &gt;
                         </button>
@@ -335,6 +336,8 @@
     Activity="newActivity"
     AvailableTags="tags"
     OptionLists="optionLists"
+    OptionListLookup="optionListLookup"
+    DisplayCulture="displayCulture"
     ErrorMessage="@errorMessage"
     OnActivityCreated="OnActivityCreated"
     OnError="OnError"
@@ -367,6 +370,7 @@
     private int monthsPerPage = 12;
     private int totalPages = 1;
     private string orderBy = "desc";
+    private string InputLanguage => displayCulture.Name;
 
     protected override async Task OnInitializedAsync()
     {
@@ -448,6 +452,10 @@
         if (optionLists is null)
         {
             optionLists = await ActivityApi.GetTagOptionListsAsync();
+        }
+
+        if (optionLists is not null)
+        {
             optionListLookup = optionLists.ToDictionary(list => list.Id);
         }
     }

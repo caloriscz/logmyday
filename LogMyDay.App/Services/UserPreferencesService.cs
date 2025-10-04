@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,17 +26,13 @@ public sealed class UserPreferencesService : IUserPreferencesService
 
     public async Task<UserPreferencesSnapshot> GetAsync(CancellationToken cancellationToken = default)
     {
-        if (_cached is not null)
-        {
-            return _cached;
-        }
-
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_cached is null)
+            var currentUser = await _authApi.GetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
+
+            if (_cached is null || !EqualityComparer<CurrentUserDto>.Default.Equals(_cached.CurrentUser, currentUser))
             {
-                var currentUser = await _authApi.GetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
                 var preferences = PreferencesFactory.From(currentUser.Culture, currentUser.TimeZone);
                 var culture = CultureInfo.GetCultureInfo(preferences.Culture);
                 var timeZone = TimeZoneInfo.FindSystemTimeZoneById(preferences.TimeZoneId);
@@ -48,7 +45,7 @@ public sealed class UserPreferencesService : IUserPreferencesService
             _gate.Release();
         }
 
-        return _cached;
+        return _cached!;
     }
 }
 

@@ -1,3 +1,4 @@
+@using System.Collections.Generic
 @using System.Globalization
 @using System.Linq
 @using LogMyDay.Shared.DTOs
@@ -72,11 +73,11 @@
                                     break;
                                 case 4: // Date
                                     <label class="form-label">Date:</label>
-                                    <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" />
+                                    <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" lang="@InputLanguage" />
                                     break;
                                 case 5: // Time
                                     <label class="form-label">Time:</label>
-                                    <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-control" />
+                                    <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-control" lang="@InputLanguage" />
                                     break;
                                 case 6: // Decimal
                                     <label class="form-label">Value @if (!string.IsNullOrWhiteSpace(selectedTag?.UnitSymbol)) { <span class="text-muted">(@selectedTag.UnitSymbol)</span> }</label>
@@ -103,11 +104,11 @@
                             <label class="form-label">Start Date & Time:</label>
                             @if (selectedTag?.TimeGranularity == TimeGranularity.Exact || selectedTag?.TimeGranularity == TimeGranularity.Hourly)
                             {
-                                <input type="datetime-local" @bind="Activity.DateStarted" class="form-control" />
+                                <input type="datetime-local" @bind="Activity.DateStarted" class="form-control" lang="@InputLanguage" />
                             }
                             else
                             {
-                                <input type="date" @bind="dateStartedInput" @bind:after="OnDateStartedChanged" class="form-control" />
+                                <input type="date" @bind="dateStartedInput" @bind:after="OnDateStartedChanged" class="form-control" lang="@InputLanguage" />
                             }
                         </div>
                         @if (selectedTag?.IsRange == true)
@@ -116,11 +117,11 @@
                                 <label class="form-label">End Date & Time:</label>
                                 @if (selectedTag?.TimeGranularity == TimeGranularity.Exact || selectedTag?.TimeGranularity == TimeGranularity.Hourly)
                                 {
-                                    <input type="datetime-local" @bind="Activity.DateFinished" class="form-control" />
+                                    <input type="datetime-local" @bind="Activity.DateFinished" class="form-control" lang="@InputLanguage" />
                                 }
                                 else
                                 {
-                                    <input type="date" @bind="dateFinishedInput" @bind:after="OnDateFinishedChanged" class="form-control" />
+                                    <input type="date" @bind="dateFinishedInput" @bind:after="OnDateFinishedChanged" class="form-control" lang="@InputLanguage" />
                                 }
                             </div>
                         }
@@ -161,6 +162,7 @@
     [Parameter] public ActivityRequest Activity { get; set; } = new();
     [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
     [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, TagOptionListResponse>? OptionListLookup { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
     [Parameter] public EventCallback<bool> AddAnotherAfterSaveChanged { get; set; }
@@ -170,6 +172,7 @@
     [Parameter] public string ModalId { get; set; } = "addActivityModal";
     [Parameter] public int? PreselectedTagId { get; set; }
     [Parameter] public DateTime? PreselectedDate { get; set; }
+    [Parameter] public CultureInfo? DisplayCulture { get; set; }
 
     private TagResponse? selectedTag;
     private TagOptionListResponse? selectedOptionList;
@@ -187,6 +190,7 @@
     private DateTime? dateFinishedInput = null;
 
     private string modalId => ModalId;
+    private string InputLanguage => (DisplayCulture ?? CultureInfo.CurrentCulture).Name;
 
     protected override void OnParametersSet()
     {
@@ -304,9 +308,17 @@
             timeValue = null;
             decimalValue = null;
 
-            if (selectedTag?.OptionListId is int listId && OptionLists != null)
+            if (selectedTag?.OptionListId is int listId)
             {
-                selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
+                if (OptionListLookup != null && OptionListLookup.TryGetValue(listId, out var lookupList))
+                {
+                    selectedOptionList = lookupList;
+                }
+                else if (OptionLists != null)
+                {
+                    selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
+                }
+
                 if (selectedOptionList is not null)
                 {
                     selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
