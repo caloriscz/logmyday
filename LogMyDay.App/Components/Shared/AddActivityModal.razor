@@ -1,4 +1,5 @@
 @using System.Globalization
+@using System.Linq
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using Microsoft.AspNetCore.Components.Forms
@@ -159,7 +160,7 @@
 @code {
     [Parameter] public ActivityRequest Activity { get; set; } = new();
     [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
-    [Parameter] public IReadOnlyList<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
     [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
     [Parameter] public EventCallback<bool> AddAnotherAfterSaveChanged { get; set; }
@@ -526,12 +527,12 @@
         else if (selectedTag?.TypeId == 4) // Date
         {
             dateValue = keepDateStarted.Date;
-            Activity.Description = dateValue.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
         }
         else if (selectedTag?.TypeId == 5) // Time
         {
             timeValue = TimeOnly.FromDateTime(keepDateStarted);
-            Activity.Description = timeValue.ToString("HH:mm", CultureInfo.InvariantCulture);
+            Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
         }
         else
         {

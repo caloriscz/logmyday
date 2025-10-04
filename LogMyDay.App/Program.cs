@@ -7,6 +7,7 @@ using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.App.Services;
 using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
