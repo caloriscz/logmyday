@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
@@ -11,6 +12,8 @@ namespace LogMyDay.App.Services;
 public interface IUserPreferencesService
 {
     Task<UserPreferencesSnapshot> GetAsync(CancellationToken cancellationToken = default);
+    void InvalidateCache();
+    event EventHandler? PreferencesChanged;
 }
 
 public sealed class UserPreferencesService : IUserPreferencesService
@@ -18,6 +21,8 @@ public sealed class UserPreferencesService : IUserPreferencesService
     private readonly IAuthApi _authApi;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private UserPreferencesSnapshot? _cached;
+
+    public event EventHandler? PreferencesChanged;
 
     public UserPreferencesService(IAuthApi authApi)
     {
@@ -38,6 +43,8 @@ public sealed class UserPreferencesService : IUserPreferencesService
                 var timeZone = TimeZoneInfo.FindSystemTimeZoneById(preferences.TimeZoneId);
 
                 _cached = new UserPreferencesSnapshot(currentUser, preferences, culture, timeZone);
+                
+                PreferencesChanged?.Invoke(this, EventArgs.Empty);
             }
         }
         finally
@@ -46,6 +53,11 @@ public sealed class UserPreferencesService : IUserPreferencesService
         }
 
         return _cached!;
+    }
+
+    public void InvalidateCache()
+    {
+        _cached = null;
     }
 }
 

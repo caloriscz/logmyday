@@ -12,6 +12,7 @@
     <base href="/" />    
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["LogMyDay.App.styles.css"]" />
     <ImportMap />
@@ -39,6 +40,8 @@
 <body>
     <Routes @rendermode="InteractiveServer" />
     <script src="@Assets["lib/bootstrap/dist/js/bootstrap.bundle.min.js"]"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script src="@Assets["js/flatpickr-integration.js"]"></script>
     <script src="@Assets["js/breathing.js"]"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>

@@ -1,10 +1,13 @@
 ﻿@page "/notifications"
+@using System.Globalization
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
 
 <div class="container-fluid">
     <div class="row">
@@ -15,7 +18,7 @@
                     <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
                         &lt;
                     </button>
-                    <input type="date" class="form-control" @bind="selectedDate" @bind:after="LoadRequiredTags" />
+                    <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="d-inline-block" Placeholder="Select date" />
                     <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
                         &gt;
                     </button>
@@ -38,7 +41,7 @@
             {
                 <div class="alert alert-info mb-4">
                     <i class="bi bi-info-circle me-2"></i>
-                    You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @selectedDate.ToString("MMMM dd, yyyy").
+                    You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
                 </div>
 
                 <div class="row">
@@ -97,7 +100,7 @@
             {
                 <div class="alert alert-success">
                     <i class="bi bi-check-circle me-2"></i>
-                    Great! All required tags have been filled for @selectedDate.ToString("MMMM dd, yyyy").
+                    Great! All required tags have been filled for @FormatDate(selectedDate).
                 </div>
             }
 
@@ -117,6 +120,9 @@
     Activity="newActivity"
     AvailableTags="allTags"
     OptionLists="optionLists"
+    OptionListLookup="optionListLookup"
+    DisplayCulture="displayCulture"
+    DisplayTimeZone="displayTimeZone"
     ErrorMessage="@errorMessage"
     PreselectedTagId="preselectedTagId"
     PreselectedDate="selectedDate"
@@ -128,26 +134,45 @@
     private List<TagResponse>? unfilledRequiredTags;
     private IList<TagResponse>? allTags;
     private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
     private DateTime selectedDate = DateTime.Today;
     private bool isLoading = true;
     private string? errorMessage;
     private ActivityRequest newActivity = new();
     private int? preselectedTagId;
 
+    // User preferences and localization
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Notifications");
+
+        // Load user preferences
+        userPreferences = await UserPreferencesService.GetAsync();
+        displayCulture = userPreferences.Culture;
+        displayTimeZone = userPreferences.TimeZone;
+
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
         
         // Initialize new activity with current date/time
         newActivity = new ActivityRequest
         {
-            DateStarted = selectedDate.Date == DateTime.Today 
-                ? DateTime.Now 
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
                 : selectedDate.Date
         };
         
         await LoadRequiredTags();
     }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
 
     private async Task LoadRequiredTags()
     {
@@ -167,10 +192,16 @@
             unfilledRequiredTags = await unfilledTask;
             allTags = await allTagsTask;
             optionLists = await optionListsTask;
+
+            if (optionLists is not null)
+            {
+                optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
             
             // Update new activity with the selected date
-            newActivity.DateStarted = selectedDate.Date == DateTime.Today 
-                ? DateTime.Now 
+            var today = GetTodayInDisplayZone();
+            newActivity.DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
                 : selectedDate.Date;
         }
         catch (Exception ex)
@@ -200,10 +231,11 @@
     private void PrepareModalForTag(int tagId)
     {
         preselectedTagId = tagId;
+        var today = GetTodayInDisplayZone();
         newActivity = new ActivityRequest
         {
-            DateStarted = selectedDate.Date == DateTime.Today 
-                ? DateTime.Now 
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
                 : selectedDate.Date,
             PrimaryTagId = tagId
         };
@@ -215,14 +247,24 @@
         await LoadRequiredTags();
         
         // Reset the form but keep the date
+        var today = GetTodayInDisplayZone();
         newActivity = new ActivityRequest
         {
-            DateStarted = selectedDate.Date == DateTime.Today 
-                ? DateTime.Now 
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
                 : selectedDate.Date
         };
         preselectedTagId = null;
         errorMessage = null;
+    }
+
+    private async Task OnDatePickerValueChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            selectedDate = newDate.Value;
+            await LoadRequiredTags();
+        }
     }
 
     private async Task OnError(string error)
@@ -241,5 +283,11 @@
     {
         selectedDate = selectedDate.AddDays(1);
         await LoadRequiredTags();
+    }
+
+    private string FormatDate(DateTime date)
+    {
+        var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
+        return date.ToString(pattern, displayCulture);
     }
 }

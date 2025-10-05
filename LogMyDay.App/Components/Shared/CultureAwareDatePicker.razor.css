@@ -1,0 +1,99 @@
+/* Culture-aware date picker wrapper */
+.culture-aware-datepicker-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.culture-aware-datepicker-wrapper input {
+    cursor: pointer;
+}
+
+.culture-aware-datepicker-wrapper input[readonly] {
+    background-color: var(--bs-body-bg);
+    cursor: pointer;
+}
+
+.culture-aware-datepicker-wrapper input:disabled {
+    cursor: not-allowed;
+}
+
+/* Flatpickr theme overrides for Bootstrap compatibility */
+.flatpickr-calendar {
+    font-family: var(--bs-body-font-family);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: var(--bs-border-radius);
+}
+
+/* Make navigation arrows visible */
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    fill: var(--bs-body-color) !important;
+    opacity: 0.7;
+}
+
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    fill: var(--bs-primary) !important;
+    opacity: 1;
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+    fill: inherit;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.flatpickr-day:hover {
+    background: var(--bs-light);
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+    font-weight: 600;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .flatpickr-calendar {
+        background: var(--bs-dark);
+        border-color: var(--bs-border-color);
+    }
+
+    .flatpickr-months,
+    .flatpickr-weekdays {
+        background: var(--bs-dark);
+    }
+
+    .flatpickr-day {
+        color: var(--bs-body-color);
+    }
+
+    .flatpickr-day:hover {
+        background: var(--bs-secondary);
+        color: var(--bs-body-color);
+    }
+
+    /* Dark mode arrows */
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+        fill: var(--bs-light) !important;
+    }
+
+    .flatpickr-months .flatpickr-prev-month:hover,
+    .flatpickr-months .flatpickr-next-month:hover {
+        fill: var(--bs-primary) !important;
+    }
+}
