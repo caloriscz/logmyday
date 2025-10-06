@@ -47,7 +47,28 @@ services.AddMemoryCache();
 services.AddHttpContextAccessor();
 
 // Configure cookie authentication (default scheme) and basic auth for mobile
-services.AddAuthentication("lmd-cookie")
+// Configure authentication with support for both cookie (Blazor Server) and Basic (Mobile API)
+// Use a policy scheme that tries both authentication methods
+services.AddAuthentication(options =>
+    {
+        // Use a composite scheme that tries both cookie and basic
+        options.DefaultScheme = "smart-auth";
+        options.DefaultChallengeScheme = "smart-auth";
+    })
+    .AddPolicyScheme("smart-auth", "Smart Authentication", options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            // If the request has an Authorization header with "Basic", use Basic auth
+            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            if (authHeader?.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return "basic";
+            }
+            // Otherwise, use cookie auth
+            return "lmd-cookie";
+        };
+    })
     .AddCookie("lmd-cookie", options =>
     {
         options.Cookie.Name = "lmd.auth";

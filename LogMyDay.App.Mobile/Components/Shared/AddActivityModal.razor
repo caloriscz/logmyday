@@ -53,7 +53,10 @@
                                     break;
                                 case 4: // Date
                                     <label class="form-label">Date:</label>
-                                    <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" />
+                                    <CultureAwareDatePicker Value="@dateValue" 
+                                                          ValueChanged="@OnDateValueInputChanged" 
+                                                          EnableTime="false" 
+                                                          Placeholder="Select date" />
                                     break;
                                 case 5: // Time
                                     <label class="form-label">Time:</label>
@@ -79,13 +82,19 @@
                     <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Start Date & Time:</label>
-                            <input type="datetime-local" @bind="Activity.DateStarted" class="form-control" />
+                            <CultureAwareDatePicker Value="@Activity.DateStarted" 
+                                                  ValueChanged="@((DateTime? v) => { Activity.DateStarted = v ?? DateTime.Now; })" 
+                                                  EnableTime="true" 
+                                                  Placeholder="Select start date & time" />
                         </div>
                         @if (selectedTag?.IsRange == true)
                         {
                             <div class="col-md-6">
                                 <label class="form-label">End Date & Time:</label>
-                                <input type="datetime-local" @bind="Activity.DateFinished" class="form-control" />
+                                <CultureAwareDatePicker Value="@Activity.DateFinished" 
+                                                      ValueChanged="@((DateTime? v) => { Activity.DateFinished = v; })" 
+                                                      EnableTime="true" 
+                                                      Placeholder="Select end date & time" />
                             </div>
                         }
                     </div>
@@ -283,6 +292,12 @@
     private void OnDateValueChanged()
     {
         Activity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+    }
+    
+    private void OnDateValueInputChanged(DateTime? value)
+    {
+        dateValue = value;
+        OnDateValueChanged();
     }
     
     private void OnTimeValueChanged()

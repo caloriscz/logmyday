@@ -68,7 +68,11 @@
                         <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
                             &lt;
                         </button>
-                        <input type="date" @bind="selectedDate" @bind:after="LoadData" class="form-control" style="width: auto;" />
+                        <CultureAwareDatePicker Value="@selectedDate" 
+                                              ValueChanged="@OnDatePickerValueChanged" 
+                                              EnableTime="false" 
+                                              CssClass="date-picker-compact" 
+                                              Placeholder="Select date" />
                         <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
                             &gt;
                         </button>
@@ -404,6 +408,15 @@
         finally
         {
             isRefreshing = false;
+        }
+    }
+
+    private async Task OnDatePickerValueChanged(DateTime? value)
+    {
+        if (value.HasValue)
+        {
+            selectedDate = value.Value;
+            await LoadData();
         }
     }
 

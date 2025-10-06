@@ -6,9 +6,11 @@ namespace LogMyDay.App.Mobile.Services;
 public class DynamicAuthHandler : DelegatingHandler
 {
     private readonly IApiContext _ctx;
+    
     public DynamicAuthHandler(IApiContext ctx)
     {
         _ctx = ctx;
+        System.Diagnostics.Debug.WriteLine($"🔧 DynamicAuthHandler created. Context IsConfigured: {_ctx.IsConfigured}");
     }
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -16,6 +18,7 @@ public class DynamicAuthHandler : DelegatingHandler
         System.Diagnostics.Debug.WriteLine("=== DYNAMIC AUTH HANDLER DEBUG ===");
         System.Diagnostics.Debug.WriteLine($"🔐 Request URL: {request.RequestUri}");
         System.Diagnostics.Debug.WriteLine($"🔐 Request Method: {request.Method}");
+        System.Diagnostics.Debug.WriteLine($"🔐 Context IsConfigured: {_ctx.IsConfigured}");
         
         if (_ctx.Username is { } u && _ctx.Password is { } p)
         {

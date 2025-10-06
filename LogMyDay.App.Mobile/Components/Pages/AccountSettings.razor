@@ -4,6 +4,7 @@
 @using LogMyDay.Shared.Preferences
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
+@inject IUserPreferencesService UserPreferencesService
 @inject ILogger<AccountSettings> Logger
 
 <PageTitle>Account Settings - LogMyDay</PageTitle>
@@ -150,6 +151,9 @@
 
         try
         {
+            System.Diagnostics.Debug.WriteLine($"💾 AccountSettings: Starting profile save for user {userId}");
+            System.Diagnostics.Debug.WriteLine($"💾 AccountSettings: Culture={profile.Culture}, TimeZone={profile.TimeZone}");
+            
             var request = new UpdateUserDto(
                 profile.Email.Trim(),
                 string.IsNullOrWhiteSpace(profile.DisplayName) ? null : profile.DisplayName.Trim(),
@@ -157,18 +161,24 @@
                 profile.Culture.Trim(),
                 profile.TimeZone.Trim());
 
+            System.Diagnostics.Debug.WriteLine($"💾 AccountSettings: Calling UpdateUserAsync...");
             var updatedUser = await UsersApi.UpdateUserAsync(userId.Value, request);
+            System.Diagnostics.Debug.WriteLine($"💾 AccountSettings: UpdateUserAsync completed successfully");
 
             profile.Email = updatedUser.Email;
             profile.DisplayName = updatedUser.DisplayName ?? string.Empty;
             profile.Culture = updatedUser.Culture;
             profile.TimeZone = updatedUser.TimeZone;
 
+            // Invalidate user preferences cache so new culture/timezone settings are loaded
+            UserPreferencesService.InvalidateCache();
+
             SetStatus("Profile updated successfully.");
         }
         catch (Refit.ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to update profile");
+            System.Diagnostics.Debug.WriteLine($"❌ AccountSettings: API Exception - Status: {ex.StatusCode}, Content: {ex.Content}");
             var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update profile.";
             SetStatus(message, true);
         }

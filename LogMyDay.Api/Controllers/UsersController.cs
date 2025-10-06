@@ -8,7 +8,6 @@ namespace LogMyDay.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-[Authorize(Policy = "AdminOnly")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -26,6 +25,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetUsers(CancellationToken cancellationToken)
     {
         try
@@ -44,6 +44,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto request, CancellationToken cancellationToken)
     {
         try
@@ -104,12 +105,18 @@ public class UsersController : ControllerBase
     }
 
     [HttpPatch("{id}")]
+    [Authorize] // Requires authentication, but users can update their own profile
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDto request, CancellationToken cancellationToken)
     {
         try
         {
+            _logger.LogInformation("🎯 UsersController.UpdateUser: Received update request for user {UserId}", id);
+            _logger.LogInformation("🎯 UsersController.UpdateUser: Request - Email={Email}, DisplayName={DisplayName}, IsAdmin={IsAdmin}, Culture={Culture}, TimeZone={TimeZone}", 
+                request.Email, request.DisplayName, request.IsAdmin, request.Culture, request.TimeZone);
+            
             if (!ModelState.IsValid)
             {
+                _logger.LogWarning("🎯 UsersController.UpdateUser: Invalid model state");
                 return BadRequest(ModelState);
             }
 
@@ -167,6 +174,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> DeleteUser(Guid id, CancellationToken cancellationToken)
     {
         try

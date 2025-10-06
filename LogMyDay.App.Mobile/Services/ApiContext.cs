@@ -25,17 +25,26 @@ public class ApiContext : IApiContext
 
     public void Configure(Uri server, string username, string password)
     {
+        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext.Configure called:");
+        System.Diagnostics.Debug.WriteLine($"   Server: {server}");
+        System.Diagnostics.Debug.WriteLine($"   Username: {username}");
+        System.Diagnostics.Debug.WriteLine($"   Password length: {password?.Length ?? 0}");
+        
         Server = server;
         Username = username;
         Password = password;
         Changed?.Invoke();
+        
+        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext configured. IsConfigured: {IsConfigured}");
     }
 
     public void Clear()
     {
+        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext.Clear called");
         Server = null;
         Username = null;
         Password = null;
         Changed?.Invoke();
+        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext cleared. IsConfigured: {IsConfigured}");
     }
 }

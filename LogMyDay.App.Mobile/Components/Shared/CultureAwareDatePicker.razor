@@ -1,0 +1,224 @@
+@using System.Globalization
+@using Microsoft.JSInterop
+@using LogMyDay.Shared.Preferences
+@using LogMyDay.App.Mobile.Services
+@inject IJSRuntime JSRuntime
+@inject IUserPreferencesService UserPreferencesService
+@implements IAsyncDisposable
+
+<div class="culture-aware-datepicker-wrapper">
+    <input type="text" 
+           id="@elementId" 
+           class="form-control @CssClass" 
+           placeholder="@Placeholder"
+           value="@FormattedValue"
+           readonly="@(!AllowManualInput)"
+           disabled="@Disabled" />
+</div>
+
+@code {
+    private string elementId = $"datepicker_{Guid.NewGuid():N}";
+    private DotNetObjectReference<CultureAwareDatePicker>? dotnetHelper;
+    private UserPreferencesSnapshot? userPreferences;
+    private bool isInitialized = false;
+
+    [Parameter]
+    public DateTime? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool EnableTime { get; set; } = false;
+
+    [Parameter]
+    public string CssClass { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Select date";
+
+    [Parameter]
+    public bool AllowManualInput { get; set; } = false;
+
+    [Parameter]
+    public bool Disabled { get; set; } = false;
+
+    private string FormattedValue
+    {
+        get
+        {
+            if (Value == null || userPreferences == null)
+                return string.Empty;
+
+            var culture = userPreferences.Culture;
+            var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern 
+                                     : userPreferences.Preferences.ShortDatePattern;
+
+            return Value.Value.ToString(pattern, culture);
+        }
+    }
+
+    private string FlatpickrDateFormat
+    {
+        get
+        {
+            if (userPreferences == null)
+                return EnableTime ? "Y-m-d H:i" : "Y-m-d";
+
+            // Convert .NET date format to Flatpickr format
+            var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern
+                                     : userPreferences.Preferences.ShortDatePattern;
+
+            // Flatpickr format: Y = 4-digit year, m = month with leading zero, d = day with leading zero
+            // .NET format: yyyy = 4-digit year, MM = month with leading zero, dd = day with leading zero
+            // Replace in specific order to avoid conflicts
+            var flatpickrFormat = pattern
+                .Replace("yyyy", "Y")
+                .Replace("yy", "y")
+                .Replace("MMMM", "F")  // Full month name
+                .Replace("MMM", "M")   // Short month name
+                .Replace("MM", "m")    // Month number with leading zero
+                .Replace("M", "n")     // Month number without leading zero
+                .Replace("dddd", "l")  // Full day name
+                .Replace("ddd", "D")   // Short day name
+                .Replace("dd", "d")    // Day with leading zero
+                .Replace("d", "j")     // Day without leading zero
+                .Replace("HH", "H")    // 24-hour with leading zero
+                .Replace("H", "G")     // 24-hour without leading zero
+                .Replace("hh", "h")    // 12-hour with leading zero
+                .Replace("h", "g")     // 12-hour without leading zero
+                .Replace("mm", "i")    // Minutes
+                .Replace("ss", "S")    // Seconds
+                .Replace("tt", "K");   // AM/PM
+
+            return flatpickrFormat;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeDatePickerAsync();
+        }
+    }
+
+    private async Task InitializeDatePickerAsync()
+    {
+        try
+        {
+            // Load user preferences
+            userPreferences = await UserPreferencesService.GetAsync();
+            
+            if (userPreferences == null)
+            {
+                System.Diagnostics.Debug.WriteLine("Warning: Could not load user preferences for CultureAwareDatePicker");
+                return;
+            }
+
+            var culture = userPreferences.Culture;
+
+            // Create .NET reference for callbacks
+            dotnetHelper = DotNetObjectReference.Create(this);
+
+            // Get localized weekday and month names
+            var weekdaysShort = culture.DateTimeFormat.AbbreviatedDayNames;
+            var weekdaysLong = culture.DateTimeFormat.DayNames;
+            var monthsShort = culture.DateTimeFormat.AbbreviatedMonthNames;
+            var monthsLong = culture.DateTimeFormat.MonthNames;
+
+            // Format the default date properly for Flatpickr (ISO 8601 or the configured format)
+            string? defaultDateStr = null;
+            if (Value.HasValue)
+            {
+                // Use ISO 8601 format which Flatpickr understands universally
+                defaultDateStr = Value.Value.ToString("yyyy-MM-ddTHH:mm:ss");
+            }
+
+            // Configure flatpickr
+            var config = new
+            {
+                dateFormat = FlatpickrDateFormat,
+                defaultDate = defaultDateStr,
+                enableTime = EnableTime,
+                time24hr = !userPreferences.Preferences.ShortTimePattern.Contains("tt"), // Check if 12-hour format
+                firstDayOfWeek = (int)userPreferences.Preferences.StartOfWeek,
+                weekdaysShort = weekdaysShort,
+                weekdaysLong = weekdaysLong,
+                monthsShort = monthsShort.Take(12).ToArray(), // Take only 12 months (some cultures have 13 entries)
+                monthsLong = monthsLong.Take(12).ToArray(),
+                allowInput = AllowManualInput
+            };
+
+            await JSRuntime.InvokeVoidAsync("initializeFlatpickr", elementId, dotnetHelper, config);
+            isInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error initializing CultureAwareDatePicker: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnDateChanged(string dateStr)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dateStr))
+            {
+                await ValueChanged.InvokeAsync(null);
+                return;
+            }
+
+            // Parse ISO 8601 format from JavaScript
+            if (DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDate))
+            {
+                await ValueChanged.InvokeAsync(parsedDate);
+                return;
+            }
+
+            // Fallback: Try parsing with user's culture
+            if (userPreferences != null)
+            {
+                var culture = userPreferences.Culture;
+                var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern
+                                         : userPreferences.Preferences.ShortDatePattern;
+
+                if (DateTime.TryParseExact(dateStr, pattern, culture, DateTimeStyles.None, out parsedDate))
+                {
+                    await ValueChanged.InvokeAsync(parsedDate);
+                    return;
+                }
+                
+                if (DateTime.TryParse(dateStr, culture, DateTimeStyles.None, out parsedDate))
+                {
+                    await ValueChanged.InvokeAsync(parsedDate);
+                    return;
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Failed to parse date: {dateStr}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error parsing date in CultureAwareDatePicker: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (isInitialized && JSRuntime is IJSInProcessRuntime)
+            {
+                await JSRuntime.InvokeVoidAsync("destroyFlatpickr", elementId);
+            }
+
+            dotnetHelper?.Dispose();
+        }
+        catch
+        {
+            // Suppress exceptions during disposal
+        }
+    }
+}
