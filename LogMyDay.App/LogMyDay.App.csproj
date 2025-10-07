@@ -13,6 +13,17 @@
 		<RemoveDir Directories="$(BaseIntermediateOutputPath)\staticwebassets" />
 	</Target>
 
+	<!-- Build Tailwind CSS with Vite -->
+	<Target Name="BuildTailwindCSS" BeforeTargets="BeforeBuild">
+		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\ui" />
+		<ItemGroup>
+			<TailwindCSSFiles Include="$(ProjectDir)..\ui\dist\css\*.css" />
+			<TailwindJSFiles Include="$(ProjectDir)..\ui\dist\js\*.js" />
+		</ItemGroup>
+		<Copy SourceFiles="@(TailwindCSSFiles)" DestinationFolder="$(ProjectDir)wwwroot\css" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(TailwindJSFiles)" DestinationFolder="$(ProjectDir)wwwroot\js" SkipUnchangedFiles="true" />
+	</Target>
+
 
 	<ItemGroup>
 		<None Remove="LogMyDay.App.csproj.Backup.tmp" />

@@ -1,6 +1,15 @@
 /* Culture-aware date picker wrapper */
 .culture-aware-datepicker-wrapper {
     position: relative;
+    display: inline-flex;
+    width: auto;
+}
+
+.culture-aware-datepicker-wrapper.stretch {
+    width: 100%;
+}
+
+.culture-aware-datepicker-wrapper.stretch input {
     width: 100%;
 }
 
@@ -9,7 +18,7 @@
 }
 
 .culture-aware-datepicker-wrapper input[readonly] {
-    background-color: var(--bs-body-bg);
+    background-color: var(--lmd-datepicker-bg, #ffffff);
     cursor: pointer;
 }
 
@@ -17,23 +26,23 @@
     cursor: not-allowed;
 }
 
-/* Flatpickr theme overrides for Bootstrap compatibility */
+/* Flatpickr theme overrides */
 .flatpickr-calendar {
-    font-family: var(--bs-body-font-family);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    border-radius: var(--bs-border-radius);
+    font-family: inherit;
+    box-shadow: 0 15px 30px rgba(15, 23, 42, 0.15);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
-/* Make navigation arrows visible */
 .flatpickr-months .flatpickr-prev-month,
 .flatpickr-months .flatpickr-next-month {
-    fill: var(--bs-body-color) !important;
-    opacity: 0.7;
+    fill: #334155 !important;
+    opacity: 0.75;
 }
 
 .flatpickr-months .flatpickr-prev-month:hover,
 .flatpickr-months .flatpickr-next-month:hover {
-    fill: var(--bs-primary) !important;
+    fill: #2563eb !important;
     opacity: 1;
 }
 
@@ -45,19 +54,20 @@
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
-    background: var(--bs-primary);
-    border-color: var(--bs-primary);
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
 }
 
 .flatpickr-day.selected:hover,
 .flatpickr-day.startRange:hover,
 .flatpickr-day.endRange:hover {
-    background: var(--bs-primary);
-    border-color: var(--bs-primary);
+    background: #1d4ed8;
+    border-color: #1d4ed8;
 }
 
 .flatpickr-day:hover {
-    background: var(--bs-light);
+    background: rgba(37, 99, 235, 0.12);
 }
 
 .flatpickr-current-month .flatpickr-monthDropdown-months,
@@ -67,33 +77,37 @@
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
+    .culture-aware-datepicker-wrapper input[readonly] {
+        background-color: var(--lmd-datepicker-bg-dark, #1f2937);
+    }
+
     .flatpickr-calendar {
-        background: var(--bs-dark);
-        border-color: var(--bs-border-color);
+        background: #1f2937;
+        border-color: rgba(148, 163, 184, 0.25);
+        color: #e2e8f0;
     }
 
     .flatpickr-months,
     .flatpickr-weekdays {
-        background: var(--bs-dark);
+        background: #1f2937;
     }
 
     .flatpickr-day {
-        color: var(--bs-body-color);
+        color: #e2e8f0;
     }
 
     .flatpickr-day:hover {
-        background: var(--bs-secondary);
-        color: var(--bs-body-color);
+        background: rgba(96, 165, 250, 0.2);
+        color: #e2e8f0;
     }
 
-    /* Dark mode arrows */
     .flatpickr-months .flatpickr-prev-month,
     .flatpickr-months .flatpickr-next-month {
-        fill: var(--bs-light) !important;
+        fill: #e2e8f0 !important;
     }
 
     .flatpickr-months .flatpickr-prev-month:hover,
     .flatpickr-months .flatpickr-next-month:hover {
-        fill: var(--bs-primary) !important;
+        fill: #60a5fa !important;
     }
 }

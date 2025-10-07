@@ -43,4 +43,14 @@
 		<ProjectReference Include="..\LogMyDay.UI\LogMyDay.UI.csproj" />
 	</ItemGroup>
 
+	<!-- Copy Tailwind CSS assets from ui/dist -->
+	<Target Name="CopyTailwindAssets" BeforeTargets="BeforeBuild">
+		<ItemGroup>
+			<TailwindCSSFiles Include="$(ProjectDir)..\ui\dist\css\*.css" />
+			<TailwindJSFiles Include="$(ProjectDir)..\ui\dist\js\*.js" />
+		</ItemGroup>
+		<Copy SourceFiles="@(TailwindCSSFiles)" DestinationFolder="$(ProjectDir)wwwroot\css" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(TailwindJSFiles)" DestinationFolder="$(ProjectDir)wwwroot\js" SkipUnchangedFiles="true" />
+	</Target>
+
 </Project>

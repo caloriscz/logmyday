@@ -14,14 +14,17 @@
 @inject IUserPreferencesService UserPreferencesService
 
 <!-- Add New Activity Modal -->
-<div class="modal fade" id="@modalId" tabindex="-1" aria-labelledby="@($"{modalId}Label")" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="@($"{modalId}Label")">Add New Activity</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
+<div class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4" @onclick="HandleBackdropClick">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add New Activity</h3>
+            <button type="button" @onclick="HandleCloseClick" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
                 <EditForm Model="Activity" OnValidSubmit="HandleValidSubmit">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="text-danger" />
@@ -144,19 +147,20 @@
                                 Add another activity after saving
                             </label>
                         </div>
-                        <small class="form-text text-muted">
+                        <small class="text-sm text-gray-500 dark:text-gray-400">
                             Keep the form open with the same tag and date selected for quick entry of multiple activities.
                         </small>
                     </div>
                     
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                    <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" @onclick="HandleCloseClick" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 focus:outline-none transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-colors">
                             Save Activity
                         </button>
                     </div>
                 </EditForm>
-            </div>
         </div>
     </div>
 </div>
@@ -618,5 +622,15 @@
         Activity.PrimaryTagId = keepTagId;
         Activity.DateStarted = keepDateStarted;
         Activity.DateFinished = keepDateFinished;
+    }
+    
+    private async Task HandleCloseClick()
+    {
+        await OnCanceled.InvokeAsync();
+    }
+    
+    private async Task HandleBackdropClick()
+    {
+        await OnCanceled.InvokeAsync();
     }
 }

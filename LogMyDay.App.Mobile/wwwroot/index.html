@@ -5,155 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>LogMyDay Mobile</title>
     <base href="/" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .mobile-container {
-            max-width: 100%;
-            margin: 0;
-            padding: 0;
-        }
-
-        .mobile-header {
-            background-color: #0d6efd;
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        .mobile-nav {
-            background-color: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            z-index: 1000;
-        }
-
-        .mobile-nav-item {
-            flex: 1;
-            text-align: center;
-            padding: 0.75rem 0.5rem;
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 0.875rem;
-            border: none;
-            background: none;
-            width: 100%;
-        }
-
-        .mobile-nav-item:hover, .mobile-nav-item.active {
-            color: #0d6efd;
-            background-color: #e7f1ff;
-        }
-
-        .mobile-content {
-            padding: 1rem;
-            padding-bottom: 80px; /* Space for bottom nav */
-        }
-
-        .quick-activity-btn {
-            margin: 0.25rem;
-            font-size: 0.875rem;
-        }
-
-        .activity-card {
-            border: 1px solid #dee2e6;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-            background-color: white;
-        }
-
-        .activity-time {
-            font-size: 0.875rem;
-            color: #6c757d;
-        }
-
-        .activity-tag {
-            background-color: #e9ecef;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            margin-right: 0.5rem;
-        }
-
-        .fab {
-            position: fixed;
-            bottom: 80px;
-            right: 1rem;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: #0d6efd;
-            color: white;
-            border: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            z-index: 999;
-        }
-
-        /* Pull-to-refresh enhancements */
-        .refresh-container {
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior-y: contain;
-        }
-
-        /* Better touch feedback for mobile */
-        .btn, .mobile-nav-item, .card {
-            -webkit-tap-highlight-color: rgba(0,0,0,0.1);
-        }
-
-        /* Enhanced scrolling for mobile */
-        body {
-            -webkit-overflow-scrolling: touch;
-            overscroll-behavior: contain;
-        }
-    </style>
+    <link href="css/tailwind.css" rel="stylesheet" />
+    
+    <!-- Prevent FOUC - Initialize theme before page render -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('lmd-theme') || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
 </head>
 <body>
     <div id="app">
-        <div class="d-flex justify-content-center align-items-center vh-100">
-            <div class="text-center">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <h4 class="mb-3">LogMyDay Mobile</h4>
+        <div class="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div class="text-center p-8">
+                <div class="inline-block spinner mb-4 w-12 h-12 border-4 border-primary-600"></div>
+                <h4 class="text-xl font-semibold mb-3 text-gray-900 dark:text-gray-100">LogMyDay Mobile</h4>
                 <div id="loading-steps">
-                    <p>🔄 <span id="current-step">Initializing Blazor...</span></p>
-                    <div class="progress mb-3" style="height: 8px;">
-                        <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 10%"></div>
+                    <p class="text-gray-600 dark:text-gray-400">🔄 <span id="current-step">Initializing Blazor...</span></p>
+                    <div class="w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3 mx-auto">
+                        <div id="progress-bar" class="bg-primary-600 h-2 rounded-full transition-all duration-300" style="width: 10%"></div>
                     </div>
-                    <small class="text-muted">If this takes too long, check the debug console</small>
+                    <small class="text-gray-500 dark:text-gray-500 text-sm">If this takes too long, check the debug console</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="blazor-error-ui" style="display: none;">
-        <div class="alert alert-danger m-3">
-            <h4>🚨 Blazor Error</h4>
+    <div id="blazor-error-ui" class="hidden">
+        <div class="alert-danger m-4">
+            <h4 class="text-lg font-bold mb-2">🚨 Blazor Error</h4>
             <p>An unhandled error has occurred. Check the debug console for details.</p>
-            <button class="btn btn-warning reload">Reload App</button>
-            <button class="btn btn-secondary dismiss ms-2">Dismiss</button>
+            <button class="btn-warning mt-2 reload">Reload App</button>
+            <button class="btn-secondary mt-2 ms-2 dismiss">Dismiss</button>
         </div>
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js"></script>
     <script src="_framework/blazor.webview.js"></script>
     <script src="js/refresh-view.js"></script>
     <script src="js/refresh-view-test.js"></script>

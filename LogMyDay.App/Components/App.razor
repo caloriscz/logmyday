@@ -10,12 +10,21 @@
     <meta name="msapplication-config" content="/images/favicon/browserconfig.xml" />
     <title>LogMyDay</title>
     <base href="/" />    
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css" />
+    <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["LogMyDay.App.styles.css"]" />
     <ImportMap />
+    
+    <!-- Prevent FOUC - Initialize theme before page render -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('lmd-theme') || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
     
     <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="57x57" href="/images/favicon/apple-icon-57x57.png" />
@@ -39,9 +48,7 @@
 
 <body>
     <Routes @rendermode="InteractiveServer" />
-    <script src="@Assets["lib/bootstrap/dist/js/bootstrap.bundle.min.js"]"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-    <script src="@Assets["js/flatpickr-integration.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
     <script src="@Assets["js/breathing.js"]"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>

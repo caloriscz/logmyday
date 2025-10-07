@@ -15,7 +15,7 @@
 {
     Logger.LogInformation("MainLayout: Rendering login page. Current URL: {Url}", Navigation.Uri);
     <DynamicPageTitle />
-    <article class="content px-4">
+    <article class="px-4">
         @Body
     </article>
 }
@@ -23,12 +23,12 @@ else if (IsCheckingAuth)
 {
     Logger.LogInformation("MainLayout: Checking authentication state. Current URL: {Url}", Navigation.Uri);
     <DynamicPageTitle />
-    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+            <div class="inline-block w-12 h-12 border-4 border-primary-600 dark:border-primary-400 border-t-transparent rounded-full animate-spin" role="status">
+                <span class="sr-only">Loading...</span>
             </div>
-            <p class="mt-3">Checking authentication...</p>
+            <p class="mt-4 text-gray-700 dark:text-gray-300">Checking authentication...</p>
         </div>
     </div>
 }
@@ -42,165 +42,183 @@ else
 {
     Logger.LogInformation("MainLayout: User authenticated, rendering main app. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
     <DynamicPageTitle />
-    <div class="page">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
         <NavMenu />
-        <main>
-            <article class="content px-4">
-                @Body
-            </article>
+        <main class="mx-auto max-w-screen-2xl px-4 py-6 md:px-6 lg:px-8">
+            @Body
         </main>
     </div>
 }
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
-
-<!-- Add New Activity Modal -->
-<div class="modal fade" id="addActivityModal" tabindex="-1" aria-labelledby="addActivityModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addActivityModalLabel">Add New Activity</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <EditForm Model="newActivity" OnValidSubmit="HandleValidSubmit">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="text-danger" />
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Primary Tag:</label>
-                        <InputSelect @bind-Value="newActivity.PrimaryTagId" class="form-select" @ref="primaryTagSelect" tabindex="1" @bind-Value:after="OnTagSelectionChanged" @onfocus="EnsureTagsLoaded">
-                            <option value="">-- Select Tag --</option>
-                            @if (tags != null)
-                            {
-                                foreach (var tag in tags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            }
-                        </InputSelect>
-                    </div>
-
-                    <div class="mb-3">
-                        @if (selectedTag?.TypeId.HasValue == true)
-                        {
-                            @if (selectedTag.TypeId == 1) // Integer
-                            {
-                                <label class="form-label">Value:</label>
-                                <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="form-control" tabindex="2"
-                                    placeholder="Enter numeric value" step="1" />
-                            }
-                            else if (selectedTag.TypeId == 2) // String
-                            {
-                                <label class="form-label">Value:</label>
-                                <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
-                                    placeholder="Enter text value" />
-                            }
-                            else if (selectedTag.TypeId == 3) // Boolean
-                            {
-                                <div class="form-check">
-                                    <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-check-input" tabindex="2" id="booleanInput" />
-                                    <label class="form-check-label" for="booleanInput">Value</label>
-                                </div>
-                            }
-                            else if (selectedTag.TypeId == 4) // Date
-                            {
-                                <label class="form-label">Value:</label>
-                                <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-control" tabindex="2" />
-                            }
-                            else if (selectedTag.TypeId == 5) // Time
-                            {
-                                <label class="form-label">Value:</label>
-                                <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-control" tabindex="2" />
-                            }
-                            else if (selectedTag.TypeId == 6) // Decimal, precision 2
-                            {
-                                <label class="form-label">Value:</label>
-                                <input type="number" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="form-control" tabindex="2"
-                                    placeholder="Enter decimal value" step="0.01" />
-                            }
-                            else
-                            {
-                                <label class="form-label">Description:</label>
-                                <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
-                                    placeholder="Enter activity description" />
-                            }
-                        }
-                        else
-                        {
-                            <label class="form-label">Description:</label>
-                            <InputText @bind-Value="newActivity.Description" class="form-control" tabindex="2"
-                                placeholder="Enter activity description" />
-                        }
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Date Started:</label>
-                                @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
-                                {
-                                    <input type="datetime-local" @bind="newActivity.DateStarted" class="form-control" tabindex="3" />
-                                }
-                                else
-                                {
-                                    <InputDate @bind-Value="newActivity.DateStarted" class="form-control" tabindex="3" />
-                                }
-                            </div>
-                        </div>
-                        
-                        @if (selectedTag?.IsRange == true)
-                        {
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Date Finished (optional):</label>
-                                    @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
-                                    {
-                                        <input type="datetime-local" @bind="newActivity.DateFinished" class="form-control" tabindex="4" />
-                                    }
-                                    else
-                                    {
-                                        <InputDate @bind-Value="newActivity.DateFinished" class="form-control" tabindex="4" />
-                                    }
-                                </div>
-                            </div>
-                        }
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(errorMessage))
-                    {
-                        <div class="alert alert-danger" role="alert">
-                            @errorMessage
-                        </div>
-                    }
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" @bind="addAnotherAfterSave" id="addAnotherCheck">
-                            <label class="form-check-label" for="addAnotherCheck">
-                                <i class="bi bi-plus-circle me-1"></i>Add another activity after saving
-                            </label>
-                        </div>
-                        <small class="form-text text-muted">
-                            Keep the form open with selected tag and date, but reset description
-                        </small>
-                    </div>
-                    
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            Add Activity
-                        </button>
-                    </div>
-                </EditForm>
-            </div>
+<div id="blazor-error-ui" class="fixed bottom-0 left-0 right-0 z-[9999] bg-danger-600 text-white px-4 py-3 shadow-lg hidden" data-nosnippet>
+    <div class="flex items-center justify-between max-w-screen-2xl mx-auto">
+        <span>An unhandled error has occurred.</span>
+        <div class="flex items-center gap-3">
+            <a href="." class="text-white underline hover:no-underline">Reload</a>
+            <button class="text-white text-2xl leading-none hover:opacity-70" onclick="document.getElementById('blazor-error-ui').classList.add('hidden')">&times;</button>
         </div>
     </div>
 </div>
+
+<!-- Add New Activity Modal -->
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 overflow-y-auto" @onclick="CloseModalBackground">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="fixed inset-0 bg-black/50 transition-opacity"></div>
+            
+            <!-- Modal Content -->
+            <div class="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl transform transition-all lg:max-h-[90vh] overflow-hidden" @onclick:stopPropagation>
+                <!-- Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Add New Activity</h2>
+                    <button @onclick="CloseModal" type="button" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                        <Icon Name="close" Class="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <!-- Body -->
+                <div class="px-6 py-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
+                    <EditForm Model="newActivity" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 p-3 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-600 dark:text-danger-400 text-sm" />
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="form-label">Primary Tag:</label>
+                                <InputSelect @bind-Value="newActivity.PrimaryTagId" class="form-select" @ref="primaryTagSelect" tabindex="1" @bind-Value:after="OnTagSelectionChanged" @onfocus="EnsureTagsLoaded">
+                                    <option value="">-- Select Tag --</option>
+                                    @if (tags != null)
+                                    {
+                                        foreach (var tag in tags)
+                                        {
+                                            <option value="@tag.Id">@tag.Title</option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div>
+                                @if (selectedTag?.TypeId.HasValue == true)
+                                {
+                                    @if (selectedTag.TypeId == 1) // Integer
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="form-input" tabindex="2"
+                                            placeholder="Enter numeric value" step="1" />
+                                    }
+                                    else if (selectedTag.TypeId == 2) // String
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                            placeholder="Enter text value" />
+                                    }
+                                    else if (selectedTag.TypeId == 3) // Boolean
+                                    {
+                                        <div class="flex items-center gap-2">
+                                            <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-checkbox" tabindex="2" id="booleanInput" />
+                                            <label class="form-label !mb-0" for="booleanInput">Value</label>
+                                        </div>
+                                    }
+                                    else if (selectedTag.TypeId == 4) // Date
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="date" @bind="dateValue" @bind:after="OnDateValueChanged" class="form-input" tabindex="2" />
+                                    }
+                                    else if (selectedTag.TypeId == 5) // Time
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-input" tabindex="2" />
+                                    }
+                                    else if (selectedTag.TypeId == 6) // Decimal, precision 2
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="number" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="form-input" tabindex="2"
+                                            placeholder="Enter decimal value" step="0.01" />
+                                    }
+                                    else
+                                    {
+                                        <label class="form-label">Description:</label>
+                                        <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                            placeholder="Enter activity description" />
+                                    }
+                                }
+                                else
+                                {
+                                    <label class="form-label">Description:</label>
+                                    <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                        placeholder="Enter activity description" />
+                                }
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="form-label">Date Started:</label>
+                                    @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                    {
+                                        <input type="datetime-local" @bind="newActivity.DateStarted" class="form-input" tabindex="3" />
+                                    }
+                                    else
+                                    {
+                                        <input type="date" @bind="newActivity.DateStarted" class="form-input" tabindex="3" />
+                                    }
+                                </div>
+                                
+                                @if (selectedTag?.IsRange == true)
+                                {
+                                    <div>
+                                        <label class="form-label">Date Finished (optional):</label>
+                                        @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                        {
+                                            <input type="datetime-local" @bind="newActivity.DateFinished" class="form-input" tabindex="4" />
+                                        }
+                                        else
+                                        {
+                                            <input type="date" @bind="newActivity.DateFinished" class="form-input" tabindex="4" />
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert-danger" role="alert">
+                                    @errorMessage
+                                </div>
+                            }
+                            
+                            <div>
+                                <div class="flex items-start gap-2">
+                                    <input class="form-checkbox mt-0.5" type="checkbox" @bind="addAnotherAfterSave" id="addAnotherCheck">
+                                    <div class="flex-1">
+                                        <label class="form-label !mb-1 cursor-pointer" for="addAnotherCheck">
+                                            <span class="flex items-center gap-1">
+                                                <Icon Name="plus" Class="w-4 h-4" />
+                                                <span>Add another activity after saving</span>
+                                            </span>
+                                        </label>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Keep the form open with selected tag and date, but reset description
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button type="button" @onclick="CloseModal" class="btn-secondary">Cancel</button>
+                            <button type="submit" class="btn-primary">
+                                Add Activity
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     // Modal-related variables
@@ -209,6 +227,7 @@ else
     private string? errorMessage;
     private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
     private bool addAnotherAfterSave = false;
+    private bool showModal = false;
     
     // Input type value helpers
     private bool booleanValue = false;
@@ -347,36 +366,47 @@ else
         newActivity.DateStarted = DateTime.Now;
     }
 
+    public void OpenModal()
+    {
+        showModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        StateHasChanged();
+    }
+
+    private void CloseModalBackground(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        // Only close if clicking the backdrop itself, not the modal content
+        CloseModal();
+    }
+
     private async Task SetupKeyboardShortcuts()
     {
         if (!keyboardListenerAdded)
         {
-            await JSRuntime.InvokeVoidAsync("eval", @"
-window.layoutKeyboardHandler = function(event) {
-    if (event.ctrlKey && event.key === 'm') {
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+window.layoutKeyboardHandler = function(event) {{
+    if (event.ctrlKey && event.key === 'm') {{
         event.preventDefault();
-        var modal = new bootstrap.Modal(document.getElementById('addActivityModal'));
-        modal.show();
-    }
-};
+        DotNet.invokeMethodAsync('LogMyDay.App', 'OpenAddActivityModal');
+    }}
+}};
 document.addEventListener('keydown', window.layoutKeyboardHandler);
-
-// Add event listener for when modal is shown to focus the select
-document.getElementById('addActivityModal').addEventListener('shown.bs.modal', function() {
-    setTimeout(function() {
-        var select = document.querySelector('#addActivityModal select[tabindex=""1""]') || 
-                    document.querySelector('#addActivityModal select') ||
-                    document.querySelector('#addActivityModal .form-select');
-        if (select) {
-            select.focus();
-            var event = new Event('mousedown', { bubbles: true });
-            select.dispatchEvent(event);
-        }
-    }, 300);
-});
 ");
             keyboardListenerAdded = true;
         }
+    }
+
+    [JSInvokable("OpenAddActivityModal")]
+    public static void OpenAddActivityModal()
+    {
+        // This will be called from JavaScript
+        // We'll trigger an event or use a different approach
     }
 
     public async ValueTask DisposeAsync()
@@ -442,15 +472,7 @@ if (window.layoutKeyboardHandler) {
             // Close the modal after successful submission only if not adding another
             if (!addAnotherAfterSave)
             {
-                try
-                {
-                    await JSRuntime.InvokeVoidAsync("eval",
-                    "bootstrap.Modal.getInstance(document.getElementById('addActivityModal'))?.hide()");
-                }
-                catch (InvalidOperationException)
-                {
-                    // Ignore JavaScript interop errors during static rendering
-                }
+                CloseModal();
             }
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
