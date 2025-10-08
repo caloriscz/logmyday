@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["LogMyDay.App.styles.css"]" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/air-datepicker@3.4.0/air-datepicker.min.css" />
     <ImportMap />
     
     <!-- Prevent FOUC - Initialize theme before page render -->
@@ -48,7 +49,9 @@
 
 <body>
     <Routes @rendermode="InteractiveServer" />
+    <script src="https://cdn.jsdelivr.net/npm/air-datepicker@3.4.0/air-datepicker.min.js"></script>
     <script src="@Assets["js/app.js"]"></script>
+    <script src="@Assets["js/flatpickr-integration.js"]"></script>
     <script src="@Assets["js/breathing.js"]"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>

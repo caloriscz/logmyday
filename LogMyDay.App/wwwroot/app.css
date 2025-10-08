@@ -48,20 +48,12 @@
 }
 
 /* Comprehensive dark theme coverage */
-[data-bs-theme="dark"] *:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-warning):not(.btn-info) {
-    background-color: inherit;
-    color: inherit;
-    border-color: var(--border-color);
-}
-
 [data-bs-theme="dark"] .container,
 [data-bs-theme="dark"] .container-fluid,
 [data-bs-theme="dark"] main,
 [data-bs-theme="dark"] .row,
-[data-bs-theme="dark"] .col,
-[data-bs-theme="dark"] div {
-    background-color: var(--bg-color) !important;
-    color: var(--text-color) !important;
+[data-bs-theme="dark"] .col {
+    color: var(--text-color);
 }
 
 [data-bs-theme="dark"] h1, 
@@ -416,7 +408,6 @@ body {
 /* Ensure proper spacing for the new layout */
 main {
     min-height: calc(100vh - 80px); /* Adjust based on navbar height */
-    background-color: #f8f9fa;
 }
 
 /* Page-specific card styles */
@@ -543,57 +534,38 @@ main {
         padding: 1rem;
         margin-bottom: 1rem;
     }
-    
+
     /* Reduce excessive padding on mobile */
-    .content.px-4 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    /* Override Bootstrap px-4 for better mobile experience */
-    article.content.px-4 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    .px-4 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    .container-fluid.px-4 {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    
-    /* Force override for main layout */
+    .content.px-4,
+    article.content.px-4,
+    .px-4,
+    .container-fluid.px-4,
     main article.content {
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
     }
-}
-    
-    /* Mobile card styling */
-    .card {
-        box-shadow: 0 2px 4px var(--shadow);
-        border: 1px solid var(--border-color);
-        background-color: var(--card-bg);
-    }
-    
-    .card-title {
-        color: var(--primary-color);
-        font-weight: 600;
-    }
-    
-    .badge {
-        font-size: 0.75rem;
-    }
-    
+
     /* Navigation buttons on mobile */
     .btn-sm {
         padding: 0.25rem 0.5rem;
         font-size: 0.75rem;
     }
+}
+
+/* Mobile card styling */
+.card {
+    box-shadow: 0 2px 4px var(--shadow);
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+}
+
+.card-title {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75rem;
 }
 
 /* Navigation button styling */

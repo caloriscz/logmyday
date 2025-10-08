@@ -1,111 +1,216 @@
-// Flatpickr integration for culture-aware date picking
-window.flatpickrInstances = {};
+// Lightweight date picker wrapper built on Air Datepicker
+(function () {
+    const instances = new Map();
 
-window.initializeFlatpickr = function (elementId, dotnetHelper, config) {
-    const element = document.getElementById(elementId);
-    if (!element) {
-        console.error('Flatpickr element not found:', elementId);
-        return;
+    const DATE_FORMAT_INTERNAL = 'yyyy-MM-dd';
+    const TIME_FORMAT_WITH_SECONDS = 'HH:mm:ss';
+    const TIME_FORMAT = 'HH:mm';
+
+    function parseDate(value, hasTime) {
+        if (!value) {
+            return null;
+        }
+
+        const parsed = new Date(value);
+        if (isNaN(parsed.getTime())) {
+            return null;
+        }
+
+        if (!hasTime) {
+            parsed.setHours(0, 0, 0, 0);
+        }
+
+        return parsed;
     }
 
-    // Destroy existing instance if present
-    if (window.flatpickrInstances[elementId]) {
-        window.flatpickrInstances[elementId].destroy();
-    }
+    function buildIntlOptions(pattern) {
+        const options = {};
+        const map = [
+            { token: 'yyyy', action: () => (options.year = 'numeric') },
+            { token: 'yy', action: () => (options.year = '2-digit') },
+            { token: 'MMMM', action: () => (options.month = 'long') },
+            { token: 'MMM', action: () => (options.month = 'short') },
+            { token: 'MM', action: () => (options.month = '2-digit') },
+            { token: 'M', action: () => (options.month = 'numeric') },
+            { token: 'dd', action: () => (options.day = '2-digit') },
+            { token: 'd', action: () => (options.day = 'numeric') },
+            { token: 'HH', action: () => (options.hour = '2-digit') },
+            { token: 'H', action: () => (options.hour = 'numeric') },
+            { token: 'hh', action: () => (options.hour = '2-digit') },
+            { token: 'h', action: () => (options.hour = 'numeric') },
+            { token: 'mm', action: () => (options.minute = '2-digit') },
+            { token: 'm', action: () => (options.minute = 'numeric') },
+            { token: 'ss', action: () => (options.second = '2-digit') },
+            { token: 's', action: () => (options.second = 'numeric') }
+        ];
 
-    // Map DayOfWeek enum to flatpickr format (0 = Sunday, 1 = Monday, etc.)
-    const firstDayOfWeek = config.firstDayOfWeek || 1; // Default to Monday
-
-    // Parse the default date if provided (expecting ISO format from C#)
-    let defaultDate = null;
-    if (config.defaultDate) {
-        try {
-            defaultDate = new Date(config.defaultDate);
-            // Validate the date
-            if (isNaN(defaultDate.getTime())) {
-                console.warn('Invalid date provided:', config.defaultDate);
-                defaultDate = null;
+        for (const entry of map) {
+            if (pattern.includes(entry.token)) {
+                entry.action();
             }
-        } catch (e) {
-            console.error('Error parsing default date:', e);
-            defaultDate = null;
+        }
+
+        if (pattern.includes('tt') || pattern.includes('a')) {
+            options.hour12 = true;
+        }
+
+        return options;
+    }
+
+    function formatDate(date, culture, pattern) {
+        try {
+            const options = buildIntlOptions(pattern || '');
+            if (Object.keys(options).length === 0) {
+                return date.toLocaleDateString(culture);
+            }
+            return new Intl.DateTimeFormat(culture, options).format(date);
+        } catch (err) {
+            console.warn('Unable to format date', err);
+            return date.toLocaleString();
         }
     }
 
-    // Configure flatpickr
-    const flatpickrConfig = {
-        dateFormat: config.dateFormat || 'Y-m-d',
-        defaultDate: defaultDate,
-        enableTime: config.enableTime || false,
-        time_24hr: config.time24hr !== false, // Default to 24-hour
-        allowInput: config.allowInput || false,
-        locale: {
-            firstDayOfWeek: firstDayOfWeek,
-            weekdays: {
-                shorthand: config.weekdaysShort || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-                longhand: config.weekdaysLong || ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-            },
-            months: {
-                shorthand: config.monthsShort || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                longhand: config.monthsLong || ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    function getInstance(elementId) {
+        return instances.get(elementId);
+    }
+
+    window.lmdDatePicker = {
+        init(elementId, dotnetHelper, config) {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.warn('Date picker element not found', elementId);
+                return;
+            }
+
+            this.destroy(elementId);
+
+            const hasTime = !!config.enableTime;
+            const includeSeconds = !!config.enableSeconds;
+            const defaultDate = parseDate(config.defaultDate, hasTime);
+
+            const picker = new AirDatepicker(element, {
+                selectedDates: defaultDate ? [defaultDate] : [],
+                multipleDates: false,
+                autoClose: true,
+                timepicker: hasTime,
+                timeFormat: includeSeconds ? TIME_FORMAT_WITH_SECONDS : TIME_FORMAT,
+                dateFormat: DATE_FORMAT_INTERNAL,
+                minutesStep: 1,
+                secondsStep: 1,
+                locale: {
+                    days: config.weekDayNames || [],
+                    daysShort: config.weekDayNamesShort || [],
+                    daysMin: config.weekDayNamesShort || [],
+                    months: config.monthNames || [],
+                    monthsShort: config.monthNamesShort || [],
+                    firstDay: typeof config.firstDayOfWeek === 'number' ? config.firstDayOfWeek : 1,
+                    dateFormat: DATE_FORMAT_INTERNAL,
+                    timeFormat: includeSeconds ? TIME_FORMAT_WITH_SECONDS : TIME_FORMAT
+                },
+                onSelect: ({ date }) => {
+                    if (!dotnetHelper) {
+                        return;
+                    }
+
+                    try {
+                        dotnetHelper.invokeMethodAsync('OnDateChanged', date ? date.toISOString() : null);
+                    } catch (err) {
+                        console.error('Failed to notify .NET about date change', err);
+                    }
+                },
+                onShow: () => {
+                    element.classList.add('datepicker-open');
+                },
+                onHide: () => {
+                    element.classList.remove('datepicker-open');
+                }
+            });
+
+            let manualInputHandler = null;
+
+            if (!config.allowManualInput) {
+                element.setAttribute('readonly', 'readonly');
+            } else {
+                element.removeAttribute('readonly');
+                manualInputHandler = () => {
+                    const timestamp = Date.parse(element.value);
+                    if (!Number.isNaN(timestamp)) {
+                        const manualDate = new Date(timestamp);
+                        picker.selectDate(manualDate, { silent: true });
+                        element.value = formatDate(manualDate, config.culture, config.formatPattern);
+                        if (dotnetHelper) {
+                            dotnetHelper.invokeMethodAsync('OnDateChanged', manualDate.toISOString());
+                        }
+                    }
+                };
+
+                element.addEventListener('change', manualInputHandler);
+            }
+
+            if (defaultDate) {
+                element.value = formatDate(defaultDate, config.culture, config.formatPattern);
+            }
+
+            instances.set(elementId, {
+                picker,
+                dotnetHelper,
+                config,
+                element,
+                manualInputHandler
+            });
+        },
+
+        setValue(elementId, value) {
+            const instance = getInstance(elementId);
+            if (!instance) {
+                return;
+            }
+
+            const date = parseDate(value, !!instance.config.enableTime);
+
+            if (!date) {
+                instance.picker.clear({ silent: true });
+                instance.picker.$el.value = '';
+                return;
+            }
+
+            instance.picker.selectDate(date, { silent: true });
+            instance.picker.$el.value = formatDate(date, instance.config.culture, instance.config.formatPattern);
+        },
+
+        open(elementId) {
+            const instance = getInstance(elementId);
+            if (instance) {
+                if (instance.element) {
+                    instance.element.focus();
+                }
+                instance.picker.show();
             }
         },
-        onChange: function (selectedDates, dateStr, instance) {
-            if (dotnetHelper && selectedDates.length > 0) {
-                // Pass ISO 8601 format for reliable parsing in C#
-                const isoDate = selectedDates[0].toISOString();
-                dotnetHelper.invokeMethodAsync('OnDateChanged', isoDate);
-            } else if (dotnetHelper && selectedDates.length === 0) {
-                // Date was cleared
-                dotnetHelper.invokeMethodAsync('OnDateChanged', null);
+
+        close(elementId) {
+            const instance = getInstance(elementId);
+            if (instance) {
+                instance.picker.hide();
             }
         },
-        onReady: function (selectedDates, dateStr, instance) {
-            // Apply any custom styling or behavior
-            instance.calendarContainer.classList.add('culture-aware-datepicker');
+
+        destroy(elementId) {
+            const instance = getInstance(elementId);
+            if (!instance) {
+                return;
+            }
+
+            instance.picker.destroy();
+            if (instance.dotnetHelper) {
+                instance.dotnetHelper.dispose();
+            }
+
+            if (instance.element && instance.manualInputHandler) {
+                instance.element.removeEventListener('change', instance.manualInputHandler);
+            }
+
+            instances.delete(elementId);
         }
     };
-
-    // Create and store the flatpickr instance
-    const fp = flatpickr(element, flatpickrConfig);
-    window.flatpickrInstances[elementId] = fp;
-
-    return true;
-};
-
-window.updateFlatpickr = function (elementId, value) {
-    const instance = window.flatpickrInstances[elementId];
-    if (instance) {
-        instance.setDate(value, false); // Don't trigger onChange
-        return true;
-    }
-    return false;
-};
-
-window.destroyFlatpickr = function (elementId) {
-    const instance = window.flatpickrInstances[elementId];
-    if (instance) {
-        instance.destroy();
-        delete window.flatpickrInstances[elementId];
-        return true;
-    }
-    return false;
-};
-
-window.openFlatpickr = function (elementId) {
-    const instance = window.flatpickrInstances[elementId];
-    if (instance) {
-        instance.open();
-        return true;
-    }
-    return false;
-};
-
-window.closeFlatpickr = function (elementId) {
-    const instance = window.flatpickrInstances[elementId];
-    if (instance) {
-        instance.close();
-        return true;
-    }
-    return false;
-};
+})();

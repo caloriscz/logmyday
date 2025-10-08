@@ -1,26 +1,33 @@
+@using System.Collections.Generic
 @using System.Globalization
+@using System.Linq
 @using Microsoft.JSInterop
 @using LogMyDay.Shared.Preferences
+@using Microsoft.AspNetCore.Components.Web
 @using LogMyDay.App.Services
 @inject IJSRuntime JSRuntime
 @inject IUserPreferencesService UserPreferencesService
 @implements IAsyncDisposable
 
 <div class="culture-aware-datepicker-wrapper @(Stretch ? "stretch" : string.Empty)">
-    <input type="text" 
-           id="@elementId" 
-           class="@GetInputCssClasses()" 
+    <input type="text"
+           id="@elementId"
+           class="@GetInputCssClasses()"
            placeholder="@Placeholder"
            value="@FormattedValue"
            readonly="@(!AllowManualInput)"
-           disabled="@Disabled" />
+           disabled="@Disabled"
+           @onfocus="HandleFocus"
+           @onmousedown="HandleMouseDown" />
 </div>
 
 @code {
-    private string elementId = $"datepicker_{Guid.NewGuid():N}";
+    private readonly string elementId = $"datepicker_{Guid.NewGuid():N}";
     private DotNetObjectReference<CultureAwareDatePicker>? dotnetHelper;
     private UserPreferencesSnapshot? userPreferences;
-    private bool isInitialized = false;
+    private bool isInitialized;
+    private DateTime? lastValue;
+    private DateTime? lastSyncedValue;
 
     [Parameter]
     public DateTime? Value { get; set; }
@@ -58,55 +65,64 @@
             : $"{baseClasses} {CssClass}";
     }
 
-    private string FormattedValue
+    private string FormattedValue => FormatValue(Value);
+
+    private string GetDisplayPattern()
     {
-        get
+        if (userPreferences == null)
         {
-            if (Value == null || userPreferences == null)
-                return string.Empty;
+            var culture = CultureInfo.CurrentCulture;
+            return EnableTime
+                ? $"{culture.DateTimeFormat.ShortDatePattern} {culture.DateTimeFormat.ShortTimePattern}"
+                : culture.DateTimeFormat.ShortDatePattern;
+        }
 
-            var culture = userPreferences.Culture;
-            var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern 
-                                     : userPreferences.Preferences.ShortDatePattern;
+        return EnableTime
+            ? $"{userPreferences.Preferences.ShortDatePattern} {userPreferences.Preferences.ShortTimePattern}"
+            : userPreferences.Preferences.ShortDatePattern;
+    }
 
-            return Value.Value.ToString(pattern, culture);
+    private string FormatValue(DateTime? value)
+    {
+        if (value == null)
+        {
+            return string.Empty;
+        }
+
+        var pattern = GetDisplayPattern();
+        var culture = userPreferences?.Culture ?? CultureInfo.CurrentCulture;
+
+        return value.Value.ToString(pattern, culture);
+    }
+
+    private void HandleFocus(FocusEventArgs args)
+    {
+        if (!AllowManualInput)
+        {
+            _ = JSRuntime.InvokeVoidAsync("lmdDatePicker.open", elementId);
         }
     }
 
-    private string FlatpickrDateFormat
+    private void HandleMouseDown(MouseEventArgs args)
     {
-        get
+        if (!AllowManualInput)
         {
-            if (userPreferences == null)
-                return EnableTime ? "Y-m-d H:i" : "Y-m-d";
+            _ = JSRuntime.InvokeVoidAsync("lmdDatePicker.open", elementId);
+        }
+    }
 
-            // Convert .NET date format to Flatpickr format
-            var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern
-                                     : userPreferences.Preferences.ShortDatePattern;
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
 
-            // Flatpickr format: Y = 4-digit year, m = month with leading zero, d = day with leading zero
-            // .NET format: yyyy = 4-digit year, MM = month with leading zero, dd = day with leading zero
-            // Replace in specific order to avoid conflicts
-            var flatpickrFormat = pattern
-                .Replace("yyyy", "Y")
-                .Replace("yy", "y")
-                .Replace("MMMM", "F")  // Full month name
-                .Replace("MMM", "M")   // Short month name
-                .Replace("MM", "m")    // Month number with leading zero
-                .Replace("M", "n")     // Month number without leading zero
-                .Replace("dddd", "l")  // Full day name
-                .Replace("ddd", "D")   // Short day name
-                .Replace("dd", "d")    // Day with leading zero
-                .Replace("d", "j")     // Day without leading zero
-                .Replace("HH", "H")    // 24-hour with leading zero
-                .Replace("H", "G")     // 24-hour without leading zero
-                .Replace("hh", "h")    // 12-hour with leading zero
-                .Replace("h", "g")     // 12-hour without leading zero
-                .Replace("mm", "i")    // Minutes
-                .Replace("ss", "S")    // Seconds
-                .Replace("tt", "K");   // AM/PM
+        if (Value != lastValue)
+        {
+            lastValue = Value;
 
-            return flatpickrFormat;
+            if (isInitialized)
+            {
+                await SyncPickerValueAsync();
+            }
         }
     }
 
@@ -114,60 +130,28 @@
     {
         if (firstRender)
         {
-            await InitializeDatePickerAsync();
+            await InitializePickerAsync();
         }
     }
 
-    private async Task InitializeDatePickerAsync()
+    private async Task InitializePickerAsync()
     {
         try
         {
-            // Load user preferences
-            userPreferences = await UserPreferencesService.GetAsync();
-            
+            userPreferences ??= await UserPreferencesService.GetAsync();
+
             if (userPreferences == null)
             {
                 Console.WriteLine("Warning: Could not load user preferences for CultureAwareDatePicker");
                 return;
             }
 
-            var culture = userPreferences.Culture;
-
-            // Create .NET reference for callbacks
             dotnetHelper = DotNetObjectReference.Create(this);
 
-            // Get localized weekday and month names
-            var weekdaysShort = culture.DateTimeFormat.AbbreviatedDayNames;
-            var weekdaysLong = culture.DateTimeFormat.DayNames;
-            var monthsShort = culture.DateTimeFormat.AbbreviatedMonthNames;
-            var monthsLong = culture.DateTimeFormat.MonthNames;
+            await JSRuntime.InvokeVoidAsync("lmdDatePicker.init", elementId, dotnetHelper, BuildConfig());
 
-            // Format the default date properly for Flatpickr (ISO 8601 or the configured format)
-            string? defaultDateStr = null;
-            if (Value.HasValue)
-            {
-                // Use ISO 8601 format which Flatpickr understands universally
-                defaultDateStr = Value.Value.ToString("yyyy-MM-ddTHH:mm:ss");
-            }
-
-            // Configure flatpickr
-            var config = new
-            {
-                dateFormat = FlatpickrDateFormat,
-                defaultDate = defaultDateStr,
-                enableTime = EnableTime,
-                time24hr = !userPreferences.Preferences.ShortTimePattern.Contains("tt"), // Check if 12-hour format
-                firstDayOfWeek = (int)userPreferences.Preferences.StartOfWeek,
-                weekdaysShort = weekdaysShort,
-                weekdaysLong = weekdaysLong,
-                monthsShort = monthsShort.Take(12).ToArray(), // Take only 12 months (some cultures have 13 entries)
-                monthsLong = monthsLong.Take(12).ToArray(),
-                allowInput = AllowManualInput
-            };
-
-            await JSRuntime.InvokeVoidAsync("initializeFlatpickr", elementId, dotnetHelper, config);
             isInitialized = true;
-
+            await SyncPickerValueAsync();
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
@@ -176,45 +160,251 @@
         }
     }
 
+    private object BuildConfig()
+    {
+        var pattern = GetDisplayPattern();
+        var culture = userPreferences!.Culture;
+        return new
+        {
+            defaultDate = GetJsDateValue(Value, EnableTime),
+            enableTime = EnableTime,
+            enableSeconds = EnableTime && ContainsSeconds(userPreferences.Preferences.ShortTimePattern),
+            culture = culture.Name,
+            formatPattern = pattern,
+            firstDayOfWeek = (int)userPreferences.Preferences.StartOfWeek,
+            monthNames = culture.DateTimeFormat.MonthNames.Where(m => !string.IsNullOrWhiteSpace(m)).Take(12).ToArray(),
+            monthNamesShort = culture.DateTimeFormat.AbbreviatedMonthNames.Where(m => !string.IsNullOrWhiteSpace(m)).Take(12).ToArray(),
+            weekDayNames = culture.DateTimeFormat.DayNames,
+            weekDayNamesShort = culture.DateTimeFormat.AbbreviatedDayNames,
+            allowManualInput = AllowManualInput
+        };
+    }
+
+    private bool Uses24HourClock()
+    {
+        if (userPreferences == null)
+        {
+            return !CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern.Contains("tt", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return !userPreferences.Preferences.ShortTimePattern.Contains("tt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IDictionary<string, object?>? BuildFormatOptions()
+    {
+        if (userPreferences == null)
+        {
+            return null;
+        }
+
+        var options = new Dictionary<string, object?>();
+
+        AddDateFormatOptions(userPreferences.Preferences.ShortDatePattern, options);
+
+        if (EnableTime)
+        {
+            var timePattern = userPreferences.Preferences.ShortTimePattern;
+            var hourOption = GetHourFormatOption(timePattern);
+            var minuteOption = GetMinuteFormatOption(timePattern);
+            var secondOption = GetSecondFormatOption(timePattern);
+
+            if (hourOption != null)
+            {
+                options["hour"] = hourOption;
+            }
+
+            if (minuteOption != null)
+            {
+                options["minute"] = minuteOption;
+            }
+
+            if (secondOption != null)
+            {
+                options["second"] = secondOption;
+            }
+
+            options["hour12"] = Is12HourFormat(timePattern);
+        }
+
+        return options.Count == 0 ? null : options;
+    }
+
+    private static void AddDateFormatOptions(string pattern, IDictionary<string, object?> options)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return;
+        }
+
+        if (pattern.Contains("yyyy", StringComparison.OrdinalIgnoreCase))
+        {
+            options["year"] = "numeric";
+        }
+        else if (pattern.Contains("yy", StringComparison.OrdinalIgnoreCase))
+        {
+            options["year"] = "2-digit";
+        }
+
+        if (pattern.Contains("MMMM", StringComparison.Ordinal))
+        {
+            options["month"] = "long";
+        }
+        else if (pattern.Contains("MMM", StringComparison.Ordinal))
+        {
+            options["month"] = "short";
+        }
+        else if (pattern.Contains("MM", StringComparison.Ordinal))
+        {
+            options["month"] = "2-digit";
+        }
+        else if (pattern.Contains("M", StringComparison.Ordinal))
+        {
+            options["month"] = "numeric";
+        }
+
+        if (pattern.Contains("dd", StringComparison.Ordinal))
+        {
+            options["day"] = "2-digit";
+        }
+        else if (pattern.Contains("d", StringComparison.Ordinal))
+        {
+            options["day"] = "numeric";
+        }
+    }
+
+    private static string? GetHourFormatOption(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return null;
+        }
+
+        if (pattern.Contains("HH", StringComparison.Ordinal))
+        {
+            return "2-digit";
+        }
+
+        if (pattern.Contains("H", StringComparison.Ordinal))
+        {
+            return "numeric";
+        }
+
+        if (pattern.Contains("hh", StringComparison.Ordinal))
+        {
+            return "2-digit";
+        }
+
+        if (pattern.Contains("h", StringComparison.Ordinal))
+        {
+            return "numeric";
+        }
+
+        return null;
+    }
+
+    private static string? GetMinuteFormatOption(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return null;
+        }
+
+        if (pattern.Contains("mm", StringComparison.Ordinal))
+        {
+            return "2-digit";
+        }
+
+        if (pattern.Contains("m", StringComparison.Ordinal))
+        {
+            return "numeric";
+        }
+
+        return null;
+    }
+
+    private static string? GetSecondFormatOption(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return null;
+        }
+
+        if (pattern.Contains("ss", StringComparison.Ordinal))
+        {
+            return "2-digit";
+        }
+
+        if (pattern.Contains("s", StringComparison.Ordinal))
+        {
+            return "numeric";
+        }
+
+        return null;
+    }
+
+    private static bool ContainsSeconds(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return false;
+        }
+
+        return pattern.Contains("s", StringComparison.Ordinal);
+    }
+
+    private static bool Is12HourFormat(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+        {
+            return false;
+        }
+
+        return pattern.Contains("h", StringComparison.Ordinal) || pattern.Contains("tt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task SyncPickerValueAsync()
+    {
+        if (!isInitialized)
+        {
+            return;
+        }
+
+        if (Value == lastSyncedValue)
+        {
+            return;
+        }
+
+        var jsValue = GetJsDateValue(Value, EnableTime);
+        await JSRuntime.InvokeVoidAsync("lmdDatePicker.setValue", elementId, jsValue);
+        lastSyncedValue = Value;
+    }
+
+    private static string? GetJsDateValue(DateTime? value, bool includeTime)
+    {
+        if (!value.HasValue)
+        {
+            return null;
+        }
+
+        return includeTime
+            ? value.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture)
+            : value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
     [JSInvokable]
     public async Task OnDateChanged(string dateStr)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(dateStr))
+            var parsedDate = ParseIncomingDate(dateStr);
+
+            lastSyncedValue = parsedDate;
+            await ValueChanged.InvokeAsync(parsedDate);
+
+            if (ValueChangedAfter.HasDelegate)
             {
-                await ValueChanged.InvokeAsync(null);
-                return;
+                await ValueChangedAfter.InvokeAsync();
             }
-
-            // Parse ISO 8601 format from JavaScript
-            if (DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDate))
-            {
-                await ValueChanged.InvokeAsync(parsedDate);
-                return;
-            }
-
-            // Fallback: Try parsing with user's culture
-            if (userPreferences != null)
-            {
-                var culture = userPreferences.Culture;
-                var pattern = EnableTime ? userPreferences.Preferences.ShortDatePattern + " " + userPreferences.Preferences.ShortTimePattern
-                                         : userPreferences.Preferences.ShortDatePattern;
-
-                if (DateTime.TryParseExact(dateStr, pattern, culture, DateTimeStyles.None, out parsedDate))
-                {
-                    await ValueChanged.InvokeAsync(parsedDate);
-                    return;
-                }
-                
-                if (DateTime.TryParse(dateStr, culture, DateTimeStyles.None, out parsedDate))
-                {
-                    await ValueChanged.InvokeAsync(parsedDate);
-                    return;
-                }
-            }
-
-            Console.WriteLine($"Failed to parse date: {dateStr}");
         }
         catch (Exception ex)
         {
@@ -222,20 +412,79 @@
         }
     }
 
+    private DateTime? ParseIncomingDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedUtc))
+        {
+            return ConvertFromUtcIfNeeded(parsedUtc);
+        }
+
+        if (userPreferences != null)
+        {
+            var culture = userPreferences.Culture;
+            var pattern = GetDisplayPattern();
+
+            if (DateTime.TryParseExact(value, pattern, culture, DateTimeStyles.None, out var parsedExact))
+            {
+                return parsedExact;
+            }
+
+            if (DateTime.TryParse(value, culture, DateTimeStyles.None, out var parsedCulture))
+            {
+                return parsedCulture;
+            }
+        }
+
+        if (DateTime.TryParse(value, out var fallback))
+        {
+            return fallback;
+        }
+
+        throw new FormatException($"Failed to parse date value '{value}'.");
+    }
+
+    private DateTime ConvertFromUtcIfNeeded(DateTime parsedUtc)
+    {
+        if (parsedUtc.Kind != DateTimeKind.Utc || userPreferences == null)
+        {
+            return parsedUtc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(parsedUtc, userPreferences.TimeZone);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return parsedUtc.ToLocalTime();
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return parsedUtc.ToLocalTime();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         try
         {
-            if (isInitialized && JSRuntime is IJSInProcessRuntime)
+            if (isInitialized)
             {
-                await JSRuntime.InvokeVoidAsync("destroyFlatpickr", elementId);
+                await JSRuntime.InvokeVoidAsync("lmdDatePicker.destroy", elementId);
             }
-
-            dotnetHelper?.Dispose();
         }
         catch
         {
             // Suppress exceptions during disposal
+        }
+        finally
+        {
+            dotnetHelper?.Dispose();
         }
     }
 }

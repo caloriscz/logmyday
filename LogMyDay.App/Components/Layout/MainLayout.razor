@@ -23,7 +23,7 @@ else if (IsCheckingAuth)
 {
     Logger.LogInformation("MainLayout: Checking authentication state. Current URL: {Url}", Navigation.Uri);
     <DynamicPageTitle />
-    <div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
         <div class="text-center">
             <div class="inline-block w-12 h-12 border-4 border-primary-600 dark:border-primary-400 border-t-transparent rounded-full animate-spin" role="status">
                 <span class="sr-only">Loading...</span>
@@ -42,9 +42,9 @@ else
 {
     Logger.LogInformation("MainLayout: User authenticated, rendering main app. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
     <DynamicPageTitle />
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="min-h-screen bg-gray-50 dark:bg-slate-950">
         <NavMenu />
-        <main class="mx-auto max-w-screen-2xl px-4 py-6 md:px-6 lg:px-8">
+        <main class="mx-auto max-w-screen-2xl px-4 py-6 md:px-6 lg:px-8 bg-gray-50 dark:bg-slate-950">
             @Body
         </main>
     </div>

@@ -16,38 +16,38 @@
 
 <div class="mx-auto max-w-6xl px-4 py-6 space-y-6 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">Activities</h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Review and manage your logged activities.</p>
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="button" title="Open filters" @onclick="OpenFilterModal" class="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="button" title="Open filters" @onclick="OpenFilterModal" aria-label="Open filters" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-gray-900">
                 <Icon Name="filter" Class="w-5 h-5" />
                 <span>Filters</span>
             </button>
-            <div class="inline-flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-600">
-                <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
-                <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))">Descending</button>
+            <div class="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" aria-label="Sort ascending">Ascending</button>
+                <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" aria-label="Sort descending">Descending</button>
             </div>
         </div>
     </div>
 
     @if (displayType != "daily" && pagedResult != null)
     {
-        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm text-gray-600 dark:text-gray-300">
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm font-medium text-gray-700 dark:text-slate-300">
                 Page @GetCurrentPageNumber() of @totalPages
             </div>
             <div class="flex items-center gap-2">
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)">Previous</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)">Next</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)" aria-label="Previous page">Previous</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)" aria-label="Next page">Next</button>
             </div>
         </div>
     }
 
     @if (pagedResult == null)
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading activities…
         </div>
     }
@@ -55,48 +55,51 @@
     {
         <div class="space-y-4">
             <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()">&lt;&lt;</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous Day">‹</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()" aria-label="Previous month">&laquo;</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous Day" aria-label="Previous day">&lsaquo;</button>
                 <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="w-40 sm:w-48" Stretch="false" Placeholder="Select date" />
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next Day">›</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()">&gt;&gt;</button>
-                <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday">Today</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next Day" aria-label="Next day">&rsaquo;</button>
+                <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()" aria-label="Next month">&raquo;</button>
+                <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
             </div>
 
             @if (!pagedResult.Items.Any())
             {
-                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                     No activities found for @FormatDate(selectedDate).
                 </div>
             }
             else
             {
                 <div class="hidden md:block">
-                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-800/60">
+                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead class="bg-gray-50 dark:bg-slate-800">
                                 <tr>
-                                    <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Actions</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Tag</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Description</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Date Started</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Date Finished</th>
+                                    <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Started</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Finished</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                 @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
                                 {
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                                    <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
                                         <td class="px-4 py-3">
-                                            <button type="button" class="inline-flex items-center gap-1 rounded-md bg-danger-100 px-3 py-1.5 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-200 focus:outline-none focus:ring-2 focus:ring-danger-500 dark:bg-danger-900/40 dark:text-danger-200 dark:hover:bg-danger-900/60" @onclick="() => DeleteActivity(activity.Id)">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                                 <Icon Name="trash" Class="w-4 h-4" />
-                                                <span class="sr-only">Delete activity</span>
                                             </button>
                                         </td>
-                                        <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">@activity.PrimaryTagName</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@GetActivityDisplayValue(activity)</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@FormatTime(activity.DateStarted)</td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "-")</td>
+                                        <td class="px-4 py-3 text-sm font-medium">
+                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                @activity.PrimaryTagName
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@FormatTime(activity.DateStarted)</td>
+                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-500 dark:text-slate-400">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -107,30 +110,33 @@
                 <div class="space-y-3 md:hidden">
                     @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
                     {
-                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                             <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">@activity.PrimaryTagName</h3>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                        <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                            @activity.PrimaryTagName
+                                        </span>
+                                    </h3>
                                     @{ var displayValue = GetActivityDisplayValue(activity);
                                         if (!string.IsNullOrWhiteSpace(displayValue))
                                         {
-                                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">@displayValue</p>
+                                            <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
                                         }
                                     }
                                 </div>
-                                <button type="button" class="inline-flex items-center gap-1 rounded-md bg-danger-100 px-3 py-1.5 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-200 focus:outline-none focus:ring-2 focus:ring-danger-500 dark:bg-danger-900/40 dark:text-danger-200 dark:hover:bg-danger-900/60" @onclick="() => DeleteActivity(activity.Id)">
+                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                     <Icon Name="trash" Class="w-4 h-4" />
-                                    <span class="sr-only">Delete activity</span>
                                 </button>
                             </div>
-                            <dl class="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-300">
+                            <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <dt class="font-medium text-gray-500 dark:text-gray-400">Started</dt>
-                                    <dd>@FormatTime(activity.DateStarted)</dd>
+                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Started</dt>
+                                    <dd class="tabular-nums text-gray-900 dark:text-slate-200">@FormatTime(activity.DateStarted)</dd>
                                 </div>
                                 <div>
-                                    <dt class="font-medium text-gray-500 dark:text-gray-400">Finished</dt>
-                                    <dd>@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "-")</dd>
+                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Finished</dt>
+                                    <dd class="tabular-nums text-gray-700 dark:text-slate-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</dd>
                                 </div>
                             </dl>
                         </div>
@@ -141,7 +147,7 @@
     }
     else if (!pagedResult.Items.Any())
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             No activities found for the selected criteria.
         </div>
     }
@@ -151,34 +157,37 @@
             @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
             {
                 <section class="space-y-3">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">@FormatDate(group.Key)</h2>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-slate-100">@FormatDate(group.Key)</h2>
 
                     <div class="hidden md:block">
-                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-800/60">
+                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                                <thead class="bg-gray-50 dark:bg-slate-800">
                                     <tr>
-                                        <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Actions</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Tag</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Description</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Date Started</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300">Date Finished</th>
+                                        <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Started</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Finished</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                     @foreach (var activity in group)
                                     {
-                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                                        <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
                                             <td class="px-4 py-3">
-                                                <button type="button" class="inline-flex items-center gap-1 rounded-md bg-danger-100 px-3 py-1.5 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-200 focus:outline-none focus:ring-2 focus:ring-danger-500 dark:bg-danger-900/40 dark:text-danger-200 dark:hover:bg-danger-900/60" @onclick="() => DeleteActivity(activity.Id)">
+                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                                     <Icon Name="trash" Class="w-4 h-4" />
-                                                    <span class="sr-only">Delete activity</span>
                                                 </button>
                                             </td>
-                                            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">@activity.PrimaryTagName</td>
-                                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@GetActivityDisplayValue(activity)</td>
-                                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@FormatTime(activity.DateStarted)</td>
-                                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "-")</td>
+                                            <td class="px-4 py-3 text-sm font-medium">
+                                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                    @activity.PrimaryTagName
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@FormatTime(activity.DateStarted)</td>
+                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-500 dark:text-slate-400">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -189,30 +198,33 @@
                     <div class="space-y-3 md:hidden">
                         @foreach (var activity in group)
                         {
-                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                                 <div class="flex items-start justify-between gap-3">
-                                    <div>
-                                        <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">@activity.PrimaryTagName</h3>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                @activity.PrimaryTagName
+                                            </span>
+                                        </h3>
                                         @{ var displayValue = GetActivityDisplayValue(activity);
                                             if (!string.IsNullOrWhiteSpace(displayValue))
                                             {
-                                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">@displayValue</p>
+                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
                                             }
                                         }
                                     </div>
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md bg-danger-100 px-3 py-1.5 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-200 focus:outline-none focus:ring-2 focus:ring-danger-500 dark:bg-danger-900/40 dark:text-danger-200 dark:hover:bg-danger-900/60" @onclick="() => DeleteActivity(activity.Id)">
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                         <Icon Name="trash" Class="w-4 h-4" />
-                                        <span class="sr-only">Delete activity</span>
                                     </button>
                                 </div>
-                                <dl class="mt-4 grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-300">
+                                <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
                                     <div>
-                                        <dt class="font-medium text-gray-500 dark:text-gray-400">Started</dt>
-                                        <dd>@FormatTime(activity.DateStarted)</dd>
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Started</dt>
+                                        <dd class="tabular-nums text-gray-900 dark:text-slate-200">@FormatTime(activity.DateStarted)</dd>
                                     </div>
                                     <div>
-                                        <dt class="font-medium text-gray-500 dark:text-gray-400">Finished</dt>
-                                        <dd>@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "-")</dd>
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Finished</dt>
+                                        <dd class="tabular-nums text-gray-700 dark:text-slate-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</dd>
                                     </div>
                                 </dl>
                             </div>
@@ -225,7 +237,7 @@
 </div>
 
 <!-- Floating Action Button -->
-<button type="button" class="fixed bottom-6 right-6 z-40 inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 p-4 text-white shadow-lg transition-transform hover:scale-105 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500" @onclick="OpenAddActivityModal" title="Add Activity">
+<button type="button" class="fixed bottom-6 right-6 z-40 inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 p-4 text-white shadow-lg transition-transform hover:scale-105 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add Activity">
     <Icon Name="plus" Class="h-6 w-6" />
     <span class="sr-only">Add activity</span>
 </button>
@@ -233,11 +245,11 @@
 <!-- Filter Modal (Tailwind) -->
 @if (showFilterModal && isInitialized)
 {
-    <div class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4" @onclick="CloseFilterModal">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
+    <div class="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-50 p-4" @onclick="CloseFilterModal">
+        <div class="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
             <!-- Modal Header -->
-            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Filters</h3>
                 <button type="button" @onclick="CloseFilterModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                     <Icon Name="close" Class="w-5 h-5" />
                 </button>
@@ -248,8 +260,8 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Display Type -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Display Type:</label>
-                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Display Type:</label>
+                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
                             <option value="monthly">Monthly</option>
@@ -258,16 +270,16 @@
 
                     <!-- Description Filter -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description Filter:</label>
-                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Description Filter:</label>
+                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             placeholder="Search description..." />
                     </div>
                 </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
-                <button type="button" @onclick="CloseFilterModal" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 focus:outline-none transition-colors">
+            <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-slate-700">
+                <button type="button" @onclick="CloseFilterModal" class="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-900 dark:text-slate-100 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 transition-colors">
                     Close
                 </button>
             </div>
@@ -420,7 +432,6 @@
 
     private string FormatTime(DateTime dateTime)
     {
-        var culture = displayCulture ?? CultureInfo.CurrentCulture;
         var timezone = displayTimeZone ?? TimeZoneInfo.Local;
         
         // Convert to user's timezone if needed
@@ -428,30 +439,30 @@
             ? TimeZoneInfo.ConvertTimeFromUtc(dateTime, timezone)
             : TimeZoneInfo.ConvertTime(dateTime, timezone);
             
-        var pattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
-        return localDateTime.ToString(pattern, culture);
+        // Use 24-hour format (HH:mm) for EU localization
+        return localDateTime.ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 
     private string GetOrderButtonClasses(string order)
     {
         var isActive = string.Equals(orderBy, order, System.StringComparison.OrdinalIgnoreCase);
-        var baseClasses = "inline-flex items-center justify-center px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500";
-        var activeClasses = "bg-primary-600 text-white hover:bg-primary-700";
-        var inactiveClasses = "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
+        var baseClasses = "inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
+        var activeClasses = "bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600";
+        var inactiveClasses = "bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
 
         return $"{baseClasses} {(isActive ? activeClasses : inactiveClasses)}";
     }
 
     private string GetNavButtonClasses(bool emphasize = false)
     {
-        var baseClasses = "inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50";
+        var baseClasses = "inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
 
         if (emphasize)
         {
-            return $"{baseClasses} border-primary-600 bg-primary-600 text-white hover:bg-primary-700";
+            return $"{baseClasses} border-sky-600 bg-sky-600 text-white hover:bg-sky-700 hover:border-sky-700 dark:bg-sky-500 dark:border-sky-500 dark:hover:bg-sky-600 dark:hover:border-sky-600";
         }
 
-        return $"{baseClasses} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700";
+        return $"{baseClasses} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
     }
 
     private string GetActivityDisplayValue(ActivityResponse activity)
