@@ -17,16 +17,10 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Tags</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Manage the tags and metadata used across your activities.</p>
         </div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <a href="/tags/new" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">
-                <Icon Name="plus" Class="h-4 w-4" />
-                Add Tag
-            </a>
-        
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                Total tags: @(pagedResult?.TotalCount ?? 0)
-            </div>
-        </div>
+        <a href="/tags/new" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto">
+            <Icon Name="plus" Class="h-4 w-4" />
+            Add Tag
+        </a>
     </div>
     @if (!string.IsNullOrEmpty(errorMessage))
     {
@@ -269,6 +263,10 @@
                             Next
                         </button>
                     </div>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    Total tags: @(pagedResult?.TotalCount ?? 0)
                 </div>
             }
     </section>

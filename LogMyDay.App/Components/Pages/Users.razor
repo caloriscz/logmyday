@@ -18,10 +18,10 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">User Management</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Only administrators can invite, edit, or remove users.</p>
         </div>
-        <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            <Icon Name="users" Class="h-5 w-5" />
-            <span>Total users: @users.Count</span>
-        </div>
+        <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isCreating">
+            <Icon Name="person-plus" Class="h-4 w-4" />
+            Invite User
+        </button>
     </div>
 
     @if (!string.IsNullOrEmpty(statusMessage))
@@ -46,78 +46,7 @@
     }
     else
     {
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,360px)_1fr]">
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <header class="mb-4 space-y-1">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Create New User</h2>
-                    <p class="text-sm text-gray-600 dark:text-slate-400">Invite a teammate and set their preferences immediately.</p>
-                </header>
-
-                <EditForm Model="newUser" OnValidSubmit="CreateUserAsync">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
-
-                    <div class="space-y-4">
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserEmail">Email</label>
-                            <InputText id="newUserEmail" @bind-Value="newUser.Email" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserCulture">Culture</label>
-                            <SearchableSelect @bind-Value="newUser.Culture"
-                                              Id="newUserCulture"
-                                              Options="CultureOptions"
-                                              Placeholder="Select culture"
-                                              SearchPlaceholder="Search cultures"
-                                              ShowValueInList="true" />
-                            <p class="text-xs text-gray-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</p>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserTimeZone">Time Zone</label>
-                            <SearchableSelect @bind-Value="newUser.TimeZone"
-                                              Id="newUserTimeZone"
-                                              Options="TimeZoneOptions"
-                                              Placeholder="Select time zone"
-                                              SearchPlaceholder="Search time zones"
-                                              ShowValueInList="true" />
-                            <p class="text-xs text-gray-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</p>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserDisplayName">Display Name (optional)</label>
-                            <InputText id="newUserDisplayName" @bind-Value="newUser.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserPassword">Password</label>
-                            <InputText id="newUserPassword" @bind-Value="newUser.Password" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" />
-                            <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
-                        </div>
-
-                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                            <InputCheckbox id="newUserIsAdmin" @bind-Value="newUser.IsAdmin" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
-                            Grant administrator access
-                        </label>
-
-                        <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isCreating">
-                            @if (isCreating)
-                            {
-                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
-                                <span>Creating…</span>
-                            }
-                            else
-                            {
-                                <Icon Name="person-plus" Class="h-4 w-4" />
-                                <span>Create User</span>
-                            }
-                        </button>
-                    </div>
-                </EditForm>
-            </section>
-
-            <section class="space-y-4">
+        <section class="space-y-4">
                 <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Existing Users</h2>
@@ -128,7 +57,7 @@
                 @if (users == null || users.Count == 0)
                 {
                     <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                        No users found. Create a new user using the form on the left.
+                        No users found. Use the Invite User button above to add someone.
                     </div>
                 }
                 else
@@ -378,10 +307,103 @@
                         }
                     </div>
                 }
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    Total users: @(users?.Count ?? 0)
+                </div>
             </section>
-        </div>
     }
 </div>
+
+@if (showCreateModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isCreating) CloseCreateModal(); }">
+        <div class="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Invite User</h2>
+                    <p class="text-sm text-gray-600 dark:text-slate-400">Create a new account and configure their preferences.</p>
+                </div>
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isCreating) CloseCreateModal(); }" disabled="@isCreating">
+                    <Icon Name="close" Class="h-5 w-5" />
+                    <span class="sr-only">Close</span>
+                </button>
+            </div>
+
+            <EditForm Model="newUser" OnValidSubmit="CreateUserAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mx-6 mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                <div class="max-h-[70vh] overflow-y-auto px-6 py-5">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="sm:col-span-2 space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserEmail">Email</label>
+                            <InputText id="newUserEmail" @bind-Value="newUser.Email" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isCreating" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserCulture">Culture</label>
+                            <SearchableSelect @bind-Value="newUser.Culture"
+                                              Id="newUserCulture"
+                                              Options="CultureOptions"
+                                              Placeholder="Select culture"
+                                              SearchPlaceholder="Search cultures"
+                                              ShowValueInList="true" />
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserTimeZone">Time Zone</label>
+                            <SearchableSelect @bind-Value="newUser.TimeZone"
+                                              Id="newUserTimeZone"
+                                              Options="TimeZoneOptions"
+                                              Placeholder="Select time zone"
+                                              SearchPlaceholder="Search time zones"
+                                              ShowValueInList="true" />
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserDisplayName">Display Name (optional)</label>
+                            <InputText id="newUserDisplayName" @bind-Value="newUser.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isCreating" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newUserPassword">Password</label>
+                            <InputText id="newUserPassword" @bind-Value="newUser.Password" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" disabled="@isCreating" />
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
+                        </div>
+
+                        <div class="sm:col-span-2">
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                                <InputCheckbox id="newUserIsAdmin" @bind-Value="newUser.IsAdmin" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isCreating" />
+                                Grant administrator access
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isCreating) CloseCreateModal(); }" disabled="@isCreating">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isCreating">
+                        @if (isCreating)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Creating…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="person-plus" Class="h-4 w-4" />
+                            <span>Create User</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
 
 @code {
     private static readonly IReadOnlyList<SelectOption> CultureOptions = CultureCatalog.All;
@@ -396,6 +418,7 @@
     private bool isUnauthorized;
     private bool isCreating;
     private bool isUpdating;
+    private bool showCreateModal;
     private Guid? deletingUserId;
     private string? statusMessage;
     private bool statusIsError;
@@ -427,6 +450,7 @@
             }
 
             await LoadUsersAsync();
+            ResetNewUser();
         }
         finally
         {
@@ -478,7 +502,7 @@
             var createdUser = await UsersApi.CreateUserAsync(request);
             users.Add(createdUser);
             SortUsers();
-            newUser = new CreateUserModel();
+            CloseCreateModal();
             SetStatus($"User '{createdUser.Email}' created successfully.");
         }
         catch (Refit.ApiException ex)
@@ -496,6 +520,24 @@
         {
             isCreating = false;
         }
+    }
+
+    private void OpenCreateModal()
+    {
+        if (isCreating)
+        {
+            return;
+        }
+
+        ResetNewUser();
+        SetStatus(null);
+        showCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        showCreateModal = false;
+        ResetNewUser();
     }
 
     private void BeginEdit(UserDto user)
@@ -627,6 +669,18 @@
     {
         statusMessage = message;
         statusIsError = isError;
+    }
+
+    private void ResetNewUser()
+    {
+        var culture = userPreferences?.Culture?.Name ?? PreferencesFactory.DefaultCulture;
+        var timeZone = userPreferences?.TimeZone?.Id ?? PreferencesFactory.DefaultTimeZoneId;
+
+        newUser = new CreateUserModel
+        {
+            Culture = culture,
+            TimeZone = timeZone
+        };
     }
 
     private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
