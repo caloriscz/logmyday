@@ -72,7 +72,7 @@ public interface IActivityApi
     Task<TagResponse> GetTagById(int id);
 
     [Post("/api/tags")]
-    Task CreateTag([Body] TagRequest tagRequest);
+    Task<int> CreateTag([Body] TagRequest tagRequest);
 
     [Put("/api/tags/{id}")]
     Task UpdateTag(int id, [Body] TagRequest tagRequest);

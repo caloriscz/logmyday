@@ -142,7 +142,7 @@ public class ApiService
                 IsRange = false
             };
             
-            await _activityApi.CreateTag(tagRequest);
+            _ = await _activityApi.CreateTag(tagRequest);
             
             System.Diagnostics.Debug.WriteLine($"✅ SUCCESS: Tag '{tagName}' created successfully");
             System.Diagnostics.Debug.WriteLine("=== END TAG CREATION ===");

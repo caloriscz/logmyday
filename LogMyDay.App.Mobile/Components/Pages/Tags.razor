@@ -330,7 +330,7 @@
     {
         try
         {
-            await ActivityApi.CreateTag(newTag);
+            _ = await ActivityApi.CreateTag(newTag);
             
             newTag = new() { Tag = "" };
             errorMessage = null;
