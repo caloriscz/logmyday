@@ -1,0 +1,696 @@
+@page "/users"
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using LogMyDay.Shared.Preferences
+@using Microsoft.AspNetCore.Authorization
+@using LogMyDay.App.Mobile.Services
+@inject IUsersApi UsersApi
+@inject IJSRuntime JSRuntime
+@inject ILogger<Users> Logger
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+
+@attribute [Authorize(Policy = "AdminOnly")]
+
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
+        <h2 class="mb-0">User Management</h2>
+        <div class="text-muted small">
+            Manage application users. Only administrators can access this page.
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(statusIsError ? "alert-danger" : "alert-success")" role="alert">
+            @statusMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>Loading users...</span>
+        </div>
+    }
+    else if (isUnauthorized)
+    {
+        <div class="alert alert-danger" role="alert">
+            You do not have permission to manage users.
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-12 col-xl-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Create New User</h5>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="newUser" OnValidSubmit="CreateUserAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newUserEmail">Email</label>
+                                <InputText id="newUserEmail" @bind-Value="newUser.Email" class="form-control" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newUserCulture">Culture</label>
+                                <SearchableSelect @bind-Value="newUser.Culture"
+                                                  Id="newUserCulture"
+                                                  Options="CultureOptions"
+                                                  Placeholder="Select culture"
+                                                  SearchPlaceholder="Search cultures"
+                                                  ShowValueInList="true" />
+                                <div class="form-text">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newUserTimeZone">Time Zone</label>
+                                <SearchableSelect @bind-Value="newUser.TimeZone"
+                                                  Id="newUserTimeZone"
+                                                  Options="TimeZoneOptions"
+                                                  Placeholder="Select time zone"
+                                                  SearchPlaceholder="Search time zones"
+                                                  ShowValueInList="true" />
+                                <div class="form-text">Pick an IANA time zone (e.g., Europe/Vienna).</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newUserDisplayName">Display Name (optional)</label>
+                                <InputText id="newUserDisplayName" @bind-Value="newUser.DisplayName" class="form-control" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="newUserPassword">Password</label>
+                                <InputText id="newUserPassword" @bind-Value="newUser.Password" type="password" class="form-control" autocomplete="new-password" />
+                                <div class="form-text">Minimum 10 characters.</div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <InputCheckbox id="newUserIsAdmin" @bind-Value="newUser.IsAdmin" class="form-check-input" />
+                                <label class="form-check-label" for="newUserIsAdmin">Grant administrator access</label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" disabled="@isCreating">
+                                @if (isCreating)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Creating...</span>
+                                }
+                                else
+                                {
+                                    <span><i class="bi bi-person-plus me-1"></i>Create User</span>
+                                }
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">Existing Users</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (users == null || users.Count == 0)
+                        {
+                            <div class="alert alert-info mb-0">No users found. Create a new user using the form on the left.</div>
+                        }
+                        else
+                        {
+                            <!-- Desktop Table View -->
+                            <div class="table-responsive d-none d-lg-block">
+                                <table class="table table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Display Name</th>
+                                            <th>Preferences</th>
+                                            <th class="text-center">Admin</th>
+                                            <th>Updated</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var user in users)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold">@user.Email</div>
+                                                    <div class="text-muted small">Created @FormatUserDate(user.CreatedUtc)</div>
+                                                </td>
+                                                <td>
+                                                    <div class="fw-semibold">@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</div>
+                                                    <div class="text-muted small">@user.Id</div>
+                                                </td>
+                                                <td>
+                                                    <div class="fw-semibold">@user.Culture</div>
+                                                    <div class="text-muted small">@user.TimeZone</div>
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (user.IsAdmin)
+                                                    {
+                                                        <span class="badge bg-success">Admin</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">User</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <span class="small text-muted">@FormatUserDate(user.UpdatedUtc)</span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-outline-secondary btn-sm me-2" @onclick="() => BeginEdit(user)" disabled="@isCreating">
+                                                        <i class="bi bi-pencil"></i> Edit
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => ConfirmDeleteAsync(user)" disabled="@(!CanDelete(user) || deletingUserId == user.Id || isCreating)">
+                                                        @if (deletingUserId == user.Id)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span><i class="bi bi-trash"></i> Delete</span>
+                                                        }
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            if (editingUserId == user.Id)
+                                            {
+                                                <tr class="table-light">
+                                                    <td colspan="6">
+                                                        <EditForm Model="editUser" OnValidSubmit="SaveEditAsync">
+                                                            <DataAnnotationsValidator />
+                                                            <ValidationSummary />
+                                                            <div class="row g-3">
+                                                                <div class="col-md-6 col-lg-3">
+                                                                    <label class="form-label" for="editEmail">Email</label>
+                                                                    <InputText id="editEmail" @bind-Value="editUser.Email" class="form-control" />
+                                                                </div>
+                                                                <div class="col-md-6 col-lg-3">
+                                                                    <label class="form-label" for="editDisplayName">Display Name</label>
+                                                                    <InputText id="editDisplayName" @bind-Value="editUser.DisplayName" class="form-control" />
+                                                                </div>
+                                                                <div class="col-md-6 col-lg-3">
+                                                                    <label class="form-label" for="editCulture">Culture</label>
+                                                                    <SearchableSelect @bind-Value="editUser.Culture"
+                                                                                      Id="editCulture"
+                                                                                      Options="CultureOptions"
+                                                                                      Placeholder="Select culture"
+                                                                                      SearchPlaceholder="Search cultures"
+                                                                                      ShowValueInList="true" />
+                                                                </div>
+                                                                <div class="col-md-6 col-lg-3">
+                                                                    <label class="form-label" for="editTimeZone">Time Zone</label>
+                                                                    <SearchableSelect @bind-Value="editUser.TimeZone"
+                                                                                      Id="editTimeZone"
+                                                                                      Options="TimeZoneOptions"
+                                                                                      Placeholder="Select time zone"
+                                                                                      SearchPlaceholder="Search time zones"
+                                                                                      ShowValueInList="true" />
+                                                                </div>
+                                                                <div class="col-12 col-lg-3">
+                                                                    <div class="form-check mt-2 mt-lg-4">
+                                                                        <InputCheckbox id="editIsAdmin" @bind-Value="editUser.IsAdmin" class="form-check-input" />
+                                                                        <label class="form-check-label" for="editIsAdmin">Administrator</label>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="d-flex justify-content-end gap-2 mt-3">
+                                                                <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@isUpdating">
+                                                                    Cancel
+                                                                </button>
+                                                                <button type="submit" class="btn btn-primary" disabled="@isUpdating">
+                                                                    @if (isUpdating)
+                                                                    {
+                                                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                                        <span>Saving...</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span><i class="bi bi-save me-1"></i>Save Changes</span>
+                                                                    }
+                                                                </button>
+                                                            </div>
+                                                        </EditForm>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Mobile Card View -->
+                            <div class="d-lg-none">
+                                @foreach (var user in users)
+                                {
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h5 class="card-title mb-1">@user.Email</h5>
+                                                    <div class="text-muted small">Created @FormatUserDate(user.CreatedUtc)</div>
+                                                </div>
+                                                <div>
+                                                    @if (user.IsAdmin)
+                                                    {
+                                                        <span class="badge bg-success">Admin</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">User</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-6">
+                                                    <small class="text-muted d-block">Display Name</small>
+                                                    <strong>@(string.IsNullOrWhiteSpace(user.DisplayName) ? "—" : user.DisplayName)</strong>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted d-block">User ID</small>
+                                                    @user.Id
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted d-block">Culture</small>
+                                                    @user.Culture
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted d-block">Time Zone</small>
+                                                    @user.TimeZone
+                                                </div>
+                                                <div class="col-12">
+                                                    <small class="text-muted d-block">Updated</small>
+                                                    @FormatUserDate(user.UpdatedUtc)
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-end gap-2">
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => BeginEdit(user)" disabled="@(isCreating || isUpdating || editingUserId != null)">
+                                                    @if (deletingUserId == user.Id)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-pencil"></i>
+                                                    }
+                                                    Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDeleteAsync(user)" disabled="@(!CanDelete(user) || deletingUserId == user.Id)">
+                                                    @if (deletingUserId == user.Id)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-trash"></i>
+                                                    }
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (editingUserId == user.Id)
+                                    {
+                                        <div class="card mb-3 border-primary">
+                                            <div class="card-header bg-primary text-white">
+                                                <h6 class="mb-0">Edit User</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <EditForm Model="editUser" OnValidSubmit="SaveEditAsync">
+                                                    <DataAnnotationsValidator />
+                                                    <ValidationSummary class="text-danger mb-3" />
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label" for="editEmailMobile">Email</label>
+                                                        <InputText id="editEmailMobile" @bind-Value="editUser.Email" class="form-control" readonly />
+                                                        <div class="form-text">Email cannot be changed.</div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label" for="editDisplayNameMobile">Display Name</label>
+                                                        <InputText id="editDisplayNameMobile" @bind-Value="editUser.DisplayName" class="form-control" placeholder="Enter display name" />
+                                                        <ValidationMessage For="@(() => editUser.DisplayName)" />
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label" for="editCultureMobile">Culture</label>
+                                                        <SearchableSelect @bind-Value="editUser.Culture"
+                                                                          Id="editCultureMobile"
+                                                                          Options="CultureOptions"
+                                                                          Placeholder="Select culture"
+                                                                          SearchPlaceholder="Search cultures" />
+                                                        <ValidationMessage For="@(() => editUser.Culture)" />
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label" for="editTimeZoneMobile">Time Zone</label>
+                                                        <SearchableSelect @bind-Value="editUser.TimeZone"
+                                                                          Id="editTimeZoneMobile"
+                                                                          Options="TimeZoneOptions"
+                                                                          Placeholder="Select time zone"
+                                                                          SearchPlaceholder="Search time zones" />
+                                                        <ValidationMessage For="@(() => editUser.TimeZone)" />
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <div class="form-check">
+                                                            <InputCheckbox @bind-Value="editUser.IsAdmin" class="form-check-input" id="editAdminMobile" />
+                                                            <label class="form-check-label" for="editAdminMobile">Administrator</label>
+                                                        </div>
+                                                        <div class="form-text">Administrators can manage users and have full access.</div>
+                                                    </div>
+
+                                                    <div class="d-flex justify-content-end gap-2">
+                                                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@isUpdating">
+                                                            Cancel
+                                                        </button>
+                                                        <button type="submit" class="btn btn-primary" disabled="@isUpdating">
+                                                            @if (isUpdating)
+                                                            {
+                                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                                <span>Saving...</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span><i class="bi bi-save me-1"></i>Save Changes</span>
+                                                            }
+                                                        </button>
+                                                    </div>
+                                                </EditForm>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly IReadOnlyList<SelectOption> CultureOptions = CultureCatalog.All;
+    private static readonly IReadOnlyList<SelectOption> TimeZoneOptions = TimeZoneCatalog.All;
+
+    private readonly List<UserDto> users = new();
+    private Guid? currentUserId;
+    private CreateUserModel newUser = new();
+    private EditUserModel editUser = new();
+    private Guid? editingUserId;
+    private bool isLoading = true;
+    private bool isUnauthorized;
+    private bool isCreating;
+    private bool isUpdating;
+    private Guid? deletingUserId;
+    private string? statusMessage;
+    private bool statusIsError;
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private EffectivePreferences? effectivePreferences;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("User Management");
+        
+        try
+        {
+            isLoading = true;
+            statusMessage = null;
+
+            try
+            {
+                userPreferences = await UserPreferencesService.GetAsync();
+                currentUserId = userPreferences.CurrentUser.Id;
+                displayCulture = userPreferences.Culture;
+                displayTimeZone = userPreferences.TimeZone;
+                effectivePreferences = userPreferences.Preferences;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to load current user preferences");
+            }
+
+            await LoadUsersAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            var response = await UsersApi.GetUsersAsync();
+            users.Clear();
+            users.AddRange(response.OrderBy(u => u.Email));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden || ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Logger.LogWarning(ex, "User management is not authorized");
+            isUnauthorized = true;
+            SetStatus("You are not authorized to view users.", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load users");
+            SetStatus("Failed to load users. Please try again.", true);
+        }
+    }
+
+    private async Task CreateUserAsync()
+    {
+        if (isCreating)
+        {
+            return;
+        }
+
+        isCreating = true;
+        SetStatus(null);
+
+        try
+        {
+            var request = new CreateUserDto(
+                newUser.Email.Trim(),
+                newUser.Password,
+                string.IsNullOrWhiteSpace(newUser.DisplayName) ? null : newUser.DisplayName.Trim(),
+                newUser.IsAdmin,
+                newUser.Culture.Trim(),
+                newUser.TimeZone.Trim());
+
+            var createdUser = await UsersApi.CreateUserAsync(request);
+            users.Add(createdUser);
+            SortUsers();
+            newUser = new CreateUserModel();
+            SetStatus($"User '{createdUser.Email}' created successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to create user");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to create user.";
+            SetStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while creating user");
+            SetStatus("An unexpected error occurred while creating the user.", true);
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private void BeginEdit(UserDto user)
+    {
+        editingUserId = user.Id;
+        editUser = new EditUserModel
+        {
+            Email = user.Email,
+            DisplayName = user.DisplayName ?? string.Empty,
+            Culture = user.Culture,
+            TimeZone = user.TimeZone,
+            IsAdmin = user.IsAdmin
+        };
+        SetStatus(null);
+    }
+
+    private void CancelEdit()
+    {
+        editingUserId = null;
+        editUser = new EditUserModel();
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (editingUserId == null || isUpdating)
+        {
+            return;
+        }
+
+        isUpdating = true;
+        SetStatus(null);
+
+        try
+        {
+            var request = new UpdateUserDto(
+                editUser.Email.Trim(),
+                editUser.DisplayName?.Trim(),
+                editUser.IsAdmin,
+                editUser.Culture.Trim(),
+                editUser.TimeZone.Trim());
+
+            var updatedUser = await UsersApi.UpdateUserAsync(editingUserId.Value, request);
+            var index = users.FindIndex(u => u.Id == updatedUser.Id);
+            if (index >= 0)
+            {
+                users[index] = updatedUser;
+                SortUsers();
+            }
+            editingUserId = null;
+            editUser = new EditUserModel();
+            SetStatus($"User '{updatedUser.Email}' updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to update user");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update user.";
+            SetStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while updating user");
+            SetStatus("An unexpected error occurred while updating the user.", true);
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+
+    private async Task ConfirmDeleteAsync(UserDto user)
+    {
+        if (!CanDelete(user) || deletingUserId == user.Id)
+        {
+            return;
+        }
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Delete user '{user.Email}'? This action cannot be undone.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        deletingUserId = user.Id;
+        SetStatus(null);
+
+        try
+        {
+            await UsersApi.DeleteUserAsync(user.Id);
+            users.RemoveAll(u => u.Id == user.Id);
+            SetStatus($"User '{user.Email}' deleted successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to delete user");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to delete user.";
+            SetStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while deleting user");
+            SetStatus("An unexpected error occurred while deleting the user.", true);
+        }
+        finally
+        {
+            deletingUserId = null;
+        }
+    }
+
+    private bool CanDelete(UserDto user)
+    {
+        return currentUserId == null || currentUserId.Value != user.Id;
+    }
+
+    private void SortUsers()
+    {
+        users.Sort((a, b) => string.Compare(a.Email, b.Email, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string FormatUserDate(DateTime utc)
+    {
+        var utcValue = DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utcValue, displayTimeZone);
+        var datePart = local.ToString(effectivePreferences?.ShortDatePattern ?? displayCulture.DateTimeFormat.ShortDatePattern, displayCulture);
+        var timePart = local.ToString(effectivePreferences?.ShortTimePattern ?? displayCulture.DateTimeFormat.ShortTimePattern, displayCulture);
+        return string.IsNullOrEmpty(timePart) ? datePart : $"{datePart} {timePart}";
+    }
+
+    private void SetStatus(string? message, bool isError = false)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
+    {
+        return exception.Content ?? exception.Message;
+    }
+
+    private sealed class CreateUserModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(10, ErrorMessage = "Password must be at least 10 characters long.")]
+        public string Password { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = PreferencesFactory.DefaultCulture;
+
+        [Required]
+        public string TimeZone { get; set; } = PreferencesFactory.DefaultTimeZoneId;
+
+        public bool IsAdmin { get; set; }
+    }
+
+    private sealed class EditUserModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = PreferencesFactory.DefaultCulture;
+
+        [Required]
+        public string TimeZone { get; set; } = PreferencesFactory.DefaultTimeZoneId;
+
+        public bool IsAdmin { get; set; }
+    }
+}

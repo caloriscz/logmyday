@@ -83,8 +83,6 @@
                                     
                                     <div class="mt-3">
                                         <button class="btn btn-sm btn-outline-primary w-100" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#addActivityModal"
                                                 @onclick="@(() => PrepareModalForTag(tag.Id))">
                                             <i class="bi bi-plus-circle me-1"></i>
                                             Add Activity
@@ -116,19 +114,23 @@
 </div>
 
 <!-- Add Activity Modal -->
-<AddActivityModal
-    Activity="newActivity"
-    AvailableTags="allTags"
-    OptionLists="optionLists"
-    OptionListLookup="optionListLookup"
-    DisplayCulture="displayCulture"
-    DisplayTimeZone="displayTimeZone"
-    ErrorMessage="@errorMessage"
-    PreselectedTagId="preselectedTagId"
-    PreselectedDate="selectedDate"
-    OnActivityCreated="OnActivityCreated"
-    OnError="OnError"
-    ModalId="addActivityModal" />
+@if (showAddActivityModal && allTags != null && newActivity != null)
+{
+    <AddActivityModal
+        Activity="newActivity"
+        AvailableTags="allTags"
+        OptionLists="optionLists"
+        OptionListLookup="optionListLookup"
+        DisplayCulture="displayCulture"
+        DisplayTimeZone="displayTimeZone"
+        ErrorMessage="@errorMessage"
+        PreselectedTagId="preselectedTagId"
+        PreselectedDate="selectedDate"
+        OnActivityCreated="OnActivityCreated"
+        OnCanceled="CloseAddActivityModal"
+        OnError="OnError"
+        ModalId="addActivityModal" />
+}
 
 @code {
     private List<TagResponse>? unfilledRequiredTags;
@@ -140,6 +142,7 @@
     private string? errorMessage;
     private ActivityRequest newActivity = new();
     private int? preselectedTagId;
+    private bool showAddActivityModal = false;
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -239,12 +242,23 @@
                 : selectedDate.Date,
             PrimaryTagId = tagId
         };
+        showAddActivityModal = true;
+    }
+
+    private void CloseAddActivityModal()
+    {
+        showAddActivityModal = false;
+        preselectedTagId = null;
+        errorMessage = null;
     }
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
         // Refresh the notifications list
         await LoadRequiredTags();
+        
+        // Close the modal
+        showAddActivityModal = false;
         
         // Reset the form but keep the date
         var today = GetTodayInDisplayZone();

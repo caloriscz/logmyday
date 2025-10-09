@@ -1,89 +1,91 @@
 ﻿@page "/notifications"
+@using System.Globalization
 @using LogMyDay.Shared.DTOs
-@using LogMyDay.Shared.Notifications
-@using LogMyDay.App.Mobile.Services
-@using Refit
+@using LogMyDay.App.Components.Shared
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
-@implements IAsyncDisposable
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
 
-<PageTitle>Notifications - LogMyDay</PageTitle>
-
-<MobileTopbar Title="Notifications" />
-
-<div class="container-fluid px-4">
+<div class="container-fluid">
     <div class="row">
-        <div class="col-12 mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-column flex-md-row gap-3">
-                <div>
-                    <h5 class="mb-1">Scheduled reminders</h5>
-                    <small class="text-muted">Reminders run locally on your device using the notification rules you configure for each tag.</small>
-                </div>
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="mb-0">Notifications</h3>
                 <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-outline-primary" @onclick="RefreshNotifications" title="Refresh">
-                        <i class="bi bi-arrow-clockwise me-1"></i>
-                        Refresh
+                    <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
+                        &lt;
+                    </button>
+                    <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="d-inline-block" Placeholder="Select date" />
+                    <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
+                        &gt;
+                    </button>
+                    <button class="btn btn-outline-primary ms-2" @onclick="RefreshNotifications">
+                        <i class="bi bi-arrow-clockwise"></i>
                     </button>
                 </div>
             </div>
 
             @if (isLoading)
             {
-                <div class="text-center py-5">
+                <div class="text-center">
                     <div class="spinner-border" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p class="mt-2 mb-0">Checking your notification rules…</p>
+                    <p class="mt-2">Loading notifications...</p>
                 </div>
             }
-            else if (notifications.Count == 0)
+            else if (unfilledRequiredTags?.Any() == true)
             {
-                <div class="alert alert-info">
+                <div class="alert alert-info mb-4">
                     <i class="bi bi-info-circle me-2"></i>
-                    You haven&apos;t configured any notifications yet. Open a tag in the Tags page to add your first reminder.
+                    You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
                 </div>
-            }
-            else
-            {
-                <div class="row g-3">
-                    @foreach (var notification in notifications)
+
+                <div class="row">
+                    @foreach (var tag in unfilledRequiredTags)
                     {
-                        <div class="col-12 col-lg-6">
-                            <div class="card h-100 shadow-sm">
-                                <div class="card-body d-flex flex-column">
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <div>
-                                            <h5 class="card-title mb-1">@GetTagLabel(notification)</h5>
-                                            <small class="text-muted">Notification ID: @notification.Id</small>
-                                        </div>
-                                        @if (notification.IsActive)
+                                        <h5 class="card-title mb-0 text-warning">
+                                            <i class="bi bi-exclamation-triangle me-2"></i>
+                                            @tag.Title
+                                        </h5>
+                                        <span class="badge bg-warning text-dark">Required</span>
+                                    </div>
+                                    
+                                    <div class="card-text">
+                                        <small class="text-muted">
+                                            <i class="bi bi-clock me-1"></i>
+                                            Time Granularity: @tag.TimeGranularity
+                                        </small>
+                                        @if (tag.IsRepeatable)
                                         {
-                                            <span class="badge bg-success">Active</span>
+                                            <br />
+                                            <small class="text-muted">
+                                                <i class="bi bi-arrow-repeat me-1"></i>
+                                                Repeatable
+                                            </small>
                                         }
-                                        else
+                                        @if (tag.IsRange)
                                         {
-                                            <span class="badge bg-secondary">Paused</span>
+                                            <br />
+                                            <small class="text-muted">
+                                                <i class="bi bi-arrows-expand me-1"></i>
+                                                Range Values
+                                            </small>
                                         }
                                     </div>
-
-                                    <p class="text-body-secondary mb-3">@GetNotificationMessage(notification)</p>
-
-                                    <dl class="row mb-0 small">
-                                        <dt class="col-5">Time window</dt>
-                                        <dd class="col-7">@FormatWindow(notification)</dd>
-
-                                        <dt class="col-5">Reminder cadence</dt>
-                                        <dd class="col-7">@FormatCadence(notification)</dd>
-
-                                        <dt class="col-5">Created</dt>
-                                        <dd class="col-7">@FormatCreated(notification.DateCreated)</dd>
-                                    </dl>
-
-                                    <div class="mt-3 mt-auto">
-                                        <button class="btn btn-outline-primary w-100" @onclick="() => OpenAddActivityModal(notification.TagId)">
+                                    
+                                    <div class="mt-3">
+                                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                                @onclick="@(() => PrepareModalForTag(tag.Id))">
                                             <i class="bi bi-plus-circle me-1"></i>
-                                            Log activity for this tag
+                                            Add Activity
                                         </button>
                                     </div>
                                 </div>
@@ -92,10 +94,17 @@
                     }
                 </div>
             }
+            else
+            {
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Great! All required tags have been filled for @FormatDate(selectedDate).
+                </div>
+            }
 
             @if (!string.IsNullOrEmpty(errorMessage))
             {
-                <div class="alert alert-danger mt-4">
+                <div class="alert alert-danger">
                     <i class="bi bi-exclamation-triangle me-2"></i>
                     @errorMessage
                 </div>
@@ -104,41 +113,71 @@
     </div>
 </div>
 
-<!-- Shared Add Activity Modal -->
-<AddActivityModal 
-    ModalId="notificationsAddActivityModal"
-    Activity="newActivity" 
-    AvailableTags="allTags" 
-    ErrorMessage="@errorMessage"
-    @bind-AddAnotherAfterSave="addAnotherAfterSave"
-    OnActivityCreated="OnActivityCreated"
-    OnCanceled="OnModalCanceled"
-    OnFormReset="OnFormReset" />
+<!-- Add Activity Modal -->
+@if (showAddActivityModal && allTags != null && newActivity != null)
+{
+    <AddActivityModal
+        Activity="newActivity"
+        AvailableTags="allTags"
+        OptionLists="optionLists"
+        OptionListLookup="optionListLookup"
+        DisplayCulture="displayCulture"
+        DisplayTimeZone="displayTimeZone"
+        ErrorMessage="@errorMessage"
+        PreselectedTagId="preselectedTagId"
+        PreselectedDate="selectedDate"
+        OnActivityCreated="OnActivityCreated"
+        OnCanceled="CloseAddActivityModal"
+        OnError="OnError"
+        ModalId="addActivityModal" />
+}
 
 @code {
-    private List<NotificationResponse> notifications = new();
+    private List<TagResponse>? unfilledRequiredTags;
     private IList<TagResponse>? allTags;
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+    private DateTime selectedDate = DateTime.Today;
     private bool isLoading = true;
     private string? errorMessage;
-
-    // Modal-related properties
     private ActivityRequest newActivity = new();
-    private bool addAnotherAfterSave;
+    private int? preselectedTagId;
+    private bool showAddActivityModal = false;
+
+    // User preferences and localization
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
 
     protected override async Task OnInitializedAsync()
     {
-        RefreshService.RefreshRequested += OnRefreshRequested;
-        InitializeNewActivity();
+        PageTitleService.SetTitle("Notifications");
 
-        await Task.WhenAll(LoadAllTags(), LoadNotificationsAsync());
+        // Load user preferences
+        userPreferences = await UserPreferencesService.GetAsync();
+        displayCulture = userPreferences.Culture;
+        displayTimeZone = userPreferences.TimeZone;
+
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
+        
+        // Initialize new activity with current date/time
+        newActivity = new ActivityRequest
+        {
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date
+        };
+        
+        await LoadRequiredTags();
     }
 
-    private async void OnRefreshRequested(object? sender, EventArgs e)
-    {
-        await RefreshNotifications();
-    }
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
 
-    private async Task LoadNotificationsAsync()
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+
+    private async Task LoadRequiredTags()
     {
         try
         {
@@ -146,22 +185,34 @@
             errorMessage = null;
             StateHasChanged();
 
-            var apiNotifications = await ActivityApi.GetNotifications();
-            notifications = (apiNotifications ?? Array.Empty<NotificationResponse>())
-                .OrderByDescending(n => n.IsActive)
-                .ThenBy(n => GetTagLabel(n), StringComparer.CurrentCultureIgnoreCase)
-                .ThenBy(n => n.NotBeforeTime ?? TimeSpan.Zero)
-                .ToList();
-        }
-        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            errorMessage = "Authentication expired. Please wait or try again.";
-            notifications = new List<NotificationResponse>();
+            // Load both unfilled required tags and all tags for the modal
+            var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
+            var allTagsTask = ActivityApi.GetTags();
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+
+            await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
+
+            unfilledRequiredTags = await unfilledTask;
+            allTags = await allTagsTask;
+            optionLists = await optionListsTask;
+
+            if (optionLists is not null)
+            {
+                optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+            
+            // Update new activity with the selected date
+            var today = GetTodayInDisplayZone();
+            newActivity.DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date;
         }
         catch (Exception ex)
         {
             errorMessage = $"Error loading notifications: {ex.Message}";
-            notifications = new List<NotificationResponse>();
+            unfilledRequiredTags = new List<TagResponse>();
+            allTags = new List<TagResponse>();
+            optionLists = new List<TagOptionListResponse>();
         }
         finally
         {
@@ -170,147 +221,87 @@
         }
     }
 
-    private async Task LoadAllTags()
-    {
-        try
-        {
-            allTags = await ActivityApi.GetTags();
-        }
-        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            errorMessage = "Authentication expired. Please wait or try again.";
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error loading tags: {ex.Message}";
-        }
-    }
-
     private async Task RefreshNotifications()
     {
-        await LoadNotificationsAsync();
+        await LoadRequiredTags();
     }
 
-    private async Task OpenAddActivityModal(int tagId)
+    private void NavigateToAddActivity(int tagId)
     {
-        InitializeNewActivity(tagId);
-        errorMessage = null;
-
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("eval",
-                "new bootstrap.Modal(document.getElementById('notificationsAddActivityModal')).show()");
-        }
-        catch (InvalidOperationException)
-        {
-            // Ignore JavaScript interop errors during static rendering
-        }
+        Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
     }
 
-    private void InitializeNewActivity(int? tagId = null)
+    private void PrepareModalForTag(int tagId)
     {
+        preselectedTagId = tagId;
+        var today = GetTodayInDisplayZone();
         newActivity = new ActivityRequest
         {
-            DateStarted = DateTime.Now,
-            PrimaryTagId = tagId,
-            Description = null,
-            DateFinished = null
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date,
+            PrimaryTagId = tagId
         };
+        showAddActivityModal = true;
+    }
+
+    private void CloseAddActivityModal()
+    {
+        showAddActivityModal = false;
+        preselectedTagId = null;
+        errorMessage = null;
     }
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
-        await LoadNotificationsAsync();
-
-        if (!addAnotherAfterSave)
+        // Refresh the notifications list
+        await LoadRequiredTags();
+        
+        // Close the modal
+        showAddActivityModal = false;
+        
+        // Reset the form but keep the date
+        var today = GetTodayInDisplayZone();
+        newActivity = new ActivityRequest
         {
-            InitializeNewActivity();
-        }
-        else
-        {
-            var keepTagId = activity.PrimaryTagId;
-            InitializeNewActivity(keepTagId);
-        }
-
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date
+        };
+        preselectedTagId = null;
         errorMessage = null;
     }
 
-    private Task OnModalCanceled()
+    private async Task OnDatePickerValueChanged(DateTime? newDate)
     {
-        InitializeNewActivity();
-        errorMessage = null;
-        return Task.CompletedTask;
-    }
-
-    private Task OnFormReset()
-    {
-        errorMessage = "Error saving activity. Please try again.";
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    public ValueTask DisposeAsync()
-    {
-        RefreshService.RefreshRequested -= OnRefreshRequested;
-        return ValueTask.CompletedTask;
-    }
-
-    private static string GetTagLabel(NotificationResponse notification)
-    {
-        if (!string.IsNullOrWhiteSpace(notification.TagName))
+        if (newDate.HasValue)
         {
-            return notification.TagName;
+            selectedDate = newDate.Value;
+            await LoadRequiredTags();
         }
-
-        return $"Tag #{notification.TagId}";
     }
 
-    private static string GetNotificationMessage(NotificationResponse notification)
+    private async Task OnError(string error)
     {
-        if (!string.IsNullOrWhiteSpace(notification.NotificationText))
-        {
-            return notification.NotificationText;
-        }
-
-        return NotificationScheduleCalculator.BuildDefaultMessage(notification);
+        errorMessage = error;
+        await Task.CompletedTask;
     }
 
-    private static string FormatWindow(NotificationResponse notification)
+    private async Task PreviousDay()
     {
-        var start = FormatTime(notification.NotBeforeTime);
-        var end = FormatTime(notification.NotAfterTime);
-
-        if (!notification.NotBeforeTime.HasValue && !notification.NotAfterTime.HasValue)
-        {
-            return "Any time";
-        }
-
-        return $"{start} - {end}";
+        selectedDate = selectedDate.AddDays(-1);
+        await LoadRequiredTags();
     }
 
-    private static string FormatCadence(NotificationResponse notification)
+    private async Task NextDay()
     {
-        var interval = NotificationScheduleCalculator.SanitizeInterval(notification.NudgeInterval);
-        var total = Math.Max(0, notification.MaxNudges) + 1;
-        var plural = total == 1 ? "time" : "times";
-
-        return $"First reminder then every {interval.TotalMinutes:0} min (up to {total} {plural} per cycle)";
+        selectedDate = selectedDate.AddDays(1);
+        await LoadRequiredTags();
     }
 
-    private static string FormatCreated(DateTime utcDate)
+    private string FormatDate(DateTime date)
     {
-        return utcDate.ToLocalTime().ToString("g");
-    }
-
-    private static string FormatTime(TimeSpan? value)
-    {
-        if (!value.HasValue)
-        {
-            return "--:--";
-        }
-
-        var totalHours = (int)Math.Floor(value.Value.TotalHours);
-        var minutes = Math.Abs(value.Value.Minutes);
-        return $"{totalHours:D2}:{minutes:D2}";
+        var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
+        return date.ToString(pattern, displayCulture);
     }
 }

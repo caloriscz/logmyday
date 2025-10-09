@@ -72,6 +72,7 @@ public static class MauiProgram
             builder.Services.AddScoped<ApiService>();
             builder.Services.AddScoped<QuickActivityService>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
+            builder.Services.AddSingleton<IPageTitleService, PageTitleService>();
 
             // Register notification services
 #if ANDROID

@@ -16,6 +16,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionIt
 		.build\build-ftp.cake = .build\build-ftp.cake
 		.build\build-ftp.json = .build\build-ftp.json
 		.build\build-ftp.json.dist = .build\build-ftp.json.dist
+		.build\build.cake = .build\build.cake
+		.build\build.ps1 = .build\build.ps1
+		.build\build.sh = .build\build.sh
 		README.md = README.md
 	EndProjectSection
 EndProject
@@ -97,6 +100,7 @@ Global
 		{E09F8EA4-8095-4654-9108-793D1FA5E2D9}.Release|x86.Build.0 = Release|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|x64.Build.0 = Debug|Any CPU
 		{36542F73-A3EE-4BD9-210B-0672540A235F}.Debug|x86.ActiveCfg = Debug|Any CPU
