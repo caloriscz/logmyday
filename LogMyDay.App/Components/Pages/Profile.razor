@@ -53,36 +53,36 @@
                             <DataAnnotationsValidator />
                             <ValidationSummary />
 
-                            <div class="mb-3">
-                                <label class="form-label" for="profileEmail">Email</label>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileEmail">Email</label>
                                 <InputText id="profileEmail" @bind-Value="profile.Email" class="form-control" autocomplete="email" />
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="profileDisplayName">Display Name (optional)</label>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileDisplayName">Display Name (optional)</label>
                                 <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="form-control" autocomplete="name" />
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="profileCulture">Culture</label>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileCulture">Culture</label>
                                 <SearchableSelect @bind-Value="profile.Culture"
                                                   Id="profileCulture"
                                                   Options="CultureOptions"
                                                   Placeholder="Select culture"
                                                   SearchPlaceholder="Search cultures"
                                                   ShowValueInList="true" />
-                                <div class="form-text">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
+                                <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="profileTimeZone">Time Zone</label>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileTimeZone">Time Zone</label>
                                 <SearchableSelect @bind-Value="profile.TimeZone"
                                                   Id="profileTimeZone"
                                                   Options="TimeZoneOptions"
                                                   Placeholder="Select time zone"
                                                   SearchPlaceholder="Search time zones"
                                                   ShowValueInList="true" />
-                                <div class="form-text">Pick an IANA time zone (e.g., Europe/Vienna).</div>
+                                <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</div>
                             </div>
 
                             <button type="submit" class="btn btn-primary" disabled="@isSavingProfile">
