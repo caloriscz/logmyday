@@ -4,39 +4,145 @@
 @inject ILogger<Login> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
-    <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
-        <div class="card-body">
-            <h3 class="card-title text-center mb-4">Login to LogMyDay</h3>
-            @if (!string.IsNullOrEmpty(ErrorMessage))
-            {
-                <div class="alert alert-danger text-center" role="alert">@ErrorMessage</div>
-            }
-            <form method="post" action="/api/auth/login-form" onsubmit="console.log('Form submitted to /api/auth/login-form'); return true;">
-                <div class="mb-3">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" class="form-control" name="email" autocomplete="username" placeholder="your-email@example.com" required />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Password</label>
-                    <input type="password" class="form-control" name="password" autocomplete="current-password" placeholder="Your password" required />
-                </div>
-                <button type="submit" class="btn btn-primary w-100">
-                    <span>Login</span>
-                </button>
-            </form>
-            
-            <div class="text-center mt-3">
-                <a href="/forgot-password" class="text-decoration-none">Forgot Password?</a>
-            </div>
+<style>
+    .login-background {
+        background:
+            radial-gradient(1200px 800px at 100% -10%, rgba(59,130,246,.08), transparent 60%),
+            linear-gradient(to bottom right, rgb(248 250 252), rgb(226 232 240));
+    }
 
-            <div class="text-center mt-2">
-                <small class="text-muted">
-                    No admin user yet? <a href="/register-first" class="text-decoration-none">Create first admin</a>
-                </small>
-            </div>
+    .dark .login-background {
+        background:
+            radial-gradient(1200px 800px at 100% -10%, rgba(37,99,235,.12), transparent 60%),
+            linear-gradient(to bottom right, rgb(2 6 23), rgb(15 23 42));
+    }
+
+    .login-pattern {
+        background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='rgb(100,116,139)' stroke-opacity='.12' stroke-width='3'%3E%3Cpath d='M28 18h24M28 62h24M24 22v36M56 22v36'/%3E%3C/g%3E%3C/svg%3E");
+        background-size: 80px 80px;
+        opacity: .6;
+        mask-image: linear-gradient(to bottom, rgba(0,0,0,.18), rgba(0,0,0,.08));
+        -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.18), rgba(0,0,0,.08));
+    }
+</style>
+
+<div class="relative min-h-screen overflow-hidden login-background">
+    <div class="absolute inset-0 login-pattern" aria-hidden="true"></div>
+
+    <main class="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col justify-center px-4 py-10 sm:px-6 lg:px-10 lg:py-16">
+        <div class="flex min-h-[70vh] flex-col gap-12 md:flex-row md:items-center">
+            <section class="flex w-full justify-center md:w-1/2">
+                <div class="w-full max-w-md rounded-2xl bg-white/90 p-8 shadow-xl backdrop-blur dark:bg-slate-900/85 dark:shadow-slate-900/40 md:p-10">
+                    <div class="mb-6 flex flex-col items-center text-center">
+                        <div class="mb-3 grid h-14 w-14 place-items-center rounded-xl bg-primary-600/10 text-primary-600 dark:text-primary-400">
+                            <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.6">
+                                <rect x="4" y="4" width="16" height="16" rx="4"></rect>
+                                <path d="M8 8v8m4-6v6m4-4v4" stroke-linecap="round"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Continue to LogMyDay</h1>
+                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Sign in with your administrator credentials to manage your day.</p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-100" role="alert">
+                            @ErrorMessage
+                        </div>
+                    }
+
+                    <form method="post" action="/api/auth/login-form" class="space-y-5">
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Email address</span>
+                            <input type="email" name="email" autocomplete="username" placeholder="you@example.com" required
+                                   class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                        </label>
+
+                        <label class="block">
+                            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Password</span>
+                            <input type="password" name="password" autocomplete="current-password" placeholder="••••••••" required
+                                   class="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                        </label>
+
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <label class="inline-flex select-none items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                <input type="checkbox" name="remember" class="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-900" />
+                                Remember me
+                            </label>
+                            <a href="/forgot-password" class="text-sm font-medium text-primary-600 transition hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300">Forgot password?</a>
+                        </div>
+
+                        <button type="submit" class="w-full rounded-lg bg-primary-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">
+                            Continue →
+                        </button>
+
+                        <p class="text-center text-xs text-slate-500 dark:text-slate-400">
+                            By continuing, you agree to our <a href="/terms" class="underline">Terms</a> and <a href="/privacy" class="underline">Privacy Policy</a>.
+                        </p>
+                    </form>
+
+                    <div class="mt-6 space-y-2 text-center text-sm">
+                        <p class="text-slate-600 dark:text-slate-400">
+                            No admin user yet?
+                            <a href="/register-first" class="font-medium text-primary-600 hover:underline dark:text-primary-400">Create first admin</a>
+                        </p>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Need help? Contact your server administrator.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="hidden h-full w-px bg-slate-200 dark:bg-slate-800 md:block" aria-hidden="true"></div>
+
+            <aside class="w-full md:w-1/2 md:pl-12">
+                <div class="max-w-xl space-y-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 md:text-3xl">Built for people who track everything</h2>
+                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Keep your activities, metrics, and routines in sync across every device.</p>
+                    </div>
+
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-600/10 text-primary-600 dark:text-primary-400">
+                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h10M4 18h7" stroke-linecap="round" /></svg>
+                            </span>
+                            <div>
+                                <p class="font-medium text-slate-900 dark:text-slate-200">Instant capture & tagging</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Log any activity with contextual tags and structured metadata.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-600/10 text-primary-600 dark:text-primary-400">
+                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3" /><path d="M3 12s3-6 9-6 9 6 9 6-3 6-9 6-9-6-9-6Z" /></svg>
+                            </span>
+                            <div>
+                                <p class="font-medium text-slate-900 dark:text-slate-200">See trends at a glance</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Beautiful dashboards for habits, health markers, and goals.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-600/10 text-primary-600 dark:text-primary-400">
+                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 6v12M6 12h12" stroke-linecap="round" /></svg>
+                            </span>
+                            <div>
+                                <p class="font-medium text-slate-900 dark:text-slate-200">Scale with your team</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Invite collaborators, manage permissions, and stay aligned.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary-600/10 text-primary-600 dark:text-primary-400">
+                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" /><path d="M8 7V5a4 4 0 1 1 8 0v2" /></svg>
+                            </span>
+                            <div>
+                                <p class="font-medium text-slate-900 dark:text-slate-200">Privacy-first architecture</p>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">Self-host friendly, encrypted backups, and fine-grained access.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </aside>
         </div>
-    </div>
+    </main>
 </div>
 
 @code {
@@ -45,10 +151,9 @@
     protected override void OnInitialized()
     {
         PageTitleService.SetTitle("Login");
-        
+
         Logger.LogInformation("Login.OnInitialized: Starting login page initialization. Current URL: {Url}", Navigation.Uri);
-        
-        // Check for error message in query parameters
+
         var uri = new Uri(Navigation.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
         if (query.TryGetValue("error", out var error))
@@ -60,7 +165,7 @@
         {
             Logger.LogInformation("Login.OnInitialized: No error message in query parameters");
         }
-        
+
         Logger.LogInformation("Login.OnInitialized: Login page initialization completed");
     }
 }
