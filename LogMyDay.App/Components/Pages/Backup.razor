@@ -4,6 +4,7 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
 @using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
 @inject IBackupService BackupService
 @inject IExcelExportService ExcelExportService
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
@@ -197,11 +198,11 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Start Date:</label>
-                            <input type="date" class="form-control" @bind="excelStartDate" />
+                            <CultureAwareDatePicker Value="@excelStartDate" ValueChanged="@((DateTime? v) => excelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">End Date:</label>
-                            <input type="date" class="form-control" @bind="excelEndDate" />
+                            <CultureAwareDatePicker Value="@excelEndDate" ValueChanged="@((DateTime? v) => excelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
                         </div>
                     </div>
 
