@@ -6,214 +6,219 @@
 @using System.Globalization
 @using System.Linq
 @using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
+@using Microsoft.AspNetCore.Components.Forms
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject NavigationManager Navigation
 @inject ILogger<TagEdit> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="container mt-4">
-    <h3>Edit Tag</h3>
+<div class="mx-auto max-w-5xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">@(!string.IsNullOrEmpty(tagTitle) ? tagTitle : "Edit Tag")</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Update the tag details and notification rules.</p>
+        </div>
+        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
+            <Icon Name="chevron-left" Class="h-4 w-4" />
+            Back to Tags
+        </a>
+    </div>
+
     @if (isLoading)
     {
-        <p><em>Loading...</em></p>
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            Loading tag details...
+        </div>
     }
-    else if (errorMessage != null)
+    else if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger">@errorMessage</div>
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @errorMessage
+        </div>
     }
     else if (editTag != null)
     {
-        <EditForm Model="editTag" OnValidSubmit="HandleValidSubmit">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <div class="mb-3">
-                <label class="form-label">Title:</label>
-                <InputText @bind-Value="editTag.Tag" class="form-control" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Type (optional):</label>
-                <InputSelect @bind-Value="editTag.TypeId" class="form-select">
-                    <option value="">(None)</option>
-                    @foreach (var type in inputTypes)
-                    {
-                        <option value="@type.Id">@type.Name</option>
-                    }
-                </InputSelect>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Required:</label>
-                <InputCheckbox @bind-Value="editTag.IsRequired" class="form-check-input" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Repeatable:</label>
-                <InputCheckbox @bind-Value="editTag.IsRepeatable" class="form-check-input" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Time Granularity:</label>
-                <InputSelect @bind-Value="editTag.TimeGranularity" class="form-select">
-                    @foreach (var granularity in Enum.GetValues<TimeGranularity>())
-                    {
-                        <option value="@granularity">@granularity</option>
-                    }
-                </InputSelect>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Is Range:</label>
-                <InputCheckbox @bind-Value="editTag.IsRange" class="form-check-input" />
-            </div>
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Min Value:</label>
-                    <InputNumber @bind-Value="editTag.MinValue" class="form-control" TValue="double?" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Max Value:</label>
-                    <InputNumber @bind-Value="editTag.MaxValue" class="form-control" TValue="double?" />
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Step:</label>
-                    <InputNumber @bind-Value="editTag.Step" class="form-control" TValue="double?" />
-                </div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Default Value:</label>
-                <InputText @bind-Value="editTag.DefaultValue" class="form-control" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Unit (optional):</label>
-                @if (availableUnits.Count > 0)
-                {
-                    <InputSelect @bind-Value="editTag.UnitId" class="form-select" TValue="int?">
-                        <option value="">(None)</option>
-                        @foreach (var unit in availableUnits)
-                        {
-                            <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
-                        }
-                    </InputSelect>
-                }
-                else
-                {
-                    <div class="alert alert-info mb-0">
-                        No units yet. <a href="/units">Let's create your first unit.</a>
+        <section class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <EditForm Model="editTag" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Title</label>
+                        <InputText @bind-Value="editTag.Tag" class="@InputCss" disabled="@isSaving" />
                     </div>
-                }
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Option List (optional):</label>
-                @if (availableOptionLists.Count > 0)
-                {
-                    <InputSelect @bind-Value="editTag.OptionListId" class="form-select" TValue="int?">
-                        <option value="">(None)</option>
-                        @foreach (var list in availableOptionLists)
-                        {
-                            <option value="@list.Id">@list.Name</option>
-                        }
-                    </InputSelect>
-                }
-                else
-                {
-                    <div class="alert alert-info mb-0">
-                        No option lists yet. <a href="/option-lists">Let's create your first list.</a>
-                    </div>
-                }
-            </div>
-            <button type="submit" class="btn btn-primary" disabled="@isSaving">Save</button>
-            <button type="button" class="btn btn-secondary ms-2" @onclick="GoBack" disabled="@isSaving">Cancel</button>
-        </EditForm>
 
-        <hr class="my-4" />
-
-        <div class="mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">Notifications</h4>
-                <button class="btn btn-sm btn-primary" type="button" @onclick="StartAddNotification">Add Notification</button>
-            </div>
-
-            @if (isNotificationFormVisible && editingNotification != null)
-            {
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <EditForm Model="editingNotification" OnValidSubmit="SaveNotificationAsync">
-                            <DataAnnotationsValidator />
-                            <div class="mb-3">
-                                <label class="form-label">Notification Text</label>
-                                <InputText @bind-Value="editingNotification.NotificationText" class="form-control" />
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Not Before Time</label>
-                                    <input type="text" class="form-control" value="@editingNotification.NotBeforeTime" placeholder="08:00 or 32:00" @onchange="@((ChangeEventArgs e) => editingNotification.NotBeforeTime = e.Value?.ToString())" />
-                                    <small class="text-muted">Supports offsets beyond 24 hours (e.g., 32:00 = next day at 08:00).</small>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Not After Time</label>
-                                    <input type="text" class="form-control" value="@editingNotification.NotAfterTime" placeholder="Optional" @onchange="@((ChangeEventArgs e) => editingNotification.NotAfterTime = e.Value?.ToString())" />
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Max Nudges</label>
-                                    <InputNumber @bind-Value="editingNotification.MaxNudges" class="form-control" min="0" />
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Nudge Interval (minutes)</label>
-                                    <InputNumber @bind-Value="editingNotification.NudgeIntervalMinutes" class="form-control" min="0" />
-                                </div>
-                            </div>
-                            <div class="form-check mb-3">
-                                <InputCheckbox @bind-Value="editingNotification.IsActive" class="form-check-input" id="notificationActive" />
-                                <label class="form-check-label" for="notificationActive">Active</label>
-                            </div>
-                            @if (!string.IsNullOrEmpty(notificationErrorMessage))
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type (optional)</label>
+                        <InputSelect @bind-Value="editTag.TypeId" class="@InputCss" disabled="@isSaving">
+                            <option value="">(None)</option>
+                            @foreach (var type in inputTypes)
                             {
-                                <div class="text-danger mb-3">@notificationErrorMessage</div>
+                                <option value="@type.Id">@type.Name</option>
                             }
-                            <button type="submit" class="btn btn-primary me-2" disabled="@isNotificationSaving">Save</button>
-                            <button type="button" class="btn btn-secondary" @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">Cancel</button>
-                        </EditForm>
+                        </InputSelect>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="editTag.IsRequired" class="@CheckboxCss" disabled="@isSaving" />
+                            Required
+                        </label>
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="editTag.IsRepeatable" class="@CheckboxCss" disabled="@isSaving" />
+                            Repeatable
+                        </label>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Time Granularity</label>
+                        <InputSelect @bind-Value="editTag.TimeGranularity" class="@InputCss" disabled="@isSaving">
+                            @foreach (var granularity in Enum.GetValues<TimeGranularity>())
+                            {
+                                <option value="@granularity">@granularity</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                        <InputCheckbox @bind-Value="editTag.IsRange" class="@CheckboxCss" disabled="@isSaving" />
+                        Is Range
+                    </label>
+
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
+                            <InputNumber @bind-Value="editTag.MinValue" class="@InputCss" TValue="double?" disabled="@isSaving" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
+                            <InputNumber @bind-Value="editTag.MaxValue" class="@InputCss" TValue="double?" disabled="@isSaving" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
+                            <InputNumber @bind-Value="editTag.Step" class="@InputCss" TValue="double?" disabled="@isSaving" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
+                        <InputText @bind-Value="editTag.DefaultValue" class="@InputCss" disabled="@isSaving" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Unit (optional)</label>
+                        @if (availableUnits.Count > 0)
+                        {
+                            <InputSelect @bind-Value="editTag.UnitId" class="@InputCss" TValue="int?" disabled="@isSaving">
+                                <option value="">(None)</option>
+                                @foreach (var unit in availableUnits)
+                                {
+                                    <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-sm dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
+                                No units yet. <a href="/units" class="font-semibold underline">Let's create your first unit.</a>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Option List (optional)</label>
+                        @if (availableOptionLists.Count > 0)
+                        {
+                            <InputSelect @bind-Value="editTag.OptionListId" class="@InputCss" TValue="int?" disabled="@isSaving">
+                                <option value="">(None)</option>
+                                @foreach (var list in availableOptionLists)
+                                {
+                                    <option value="@list.Id">@list.Name</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-sm dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
+                                No option lists yet. <a href="/option-lists" class="font-semibold underline">Let's create your first list.</a>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            }
+                            Save Changes
+                        </button>
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
+                            Cancel
+                        </button>
                     </div>
                 </div>
-            }
-            else if (!string.IsNullOrEmpty(notificationErrorMessage))
+            </EditForm>
+        </section>
+
+        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="space-y-1">
+                    <h2 class="text-2xl font-semibold text-gray-900 dark:text-slate-100">Notifications</h2>
+                    <p class="text-sm text-gray-600 dark:text-slate-300">Configure reminders that nudge you when this tag is missing.</p>
+                </div>
+                <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="StartAddNotification">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    Add Notification
+                </button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(notificationErrorMessage) && !isNotificationModalOpen)
             {
-                <div class="alert alert-danger">@notificationErrorMessage</div>
+                <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                    @notificationErrorMessage
+                </div>
             }
 
             @if (notifications.Count == 0)
             {
-                <p class="text-muted mb-0">No notifications configured for this tag yet.</p>
+                <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    No notifications configured yet. Add one to start receiving reminders.
+                </div>
             }
             else
             {
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead class="bg-gray-50 dark:bg-slate-800">
                             <tr>
-                                <th>Text</th>
-                                <th>Time Window</th>
-                                <th>Max Nudges</th>
-                                <th>Nudge Interval (min)</th>
-                                <th>Active</th>
-                                <th>Created</th>
-                                <th style="width: 140px;">Actions</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Text</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Time Window</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Max Nudges</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Interval (min)</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Active</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Created</th>
+                                <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                             @foreach (var notification in notifications)
                             {
-                                <tr>
-                                    <td>
+                                <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                    <td class="px-4 py-3 text-sm text-gray-900 dark:text-slate-100">
                                         @if (string.IsNullOrWhiteSpace(notification.NotificationText))
                                         {
-                                            <em>(Default)</em>
+                                            <em class="text-gray-500 dark:text-slate-400">(Default)</em>
                                         }
                                         else
                                         {
                                             @notification.NotificationText
                                         }
                                     </td>
-                                    <td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                         @if (!string.IsNullOrWhiteSpace(notification.NotBeforeTime) || !string.IsNullOrWhiteSpace(notification.NotAfterTime))
                                         {
                                             <span>@(notification.NotBeforeTime ?? "-") - @(notification.NotAfterTime ?? "-")</span>
@@ -223,22 +228,28 @@
                                             <span>-</span>
                                         }
                                     </td>
-                                    <td>@notification.MaxNudges</td>
-                                    <td>@(notification.NudgeIntervalMinutes?.ToString() ?? "-")</td>
-                                    <td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@notification.MaxNudges</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(notification.NudgeIntervalMinutes?.ToString() ?? "-")</td>
+                                    <td class="px-4 py-3 text-sm">
                                         @if (notification.IsActive)
                                         {
-                                            <span class="badge bg-success">Yes</span>
+                                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200">Yes</span>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary">No</span>
+                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-slate-700/40 dark:text-slate-300">No</span>
                                         }
                                     </td>
-                                    <td>@notification.DateCreated.ToLocalTime().ToString("g")</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-secondary me-2" @onclick="() => EditNotification(notification)">Edit</button>
-                                        <button class="btn btn-sm btn-danger" @onclick="async () => await DeleteNotificationAsync(notification.Id)">Delete</button>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@notification.DateCreated.ToLocalTime().ToString("g")</td>
+                                    <td class="px-4 py-3 text-right text-sm">
+                                        <div class="flex justify-end gap-2">
+                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800" @onclick="() => EditNotification(notification)">
+                                                Edit
+                                            </button>
+                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/20" @onclick="async () => await DeleteNotificationAsync(notification.Id)">
+                                                Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -246,31 +257,112 @@
                     </table>
                 </div>
             }
-        </div>
+        </section>
     }
 </div>
+
+@if (isNotificationModalOpen && editingNotification != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/70" @onclick="CancelNotificationEdit"></div>
+    <div class="relative z-10 w-full max-w-2xl space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-start justify-between gap-4 border-b border-gray-200 pb-4 dark:border-slate-700">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">@(!editingNotification.Id.HasValue ? "Add Notification" : "Edit Notification")</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">Fine-tune when the app should nudge you.</p>
+                </div>
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit">
+                    <Icon Name="x" Class="h-4 w-4" />
+                </button>
+            </div>
+
+            <EditForm Model="editingNotification" OnValidSubmit="SaveNotificationAsync">
+                <DataAnnotationsValidator />
+
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Notification Text</label>
+                        <InputText @bind-Value="editingNotification.NotificationText" class="@InputCss" placeholder="Optional custom message" />
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Not Before Time</label>
+                            <InputText @bind-Value="editingNotification.NotBeforeTime" class="@InputCss" placeholder="08:00 or 32:00" />
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Supports offsets beyond 24 hours (e.g., 32:00 = next day at 08:00).</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Not After Time</label>
+                            <InputText @bind-Value="editingNotification.NotAfterTime" class="@InputCss" placeholder="Optional end" />
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Nudges</label>
+                            <InputNumber @bind-Value="editingNotification.MaxNudges" class="@InputCss" min="0" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Nudge Interval (minutes)</label>
+                            <InputNumber @bind-Value="editingNotification.NudgeIntervalMinutes" class="@InputCss" min="0" />
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                        <InputCheckbox @bind-Value="editingNotification.IsActive" class="@CheckboxCss" />
+                        Active
+                    </label>
+
+                    @if (!string.IsNullOrEmpty(notificationErrorMessage))
+                    {
+                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                            @notificationErrorMessage
+                        </div>
+                    }
+
+                    <div class="flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">
+                            Cancel
+                        </button>
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isNotificationSaving">
+                            @if (isNotificationSaving)
+                            {
+                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            }
+                            Save Notification
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter]
     public int Id { get; set; }
 
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string CheckboxCss = "h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800";
+
     private TagRequest? editTag;
     private List<InputTypeDto> inputTypes = new();
     private List<UnitResponse> availableUnits = new();
     private List<TagOptionListResponse> availableOptionLists = new();
+    private string? tagTitle;
     private string? errorMessage;
     private bool isLoading = true;
     private bool isSaving = false;
 
     private List<NotificationViewModel> notifications = new();
     private NotificationEditModel? editingNotification;
-    private bool isNotificationFormVisible;
+    private bool isNotificationModalOpen;
     private string? notificationErrorMessage;
     private bool isNotificationSaving;
 
     protected override async Task OnInitializedAsync()
     {
-        PageTitleService.SetTitle("Edit Tag");
+    PageTitleService.SetTitle("Edit Tag");
         
         try
         {
@@ -292,6 +384,9 @@
                 DefaultValue = tag.DefaultValue,
                 OptionListId = tag.OptionListId
             };
+
+            tagTitle = tag.Title;
+            PageTitleService.SetTitle(tag.Title);
 
             await LoadSupportingData();
             await LoadNotifications();
@@ -366,7 +461,7 @@
             IsActive = true
         };
         notificationErrorMessage = null;
-        isNotificationFormVisible = true;
+        isNotificationModalOpen = true;
     }
 
     private void EditNotification(NotificationViewModel notification)
@@ -383,13 +478,13 @@
             IsActive = notification.IsActive
         };
         notificationErrorMessage = null;
-        isNotificationFormVisible = true;
+        isNotificationModalOpen = true;
     }
 
     private void CancelNotificationEdit()
     {
         editingNotification = null;
-        isNotificationFormVisible = false;
+        isNotificationModalOpen = false;
         notificationErrorMessage = null;
     }
 
