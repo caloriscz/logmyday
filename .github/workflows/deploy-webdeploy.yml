@@ -2,7 +2,8 @@ name: Deploy Web Application
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - '*'
     paths-ignore:
       - '**.md'
       - 'LogMyDay.App.Mobile/**'
