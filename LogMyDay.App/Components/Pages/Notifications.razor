@@ -1,5 +1,7 @@
 ﻿@page "/notifications"
 @using System.Globalization
+@using System.Linq
+@using System.Net
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Services
@@ -9,108 +11,96 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="mb-0">Notifications</h3>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
-                        &lt;
-                    </button>
-                    <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="d-inline-block" Placeholder="Select date" />
-                    <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
-                        &gt;
-                    </button>
-                    <button class="btn btn-outline-primary ms-2" @onclick="RefreshNotifications">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                </div>
-            </div>
-
-            @if (isLoading)
-            {
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Loading notifications...</p>
-                </div>
-            }
-            else if (unfilledRequiredTags?.Any() == true)
-            {
-                <div class="alert alert-info mb-4">
-                    <i class="bi bi-info-circle me-2"></i>
-                    You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
-                </div>
-
-                <div class="row">
-                    @foreach (var tag in unfilledRequiredTags)
-                    {
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card border-warning">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h5 class="card-title mb-0 text-warning">
-                                            <i class="bi bi-exclamation-triangle me-2"></i>
-                                            @tag.Title
-                                        </h5>
-                                        <span class="badge bg-warning text-dark">Required</span>
-                                    </div>
-                                    
-                                    <div class="card-text">
-                                        <small class="text-muted">
-                                            <i class="bi bi-clock me-1"></i>
-                                            Time Granularity: @tag.TimeGranularity
-                                        </small>
-                                        @if (tag.IsRepeatable)
-                                        {
-                                            <br />
-                                            <small class="text-muted">
-                                                <i class="bi bi-arrow-repeat me-1"></i>
-                                                Repeatable
-                                            </small>
-                                        }
-                                        @if (tag.IsRange)
-                                        {
-                                            <br />
-                                            <small class="text-muted">
-                                                <i class="bi bi-arrows-expand me-1"></i>
-                                                Range Values
-                                            </small>
-                                        }
-                                    </div>
-                                    
-                                    <div class="mt-3">
-                                        <button class="btn btn-sm btn-outline-primary w-100" 
-                                                @onclick="@(() => PrepareModalForTag(tag.Id))">
-                                            <i class="bi bi-plus-circle me-1"></i>
-                                            Add Activity
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-success">
-                    <i class="bi bi-check-circle me-2"></i>
-                    Great! All required tags have been filled for @FormatDate(selectedDate).
-                </div>
-            }
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    @errorMessage
-                </div>
-            }
+<div class="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Notifications</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Review required tags and quickly log missing activities.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="RefreshNotifications">
+                Refresh
+            </button>
         </div>
     </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-1 flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous month" aria-label="Previous month">&laquo;</button>
+            <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous day" aria-label="Previous day">&lsaquo;</button>
+            <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="w-40 sm:w-48" Stretch="false" Placeholder="Select date" />
+            <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next day" aria-label="Next day">&rsaquo;</button>
+            <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next month" aria-label="Next month">&raquo;</button>
+            <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
+        </div>
+        <div class="hidden sm:flex sm:items-center sm:justify-end sm:gap-2"></div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <span class="h-10 w-10 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"></span>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Loading notifications…</p>
+        </div>
+    }
+    else if (unfilledRequiredTags?.Any() == true)
+    {
+        <div class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach (var tag in unfilledRequiredTags)
+                {
+                    <div class="rounded-xl border border-amber-200 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-amber-500/40 dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="space-y-1">
+                                <h2 class="text-lg font-semibold text-amber-700 dark:text-amber-200">@tag.Title</h2>
+                                @if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
+                                {
+                                    <p class="text-sm text-gray-600 dark:text-slate-300">Default value: <span class="font-medium text-gray-800 dark:text-slate-100">@GetDefaultValueLabel(tag)</span></p>
+                                }
+                            </div>
+                            <a class="inline-flex items-center gap-1 rounded-md border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-500/40 dark:text-amber-200 dark:hover:bg-amber-500/20 dark:focus-visible:ring-offset-slate-900" href="/tags/edit/@tag.Id" title="Edit tag">
+                                <Icon Name="pencil" Class="h-4 w-4" />
+                                Edit
+                            </a>
+                        </div>
+
+                        <div class="mt-6 grid gap-3 sm:grid-cols-2">
+                            <button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="@(() => PrepareModalForTag(tag.Id))">
+                                <Icon Name="plus" Class="h-4 w-4" />
+                                Add activity
+                            </button>
+                            <button type="button" class="@GetQuickAddButtonClasses(tag)" @onclick="@(() => QuickAddDefaultAsync(tag))" disabled="@IsQuickAddDisabled(tag)">
+                                <Icon Name="check" Class="h-4 w-4" />
+                                Use default
+                                @if (IsQuickAddInProgress(tag.Id))
+                                {
+                                    <span class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-white"></span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <p class="text-sm text-gray-600 dark:text-slate-300">You have <span class="font-semibold">@unfilledRequiredTags.Count</span> required tag(s) that still need an activity for @FormatDate(selectedDate).</p>
+        </div>
+    }
+    else
+    {
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div class="flex items-center gap-2">
+                <Icon Name="check" Class="h-5 w-5" />
+                <span>All required tags are filled for @FormatDate(selectedDate). Nice work!</span>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @errorMessage
+        </div>
+    }
 </div>
 
 <!-- Add Activity Modal -->
@@ -143,6 +133,7 @@
     private ActivityRequest newActivity = new();
     private int? preselectedTagId;
     private bool showAddActivityModal = false;
+    private readonly HashSet<int> quickAddInProgress = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -281,6 +272,24 @@
         }
     }
 
+    private async Task PreviousMonth()
+    {
+        selectedDate = selectedDate.AddMonths(-1);
+        await LoadRequiredTags();
+    }
+
+    private async Task NextMonth()
+    {
+        selectedDate = selectedDate.AddMonths(1);
+        await LoadRequiredTags();
+    }
+
+    private async Task GoToToday()
+    {
+        selectedDate = GetTodayInDisplayZone();
+        await LoadRequiredTags();
+    }
+
     private async Task OnError(string error)
     {
         errorMessage = error;
@@ -303,5 +312,121 @@
     {
         var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
         return date.ToString(pattern, displayCulture);
+    }
+
+    private string GetNavButtonClasses(bool emphasize = false)
+    {
+        var baseClasses = "inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-primary-400 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
+
+        if (emphasize)
+        {
+            return $"{baseClasses} border-primary-600 bg-primary-600 text-white hover:bg-primary-700 dark:border-primary-400 dark:bg-primary-500 dark:hover:bg-primary-400";
+        }
+
+        return $"{baseClasses} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
+    }
+
+    private bool HasDefaultValue(TagResponse tag)
+        => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
+
+    private bool IsQuickAddDisabled(TagResponse tag)
+        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
+
+    private bool IsQuickAddInProgress(int tagId)
+        => quickAddInProgress.Contains(tagId);
+
+    private string GetQuickAddButtonClasses(TagResponse tag)
+    {
+        var baseClasses = "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 w-full";
+
+        if (IsQuickAddDisabled(tag))
+        {
+            return $"{baseClasses} cursor-not-allowed bg-emerald-500/40 text-emerald-100 opacity-70";
+        }
+
+        return $"{baseClasses} bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700";
+    }
+
+    private string? GetDefaultValueLabel(TagResponse tag)
+    {
+        var value = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (tag.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                return option.DisplayName ?? option.Value;
+            }
+        }
+
+        return value;
+    }
+
+    private string? ResolveDefaultValue(TagResponse tag)
+    {
+        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
+        {
+            return tag.DefaultValue;
+        }
+
+        return null;
+    }
+
+    private async Task QuickAddDefaultAsync(TagResponse tag)
+    {
+        var defaultValue = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(defaultValue))
+        {
+            errorMessage = "No default value is configured for this tag.";
+            return;
+        }
+
+        if (!quickAddInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = defaultValue,
+                DateStarted = startDate
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            await LoadRequiredTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "The activity could not be created with the default value.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding default activity: {ex.Message}";
+        }
+        finally
+        {
+            quickAddInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
     }
 }
