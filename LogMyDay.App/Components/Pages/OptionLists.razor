@@ -47,17 +47,27 @@
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead class="bg-gray-50 dark:bg-slate-800">
                             <tr>
-                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Name</th>
+                                <th scope="col" class="px-1 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
+                                <th scope="col" class="px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Name</th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Scope</th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Options</th>
-                                <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                             @foreach (var list in lists)
                             {
                                 <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@list.Name</td>
+                                    <td class="px-1 w-[56px] py-3">
+                                        <div class="flex justify-end">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="pencil" Class="h-4 w-4" />
+                                            </button>
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="trash" Class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-1 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@list.Name</td>
                                     <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                         @if (list.IsGlobal)
                                         {
@@ -69,18 +79,7 @@
                                         }
                                     </td>
                                     <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@list.Options.Count</td>
-                                    <td class="px-4 py-3 text-right">
-                                        <div class="flex justify-end gap-2">
-                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(list)" disabled="@(isBusy || list.IsGlobal)">
-                                                <Icon Name="pencil" Class="h-4 w-4" />
-                                                <span>Edit</span>
-                                            </button>
-                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
-                                                <Icon Name="trash" Class="h-4 w-4" />
-                                                <span>Delete</span>
-                                            </button>
-                                        </div>
-                                    </td>
+
                                 </tr>
                             }
                         </tbody>

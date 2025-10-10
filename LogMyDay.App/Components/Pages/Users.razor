@@ -67,18 +67,36 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                                 <thead class="bg-gray-50 dark:bg-slate-800">
                                     <tr>
+                                        <th scope="col" class="px-1 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300"></th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Email</th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Display Name</th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Preferences</th>
                                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Admin</th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Updated</th>
-                                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                     @foreach (var user in users)
                                     {
                                         <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                            <td class="px-1 w-[56px] py-3">
+                                                <div class="flex justify-end">
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => BeginEdit(user)" disabled="@isCreating">
+                                                        <Icon Name="pencil" Class="h-4 w-4" />
+                                                    </button>
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDeleteAsync(user)" disabled="@(!CanDelete(user) || deletingUserId == user.Id || isCreating)">
+                                                        @if (deletingUserId == user.Id)
+                                                        {
+                                                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-rose-500/40 border-t-rose-500"></span>
+                                                            <span>Deleting…</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <Icon Name="trash" Class="h-4 w-4" />
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </td>
                                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-slate-100">
                                                 <div class="font-semibold">@user.Email</div>
                                                 <div class="text-xs text-gray-500 dark:text-slate-400">Created @FormatUserDate(user.CreatedUtc)</div>
@@ -102,26 +120,6 @@
                                                 }
                                             </td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@FormatUserDate(user.UpdatedUtc)</td>
-                                            <td class="px-4 py-3 text-right">
-                                                <div class="flex justify-end gap-2">
-                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => BeginEdit(user)" disabled="@isCreating">
-                                                        <Icon Name="pencil" Class="h-4 w-4" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDeleteAsync(user)" disabled="@(!CanDelete(user) || deletingUserId == user.Id || isCreating)">
-                                                        @if (deletingUserId == user.Id)
-                                                        {
-                                                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-rose-500/40 border-t-rose-500"></span>
-                                                            <span>Deleting…</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <Icon Name="trash" Class="h-4 w-4" />
-                                                            <span>Delete</span>
-                                                        }
-                                                    </button>
-                                                </div>
-                                            </td>
                                         </tr>
 
                                         if (editingUserId == user.Id)
