@@ -43,12 +43,12 @@
                     </div>
 
                     <div class="space-y-2">
-                        @if (selectedOptionList is not null)
+                        @if (selectedOptionList is TagOptionListResponse optionList)
                         {
                             <label class="@LabelCss" for="@($"{modalId}OptionSelect")">Value</label>
                             <InputSelect id="@($"{modalId}OptionSelect")" class="@InputCss" @bind-Value="selectedOptionValue" @bind-Value:after="OnOptionValueChanged">
                                 <option value="">-- Select an option --</option>
-                                @foreach (var option in selectedOptionList.Options)
+                                @foreach (var option in (optionList.Options ?? Enumerable.Empty<TagOptionResponse>()))
                                 {
                                     <option value="@option.Value">@(!string.IsNullOrWhiteSpace(option.DisplayName) ? option.DisplayName : option.Value)</option>
                                 }
@@ -358,9 +358,17 @@
 
                 if (selectedOptionList is not null)
                 {
-                    selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
-                    Activity.Description = selectedOptionValue ?? string.Empty;
-                    return;
+                    if (selectedOptionList.Options is null || selectedOptionList.Options.Count == 0)
+                    {
+                        Logger.LogWarning("Tag {TagId} references option list {OptionListId} without any options. Falling back to manual entry.", selectedTag.Id, selectedOptionList.Id);
+                        selectedOptionList = null;
+                    }
+                    else
+                    {
+                        selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
+                        Activity.Description = selectedOptionValue ?? string.Empty;
+                        return;
+                    }
                 }
             }
 
@@ -488,6 +496,11 @@
 
     private static string? ResolveDefaultOptionValue(TagResponse? tag, TagOptionListResponse optionList)
     {
+        if (optionList.Options is null || optionList.Options.Count == 0)
+        {
+            return null;
+        }
+
         if (tag is null)
         {
             return optionList.Options.FirstOrDefault()?.Value;
