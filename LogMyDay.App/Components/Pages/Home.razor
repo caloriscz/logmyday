@@ -20,27 +20,39 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
         </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <button type="button" title="Open filters" @onclick="OpenFilterModal" aria-label="Open filters" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-gray-900">
-                <Icon Name="filter" Class="w-5 h-5" />
-                <span>Filters</span>
+        <div class="flex items-center">
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
+                <Icon Name="plus" Class="h-4 w-4" />
+                Add Activity
             </button>
-            <div class="inline-flex overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" aria-label="Sort ascending">Ascending</button>
-                <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" aria-label="Sort descending">Descending</button>
-            </div>
         </div>
     </div>
 
     @if (displayType != "daily" && pagedResult != null)
     {
-        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm font-medium text-gray-700 dark:text-slate-300">
-                Page @GetCurrentPageNumber() of @totalPages
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)" aria-label="Previous page">Previous</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)" aria-label="Next page">Next</button>
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="text-sm font-medium text-gray-700 dark:text-slate-300">
+                    Page @GetCurrentPageNumber() of @totalPages
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto">
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)" aria-label="Previous page">Previous</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)" aria-label="Next page">Next</button>
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                        <Icon Name="filter" Class="h-5 w-5" />
+                        <span class="sr-only">Filters</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
+                        <Icon Name="chevron-up" Class="h-5 w-5" />
+                        <span class="sr-only">Sort ascending</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
+                        <Icon Name="chevron-down" Class="h-5 w-5" />
+                        <span class="sr-only">Sort descending</span>
+                    </button>
+                </div>
             </div>
         </div>
     }
@@ -54,13 +66,29 @@
     else if (displayType == "daily")
     {
         <div class="space-y-4">
-            <div class="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()" aria-label="Previous month">&laquo;</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous Day" aria-label="Previous day">&lsaquo;</button>
-                <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="w-40 sm:w-48" Stretch="false" Placeholder="Select date" />
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next Day" aria-label="Next day">&rsaquo;</button>
-                <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()" aria-label="Next month">&raquo;</button>
-                <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-1 flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()" aria-label="Previous month">&laquo;</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous Day" aria-label="Previous day">&lsaquo;</button>
+                    <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="w-40 sm:w-48" Stretch="false" Placeholder="Select date" />
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next Day" aria-label="Next day">&rsaquo;</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()" aria-label="Next month">&raquo;</button>
+                    <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                        <Icon Name="filter" Class="h-5 w-5" />
+                        <span class="sr-only">Filters</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
+                        <Icon Name="chevron-up" Class="h-5 w-5" />
+                        <span class="sr-only">Sort ascending</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
+                        <Icon Name="chevron-down" Class="h-5 w-5" />
+                        <span class="sr-only">Sort descending</span>
+                    </button>
+                </div>
             </div>
 
             @if (!pagedResult.Items.Any())
@@ -79,8 +107,7 @@
                                     <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Started</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Finished</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -98,8 +125,7 @@
                                             </span>
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
-                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@FormatTime(activity.DateStarted)</td>
-                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-500 dark:text-slate-400">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</td>
+                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -129,14 +155,10 @@
                                     <Icon Name="trash" Class="w-4 h-4" />
                                 </button>
                             </div>
-                            <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                            <dl class="mt-4 grid grid-cols-1 gap-4 text-sm">
                                 <div>
-                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Started</dt>
-                                    <dd class="tabular-nums text-gray-900 dark:text-slate-200">@FormatTime(activity.DateStarted)</dd>
-                                </div>
-                                <div>
-                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Finished</dt>
-                                    <dd class="tabular-nums text-gray-700 dark:text-slate-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</dd>
+                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Date</dt>
+                                    <dd class="tabular-nums text-gray-900 dark:text-slate-200">@GetActivityDateDisplay(activity)</dd>
                                 </div>
                             </dl>
                         </div>
@@ -167,8 +189,7 @@
                                         <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
                                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Started</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date Finished</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -186,8 +207,7 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
-                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@FormatTime(activity.DateStarted)</td>
-                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-500 dark:text-slate-400">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</td>
+                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -217,14 +237,10 @@
                                         <Icon Name="trash" Class="w-4 h-4" />
                                     </button>
                                 </div>
-                                <dl class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                                <dl class="mt-4 grid grid-cols-1 gap-4 text-sm">
                                     <div>
-                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Started</dt>
-                                        <dd class="tabular-nums text-gray-900 dark:text-slate-200">@FormatTime(activity.DateStarted)</dd>
-                                    </div>
-                                    <div>
-                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Finished</dt>
-                                        <dd class="tabular-nums text-gray-700 dark:text-slate-300">@(activity.DateFinished.HasValue ? FormatTime(activity.DateFinished.Value) : "—")</dd>
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Date</dt>
+                                        <dd class="tabular-nums text-gray-900 dark:text-slate-200">@GetActivityDateDisplay(activity)</dd>
                                     </div>
                                 </dl>
                             </div>
@@ -235,12 +251,6 @@
         </div>
     }
 </div>
-
-<!-- Floating Action Button -->
-<button type="button" class="fixed bottom-6 right-6 z-40 inline-flex items-center justify-center gap-2 rounded-full bg-primary-600 p-4 text-white shadow-lg transition-transform hover:scale-105 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add Activity">
-    <Icon Name="plus" Class="h-6 w-6" />
-    <span class="sr-only">Add activity</span>
-</button>
 
 <!-- Filter Modal (Tailwind) -->
 @if (showFilterModal && isInitialized)
@@ -423,34 +433,73 @@
 
     private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
 
+    private DateTime ConvertToDisplayZone(DateTime dateTime)
+    {
+        var timezone = displayTimeZone ?? TimeZoneInfo.Local;
+
+        return dateTime.Kind switch
+        {
+            DateTimeKind.Utc => TimeZoneInfo.ConvertTimeFromUtc(dateTime, timezone),
+            DateTimeKind.Local => timezone.Equals(TimeZoneInfo.Local)
+                ? dateTime
+                : TimeZoneInfo.ConvertTime(dateTime, timezone),
+            _ => dateTime
+        };
+    }
+
     private string FormatDate(DateTime date)
     {
         var culture = displayCulture ?? CultureInfo.CurrentCulture;
         var pattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
-        return date.ToString(pattern, culture);
+        var localized = ConvertToDisplayZone(date);
+
+        return localized.ToString(pattern, culture);
     }
 
     private string FormatTime(DateTime dateTime)
     {
-        var timezone = displayTimeZone ?? TimeZoneInfo.Local;
-        
-        // Convert to user's timezone if needed
-        var localDateTime = dateTime.Kind == DateTimeKind.Utc 
-            ? TimeZoneInfo.ConvertTimeFromUtc(dateTime, timezone)
-            : TimeZoneInfo.ConvertTime(dateTime, timezone);
-            
-        // Use 24-hour format (HH:mm) for EU localization
-        return localDateTime.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var pattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var localized = ConvertToDisplayZone(dateTime);
+
+        return localized.ToString(pattern, culture);
+    }
+
+    private string GetActivityDateDisplay(ActivityResponse activity)
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var timePattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var datePattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+
+        var startLocal = ConvertToDisplayZone(activity.DateStarted);
+        var startTime = startLocal.ToString(timePattern, culture);
+
+        if (!activity.DateFinished.HasValue)
+        {
+            return startTime;
+        }
+
+        var endLocal = ConvertToDisplayZone(activity.DateFinished.Value);
+        var endTime = endLocal.ToString(timePattern, culture);
+
+        if (startLocal.Date == endLocal.Date)
+        {
+            return $"{startTime} – {endTime}";
+        }
+
+        var startDateTime = $"{startLocal.ToString(datePattern, culture)} {startTime}";
+        var endDateTime = $"{endLocal.ToString(datePattern, culture)} {endTime}";
+
+        return $"{startDateTime} – {endDateTime}";
     }
 
     private string GetOrderButtonClasses(string order)
     {
         var isActive = string.Equals(orderBy, order, System.StringComparison.OrdinalIgnoreCase);
-        var baseClasses = "inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
-        var activeClasses = "bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600";
-        var inactiveClasses = "bg-white text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+        var baseClasses = "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
+        var activeClasses = "border-sky-600 bg-sky-50 text-sky-700 dark:border-sky-400 dark:bg-slate-700/60 dark:text-sky-100";
 
-        return $"{baseClasses} {(isActive ? activeClasses : inactiveClasses)}";
+        return isActive ? $"{baseClasses} {activeClasses}" : baseClasses;
     }
 
     private string GetNavButtonClasses(bool emphasize = false)
