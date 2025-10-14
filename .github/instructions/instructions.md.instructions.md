@@ -205,6 +205,34 @@ There are now TWO distinct client patterns:
   - Login flow: validate URL → configure context → make a probe call (e.g., `GetTags`) → mark authenticated.
   - Logout flow: clear context (`ApiContext.Clear()`), remove transient username preference if desired, navigate to login. No phantom requests to placeholder hosts.
 
+### ⚠️ CRITICAL: MAUI wwwroot File Loading (UNDOCUMENTED BY MICROSOFT)
+
+**IMPORTANT**: MAUI Blazor's wwwroot handling is poorly documented and can cause hours of debugging!
+
+**Key Facts**:
+- MAUI merges wwwroot folders from ALL referenced projects
+- File precedence rules are NOT documented by Microsoft
+- CSS/JS files may load from unexpected locations
+- Changes to index.html require clean build + uninstall + redeploy
+
+**For LogMyDay**:
+- Mobile entry point: `LogMyDay.App.Mobile/wwwroot/index.html` (edit THIS file for mobile HTML changes)
+- Tailwind CSS: Built to `LogMyDay.App.Mobile/wwwroot/css/tailwind.css` via CopyTailwindAssets target
+- Mobile CSS: `LogMyDay.App.Mobile/wwwroot/app.css` (mobile-specific custom styles)
+- Shared JS: `LogMyDay.UI/wwwroot/js/` (used by both Server and Mobile)
+
+**Critical Configuration**:
+```xml
+<!-- LogMyDay.App.Mobile/LogMyDay.App.Mobile.csproj -->
+<ItemGroup>
+    <MauiAsset Include="wwwroot\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+</ItemGroup>
+```
+
+**See Full Documentation**: `.github/instructions/maui-blazor-wwwroot-critical-info.md`
+
+This configuration ensures ALL mobile wwwroot files (CSS, JS, HTML) are included in the Android APK. Without it, styling will not work!
+
 ### Deprecated (Mobile)
 - `ServerConfigurationService`: Replaced by `ApiContext` + `ApiClientProvider` + `DynamicAuthHandler`.
 - `AuthenticationHeaderHandler` (mobile variant): Replaced by `DynamicAuthHandler` (context-aware).

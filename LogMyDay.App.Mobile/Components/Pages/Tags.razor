@@ -11,155 +11,145 @@
 
 <PageTitle>Tags - LogMyDay</PageTitle>
 
-<MobileTopbar Title="Activity Tags" />
-
-<div class="container-fluid px-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <!-- Removed h1 as it's now in topbar -->
-            </div>
-            </div>
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Activity Tags</h1>
 
         <!-- Tags List -->
-        <div class="col-md-12">
-            @if (tags == null)
-            {
-                <p><em>Loading...</em></p>
-            }
-            else if (!tags.Any())
-            {
-                <div class="alert alert-info">
-                    <i class="bi bi-tags display-4 text-muted d-block text-center mb-3"></i>
-                    <h5 class="text-center">No Tags Yet</h5>
-                    <p class="text-center text-muted">Create tags to categorize and organize your activities.</p>
-                </div>
-            }
-            else
-            {
-                <!-- Desktop Table View -->
-                <div class="table-responsive d-none d-md-block">
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th style="width: 60px;">Actions</th>
-                                <th>Title</th>
-                                <th>Type</th>
-                                <th>Granularity</th>
-                                <th>Required</th>
-                                <th>Repeatable</th>
-                                <th>Range</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var tag in tags)
-                            {
-                                <tr>
-                                    <td>
-                                        <button @onclick="() => DeleteTag(tag.Id)"
-                                            class="btn btn-danger btn-sm" title="Delete">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </td>
-                                    <td>@tag.Title</td>
-                                    <td>@GetInputTypeName(tag.TypeId)</td>
-                                    <td>@tag.TimeGranularity</td>
-                                    <td>
-                                        @if (tag.IsRequired)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (tag.IsRepeatable)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </td>
-                                    <td>
-                                        @if (tag.IsRange)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mobile Card View -->
-                <div class="d-md-none">
-                    @foreach (var tag in tags)
-                    {
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-0">@tag.Title</h6>
+        @if (tags == null)
+        {
+            <p class="text-gray-600 dark:text-gray-400"><em>Loading...</em></p>
+        }
+        else if (!tags.Any())
+        {
+            <div class="alert-info">
+                <i class="bi bi-tags text-6xl text-gray-400 block text-center mb-3"></i>
+                <h5 class="text-center text-lg font-semibold text-gray-900 dark:text-white">No Tags Yet</h5>
+                <p class="text-center text-gray-600 dark:text-gray-400">Create tags to categorize and organize your activities.</p>
+            </div>
+        }
+        else
+        {
+            <!-- Desktop Table View -->
+            <div class="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" style="width: 60px;">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Title</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Granularity</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Required</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Repeatable</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Range</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        @foreach (var tag in tags)
+                        {
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <button @onclick="() => DeleteTag(tag.Id)"
-                                        class="btn btn-danger btn-sm" title="Delete">
+                                        class="btn-danger text-sm" title="Delete">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                </div>
-                                <div class="row text-muted small">
-                                    <div class="col-6 mb-1">
-                                        <strong>Type:</strong> @GetInputTypeName(tag.TypeId)
-                                    </div>
-                                    <div class="col-6 mb-1">
-                                        <strong>Granularity:</strong> @tag.TimeGranularity
-                                    </div>
-                                    <div class="col-4">
-                                        <strong>Required:</strong> 
-                                        @if (tag.IsRequired)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </div>
-                                    <div class="col-4">
-                                        <strong>Repeatable:</strong> 
-                                        @if (tag.IsRepeatable)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </div>
-                                    <div class="col-4">
-                                        <strong>Range:</strong> 
-                                        @if (tag.IsRange)
-                                        {
-                                            <i class="bi bi-check-circle text-success"></i>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-circle text-muted"></i>
-                                        }
-                                    </div>
-                                </div>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">@tag.Title</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">@GetInputTypeName(tag.TypeId)</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">@tag.TimeGranularity</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                    @if (tag.IsRequired)
+                                    {
+                                        <i class="bi bi-check-circle text-green-500"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-circle text-gray-400"></i>
+                                    }
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                    @if (tag.IsRepeatable)
+                                    {
+                                        <i class="bi bi-check-circle text-green-500"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-circle text-gray-400"></i>
+                                    }
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm">
+                                    @if (tag.IsRange)
+                                    {
+                                        <i class="bi bi-check-circle text-green-500"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-circle text-gray-400"></i>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Card View -->
+            <div class="md:hidden space-y-3">
+                @foreach (var tag in tags)
+                {
+                    <div class="card">
+                        <div class="flex justify-between items-start mb-2">
+                            <h6 class="font-semibold text-gray-900 dark:text-white">@tag.Title</h6>
+                            <button @onclick="() => DeleteTag(tag.Id)"
+                                class="btn-danger text-sm" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <div>
+                                <span class="font-medium">Type:</span> @GetInputTypeName(tag.TypeId)
+                            </div>
+                            <div>
+                                <span class="font-medium">Granularity:</span> @tag.TimeGranularity
+                            </div>
+                            <div>
+                                <span class="font-medium">Required:</span> 
+                                @if (tag.IsRequired)
+                                {
+                                    <i class="bi bi-check-circle text-green-500"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-circle text-gray-400"></i>
+                                }
+                            </div>
+                            <div>
+                                <span class="font-medium">Repeatable:</span> 
+                                @if (tag.IsRepeatable)
+                                {
+                                    <i class="bi bi-check-circle text-green-500"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-circle text-gray-400"></i>
+                                }
+                            </div>
+                            <div>
+                                <span class="font-medium">Range:</span> 
+                                @if (tag.IsRange)
+                                {
+                                    <i class="bi bi-check-circle text-green-500"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-circle text-gray-400"></i>
+                                }
                             </div>
                         </div>
-                    }
-                </div>
-            }
-        </div>
+                    </div>
+                }
+            </div>
+        }
     </div>
 </div>
 
@@ -179,17 +169,19 @@
             <div class="modal-body">
                 <EditForm Model="newTag" OnValidSubmit="HandleValidSubmit">
                     <DataAnnotationsValidator />
-                    <ValidationSummary class="text-danger" />
+                    <ValidationSummary class="text-red-600 dark:text-red-400 mb-4" />
 
-                    <div class="mb-3">
-                        <label class="form-label">Title:</label>
-                        <InputText @bind-Value="newTag.Tag" class="form-control"
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Title:</label>
+                        <InputText @bind-Value="newTag.Tag" 
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                             placeholder="Enter tag name" required />
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Input Type:</label>
-                        <InputSelect @bind-Value="newTag.TypeId" class="form-select">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Input Type:</label>
+                        <InputSelect @bind-Value="newTag.TypeId" 
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                             <option value="">-- Select Type --</option>
                             <option value="1">Integer</option>
                             <option value="2">String</option>
@@ -198,9 +190,10 @@
                         </InputSelect>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Time Granularity:</label>
-                        <InputSelect @bind-Value="newTag.TimeGranularity" class="form-select">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Time Granularity:</label>
+                        <InputSelect @bind-Value="newTag.TimeGranularity" 
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                             <option value="@TimeGranularity.Exact">Exact</option>
                             <option value="@TimeGranularity.Hourly">Hourly</option>
                             <option value="@TimeGranularity.Daily">Daily</option>
@@ -210,43 +203,43 @@
                         </InputSelect>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check">
-                                <InputCheckbox @bind-Value="newTag.IsRequired" class="form-check-input" id="requiredCheck" />
-                                <label class="form-check-label" for="requiredCheck">
-                                    Required
-                                </label>
-                            </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="flex items-center">
+                            <InputCheckbox @bind-Value="newTag.IsRequired" 
+                                class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" 
+                                id="requiredCheck" />
+                            <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="requiredCheck">
+                                Required
+                            </label>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check">
-                                <InputCheckbox @bind-Value="newTag.IsRepeatable" class="form-check-input" id="repeatableCheck" />
-                                <label class="form-check-label" for="repeatableCheck">
-                                    Repeatable
-                                </label>
-                            </div>
+                        <div class="flex items-center">
+                            <InputCheckbox @bind-Value="newTag.IsRepeatable" 
+                                class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" 
+                                id="repeatableCheck" />
+                            <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="repeatableCheck">
+                                Repeatable
+                            </label>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check">
-                                <InputCheckbox @bind-Value="newTag.IsRange" class="form-check-input" id="rangeCheck" />
-                                <label class="form-check-label" for="rangeCheck">
-                                    Range
-                                </label>
-                            </div>
+                        <div class="flex items-center">
+                            <InputCheckbox @bind-Value="newTag.IsRange" 
+                                class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" 
+                                id="rangeCheck" />
+                            <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="rangeCheck">
+                                Range
+                            </label>
                         </div>
                     </div>
 
                     @if (!string.IsNullOrEmpty(errorMessage))
                     {
-                        <div class="alert alert-danger" role="alert">
+                        <div class="alert-danger">
                             @errorMessage
                         </div>
                     }
                     
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="button" class="btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors">
                             Add Tag
                         </button>
                     </div>

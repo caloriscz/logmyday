@@ -6,12 +6,14 @@
     <title>LogMyDay Mobile</title>
     <base href="/" />
     <link href="css/tailwind.css" rel="stylesheet" />
+    <link href="app.css" rel="stylesheet" />
     
     <!-- Prevent FOUC - Initialize theme before page render -->
     <script>
         (function() {
             const theme = localStorage.getItem('lmd-theme') || 
                 (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-bs-theme', theme);
             if (theme === 'dark') {
                 document.documentElement.classList.add('dark');
             }
@@ -20,6 +22,8 @@
 </head>
 <body>
     <div id="app">
+        <div>Test 3000</div>
+
         <div class="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
             <div class="text-center p-8">
                 <div class="inline-block spinner mb-4 w-12 h-12 border-4 border-primary-600"></div>

@@ -19,6 +19,10 @@ function getTheme() {
 function setTheme(theme) {
   localStorage.setItem(THEME_KEY, theme);
   
+  // Set data-bs-theme attribute for Bootstrap-style dark mode
+  document.documentElement.setAttribute('data-bs-theme', theme);
+  
+  // Set dark class for Tailwind dark mode
   if (theme === 'dark') {
     document.documentElement.classList.add('dark');
   } else {

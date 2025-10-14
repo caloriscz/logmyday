@@ -6,86 +6,101 @@
 @inject IUsersApi UsersApi
 @inject IUserPreferencesService UserPreferencesService
 @inject ILogger<AccountSettings> Logger
+@inject NavigationManager Navigation
 
 <PageTitle>Account Settings - LogMyDay</PageTitle>
 
-<MobileTopbar Title="Account settings" ShowBackButton="true" />
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <!-- Back Button -->
+        <button @onclick="@(() => Navigation.NavigateTo("/settings"))" 
+                class="mb-4 flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back to Settings</span>
+        </button>
 
-<div class="container-fluid p-3">
-    @if (isLoading)
-    {
-        <div class="d-flex align-items-center gap-2 py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account settings</h1>
+
+        @if (isLoading)
+        {
+            <div class="flex items-center gap-2 py-4">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+                <span class="text-gray-600 dark:text-gray-400">Loading your profile...</span>
             </div>
-            <span class="text-muted">Loading your profile...</span>
-        </div>
-    }
-    else if (!string.IsNullOrEmpty(loadErrorMessage))
-    {
-        <div class="alert alert-danger" role="alert">
-            @loadErrorMessage
-        </div>
-    }
-    else
-    {
-        <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        }
+        else if (!string.IsNullOrEmpty(loadErrorMessage))
+        {
+            <div class="alert-danger">
+                @loadErrorMessage
+            </div>
+        }
+        else
+        {
+            <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert-danger mb-4" />
 
-            @if (!string.IsNullOrEmpty(statusMessage))
-            {
-                <div class="alert @(statusIsError ? "alert-danger" : "alert-success")" role="alert">
-                    @statusMessage
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <div class="@(statusIsError ? "alert-danger" : "alert-success") mb-4">
+                        @statusMessage
+                    </div>
+                }
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="email">Email</label>
+                    <InputText id="email" @bind-Value="profile.Email" 
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" 
+                        autocomplete="email" />
                 </div>
-            }
 
-            <div class="mb-3">
-                <label class="form-label" for="email">Email</label>
-                <InputText id="email" @bind-Value="profile.Email" class="form-control" autocomplete="email" />
-            </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="displayName">Display name</label>
+                    <InputText id="displayName" @bind-Value="profile.DisplayName" 
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" 
+                        autocomplete="name" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Optional. This is shown in the app when available.</div>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label" for="displayName">Display name</label>
-                <InputText id="displayName" @bind-Value="profile.DisplayName" class="form-control" autocomplete="name" />
-                <div class="form-text">Optional. This is shown in the app when available.</div>
-            </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="culture">Culture</label>
+                    <SearchableSelect @bind-Value="profile.Culture"
+                                      Id="culture"
+                                      Options="CultureOptions"
+                                      Placeholder="Select culture"
+                                      SearchPlaceholder="Search cultures"
+                                      ShowValueInList="true" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label" for="culture">Culture</label>
-                <SearchableSelect @bind-Value="profile.Culture"
-                                  Id="culture"
-                                  Options="CultureOptions"
-                                  Placeholder="Select culture"
-                                  SearchPlaceholder="Search cultures"
-                                  ShowValueInList="true" />
-                <div class="form-text">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
-            </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="timezone">Time zone</label>
+                    <SearchableSelect @bind-Value="profile.TimeZone"
+                                      Id="timezone"
+                                      Options="TimeZoneOptions"
+                                      Placeholder="Select time zone"
+                                      SearchPlaceholder="Search time zones"
+                                      ShowValueInList="true" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Pick an IANA time zone (e.g., Europe/Vienna).</div>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label" for="timezone">Time zone</label>
-                <SearchableSelect @bind-Value="profile.TimeZone"
-                                  Id="timezone"
-                                  Options="TimeZoneOptions"
-                                  Placeholder="Select time zone"
-                                  SearchPlaceholder="Search time zones"
-                                  ShowValueInList="true" />
-                <div class="form-text">Pick an IANA time zone (e.g., Europe/Vienna).</div>
-            </div>
-
-            <button type="submit" class="btn btn-primary w-100" disabled="@isSaving">
-                @if (isSaving)
-                {
-                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                    <span>Saving...</span>
-                }
-                else
-                {
-                    <span><i class="bi bi-save me-2"></i>Save changes</span>
-                }
-            </button>
-        </EditForm>
-    }
+                <button type="submit" 
+                        class="w-full px-4 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
+                        disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="inline-block animate-spin">⟳</span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-save"></i>
+                        <span>Save changes</span>
+                    }
+                </button>
+            </EditForm>
+        }
+    </div>
 </div>
 
 @code {

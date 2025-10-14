@@ -11,188 +11,178 @@
 @inject ILogger<Activities> Logger
 @implements IAsyncDisposable
 
-<PageTitle>Activities - LogMyDay</PageTitle>
+<div class="px-4 py-4">
+    <!-- Filter and Sort Controls -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+        <div class="flex items-center gap-2">
+            <button type="button" class="btn-secondary" data-bs-toggle="modal"
+                    data-bs-target="#filterModal" title="Open filters">
+                <i class="bi bi-funnel"></i> Filters
+            </button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline" 
+                    @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
+            <span class="text-gray-400">|</span>
+            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline" 
+                    @onclick="@(() => ChangeOrder("desc"))">Descending</button>
 
-<MobileTopbar Title="Activities" />
-
-<div class="container-fluid px-4">
-    <div class="row">
-
-        <!-- Activities List -->
-        <div class="col-md-12 mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
-                            data-bs-target="#filterModal" title="Open filters">
-                        <i class="bi bi-funnel"></i> Filters
+            @if (displayType != "daily")
+            {
+                <div class="flex items-center gap-2 ml-3">
+                    <button class="btn-secondary btn-sm" @onclick="PrevPage"
+                            disabled="@(GetCurrentPageNumber() == 1)">
+                        Previous
+                    </button>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Page @GetCurrentPageNumber() of @totalPages</span>
+                    <button class="btn-secondary btn-sm" @onclick="NextPage"
+                            disabled="@(GetCurrentPageNumber() == totalPages)">
+                        Next
                     </button>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-link" @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
-                    <button class="btn btn-link" @onclick="@(() => ChangeOrder("desc"))">Descending</button>
-
-                    @if (displayType != "daily")
-                    {
-                        <div class="ms-3">
-                            <button class="btn btn-secondary btn-sm me-2" @onclick="PrevPage"
-                                    disabled="@(GetCurrentPageNumber() == 1)">
-                                Previous
-                            </button>
-                            <span>Page @GetCurrentPageNumber() of @totalPages</span>
-                            <button class="btn btn-secondary btn-sm ms-2" @onclick="NextPage"
-                                    disabled="@(GetCurrentPageNumber() == totalPages)">
-                                Next
-                            </button>
-                        </div>
-                    }
-                </div>
-            </div>
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger" role="alert">
-                    @errorMessage
-                </div>
-            }
-
-            @if (pagedResult == null)
-            {
-                <p><em>Loading...</em></p>
-            }
-            else if (displayType == "daily")
-            {
-                <!-- Daily view with date navigation -->
-                <div class="d-flex align-items-center mb-3">
-                    <!-- Mobile: centered layout, Desktop: left-aligned with gap -->
-                    <div class="d-flex align-items-center gap-2 mx-auto mx-md-0">
-                        <button class="btn btn-outline-secondary" @onclick="PreviousDay" title="Previous Day">
-                            &lt;
-                        </button>
-                        <CultureAwareDatePicker Value="@selectedDate" 
-                                              ValueChanged="@OnDatePickerValueChanged" 
-                                              EnableTime="false" 
-                                              CssClass="date-picker-compact" 
-                                              Placeholder="Select date" />
-                        <button class="btn btn-outline-secondary" @onclick="NextDay" title="Next Day">
-                            &gt;
-                        </button>
-                    </div>
-                </div>
-
-                @if (!pagedResult.Items.Any())
-                {
-                    <div class="alert alert-info">
-                        No activities found for @selectedDate.ToString("yyyy-MM-dd").
-                    </div>
-                }
-                else
-                {
-                    <!-- Mobile Card View for Daily -->
-                    @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
-                    {
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-0">@activity.PrimaryTagName</h6>
-                                    <button @onclick="() => DeleteActivity(activity.Id)"
-                                            class="btn btn-danger btn-sm" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                                @if (!string.IsNullOrEmpty(activity.Description))
-                                {
-                                    <p class="card-text mb-2">@activity.Description</p>
-                                }
-                                <div class="row text-muted small">
-                                    <div class="col-6">
-                                        <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
-                                    </div>
-                                    <div class="col-6">
-                                        <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
-            }
-            else if (!pagedResult.Items.Any())
-            {
-                <div class="alert alert-info">
-                    No activities found for the selected criteria.
-                </div>
-            }
-            else
-            {
-                @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
-                {
-                    <h5>@group.Key.ToString("yyyy-MM-dd")</h5>
-
-                    <!-- Desktop Table View -->
-                    <div class="table-responsive d-none d-md-block">
-                        <table class="table table-striped table-bordered">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60px;">Actions</th>
-                                    <th>Tag</th>
-                                    <th>Description</th>
-                                    <th>Date Started</th>
-                                    <th>Date Finished</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var activity in group)
-                                {
-                                    <tr>
-                                        <td>
-                                            <button @onclick="() => DeleteActivity(activity.Id)"
-                                                    class="btn btn-danger btn-sm" title="Delete">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </td>
-                                        <td>@activity.PrimaryTagName</td>
-                                        <td>@activity.Description</td>
-                                        <td>@activity.DateStarted.ToString("HH:mm")</td>
-                                        <td>@(activity.DateFinished?.ToString("HH:mm") ?? "-")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Mobile Card View -->
-                    <div class="d-md-none">
-                        @foreach (var activity in group)
-                        {
-                            <div class="card mb-3">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 class="card-title mb-0">@activity.PrimaryTagName</h6>
-                                        <button @onclick="() => DeleteActivity(activity.Id)"
-                                                class="btn btn-danger btn-sm" title="Delete">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                    @if (!string.IsNullOrEmpty(activity.Description))
-                                    {
-                                        <p class="card-text mb-2">@activity.Description</p>
-                                    }
-                                    <div class="row text-muted small">
-                                        <div class="col-6">
-                                            <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
-                                        </div>
-                                        <div class="col-6">
-                                            <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
             }
         </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert-danger mb-4" role="alert">
+            @errorMessage
+        </div>
+    }
+
+    @if (pagedResult == null)
+    {
+        <p class="text-gray-600 dark:text-gray-400"><em>Loading...</em></p>
+    }
+    else if (displayType == "daily")
+    {
+        <!-- Daily view with date navigation -->
+        <div class="flex items-center mb-4">
+            <!-- Mobile: centered layout, Desktop: left-aligned with gap -->
+            <div class="flex items-center gap-2 mx-auto sm:mx-0">
+                <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
+                    &lt;
+                </button>
+                <CultureAwareDatePicker Value="@selectedDate" 
+                                      ValueChanged="@OnDatePickerValueChanged" 
+                                      EnableTime="false" 
+                                      CssClass="date-picker-compact" 
+                                      Placeholder="Select date" />
+                <button class="btn-secondary" @onclick="NextDay" title="Next Day">
+                    &gt;
+                </button>
+            </div>
+        </div>
+
+        @if (!pagedResult.Items.Any())
+        {
+            <div class="alert-info">
+                No activities found for @selectedDate.ToString("yyyy-MM-dd").
+            </div>
+        }
+        else
+        {
+            <!-- Mobile Card View for Daily -->
+            @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
+            {
+                <div class="card mb-3">
+                    <div class="flex justify-between items-start mb-2">
+                        <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-0">@activity.PrimaryTagName</h6>
+                        <button @onclick="() => DeleteActivity(activity.Id)"
+                                class="btn-danger btn-sm" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(activity.Description))
+                    {
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
+                    }
+                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <div>
+                            <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
+                        </div>
+                        <div>
+                            <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+    else if (!pagedResult.Items.Any())
+    {
+        <div class="alert-info">
+            No activities found for the selected criteria.
+        </div>
+    }
+    else
+    {
+        @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
+        {
+            <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">@group.Key.ToString("yyyy-MM-dd")</h5>
+
+            <!-- Desktop Table View -->
+            <div class="hidden md:block overflow-x-auto mb-4">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="w-16">Actions</th>
+                            <th>Tag</th>
+                            <th>Description</th>
+                            <th>Date Started</th>
+                            <th>Date Finished</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var activity in group)
+                        {
+                            <tr>
+                                <td>
+                                    <button @onclick="() => DeleteActivity(activity.Id)"
+                                            class="btn-danger btn-sm" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                                <td>@activity.PrimaryTagName</td>
+                                <td>@activity.Description</td>
+                                <td>@activity.DateStarted.ToString("HH:mm")</td>
+                                <td>@(activity.DateFinished?.ToString("HH:mm") ?? "-")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        <!-- Mobile Card View -->
+        <div class="md:hidden">
+            @foreach (var activity in group)
+            {
+                <div class="card mb-3">
+                    <div class="flex justify-between items-start mb-2">
+                        <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-0">@activity.PrimaryTagName</h6>
+                        <button @onclick="() => DeleteActivity(activity.Id)"
+                                class="btn-danger btn-sm" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(activity.Description))
+                    {
+                        <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
+                    }
+                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <div>
+                            <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
+                        </div>
+                        <div>
+                            <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        }
+    }
 </div>
 
 <!-- Floating Action Button -->
@@ -209,11 +199,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="row">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Display Type -->
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Display Type:</label>
-                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="form-select">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Display Type:</label>
+                        <select value="@displayType" @onchange="OnDisplayTypeChanged" 
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                             <option value="daily">Daily</option>
                             <option value="weekly">Weekly</option>
                             <option value="monthly">Monthly</option>
@@ -221,31 +212,32 @@
                     </div>
 
                     <!-- Description Filter -->
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Description Filter:</label>
-                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="form-control"
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Description Filter:</label>
+                        <input value="@descriptionFilter" @onchange="OnFilterChanged" 
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                placeholder="Search description..." />
                     </div>
 
                     <!-- Calendar Navigation -->
-                    <div class="col-12">
-                        <label class="form-label">Date Navigation:</label>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Date Navigation:</label>
 
                         <!-- Navigation Controls -->
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <!-- Daily navigation -->
-                            <button class="btn btn-outline-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
+                            <button class="btn-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
                                 &lt;
                             </button>
 
-                            <div class="flex-grow-1 text-center">
-                                <strong>@GetCurrentPeriodDisplay()</strong>
+                            <div class="flex-grow text-center">
+                                <strong class="text-gray-900 dark:text-gray-100">@GetCurrentPeriodDisplay()</strong>
                             </div>
 
-                            <button class="btn btn-outline-secondary" @onclick="NextCalendarPeriod" title="Next Day">
+                            <button class="btn-secondary" @onclick="NextCalendarPeriod" title="Next Day">
                                 &gt;
                             </button>
-                            <button class="btn btn-outline-primary" @onclick="GoToToday">
+                            <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors" @onclick="GoToToday">
                                 @GetTodayButtonText()
                             </button>
                         </div>
@@ -253,7 +245,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

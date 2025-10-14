@@ -12,134 +12,122 @@
 
 <PageTitle>Quick Activities - LogMyDay</PageTitle>
 
-<MobileTopbar Title="Quick Activities" />
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quick Activities</h1>
 
-<div class="container-fluid p-3">
-    <!-- Wellness Tools Section -->
-    <div class="row g-3 mb-3">
-        <!-- Breathing Tool -->
-        <div class="col-12 col-md-6">
-            <div class="card tool-card" @onclick="@(() => NavigateToTool("/breathing"))" style="cursor: pointer;">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">Breathing Exercises</h5>
-                            <small class="text-muted">4-7-8 Triangle and Box breathing</small>
-                        </div>
-                        <div class="tool-icon-container me-3">
-                            <i class="bi bi-lungs text-primary fs-2"></i>
-                        </div>
-                        <i class="bi bi-arrow-right text-muted"></i>
+        <!-- Wellness Tools Section -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <!-- Breathing Tool -->
+            <div class="card cursor-pointer hover:shadow-lg transition-shadow" @onclick="@(() => NavigateToTool("/breathing"))">
+                <div class="flex items-center justify-between">
+                    <div class="flex-grow">
+                        <h5 class="font-semibold text-gray-900 dark:text-white mb-1">Breathing Exercises</h5>
+                        <small class="text-gray-600 dark:text-gray-400">4-7-8 Triangle and Box breathing</small>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="bi bi-lungs text-primary-600 dark:text-primary-400 text-2xl"></i>
+                        <i class="bi bi-arrow-right text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HIIT Timer Tool -->
+            <div class="card cursor-pointer hover:shadow-lg transition-shadow" @onclick="@(() => NavigateToTool("/exercise"))">
+                <div class="flex items-center justify-between">
+                    <div class="flex-grow">
+                        <h5 class="font-semibold text-gray-900 dark:text-white mb-1">HIIT Timer</h5>
+                        <small class="text-gray-600 dark:text-gray-400">High-intensity interval training timer</small>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="bi bi-stopwatch text-green-600 dark:text-green-400 text-2xl"></i>
+                        <i class="bi bi-arrow-right text-gray-400"></i>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- HIIT Timer Tool -->
-        <div class="col-12 col-md-6">
-            <div class="card tool-card" @onclick="@(() => NavigateToTool("/exercise"))" style="cursor: pointer;">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <h5 class="card-title mb-1">HIIT Timer</h5>
-                            <small class="text-muted">High-intensity interval training timer</small>
-                        </div>
-                        <div class="tool-icon-container me-3">
-                            <i class="bi bi-stopwatch text-success fs-2"></i>
-                        </div>
-                        <i class="bi bi-arrow-right text-muted"></i>
-                    </div>
-                </div>
+        @if (isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
             </div>
-        </div>
-    </div>
-
-    @if (isLoading)
-    {
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        }
+        else if (quickButtons.Count == 0)
+        {
+            <!-- Empty State -->
+            <div class="text-center py-12">
+                <i class="bi bi-lightning-charge text-6xl text-gray-400 block mb-3"></i>
+                <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-3">No Quick Activities Yet</h4>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Create quick activity buttons for one-tap logging!</p>
+                <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors" data-bs-toggle="modal" data-bs-target="#addQuickActivityModal">
+                    <i class="bi bi-plus-lg"></i> Create Your First Quick Activity
+                </button>
             </div>
-        </div>
-    }
-    else if (quickButtons.Count == 0)
-    {
-        <!-- Empty State -->
-        <div class="text-center py-5">
-            <i class="bi bi-lightning-charge display-1 text-muted mb-3"></i>
-            <h4 class="text-muted mb-3">No Quick Activities Yet</h4>
-            <p class="text-muted mb-4">Create quick activity buttons for one-tap logging!</p>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addQuickActivityModal">
-                <i class="bi bi-plus-lg"></i> Create Your First Quick Activity
-            </button>
-        </div>
-    }
-    else
-    {
-        <!-- Quick Activity Buttons -->
-        <div class="row g-3">
-            @foreach (var button in quickButtons)
-            {
-                <div class="col-12">
-                    <div class="card quick-activity-card @(button.IsEnabled ? "card-enabled" : "card-disabled")"
-                         @onclick="@(() => UseQuickActivity(button))"
-                         style="@(button.IsEnabled ? "cursor: pointer;" : "cursor: not-allowed;")">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="flex-grow-1">
-                                    <h5 class="card-title mb-1 @(button.IsEnabled ? "" : "text-muted")">
-                                        @button.Name
-                                    </h5>
-                                    <div class="d-flex align-items-center">
-                                        <small class="text-muted me-2">
-                                            <i class="bi bi-tag"></i> @button.TagName
-                                        </small>
-                                        @if (!string.IsNullOrEmpty(button.Value))
-                                        {
-                                            <small class="text-muted">
-                                                <i class="bi bi-arrow-right"></i> @button.Value
-                                            </small>
-                                        }
-                                    </div>
-                                    @if (!button.IsEnabled)
+        }
+        else
+        {
+            <!-- Quick Activity Buttons -->
+            <div class="space-y-3">
+                @foreach (var button in quickButtons)
+                {
+                    <div class="card @(button.IsEnabled ? "hover:shadow-lg cursor-pointer" : "opacity-60 cursor-not-allowed")"
+                         @onclick="@(() => UseQuickActivity(button))">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-grow">
+                                <h5 class="font-semibold mb-1 @(button.IsEnabled ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-600")">
+                                    @button.Name
+                                </h5>
+                                <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <span>
+                                        <i class="bi bi-tag"></i> @button.TagName
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(button.Value))
                                     {
-                                        <small class="text-warning">
-                                            <i class="bi bi-clock"></i> Cooling down...
-                                        </small>
+                                        <span>
+                                            <i class="bi bi-arrow-right"></i> @button.Value
+                                        </span>
                                     }
                                 </div>
-                                <div class="d-flex align-items-center">
-                                    @if (button.IsEnabled)
-                                    {
-                                        <i class="bi bi-lightning-charge text-primary fs-2 me-3"></i>
-                                    }
-                                    else
-                                    {
-                                        <i class="bi bi-hourglass-split text-muted fs-2 me-3"></i>
-                                    }
-                                    <button class="btn btn-outline-danger btn-sm"
-                                            @onclick:stopPropagation="true"
-                                            @onclick="@(() => DeleteQuickActivity(button))"
-                                            title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
+                                @if (!button.IsEnabled)
+                                {
+                                    <small class="text-yellow-600 dark:text-yellow-400">
+                                        <i class="bi bi-clock"></i> Cooling down...
+                                    </small>
+                                }
+                            </div>
+                            <div class="flex items-center gap-2">
+                                @if (button.IsEnabled)
+                                {
+                                    <i class="bi bi-lightning-charge text-primary-600 dark:text-primary-400 text-2xl"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-hourglass-split text-gray-400 text-2xl"></i>
+                                }
+                                <button class="btn-danger text-sm"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="@(() => DeleteQuickActivity(button))"
+                                        title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            }
-        </div>
-    }
+                }
+            </div>
+        }
 
-
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-        <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show mt-3" role="alert">
-            @statusMessage
-            <button type="button" class="btn-close" @onclick="ClearStatus"></button>
-        </div>
-    }
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="@(isError ? "alert-danger" : "alert-success") mt-4">
+                @statusMessage
+                <button type="button" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" @onclick="ClearStatus">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        }
+    </div>
 </div>
 
 <!-- Floating Action Button -->
