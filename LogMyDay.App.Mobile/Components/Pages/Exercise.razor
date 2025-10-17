@@ -3,10 +3,19 @@
 
 <PageTitle>HIIT Timer - LogMyDay</PageTitle>
 
-<MobileTopbar Title="HIIT Timer" ShowBackButton="true" />
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <!-- Back Button -->
+        <button @onclick="@(() => Navigation.NavigateTo("/quick"))" 
+                class="mb-4 flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300">
+            <i class="bi bi-arrow-left"></i>
+            <span>Back to Quick Activities</span>
+        </button>
 
-<div class="container-fluid p-3">
-    <HiitTimer ShowSaveControls="true" />
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">HIIT Timer</h1>
+
+        <HiitTimer ShowSaveControls="true" />
+    </div>
 </div>
 
 @code {

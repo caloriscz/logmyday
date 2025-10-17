@@ -1,6 +1,113 @@
 /* Import Bootstrap Icons - Remove this if not working */
 /* @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"); */
 
+/* ========================================
+   TAILWIND MODAL STYLES
+   ======================================== */
+
+/* Modal animations are now handled inline with Tailwind classes */
+/* No custom modal CSS needed - using pure Tailwind utilities */
+
+/* Modal header */
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+[data-bs-theme="dark"] .modal-header {
+    border-bottom-color: #374151;
+}
+
+/* Modal body */
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.modal-fullscreen-lg-down .modal-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Modal footer */
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    border-top-color: #374151;
+}
+
+/* Modal title */
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+[data-bs-theme="dark"] .modal-title {
+    color: #f9fafb;
+}
+
+/* Close button */
+.btn-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    color: #111827;
+}
+
+[data-bs-theme="dark"] .btn-close {
+    color: #9ca3af;
+}
+
+[data-bs-theme="dark"] .btn-close:hover {
+    color: #f9fafb;
+}
+
+/* Animation classes */
+.modal-fade-enter {
+    opacity: 0;
+}
+
+.modal-fade-enter-active {
+    opacity: 1;
+    transition: opacity 300ms ease-in-out;
+}
+
+.modal-fade-exit {
+    opacity: 1;
+}
+
+.modal-fade-exit-active {
+    opacity: 0;
+    transition: opacity 300ms ease-in-out;
+}
+
+/* ========================================
+   END TAILWIND MODAL STYLES
+   ======================================== */
+
 /* CSS Variables for Light/Dark Theme */
 :root {
     --bg-color: #ffffff;
@@ -1035,7 +1142,7 @@ main {
     justify-content: center;
     font-size: 1.5rem;
     line-height: 2rem;
-    z-index: 50; /* Above modals */
+    z-index: 40; /* Above content, below modals */
     transition-property: all;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 200ms;

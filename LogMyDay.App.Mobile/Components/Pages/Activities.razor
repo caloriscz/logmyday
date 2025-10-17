@@ -15,8 +15,7 @@
     <!-- Filter and Sort Controls -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
         <div class="flex items-center gap-2">
-            <button type="button" class="btn-secondary" data-bs-toggle="modal"
-                    data-bs-target="#filterModal" title="Open filters">
+            <button type="button" class="btn-secondary" data-modal-show="filterModal" title="Open filters">
                 <i class="bi bi-funnel"></i> Filters
             </button>
         </div>
@@ -112,7 +111,7 @@
     }
     else if (!pagedResult.Items.Any())
     {
-        <div class="alert-info">
+        <div class="alert-danger">
             No activities found for the selected criteria.
         </div>
     }
@@ -186,19 +185,23 @@
 </div>
 
 <!-- Floating Action Button -->
-<button class="fab" data-bs-toggle="modal" data-bs-target="#addActivityModal" title="Add Activity">
+<button class="fab" data-modal-show="addActivityModal" title="Add Activity">
     <i class="bi bi-plus-lg"></i>
 </button>
 
-<!-- Filter Modal -->
-<div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-fullscreen-lg-down">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="filterModalLabel">Filters & Navigation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
+<!-- Filter Modal - Full Screen Overlay -->
+<div id="filterModal" data-modal class="hidden fixed inset-0 z-50 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="filterModalLabel" aria-hidden="true">
+    <div data-modal-content class="w-full h-full flex flex-col">
+        <!-- Modal Header - Fixed at top -->
+        <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+            <h5 class="text-xl font-semibold text-gray-900 dark:text-gray-100" id="filterModalLabel">Filters & Navigation</h5>
+            <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-3 -mr-2" data-modal-hide="filterModal" aria-label="Close">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        
+        <!-- Modal Body - Scrollable content -->
+        <div class="flex-1 overflow-y-auto px-4 py-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Display Type -->
                     <div>
@@ -244,11 +247,14 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" data-bs-dismiss="modal">Close</button>
+            
+            <!-- Modal Footer - Fixed at bottom -->
+            <div class="px-4 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+                <div class="flex items-center justify-end">
+                    <button type="button" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium" data-modal-hide="filterModal">Close</button>
+                </div>
             </div>
         </div>
-    </div>
 </div>
 
 <!-- Add New Activity Modal Component -->
@@ -579,8 +585,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("eval",
-                "new bootstrap.Modal(document.getElementById('addActivityModal')).show()");
+            await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
         }
         catch (InvalidOperationException)
         {
@@ -703,3 +708,4 @@
     }
 
 }
+

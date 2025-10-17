@@ -15,7 +15,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Refit;
 using Serilog;
-using System.Threading.RateLimiting;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +64,7 @@ services.AddAuthentication(options =>
             {
                 return "basic";
             }
+            
             // Otherwise, use cookie auth
             return "lmd-cookie";
         };
