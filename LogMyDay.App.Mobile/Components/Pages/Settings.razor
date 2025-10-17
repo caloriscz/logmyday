@@ -1,7 +1,9 @@
 @page "/settings"
+@using LogMyDay.App.Mobile.Services
 @inject NavigationManager Navigation
 @inject AuthenticationService AuthService
 @inject IApiContext ApiContext
+@inject IThemeService ThemeService
 @inject ILogger<Settings> Logger
 
 <PageTitle>Settings - LogMyDay</PageTitle>
@@ -10,6 +12,30 @@
     <div class="max-w-7xl mx-auto px-6 py-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Settings</h1>
 
+        <!-- Theme Settings -->
+        <div class="mb-6">
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Appearance</h2>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                <div class="p-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        @foreach (var themeOption in themeOptions)
+                        {
+                            <button type="button"
+                                    class="@GetThemeButtonClass(themeOption.Theme)"
+                                    @onclick="@(() => SetThemeAsync(themeOption.Theme))">
+                                <div class="flex flex-col items-center gap-1 py-2">
+                                    <i class="@themeOption.Icon text-xl"></i>
+                                    <span class="text-xs font-medium">@themeOption.Label</span>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Settings -->
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Account</h2>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
             <button type="button"
                     class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
@@ -66,6 +92,53 @@
 
 @code {
     private bool isLoggingOut;
+    private AppTheme currentTheme = AppTheme.System;
+
+    private readonly List<ThemeOption> themeOptions = new()
+    {
+        new ThemeOption(AppTheme.Light, "Light", "bi-sun-fill"),
+        new ThemeOption(AppTheme.Dark, "Dark", "bi-moon-stars-fill"),
+        new ThemeOption(AppTheme.System, "System", "bi-circle-half")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            currentTheme = await ThemeService.GetThemeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to load theme");
+        }
+    }
+
+    private string GetThemeButtonClass(AppTheme theme)
+    {
+        var baseClasses = "relative rounded-lg border-2 transition-all duration-200";
+        var isSelected = theme == currentTheme;
+
+        if (isSelected)
+        {
+            return $"{baseClasses} border-primary-600 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400";
+        }
+
+        return $"{baseClasses} border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-300";
+    }
+
+    private async Task SetThemeAsync(AppTheme theme)
+    {
+        try
+        {
+            await ThemeService.SetThemeAsync(theme);
+            currentTheme = theme;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to set theme");
+        }
+    }
 
     private void NavigateTo(string url)
     {
@@ -96,4 +169,6 @@
         }
         return Task.CompletedTask;
     }
+
+    private record ThemeOption(AppTheme Theme, string Label, string Icon);
 }

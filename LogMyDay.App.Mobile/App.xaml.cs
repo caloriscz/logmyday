@@ -23,6 +23,9 @@ public partial class App : Application
         
         System.Diagnostics.Debug.WriteLine("App.OnStart called");
         
+        // Initialize theme
+        InitializeThemeAsync().ConfigureAwait(false);
+        
         // Initialize system notification service 
         try
         {
@@ -78,5 +81,29 @@ public partial class App : Application
     {
         base.OnResume();
         // System notifications should continue from where they left off
+    }
+
+    private async Task InitializeThemeAsync()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("Initializing theme...");
+            var serviceProvider = IPlatformApplication.Current?.Services;
+            var themeService = serviceProvider?.GetService<IThemeService>();
+            
+            if (themeService != null)
+            {
+                await themeService.InitializeAsync();
+                System.Diagnostics.Debug.WriteLine("Theme initialized successfully");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("ThemeService not available");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error initializing theme: {ex.Message}");
+        }
     }
 }

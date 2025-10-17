@@ -27,6 +27,44 @@ applyTo: '**'
 
 ---
 
+## ⚠️ **CRITICAL: MAUI JavaScript Execution** ⚠️
+
+**NEVER use `IJSRuntime` in MAUI Blazor applications - it will fail with "Cannot invoke JavaScript outside of a WebView context"**
+
+### The Problem
+- `IJSRuntime.InvokeVoidAsync()` and `IJSRuntime.InvokeAsync<T>()` are **Blazor Web** features
+- MAUI BlazorWebView runs natively, NOT in a browser
+- These methods will ALWAYS throw: `"Cannot invoke JavaScript outside of a WebView context"`
+
+### The Solution
+Use MAUI's native WebView API through platform-specific handlers:
+
+```csharp
+// CORRECT (MAUI):
+#if ANDROID
+if (blazorWebView?.Handler?.PlatformView is Android.Webkit.WebView webView)
+{
+    await MainThread.InvokeOnMainThreadAsync(() =>
+    {
+        webView.EvaluateJavascript(script, callback);
+    });
+}
+#endif
+
+// WRONG (won't work in MAUI):
+await _jsRuntime.InvokeVoidAsync("functionName", args);
+```
+
+### Implementation Pattern
+1. Add a helper method to `MainPage.xaml.cs`: `RunJavaScriptAsync(string script)`
+2. Access the native Android WebView via `blazorWebView.Handler.PlatformView`
+3. Call `EvaluateJavascript()` on the UI thread using `MainThread.InvokeOnMainThreadAsync()`
+4. Services call `MainPage.RunJavaScriptAsync()` instead of `IJSRuntime`
+
+**See**: `.github/instructions/theme-system-debug-summary.md` for complete implementation example.
+
+---
+
 ## Project Structure Overview
 
 This repository is organized as follows:
