@@ -27,7 +27,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<AndroidResource Remove="Platforms\Android\Resources\xml\network_security_config.xml" />
+		<!-- Explicitly include Android resource files -->
+		<AndroidResource Include="Platforms\Android\Resources\values\styles.xml" />
+		<AndroidResource Include="Platforms\Android\Resources\values\colors.xml" />
+		<AndroidResource Include="Platforms\Android\Resources\drawable\notification_icon.xml" />
 	</ItemGroup>
 
 	<ItemGroup>
