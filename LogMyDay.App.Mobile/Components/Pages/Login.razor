@@ -9,95 +9,89 @@
 
 <PageTitle>Login - LogMyDay</PageTitle>
 
-<div class="login-container">
-    <div class="login-header">
-        <h1>LogMyDay</h1>
-        <p class="text-muted">Track your daily activities</p>
-    </div>
-
-    <div class="login-form">
-        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
-            <DataAnnotationsValidator />
-            
-            <div class="form-group mb-3">
-                <label class="form-label">Server URL:</label>
-                <InputText @bind-Value="loginModel.ServerUrl" class="form-control form-control-lg" placeholder="https://logmyday.tadata.cz" />
-                <ValidationMessage For="@(() => loginModel.ServerUrl)" class="text-danger" />
-                <div class="form-text">Enter your LogMyDay server URL</div>
-            </div>
-            
-            <div class="form-group mb-3">
-                <label class="form-label">Username:</label>
-                <InputText @bind-Value="loginModel.Username" class="form-control form-control-lg" placeholder="Enter username" />
-                <ValidationMessage For="@(() => loginModel.Username)" class="text-danger" />
-            </div>
-
-            <div class="form-group mb-3">
-                <label class="form-label">Password:</label>
-                <InputText type="password" @bind-Value="loginModel.Password" class="form-control form-control-lg" placeholder="Enter password" />
-                <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
-            </div>
-
-            @if (!string.IsNullOrEmpty(errorMessage))
-            {
-                <div class="alert alert-danger mb-3" role="alert">
-                    @errorMessage
+<!-- Modern Dark Login Page -->
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
+    <div class="w-full max-w-md">
+        <!-- Logo and Branding -->
+        <div class="text-center mb-8">
+            <div class="flex justify-center mb-4">
+                <div class="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
+                    <img src="images/appicon.png" alt="LogMyDay Logo" class="w-16 h-16 object-contain" />
                 </div>
-            }
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">LogMyDay</h1>
+            <p class="text-slate-400 text-sm">Track your daily activities</p>
+        </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@isLoading">
-                @if (isLoading)
+        <!-- Login Form - No Card Background -->
+        <div>
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+                
+                <!-- Server URL -->
+                <div class="mb-6">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Server URL:</label>
+                    <InputText @bind-Value="loginModel.ServerUrl" 
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
+                               placeholder="https://localhost:7064" />
+                    <ValidationMessage For="@(() => loginModel.ServerUrl)" class="text-red-400 text-sm mt-1" />
+                    <p class="text-slate-500 text-xs mt-1">Enter your LogMyDay server URL</p>
+                </div>
+                
+                <!-- Username -->
+                <div class="mb-6">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Username:</label>
+                    <InputText @bind-Value="loginModel.Username" 
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
+                               placeholder="Enter username" />
+                    <ValidationMessage For="@(() => loginModel.Username)" class="text-red-400 text-sm mt-1" />
+                </div>
+
+                <!-- Password -->
+                <div class="mb-6">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Password:</label>
+                    <InputText type="password" 
+                               @bind-Value="loginModel.Password" 
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
+                               placeholder="Enter password" />
+                    <ValidationMessage For="@(() => loginModel.Password)" class="text-red-400 text-sm mt-1" />
+                </div>
+
+                <!-- Error Message -->
+                @if (!string.IsNullOrEmpty(errorMessage))
                 {
-                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <div class="mb-6 px-4 py-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm backdrop-blur-sm" role="alert">
+                        <div class="flex items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>@errorMessage</span>
+                        </div>
+                    </div>
                 }
-                Login
-            </button>
-        </EditForm>
+
+                <!-- Login Button -->
+                <div class="flex justify-center">
+                    <button type="submit" 
+                            class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" 
+                            disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        }
+                        Login
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8">
+            <p class="text-slate-500 text-xs">Secure connection • Your data is encrypted</p>
+        </div>
     </div>
 </div>
-
-<style>
-    .login-container {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-        padding: 2rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
-    .login-header {
-        text-align: center;
-        color: white;
-        margin-bottom: 2rem;
-    }
-
-    .login-header h1 {
-        font-size: 2.5rem;
-        font-weight: 300;
-        margin-bottom: 0.5rem;
-    }
-
-    .login-form {
-        background: white;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        width: 100%;
-        max-width: 400px;
-    }
-
-    .form-control-lg {
-        padding: 0.75rem 1rem;
-        font-size: 1.1rem;
-    }
-
-    .btn-lg {
-        padding: 0.75rem 1rem;
-        font-size: 1.1rem;
-    }
-</style>
 
 @code {
     private LoginModel loginModel = new();
