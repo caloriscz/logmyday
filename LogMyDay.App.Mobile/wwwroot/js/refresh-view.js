@@ -29,6 +29,7 @@
             element: element,
             dotNetRef: dotNetRef,
             touchStartY: 0,
+            touchStartScrollTop: 0,  // Track scroll position when touch started
             isTracking: false
         };
         
@@ -40,13 +41,25 @@
             if (e.touches.length !== 1) return;
             
             const touch = e.touches[0];
-            instance.touchStartY = touch.clientY;
-            instance.isTracking = true;
             
-            try {
-                dotNetRef.invokeMethodAsync('OnTouchStart', touch.clientY);
-            } catch (ex) {
-                console.error('RefreshView: Error in touchStart handler', ex);
+            // Find the actual scrollable content within the refresh container
+            const refreshContent = element.querySelector('.refresh-content');
+            const scrollTop = refreshContent ? refreshContent.scrollTop : 0;
+            
+            // Only start tracking if we're at the top of the scroll
+            if (scrollTop === 0) {
+                instance.touchStartY = touch.clientY;
+                instance.touchStartScrollTop = scrollTop;
+                instance.isTracking = true;
+                
+                try {
+                    dotNetRef.invokeMethodAsync('OnTouchStart', touch.clientY);
+                } catch (ex) {
+                    console.error('RefreshView: Error in touchStart handler', ex);
+                }
+            } else {
+                // Not at top, don't track pull-to-refresh
+                instance.isTracking = false;
             }
         };
         
@@ -56,20 +69,17 @@
             const touch = e.touches[0];
             const deltaY = touch.clientY - instance.touchStartY;
             
-            // Find the scrollable container (could be the element itself or a parent)
-            let scrollElement = element;
-            while (scrollElement && scrollElement.scrollTop === 0 && scrollElement.parentElement) {
-                if (scrollElement.scrollHeight > scrollElement.clientHeight) {
-                    break;
-                }
-                scrollElement = scrollElement.parentElement;
-            }
+            // Find the actual scrollable content within the refresh container
+            const refreshContent = element.querySelector('.refresh-content');
+            const scrollTop = refreshContent ? refreshContent.scrollTop : 0;
             
-            const scrollTop = scrollElement ? scrollElement.scrollTop : 0;
-            
-            // Only handle if we're at the top of the scroll and pulling down
-            if (scrollTop === 0 && deltaY > 0) {
+            // CRITICAL: Only activate pull-to-refresh when:
+            // 1. Touch started at the very top (touchStartScrollTop === 0)
+            // 2. Still at the top or haven't scrolled (scrollTop <= 2 for tolerance)
+            // 3. User is pulling DOWN (deltaY > 0)
+            if (instance.touchStartScrollTop === 0 && scrollTop <= 2 && deltaY > 0) {
                 // Prevent default scroll behavior when pulling to refresh
+                // But only after significant pull to avoid interfering with normal touches
                 if (deltaY > 10) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -80,6 +90,9 @@
                 } catch (ex) {
                     console.error('RefreshView: Error in touchMove handler', ex);
                 }
+            } else if (scrollTop > 2 || deltaY < 0) {
+                // User has scrolled away from top or is scrolling up - disable pull-to-refresh
+                instance.isTracking = false;
             }
         };
         

@@ -20,11 +20,15 @@
             </button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline" 
-                    @onclick="@(() => ChangeOrder("asc"))">Ascending</button>
+            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                    @onclick="@(() => ChangeOrder("asc"))">
+                Ascending
+            </button>
             <span class="text-gray-400">|</span>
-            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline" 
-                    @onclick="@(() => ChangeOrder("desc"))">Descending</button>
+            <button class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                    @onclick="@(() => ChangeOrder("desc"))">
+                Descending
+            </button>
 
             @if (displayType != "daily")
             {
@@ -52,7 +56,9 @@
 
     @if (pagedResult == null)
     {
-        <p class="text-gray-600 dark:text-gray-400"><em>Loading...</em></p>
+        <div class="text-gray-600 dark:text-gray-400">
+            <em>Loading...</em>
+        </div>
     }
     else if (displayType == "daily")
     {
@@ -63,11 +69,11 @@
                 <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
                     &lt;
                 </button>
-                <CultureAwareDatePicker Value="@selectedDate" 
-                                      ValueChanged="@OnDatePickerValueChanged" 
-                                      EnableTime="false" 
-                                      CssClass="date-picker-compact" 
-                                      Placeholder="Select date" />
+                <CultureAwareDatePicker Value="@selectedDate"
+                                        ValueChanged="@OnDatePickerValueChanged"
+                                        EnableTime="false"
+                                        CssClass="date-picker-compact"
+                                        Placeholder="Select date" />
                 <button class="btn-secondary" @onclick="NextDay" title="Next Day">
                     &gt;
                 </button>
@@ -153,33 +159,33 @@
                 </table>
             </div>
 
-        <!-- Mobile Card View -->
-        <div class="md:hidden">
-            @foreach (var activity in group)
-            {
-                <div class="card mb-3">
-                    <div class="flex justify-between items-start mb-2">
-                        <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-0">@activity.PrimaryTagName</h6>
-                        <button @onclick="() => DeleteActivity(activity.Id)"
-                                class="btn-danger btn-sm" title="Delete">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                    @if (!string.IsNullOrEmpty(activity.Description))
-                    {
-                        <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
-                    }
-                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <div>
-                            <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
+            <!-- Mobile Card View -->
+            <div class="md:hidden">
+                @foreach (var activity in group)
+                {
+                    <div class="card mb-3">
+                        <div class="flex justify-between items-start mb-2">
+                            <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-0">@activity.PrimaryTagName</h6>
+                            <button @onclick="() => DeleteActivity(activity.Id)"
+                                    class="btn-danger btn-sm" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </div>
-                        <div>
-                            <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
+                        @if (!string.IsNullOrEmpty(activity.Description))
+                        {
+                            <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
+                        }
+                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-500 dark:text-gray-400">
+                            <div>
+                                <strong>Started:</strong> @activity.DateStarted.ToString("HH:mm")
+                            </div>
+                            <div>
+                                <strong>Finished:</strong> @(activity.DateFinished?.ToString("HH:mm") ?? "-")
+                            </div>
                         </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
         }
     }
 </div>
@@ -190,7 +196,7 @@
 </button>
 
 <!-- Filter Modal - Full Screen Overlay -->
-<div id="filterModal" data-modal class="hidden fixed inset-0 z-50 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="filterModalLabel" aria-hidden="true">
+<div id="filterModal" data-modal class="hidden fixed inset-0 z-[60] bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="filterModalLabel" aria-hidden="true">
     <div data-modal-content class="w-full h-full flex flex-col">
         <!-- Modal Header - Fixed at top -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
@@ -199,68 +205,68 @@
                 <i class="bi bi-x-lg text-2xl"></i>
             </button>
         </div>
-        
+
         <!-- Modal Body - Scrollable content -->
         <div class="flex-1 overflow-y-auto px-6 py-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Display Type -->
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Display Type:</label>
-                        <select value="@displayType" @onchange="OnDisplayTypeChanged" 
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                        </select>
-                    </div>
-
-                    <!-- Description Filter -->
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Description Filter:</label>
-                        <input value="@descriptionFilter" @onchange="OnFilterChanged" 
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                               placeholder="Search description..." />
-                    </div>
-
-                    <!-- Calendar Navigation -->
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Date Navigation:</label>
-
-                        <!-- Navigation Controls -->
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <!-- Daily navigation -->
-                            <button class="btn-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
-                                &lt;
-                            </button>
-
-                            <div class="flex-grow text-center">
-                                <strong class="text-gray-900 dark:text-gray-100">@GetCurrentPeriodDisplay()</strong>
-                            </div>
-
-                            <button class="btn-secondary" @onclick="NextCalendarPeriod" title="Next Day">
-                                &gt;
-                            </button>
-                            <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors" @onclick="GoToToday">
-                                @GetTodayButtonText()
-                            </button>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Display Type -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Display Type:</label>
+                    <select value="@displayType" @onchange="OnDisplayTypeChanged"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
                 </div>
-            </div>
-            
-            <!-- Modal Footer - Fixed at bottom -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
-                <div class="flex items-center justify-end">
-                    <button type="button" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium" data-modal-hide="filterModal">Close</button>
+
+                <!-- Description Filter -->
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Description Filter:</label>
+                    <input value="@descriptionFilter" @onchange="OnFilterChanged"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                           placeholder="Search description..." />
+                </div>
+
+                <!-- Calendar Navigation -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Date Navigation:</label>
+
+                    <!-- Navigation Controls -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <!-- Daily navigation -->
+                        <button class="btn-secondary" @onclick="PreviousCalendarPeriod" title="Previous Day">
+                            &lt;
+                        </button>
+
+                        <div class="flex-grow text-center">
+                            <strong class="text-gray-900 dark:text-gray-100">@GetCurrentPeriodDisplay()</strong>
+                        </div>
+
+                        <button class="btn-secondary" @onclick="NextCalendarPeriod" title="Next Day">
+                            &gt;
+                        </button>
+                        <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors" @onclick="GoToToday">
+                            @GetTodayButtonText()
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- Modal Footer - Fixed at bottom -->
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+            <div class="flex items-center justify-end">
+                <button type="button" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium" data-modal-hide="filterModal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Add New Activity Modal Component -->
-<AddActivityModal Activity="newActivity" 
+<AddActivityModal Activity="newActivity"
                   AvailableTags="tags"
-                  OnActivityCreated="@HandleActivityCreated" 
+                  OnActivityCreated="@HandleActivityCreated"
                   ErrorMessage="@errorMessage" />
 
 @code {
@@ -418,20 +424,20 @@
         }
     }
 
-        private static DateOnly? ParseDateFromQuery(string? value)
+    private static DateOnly? ParseDateFromQuery(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return null;
-            }
-
-            if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-            {
-                return parsed;
-            }
-
             return null;
         }
+
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
+    }
 
     private async Task OnDisplayTypeChanged(ChangeEventArgs e)
     {

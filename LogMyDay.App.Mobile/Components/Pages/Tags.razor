@@ -159,7 +159,7 @@
 </button>
 
 <!-- Add New Tag Modal - Full Screen Overlay -->
-<div id="addTagModal" data-modal class="hidden fixed inset-0 z-50 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="addTagModalLabel">
+<div id="addTagModal" data-modal class="hidden fixed inset-0 z-[60] bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="addTagModalLabel">
     <div data-modal-content class="w-full h-full flex flex-col">
         <!-- Modal Header - Fixed at top -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
@@ -243,11 +243,11 @@
                 </EditForm>
             </div>
             
-            <!-- Modal Footer - Fixed at bottom -->
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+            <!-- Modal Footer - Fixed at bottom with safe area support -->
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
                 <div class="flex items-center justify-end gap-3">
-                    <button type="button" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-base font-medium" data-modal-hide="addTagModal">Cancel</button>
-                    <button type="submit" form="addTagForm" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium shadow-sm">
+                    <button type="button" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-base font-medium min-h-[48px]" data-modal-hide="addTagModal">Cancel</button>
+                    <button type="submit" form="addTagForm" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium shadow-sm min-h-[48px]">
                         Add Tag
                     </button>
                 </div>

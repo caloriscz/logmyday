@@ -11,46 +11,54 @@
 @using Microsoft.Maui.Storage
 @using Refit
 
-<div class="mobile-container">
-    <div class="mobile-content">
-        @Body
+@if (_isCheckingAuthentication)
+{
+    <LoadingScreen Message="Checking authentication..." SubMessage="Please wait while we verify your session" />
+}
+else
+{
+    <div class="mobile-container">
+        <div class="mobile-content">
+            @Body
+        </div>
+        
+        @* Only show navigation if user is authenticated and not on login page *@
+        @if (AuthService.IsAuthenticated && !IsLoginPage)
+        {
+            <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-around bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-xl z-50"
+                 style="padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(4rem + env(safe-area-inset-bottom, 0px));">
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/activities") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/activities"))">
+                    <i class="bi bi-calendar3 text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Activities</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/tags") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/tags"))">
+                    <i class="bi bi-tags text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Tags</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/notifications") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/notifications"))">
+                    <i class="bi bi-bell text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Notifications</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/quick"))">
+                    <i class="bi bi-lightning text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Quick</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/settings") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/settings"))">
+                    <i class="bi bi-gear text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Settings</span>
+                </button>
+            </nav>
+        }
     </div>
-    
-    @* Only show navigation if user is authenticated and not on login page *@
-    @if (AuthService.IsAuthenticated && !IsLoginPage)
-    {
-        <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-around bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-xl z-50"
-             style="padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(4rem + env(safe-area-inset-bottom, 0px));">
-            <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/activities") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                    @onclick="@(() => NavigateTo("/activities"))">
-                <i class="bi bi-calendar3 text-2xl mb-1"></i>
-                <span class="text-xs font-medium">Activities</span>
-            </button>
-            <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/tags") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                    @onclick="@(() => NavigateTo("/tags"))">
-                <i class="bi bi-tags text-2xl mb-1"></i>
-                <span class="text-xs font-medium">Tags</span>
-            </button>
-            <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/notifications") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                    @onclick="@(() => NavigateTo("/notifications"))">
-                <i class="bi bi-bell text-2xl mb-1"></i>
-                <span class="text-xs font-medium">Notifications</span>
-            </button>
-            <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                    @onclick="@(() => NavigateTo("/quick"))">
-                <i class="bi bi-lightning text-2xl mb-1"></i>
-                <span class="text-xs font-medium">Quick</span>
-            </button>
-            <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/settings") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                    @onclick="@(() => NavigateTo("/settings"))">
-                <i class="bi bi-gear text-2xl mb-1"></i>
-                <span class="text-xs font-medium">Settings</span>
-            </button>
-        </nav>
-    }
-</div>
+}
 
 @code {
+    private bool _isCheckingAuthentication = true;
     private bool IsLoginPage => GetCurrentPath().Equals("login", StringComparison.OrdinalIgnoreCase);
 
     private bool IsActive(string path)
@@ -111,8 +119,17 @@
         System.Diagnostics.Debug.WriteLine("MainLayout: Conditional layout initialized");
         AuthService.AuthenticationChanged += OnAuthenticationChanged;
         NotificationNavigation.NavigationRequested += OnNotificationNavigationRequested;
+        
+        // Show loading screen while checking authentication
+        _isCheckingAuthentication = true;
+        StateHasChanged();
+        
         await TryRestoreSessionAsync();
         await HandlePendingNotificationAsync();
+        
+        // Hide loading screen after authentication check completes
+        _isCheckingAuthentication = false;
+        StateHasChanged();
     }
 
     private void OnAuthenticationChanged(bool isAuthenticated)

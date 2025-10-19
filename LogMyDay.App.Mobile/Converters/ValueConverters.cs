@@ -13,11 +13,11 @@ public class BoolToColorConverter : IValueConverter
                 // Text color: dark for enabled (good contrast), light gray for disabled
                 return boolValue ? Colors.DarkGreen : Colors.Gray;
             }
-            
+
             // Background color: green for enabled, light gray for disabled
             return boolValue ? Colors.MediumSeaGreen : Colors.LightGray;
         }
-        
+
         return Colors.LightGray;
     }
 

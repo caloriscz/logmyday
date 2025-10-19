@@ -1177,6 +1177,25 @@ main {
     transform: scale(1.1);
 }
 
+.already-work {
+    background-color: darkred !important;
+}
+
+/* ========================================
+   LOGIN PAGE - ALWAYS DARK (NON-THEMED)
+   ======================================== */
+/* This class ensures login page is always dark regardless of system theme */
+.login-dark-bg {
+    background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a) !important;
+    background-attachment: fixed !important;
+    min-height: 100vh !important;
+}
+
+.login-dark-bg * {
+    /* Ensure all child elements don't get themed */
+    color-scheme: dark;
+}
+
 /* Better touch feedback for mobile */
 @media (hover: none) {
     .fab:hover {

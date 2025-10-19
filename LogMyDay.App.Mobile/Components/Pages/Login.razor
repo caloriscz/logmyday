@@ -9,8 +9,8 @@
 
 <PageTitle>Login - LogMyDay</PageTitle>
 
-<!-- Modern Dark Login Page -->
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
+<!-- Modern Dark Login Page - Always dark, never themed -->
+<div class="login-dark-bg flex items-center justify-center px-6 py-4">
     <div class="w-full max-w-md">
         <!-- Logo and Branding -->
         <div class="text-center mb-8">
@@ -27,22 +27,22 @@
         <div>
             <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
                 <DataAnnotationsValidator />
-                
+
                 <!-- Server URL -->
                 <div class="mb-6">
                     <label class="block text-slate-300 text-sm font-medium mb-2">Server URL:</label>
-                    <InputText @bind-Value="loginModel.ServerUrl" 
-                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
-                               placeholder="https://localhost:7064" />
+                    <InputText @bind-Value="loginModel.ServerUrl"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
+                               placeholder="https://logmyday.tadata.cz" />
                     <ValidationMessage For="@(() => loginModel.ServerUrl)" class="text-red-400 text-sm mt-1" />
                     <p class="text-slate-500 text-xs mt-1">Enter your LogMyDay server URL</p>
                 </div>
-                
+
                 <!-- Username -->
                 <div class="mb-6">
                     <label class="block text-slate-300 text-sm font-medium mb-2">Username:</label>
-                    <InputText @bind-Value="loginModel.Username" 
-                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
+                    <InputText @bind-Value="loginModel.Username"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
                                placeholder="Enter username" />
                     <ValidationMessage For="@(() => loginModel.Username)" class="text-red-400 text-sm mt-1" />
                 </div>
@@ -50,9 +50,9 @@
                 <!-- Password -->
                 <div class="mb-6">
                     <label class="block text-slate-300 text-sm font-medium mb-2">Password:</label>
-                    <InputText type="password" 
-                               @bind-Value="loginModel.Password" 
-                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm" 
+                    <InputText type="password"
+                               @bind-Value="loginModel.Password"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
                                placeholder="Enter password" />
                     <ValidationMessage For="@(() => loginModel.Password)" class="text-red-400 text-sm mt-1" />
                 </div>
@@ -70,8 +70,8 @@
 
                 <!-- Login Button -->
                 <div class="flex justify-center">
-                    <button type="submit" 
-                            class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2" 
+                    <button type="submit"
+                            class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             disabled="@isLoading">
                         @if (isLoading)
                         {
@@ -106,10 +106,10 @@
             // No need to navigate manually - MainLayout will redirect to /activities
             return;
         }
-        
-    // Load saved config from preferences (without constructing HttpClient prematurely)
-    loginModel.ServerUrl = Preferences.Get("ServerUrl", "https://localhost:7064");
-    loginModel.Username = Preferences.Get("Username", "");
+
+        // Load saved config from preferences (without constructing HttpClient prematurely)
+        loginModel.ServerUrl = Preferences.Get("ServerUrl", "https://localhost:7064");
+        loginModel.Username = Preferences.Get("Username", "");
     }
 
     private async Task HandleLogin()
@@ -208,7 +208,7 @@
         [Required]
         public string Username { get; set; } = string.Empty;
 
-        [Required] 
+        [Required]
         public string Password { get; set; } = string.Empty;
     }
 }
