@@ -1166,6 +1166,12 @@ main {
     cursor: pointer;
 }
 
+/* Hide FAB when modal is open */
+[data-modal]:not(.hidden) ~ .fab,
+body:has([data-modal]:not(.hidden)) .fab {
+    display: none !important;
+}
+
 [data-bs-theme="dark"] .fab {
     background-color: rgb(59 130 246); /* primary-500 */
 }

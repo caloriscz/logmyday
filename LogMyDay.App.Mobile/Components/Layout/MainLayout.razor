@@ -125,6 +125,13 @@ else
         StateHasChanged();
         
         await TryRestoreSessionAsync();
+        
+        // If authentication was restored successfully, redirect to activities BEFORE hiding loading screen
+        if (AuthService.IsAuthenticated && IsLoginPage)
+        {
+            Navigation.NavigateTo("/activities", true);
+        }
+        
         await HandlePendingNotificationAsync();
         
         // Hide loading screen after authentication check completes

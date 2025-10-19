@@ -9,9 +9,16 @@
 
 <PageTitle>Login - LogMyDay</PageTitle>
 
-<!-- Modern Dark Login Page - Always dark, never themed -->
-<div class="login-dark-bg flex items-start justify-center px-6 pb-8">
-    <div class="w-full max-w-md mt-6">
+@if (!_shouldRender)
+{
+    <!-- Don't render anything while checking authentication -->
+    <div></div>
+}
+else
+{
+    <!-- Modern Dark Login Page - Always dark, never themed -->
+    <div class="login-dark-bg flex items-start justify-center px-6 pb-8">
+        <div class="w-full max-w-md mt-6">
         <!-- Logo and Branding -->
         <div class="text-center mb-6">
             <div class="flex justify-center mb-3">
@@ -91,22 +98,27 @@
             <p class="text-slate-500 text-xs">Secure connection • Your data is encrypted</p>
         </div>
     </div>
-</div>
+    </div>
+}
 
 @code {
     private LoginModel loginModel = new();
     private string? errorMessage;
     private bool isLoading = false;
+    private bool _shouldRender = false;
 
     protected override void OnInitialized()
     {
-        // If already authenticated, MainLayout will handle navigation automatically
-        if (AuthService.CheckAuthentication())
+        // If already authenticated, redirect immediately and don't render
+        if (AuthService.IsAuthenticated)
         {
-            // No need to navigate manually - MainLayout will redirect to /activities
+            Navigation.NavigateTo("/activities", true);
             return;
         }
 
+        // Allow rendering only if not authenticated
+        _shouldRender = true;
+        
         // Load saved config from preferences (without constructing HttpClient prematurely)
         loginModel.ServerUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
         loginModel.Username = Preferences.Get("Username", "");
