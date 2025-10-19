@@ -134,7 +134,7 @@ else
 
     private void OnAuthenticationChanged(bool isAuthenticated)
     {
-        System.Diagnostics.Debug.WriteLine($"MainLayout: Auth changed to {isAuthenticated}");
+        System.Diagnostics.Debug.WriteLine($"===== MainLayout: Auth changed to {isAuthenticated}");
         InvokeAsync(StateHasChanged);
         
         if (!isAuthenticated)
