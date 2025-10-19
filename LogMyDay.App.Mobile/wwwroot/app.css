@@ -7,6 +7,7 @@
 
 .spinner {
     border-radius: 50%;
+    border-color: #60a5fa; /* blue-400 */
     border-top-color: transparent;
     animation: spinner-rotation 0.8s linear infinite;
 }
@@ -1201,14 +1202,25 @@ main {
    ======================================== */
 /* This class ensures login page is always dark regardless of system theme */
 .login-dark-bg {
-    background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a) !important;
+    background: linear-gradient(to bottom right, #1e293b, #334155, #1e293b) !important;
     background-attachment: fixed !important;
     min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    /* Prevent white background on overscroll */
+    overscroll-behavior: none !important;
 }
 
 .login-dark-bg * {
     /* Ensure all child elements don't get themed */
     color-scheme: dark;
+}
+
+/* Loading screen - matches login page */
+#app {
+    background: linear-gradient(to bottom right, #1e293b, #334155, #1e293b);
+    min-height: 100vh;
+    color: #e2e8f0; /* slate-200 for text visibility */
 }
 
 /* Better touch feedback for mobile */
