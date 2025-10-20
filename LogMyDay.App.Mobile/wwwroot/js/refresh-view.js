@@ -12,7 +12,6 @@
     window.refreshViewInstances = window.refreshViewInstances || new Map();
 
     const SCROLL_TOP_TOLERANCE = 1;
-    const SCROLLABLE_OVERFLOW_VALUES = new Set(['auto', 'scroll', 'overlay']);
 
     const getFallbackScrollElement = function() {
         return document.scrollingElement || document.documentElement || document.body || null;
@@ -38,103 +37,46 @@
         return value <= SCROLL_TOP_TOLERANCE;
     };
 
-    const isElementScrollable = function(element) {
-        if (!element) {
-            return false;
-        }
-
-        if (element === document.body || element === document.documentElement) {
-            const docElement = document.documentElement;
-            return (docElement.scrollHeight - docElement.clientHeight) > 1;
-        }
-
-        if (element === window || element === document) {
-            return false;
-        }
-
-        const style = window.getComputedStyle(element);
-        if (!style) {
-            return false;
-        }
-
-        const overflowY = style.overflowY || style.overflow;
-        const canScroll = SCROLLABLE_OVERFLOW_VALUES.has(overflowY);
-
-        if (!canScroll) {
-            return false;
-        }
-
-        return (element.scrollHeight - element.clientHeight) > 1;
-    };
-
-    const findScrollableDescendant = function(root) {
-        if (!root) {
-            return null;
-        }
-
-        const prioritizedSelectors = [
-            '[data-refresh-scrollable]',
-            '.mobile-content',
-            '.refresh-content'
-        ];
-
-        for (const selector of prioritizedSelectors) {
-            const candidates = root.querySelectorAll(selector);
-            for (const candidate of candidates) {
-                if (candidate && candidate !== root && isElementScrollable(candidate)) {
-                    return candidate;
-                }
-            }
-        }
-
-        const treeWalker = document.createTreeWalker(
-            root,
-            NodeFilter.SHOW_ELEMENT,
-            null,
-            false
-        );
-
-        while (treeWalker.nextNode()) {
-            const node = treeWalker.currentNode;
-            if (node && node !== root && isElementScrollable(node)) {
-                return node;
-            }
-        }
-
-        return null;
-    };
-
-    const findScrollableAncestor = function(element) {
-        let current = element ? element.parentElement : null;
-
-        while (current) {
-            if (isElementScrollable(current) || current.hasAttribute('data-refresh-scrollable')) {
-                return current;
-            }
-
-            current = current.parentElement;
-        }
-
-        return null;
-    };
-
     const findScrollTarget = function(element) {
         if (!element) {
             return getFallbackScrollElement();
         }
 
-        if (isElementScrollable(element) || element.hasAttribute('data-refresh-scrollable')) {
-            return element;
+        const attributeSelector = '[data-refresh-scrollable]';
+
+        const attributeAncestor = element.closest(attributeSelector);
+        if (attributeAncestor) {
+            return attributeAncestor;
         }
 
-        const descendant = findScrollableDescendant(element);
-        if (descendant) {
-            return descendant;
+        const mobileAncestor = element.closest('.mobile-content');
+        if (mobileAncestor) {
+            return mobileAncestor;
         }
 
-        const ancestor = findScrollableAncestor(element);
-        if (ancestor) {
-            return ancestor;
+        const attributeDescendant = element.querySelector(attributeSelector);
+        if (attributeDescendant) {
+            return attributeDescendant;
+        }
+
+        const refreshContent = element.querySelector('.refresh-content');
+        if (refreshContent) {
+            const nestedAttribute = refreshContent.querySelector(attributeSelector);
+            if (nestedAttribute) {
+                return nestedAttribute;
+            }
+
+            const nestedMobile = refreshContent.querySelector('.mobile-content');
+            if (nestedMobile) {
+                return nestedMobile;
+            }
+
+            return refreshContent;
+        }
+
+        const mobileDescendant = element.querySelector('.mobile-content');
+        if (mobileDescendant) {
+            return mobileDescendant;
         }
 
         return getFallbackScrollElement();
@@ -146,7 +88,7 @@
         }
 
         const target = findScrollTarget(instance.element);
-        instance.scrollTarget = target || getFallbackScrollElement();
+        instance.scrollTarget = target || instance.scrollTarget || getFallbackScrollElement();
         return instance.scrollTarget;
     };
 

@@ -76,7 +76,7 @@ public partial class MainPage : ContentPage
                     try {
                         if (typeof window.getRefreshViewScrollTop === 'function') {
                             var targetScrollTop = window.getRefreshViewScrollTop();
-                            return targetScrollTop || 0;
+                            return (targetScrollTop || 0).toString();
                         }
 
                         var fallback = document.querySelector('.mobile-content') ||
@@ -96,10 +96,10 @@ public partial class MainPage : ContentPage
                         }
 
                         console.log('Scroll position check (fallback):', scrollTop);
-                        return scrollTop || 0;
+                        return (scrollTop || 0).toString();
                     } catch (err) {
                         console.error('RefreshView: Error during scroll position check', err);
-                        return 1;
+                        return '1';
                     }
                 })()
             ");
