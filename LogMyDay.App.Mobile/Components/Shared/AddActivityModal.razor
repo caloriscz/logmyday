@@ -101,9 +101,9 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="">
                             <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Start Date & Time:</label>
-                            <CultureAwareDatePicker Value="@Activity.DateStarted" 
-                                                  ValueChanged="@((DateTime? v) => { Activity.DateStarted = v ?? DateTime.Now; })" 
-                                                  EnableTime="true" 
+                            <CultureAwareDatePicker Value="@Activity.DateStarted"
+                                                  ValueChanged="@OnDateStartedChanged"
+                                                  EnableTime="true"
                                                   Placeholder="Select start date & time" />
                         </div>
                         @if (selectedTag?.IsRange == true)
@@ -427,11 +427,17 @@
     {
         Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
     }
-    
+
     private void OnDateValueInputChanged(DateTime? value)
     {
         dateValue = value;
         OnDateValueChanged();
+    }
+
+    private void OnDateStartedChanged(DateTime? value)
+    {
+        dateStartedManuallyModified = true;
+        Activity.DateStarted = value ?? GetCurrentDateTimeInDisplayZone();
     }
     
     private void OnTimeValueChanged()
@@ -504,6 +510,10 @@
         dateValue = null;
         timeValue = null;
         decimalValue = null;
+        lastInitializedTagId = null;
+        lastAppliedPreselectedDate = null;
+        lastObservedPreselectedDate = null;
+        dateStartedManuallyModified = false;
     }
 }
 
