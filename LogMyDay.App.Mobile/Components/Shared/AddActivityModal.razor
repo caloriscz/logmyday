@@ -181,11 +181,6 @@
     private decimal? decimalValue = null;
 
     private TimeZoneInfo effectiveTimeZone = TimeZoneInfo.Local;
-    private ActivityRequest? lastActivityInstance;
-    private int? lastInitializedTagId;
-    private DateTime? lastAppliedPreselectedDate;
-    private DateTime? lastObservedPreselectedDate;
-    private bool dateStartedManuallyModified;
 
     private string modalId => ModalId;
 
@@ -193,54 +188,24 @@
     {
         effectiveTimeZone = DisplayTimeZone ?? TimeZoneInfo.Local;
 
-        if (!ReferenceEquals(Activity, lastActivityInstance))
-        {
-            lastActivityInstance = Activity;
-            lastInitializedTagId = null;
-            lastAppliedPreselectedDate = null;
-            lastObservedPreselectedDate = null;
-            dateStartedManuallyModified = false;
-        }
-
         if (PreselectedTagId.HasValue && Activity.PrimaryTagId != PreselectedTagId)
         {
             Activity.PrimaryTagId = PreselectedTagId;
         }
 
-        var preselectedDateChanged = !Nullable.Equals(PreselectedDate, lastObservedPreselectedDate);
-        lastObservedPreselectedDate = PreselectedDate;
-
-        if (preselectedDateChanged)
-        {
-            dateStartedManuallyModified = false;
-        }
-
         if (PreselectedDate.HasValue)
         {
             var today = GetTodayInDisplayZone();
-            if (!dateStartedManuallyModified &&
-                (!lastAppliedPreselectedDate.HasValue || lastAppliedPreselectedDate.Value != PreselectedDate.Value || Activity.DateStarted == default))
-            {
-                Activity.DateStarted = PreselectedDate.Value.Date == today
-                    ? GetCurrentDateTimeInDisplayZone()
-                    : PreselectedDate.Value.Date;
-                lastAppliedPreselectedDate = PreselectedDate;
-                dateStartedManuallyModified = false;
-            }
+            Activity.DateStarted = PreselectedDate.Value.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : PreselectedDate.Value.Date;
         }
         else if (Activity.DateStarted == default)
         {
             Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
-            lastAppliedPreselectedDate = null;
-            dateStartedManuallyModified = false;
         }
 
-        var currentTagId = Activity.PrimaryTagId;
-        if (currentTagId != lastInitializedTagId)
-        {
-            OnTagSelectionChanged();
-            lastInitializedTagId = currentTagId;
-        }
+        OnTagSelectionChanged();
     }
 
     private DateTime GetCurrentDateTimeInDisplayZone()
