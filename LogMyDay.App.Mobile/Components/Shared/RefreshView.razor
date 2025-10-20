@@ -14,7 +14,7 @@
         </div>
     </div>
     
-    <div class="refresh-content" @ref="refreshContent">
+    <div class="refresh-content" data-refresh-scrollable="true" @ref="refreshContent">
         @ChildContent
     </div>
 </div>
@@ -33,6 +33,7 @@
     private double startY = 0;
     private const double PULL_THRESHOLD = 80; // pixels to trigger refresh
     private const double MAX_PULL = 120; // maximum pull distance
+    private const double SCROLL_TOLERANCE = 1.0; // tolerance in pixels when checking scroll position
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -102,23 +103,51 @@
     {
         Console.WriteLine($"RefreshView: OnTouchMove - clientY={clientY}, scrollTop={scrollTop}, startY={startY}");
         
-        // CRITICAL: Only allow pull-to-refresh when EXACTLY at top (scrollTop == 0)
-        // This prevents accidental refresh when user scrolls up from a scrolled position
-        if (isRefreshing || !IsEnabled || scrollTop != 0) 
+        // CRITICAL: Only allow pull-to-refresh when we're effectively at the top (within tolerance)
+        // This prevents accidental refresh when the user scrolls up from a scrolled position
+        if (isRefreshing || !IsEnabled)
         {
             Console.WriteLine($"RefreshView: Touch move blocked - isRefreshing={isRefreshing}, IsEnabled={IsEnabled}, scrollTop={scrollTop}");
             return;
         }
-        
+
         var deltaY = clientY - startY;
         Console.WriteLine($"RefreshView: deltaY={deltaY}");
-        
-        // Only pull down (positive deltaY) when at exact top (scrollTop == 0)
-        if (deltaY > 0 && scrollTop == 0)
+
+        // If we've scrolled away from the top, immediately reset any pull state
+        if (scrollTop > SCROLL_TOLERANCE)
+        {
+            if (isPulling)
+            {
+                Console.WriteLine($"RefreshView: Scroll moved away from top (scrollTop={scrollTop}), resetting pull state");
+                isPulling = false;
+                pullDistance = 0;
+                await ResetPullIndicator();
+            }
+
+            return;
+        }
+
+        // If the user changes direction (moves finger upwards), reset the pull indicator
+        if (deltaY <= 0)
+        {
+            if (isPulling)
+            {
+                Console.WriteLine("RefreshView: Pull reversed before threshold, resetting state");
+                isPulling = false;
+                pullDistance = 0;
+                await ResetPullIndicator();
+            }
+
+            return;
+        }
+
+        // Only pull down (positive deltaY) when we remain within the tolerance of the top
+        if (deltaY > 0 && scrollTop <= SCROLL_TOLERANCE)
         {
             isPulling = true;
             pullDistance = Math.Min(deltaY * 0.5, MAX_PULL); // Apply resistance
-            
+
             Console.WriteLine($"RefreshView: Pulling - distance={pullDistance}, threshold={PULL_THRESHOLD}");
             
             // Update visual feedback immediately

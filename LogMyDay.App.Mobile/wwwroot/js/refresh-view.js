@@ -11,6 +11,145 @@
     // Initialize global storage
     window.refreshViewInstances = window.refreshViewInstances || new Map();
 
+    const SCROLL_TOP_TOLERANCE = 1;
+    const SCROLLABLE_OVERFLOW_VALUES = new Set(['auto', 'scroll', 'overlay']);
+
+    const getFallbackScrollElement = function() {
+        return document.scrollingElement || document.documentElement || document.body || null;
+    };
+
+    const readScrollTop = function(target) {
+        if (!target) {
+            return 0;
+        }
+
+        if (target === document || target === window) {
+            return window.pageYOffset || 0;
+        }
+
+        if (target === document.body || target === document.documentElement) {
+            return window.pageYOffset || target.scrollTop || 0;
+        }
+
+        return target.scrollTop || 0;
+    };
+
+    const isNearTop = function(value) {
+        return value <= SCROLL_TOP_TOLERANCE;
+    };
+
+    const isElementScrollable = function(element) {
+        if (!element) {
+            return false;
+        }
+
+        if (element === document.body || element === document.documentElement) {
+            const docElement = document.documentElement;
+            return (docElement.scrollHeight - docElement.clientHeight) > 1;
+        }
+
+        if (element === window || element === document) {
+            return false;
+        }
+
+        const style = window.getComputedStyle(element);
+        if (!style) {
+            return false;
+        }
+
+        const overflowY = style.overflowY || style.overflow;
+        const canScroll = SCROLLABLE_OVERFLOW_VALUES.has(overflowY);
+
+        if (!canScroll) {
+            return false;
+        }
+
+        return (element.scrollHeight - element.clientHeight) > 1;
+    };
+
+    const findScrollableDescendant = function(root) {
+        if (!root) {
+            return null;
+        }
+
+        const prioritizedSelectors = [
+            '[data-refresh-scrollable]',
+            '.mobile-content',
+            '.refresh-content'
+        ];
+
+        for (const selector of prioritizedSelectors) {
+            const candidates = root.querySelectorAll(selector);
+            for (const candidate of candidates) {
+                if (candidate && candidate !== root && isElementScrollable(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+
+        const treeWalker = document.createTreeWalker(
+            root,
+            NodeFilter.SHOW_ELEMENT,
+            null,
+            false
+        );
+
+        while (treeWalker.nextNode()) {
+            const node = treeWalker.currentNode;
+            if (node && node !== root && isElementScrollable(node)) {
+                return node;
+            }
+        }
+
+        return null;
+    };
+
+    const findScrollableAncestor = function(element) {
+        let current = element ? element.parentElement : null;
+
+        while (current) {
+            if (isElementScrollable(current) || current.hasAttribute('data-refresh-scrollable')) {
+                return current;
+            }
+
+            current = current.parentElement;
+        }
+
+        return null;
+    };
+
+    const findScrollTarget = function(element) {
+        if (!element) {
+            return getFallbackScrollElement();
+        }
+
+        if (isElementScrollable(element) || element.hasAttribute('data-refresh-scrollable')) {
+            return element;
+        }
+
+        const descendant = findScrollableDescendant(element);
+        if (descendant) {
+            return descendant;
+        }
+
+        const ancestor = findScrollableAncestor(element);
+        if (ancestor) {
+            return ancestor;
+        }
+
+        return getFallbackScrollElement();
+    };
+
+    const resolveScrollTarget = function(instance) {
+        if (!instance) {
+            return null;
+        }
+
+        const target = findScrollTarget(instance.element);
+        instance.scrollTarget = target || getFallbackScrollElement();
+        return instance.scrollTarget;
+    };
+
     window.initializeRefreshView = function(element, dotNetRef) {
         console.log('RefreshView: Initializing touch handlers', { element, dotNetRef });
         
@@ -30,7 +169,8 @@
             dotNetRef: dotNetRef,
             touchStartY: 0,
             touchStartScrollTop: 0,  // Track scroll position when touch started
-            isTracking: false
+            isTracking: false,
+            scrollTarget: null
         };
         
         // Store instance reference
@@ -39,20 +179,20 @@
         // Touch event handlers
         const handleTouchStart = function(e) {
             if (e.touches.length !== 1) return;
-            
+
             const touch = e.touches[0];
-            
-            // Find the actual scrollable content within the refresh container
-            const refreshContent = element.querySelector('.refresh-content');
-            const scrollTop = refreshContent ? refreshContent.scrollTop : 0;
-            
+
+            // Find the actual scrollable content related to the refresh container
+            const scrollTarget = resolveScrollTarget(instance);
+            const scrollTop = readScrollTop(scrollTarget);
+
             // CRITICAL: Only start tracking if we're EXACTLY at the top (scrollTop === 0)
             // This prevents pull-to-refresh from activating when scrolling up from a scrolled position
-            if (scrollTop === 0) {
+            if (isNearTop(scrollTop)) {
                 instance.touchStartY = touch.clientY;
                 instance.touchStartScrollTop = scrollTop;
                 instance.isTracking = true;
-                
+
                 try {
                     dotNetRef.invokeMethodAsync('OnTouchStart', touch.clientY);
                 } catch (ex) {
@@ -63,41 +203,49 @@
                 instance.isTracking = false;
             }
         };
-        
+
         const handleTouchMove = function(e) {
             if (!instance.isTracking || e.touches.length !== 1) return;
-            
+
             const touch = e.touches[0];
             const deltaY = touch.clientY - instance.touchStartY;
-            
-            // Find the actual scrollable content within the refresh container
-            const refreshContent = element.querySelector('.refresh-content');
-            const scrollTop = refreshContent ? refreshContent.scrollTop : 0;
-            
+
+            const scrollTarget = resolveScrollTarget(instance);
+            const scrollTop = readScrollTop(scrollTarget);
+            const startedAtTop = isNearTop(instance.touchStartScrollTop);
+            const currentlyAtTop = isNearTop(scrollTop);
+
             // CRITICAL: Only activate pull-to-refresh when:
-            // 1. Touch started at the very top (touchStartScrollTop === 0)
-            // 2. STILL EXACTLY at the top (scrollTop === 0) - no tolerance!
-            // 3. User is pulling DOWN (deltaY > 0)
+            // 1. Touch started at the very top (within tolerance)
+            // 2. The scroll position is still within the top tolerance
+            // 3. The gesture remains a downward pull (deltaY > 0 for preventDefault)
             // This prevents accidental refresh when scrolling up from below
-            if (instance.touchStartScrollTop === 0 && scrollTop === 0 && deltaY > 0) {
+            if (startedAtTop && currentlyAtTop) {
                 // Prevent default scroll behavior when pulling to refresh
                 // But only after significant pull to avoid interfering with normal touches
                 if (deltaY > 10) {
                     e.preventDefault();
                     e.stopPropagation();
                 }
-                
+
                 try {
                     dotNetRef.invokeMethodAsync('OnTouchMove', touch.clientY, scrollTop);
                 } catch (ex) {
                     console.error('RefreshView: Error in touchMove handler', ex);
                 }
-            } else if (scrollTop > 0 || deltaY < 0) {
-                // User has scrolled away from top or is scrolling up - disable pull-to-refresh
+            } else {
+                // User has scrolled away from top or changed direction - notify and stop tracking
                 instance.isTracking = false;
+
+                try {
+                    dotNetRef.invokeMethodAsync('OnTouchMove', touch.clientY, scrollTop);
+                    dotNetRef.invokeMethodAsync('OnTouchEnd');
+                } catch (ex) {
+                    console.error('RefreshView: Error cancelling touch move', ex);
+                }
             }
         };
-        
+
         const handleTouchEnd = function(e) {
             if (!instance.isTracking) return;
             
@@ -125,6 +273,24 @@
         };
         
         console.log('RefreshView: Touch handlers initialized successfully');
+    };
+
+    window.getRefreshViewScrollTop = function() {
+        try {
+            if (window.refreshViewInstances && window.refreshViewInstances.size > 0) {
+                for (const instance of window.refreshViewInstances.values()) {
+                    const target = resolveScrollTarget(instance);
+                    const scrollTop = Math.max(0, readScrollTop(target));
+                    return scrollTop;
+                }
+            }
+
+            const fallback = getFallbackScrollElement();
+            return Math.max(0, readScrollTop(fallback));
+        } catch (ex) {
+            console.error('RefreshView: Error determining scroll position', ex);
+            return 0;
+        }
     };
 
     window.updateRefreshIndicator = function(indicator, translateY, opacity) {
@@ -190,12 +356,14 @@
                 element.removeEventListener('touchend', instance.handlers.touchend);
                 element.removeEventListener('touchcancel', instance.handlers.touchcancel);
             }
-            
+
             // Clean up references
             if (instance.dotNetRef) {
                 instance.dotNetRef.dispose();
             }
-            
+
+            instance.scrollTarget = null;
+
             window.refreshViewInstances.delete(element);
             console.log('RefreshView: Cleaned up successfully');
         } catch (ex) {
