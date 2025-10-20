@@ -72,9 +72,34 @@ public partial class MainPage : ContentPage
             // Execute JavaScript synchronously and get result
             var result = await RunJavaScriptAsync(@"
                 (function() {
-                    var scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-                    console.log('Scroll position check:', scrollTop);
-                    return scrollTop.toString();
+                    try {
+                        if (typeof window.getRefreshViewScrollTop === 'function') {
+                            var targetScrollTop = window.getRefreshViewScrollTop();
+                            return (targetScrollTop || 0).toString();
+                        }
+
+                        var fallback = document.querySelector('.mobile-content') ||
+                                        document.querySelector('[data-refresh-scrollable]') ||
+                                        document.scrollingElement ||
+                                        document.documentElement ||
+                                        document.body;
+
+                        var scrollTop = 0;
+
+                        if (fallback) {
+                            if (fallback === document.body || fallback === document.documentElement) {
+                                scrollTop = window.pageYOffset || fallback.scrollTop || 0;
+                            } else {
+                                scrollTop = fallback.scrollTop || 0;
+                            }
+                        }
+
+                        console.log('Scroll position check (fallback):', scrollTop);
+                        return (scrollTop || 0).toString();
+                    } catch (err) {
+                        console.error('RefreshView: Error during scroll position check', err);
+                        return '1';
+                    }
                 })()
             ");
             
