@@ -1,4 +1,5 @@
 using LogMyDay.App.Mobile.Services;
+using System.Globalization;
 
 #if ANDROID
 using Android.Webkit;
@@ -102,19 +103,21 @@ public partial class MainPage : ContentPage
                     }
                 })()
             ");
-            
+
             System.Diagnostics.Debug.WriteLine($"[RefreshView] JavaScript returned: '{result}'");
-            
+
             if (string.IsNullOrWhiteSpace(result))
             {
                 System.Diagnostics.Debug.WriteLine("[RefreshView] Empty result, defaulting to NOT at top");
                 return false;
             }
-            
-            if (int.TryParse(result.Trim(), out int scrollTop))
+
+            var sanitized = result.Trim().Trim('"');
+
+            if (double.TryParse(sanitized, NumberStyles.Float, CultureInfo.InvariantCulture, out double scrollTop))
             {
                 System.Diagnostics.Debug.WriteLine($"[RefreshView] Parsed scroll position: {scrollTop}");
-                bool isAtTop = scrollTop == 0;
+                bool isAtTop = Math.Abs(scrollTop) <= 0.5;
                 System.Diagnostics.Debug.WriteLine($"[RefreshView] Is at top: {isAtTop}");
                 return isAtTop;
             }
