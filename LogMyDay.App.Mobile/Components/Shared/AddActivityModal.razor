@@ -1,3 +1,5 @@
+@using System.Globalization
+@using System.Linq
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
 @using Microsoft.AspNetCore.Components.Forms
@@ -39,7 +41,20 @@
                     </div>
 
                     <div class="mb-4">
-                        @if (selectedTag?.TypeId.HasValue == true)
+                        @if (selectedOptionList is TagOptionListResponse optionList)
+                        {
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Value:</label>
+                            <InputSelect @bind-Value="selectedOptionValue"
+                                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                         @bind-Value:after="OnOptionValueChanged">
+                                <option value="">-- Select an option --</option>
+                                @foreach (var option in optionList.Options ?? Enumerable.Empty<TagOptionResponse>())
+                                {
+                                    <option value="@option.Value">@(!string.IsNullOrWhiteSpace(option.DisplayName) ? option.DisplayName : option.Value)</option>
+                                }
+                            </InputSelect>
+                        }
+                        else if (selectedTag?.TypeId.HasValue == true)
                         {
                             @switch (selectedTag.TypeId.Value)
                             {
@@ -140,15 +155,24 @@
     [Parameter] public ActivityRequest Activity { get; set; } = new();
     [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
     [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, TagOptionListResponse>? OptionListLookup { get; set; }
+    [Parameter] public CultureInfo? DisplayCulture { get; set; }
+    [Parameter] public TimeZoneInfo? DisplayTimeZone { get; set; }
+    [Parameter] public int? PreselectedTagId { get; set; }
+    [Parameter] public DateTime? PreselectedDate { get; set; }
     [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
     [Parameter] public EventCallback<bool> AddAnotherAfterSaveChanged { get; set; }
     [Parameter] public EventCallback<ActivityRequest> OnActivityCreated { get; set; }
     [Parameter] public EventCallback OnCanceled { get; set; }
     [Parameter] public EventCallback OnFormReset { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
     [Parameter] public string ModalId { get; set; } = "addActivityModal";
 
     private TagResponse? selectedTag;
-    
+    private TagOptionListResponse? selectedOptionList;
+    private string? selectedOptionValue;
+
     // Input type value helpers
     private bool booleanValue = false;
     private DateTime? dateValue = null;
@@ -156,13 +180,38 @@
     private TimeOnly? timeValue = null;
     private decimal? decimalValue = null;
 
+    private TimeZoneInfo effectiveTimeZone = TimeZoneInfo.Local;
+
     private string modalId => ModalId;
 
     protected override void OnParametersSet()
     {
-        // Update selected tag when activity changes
+        effectiveTimeZone = DisplayTimeZone ?? TimeZoneInfo.Local;
+
+        if (PreselectedTagId.HasValue && Activity.PrimaryTagId != PreselectedTagId)
+        {
+            Activity.PrimaryTagId = PreselectedTagId;
+        }
+
+        if (PreselectedDate.HasValue)
+        {
+            var today = GetTodayInDisplayZone();
+            Activity.DateStarted = PreselectedDate.Value.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : PreselectedDate.Value.Date;
+        }
+        else if (Activity.DateStarted == default)
+        {
+            Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
+        }
+
         OnTagSelectionChanged();
     }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, effectiveTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
 
     private async Task HandleValidSubmit()
     {
@@ -178,8 +227,8 @@
                     if (duplicateCheck.HasDuplicate)
                     {
                         var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                        await OnError.InvokeAsync($"Activity with tag '{selectedTag.Title}' already exists for this {granularityText}. This tag is not repeatable.");
                         await OnFormReset.InvokeAsync();
-                        // Parent will handle showing error message
                         return;
                     }
                 }
@@ -203,7 +252,7 @@
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            // AutoRetryAuthHandler will handle automatic retry and redirect to login if needed
+            await OnError.InvokeAsync("Authentication failed. Please refresh and try again.");
             await OnFormReset.InvokeAsync();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
@@ -211,64 +260,144 @@
             // Handle validation errors from the server
             var content = await ex.GetContentAsAsync<string>();
             Logger.LogWarning("Validation error creating activity: {Content}", content);
-            
+
             if (content != null && content.Contains("already exists"))
             {
-                await OnFormReset.InvokeAsync();
-                // Parent will handle showing duplicate error message
+                await OnError.InvokeAsync($"Activity with tag '{selectedTag?.Title}' already exists for this time period. This tag is not repeatable.");
             }
             else
             {
-                await OnFormReset.InvokeAsync();
-                // Parent will handle showing validation error message
+                await OnError.InvokeAsync($"Validation error: {content ?? "Invalid data provided."}");
             }
+
+            await OnFormReset.InvokeAsync();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error creating activity");
+            await OnError.InvokeAsync("An unexpected error occurred while creating the activity. Please try again.");
             await OnFormReset.InvokeAsync();
-            // Parent will handle showing general error message
         }
     }
 
     private void OnTagSelectionChanged()
     {
+        selectedOptionList = null;
+        selectedOptionValue = null;
+
         if (Activity.PrimaryTagId.HasValue && AvailableTags != null)
         {
             selectedTag = AvailableTags.FirstOrDefault(t => t.Id == Activity.PrimaryTagId.Value);
-            
-            // Clear DateFinished if the selected tag is not a range type
+
             if (selectedTag?.IsRange != true)
             {
                 Activity.DateFinished = null;
             }
-            
-            // Initialize input type values and clear description
+
             Activity.Description = null;
-            if (selectedTag?.TypeId == 1) // Integer
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
+            timeValue = null;
+            decimalValue = null;
+
+            if (selectedTag?.OptionListId is int listId)
             {
-                integerValue = null;
-                Activity.Description = string.Empty;
+                if (OptionListLookup != null && OptionListLookup.TryGetValue(listId, out var lookupList))
+                {
+                    selectedOptionList = lookupList;
+                }
+                else if (OptionLists != null)
+                {
+                    selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
+                }
+
+                if (selectedOptionList is not null)
+                {
+                    if (selectedOptionList.Options is null || selectedOptionList.Options.Count == 0)
+                    {
+                        Logger.LogWarning("Tag {TagId} references option list {OptionListId} without any options. Falling back to manual entry.", selectedTag.Id, selectedOptionList.Id);
+                        selectedOptionList = null;
+                    }
+                    else
+                    {
+                        if (!string.IsNullOrWhiteSpace(Activity.Description))
+                        {
+                            var match = selectedOptionList.Options.FirstOrDefault(o => string.Equals(o.Value, Activity.Description, StringComparison.OrdinalIgnoreCase));
+                            if (match is not null)
+                            {
+                                selectedOptionValue = match.Value;
+                            }
+                        }
+
+                        selectedOptionValue ??= ResolveDefaultOptionValue(selectedTag, selectedOptionList);
+                        Activity.Description = selectedOptionValue ?? string.Empty;
+                        return;
+                    }
+                }
             }
-            else if (selectedTag?.TypeId == 3) // Boolean
+
+            switch (selectedTag?.TypeId)
             {
-                booleanValue = false;
-                Activity.Description = "false";
-            }
-            else if (selectedTag?.TypeId == 4) // Date
-            {
-                dateValue = DateTime.Today;
-                Activity.Description = DateTime.Today.ToString("yyyy-MM-dd");
-            }
-            else if (selectedTag?.TypeId == 5) // Time
-            {
-                timeValue = TimeOnly.FromDateTime(DateTime.Now);
-                Activity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
-            }
-            else if (selectedTag?.TypeId == 6) // Decimal, precision 2
-            {
-                decimalValue = null;
-                Activity.Description = string.Empty;
+                case 1:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && int.TryParse(selectedTag.DefaultValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var defaultInt))
+                    {
+                        integerValue = defaultInt;
+                        Activity.Description = defaultInt.ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        Activity.Description = string.Empty;
+                    }
+                    break;
+                case 2:
+                    Activity.Description = selectedTag.DefaultValue ?? string.Empty;
+                    break;
+                case 3:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && bool.TryParse(selectedTag.DefaultValue, out var defaultBool))
+                    {
+                        booleanValue = defaultBool;
+                    }
+                    Activity.Description = booleanValue ? "true" : "false";
+                    break;
+                case 4:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && DateTime.TryParse(selectedTag.DefaultValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var defaultDate))
+                    {
+                        dateValue = defaultDate.Date;
+                    }
+                    else
+                    {
+                        dateValue = Activity.DateStarted.Date;
+                    }
+
+                    Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+                    break;
+                case 5:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && TimeOnly.TryParse(selectedTag.DefaultValue, CultureInfo.InvariantCulture, out var defaultTime))
+                    {
+                        timeValue = defaultTime;
+                    }
+                    else
+                    {
+                        timeValue = TimeOnly.FromDateTime(Activity.DateStarted);
+                    }
+
+                    Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+                    break;
+                case 6:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && decimal.TryParse(selectedTag.DefaultValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var defaultDecimal))
+                    {
+                        decimalValue = defaultDecimal;
+                        Activity.Description = defaultDecimal.ToString("0.#############################", CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        Activity.Description = string.Empty;
+                    }
+                    break;
+                default:
+                    Activity.Description = string.Empty;
+                    break;
             }
         }
         else
@@ -286,7 +415,7 @@
     
     private void OnIntegerValueChanged()
     {
-        Activity.Description = integerValue?.ToString() ?? string.Empty;
+        Activity.Description = integerValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
     }
     
     private void OnBooleanValueChanged()
@@ -296,7 +425,7 @@
     
     private void OnDateValueChanged()
     {
-        Activity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+        Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
     }
     
     private void OnDateValueInputChanged(DateTime? value)
@@ -307,7 +436,7 @@
     
     private void OnTimeValueChanged()
     {
-        Activity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+        Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
     }
     
     private void OnDecimalValueChanged()
@@ -320,12 +449,41 @@
             {
                 decimalValue = rounded;
             }
-            Activity.Description = rounded.ToString("F2");
+            Activity.Description = rounded.ToString("0.#############################", CultureInfo.InvariantCulture);
         }
         else
         {
             Activity.Description = string.Empty;
         }
+    }
+
+    private void OnOptionValueChanged()
+    {
+        Activity.Description = selectedOptionValue ?? string.Empty;
+    }
+
+    private static string? ResolveDefaultOptionValue(TagResponse? tag, TagOptionListResponse optionList)
+    {
+        if (optionList.Options is null || optionList.Options.Count == 0)
+        {
+            return null;
+        }
+
+        if (tag is null)
+        {
+            return optionList.Options.FirstOrDefault()?.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
+        {
+            var match = optionList.Options.FirstOrDefault(o => string.Equals(o.Value, tag.DefaultValue, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                return match.Value;
+            }
+        }
+
+        return optionList.Options.FirstOrDefault()?.Value;
     }
 
     private async Task OnAddAnotherChanged()
@@ -339,6 +497,8 @@
     public void ResetForm()
     {
         selectedTag = null;
+        selectedOptionList = null;
+        selectedOptionValue = null;
         integerValue = null;
         booleanValue = false;
         dateValue = null;
