@@ -11,6 +11,98 @@ public partial class MainPage : ContentPage
     public MainPage()
     {
         InitializeComponent();
+        refreshView.Refreshing += OnRefreshing;
+    }
+
+    private async void OnRefreshing(object? sender, EventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[RefreshView] OnRefreshing triggered");
+            
+#if ANDROID
+            // FIRST: Check native WebView scroll position (fast, synchronous)
+            if (blazorWebView?.Handler?.PlatformView is Android.Webkit.WebView webView)
+            {
+                var nativeScrollY = webView.ScrollY;
+                System.Diagnostics.Debug.WriteLine($"[RefreshView] Native WebView ScrollY: {nativeScrollY}");
+                
+                // If native scroll is not at top, cancel immediately
+                if (nativeScrollY > 5) // Small tolerance for floating point precision
+                {
+                    System.Diagnostics.Debug.WriteLine("[RefreshView] Native scroll not at top, cancelling");
+                    refreshView.IsRefreshing = false;
+                    return;
+                }
+            }
+#endif
+            
+            // SECOND: Double-check with JavaScript scroll position (accurate but slower)
+            var isAtTop = await CheckIfAtTopAsync();
+            
+            if (!isAtTop)
+            {
+                System.Diagnostics.Debug.WriteLine("[RefreshView] JavaScript confirms not at top, cancelling refresh");
+                refreshView.IsRefreshing = false;
+                return;
+            }
+            
+            System.Diagnostics.Debug.WriteLine("[RefreshView] At top (both checks passed), executing refresh");
+            
+            // Notify Blazor pages to refresh
+            RefreshService.RequestRefresh();
+            
+            // Wait for refresh to complete
+            await Task.Delay(1000);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[RefreshView] Error: {ex.Message}");
+        }
+        finally
+        {
+            refreshView.IsRefreshing = false;
+        }
+    }
+
+    private async Task<bool> CheckIfAtTopAsync()
+    {
+        try
+        {
+            // Execute JavaScript synchronously and get result
+            var result = await RunJavaScriptAsync(@"
+                (function() {
+                    var scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+                    console.log('Scroll position check:', scrollTop);
+                    return scrollTop.toString();
+                })()
+            ");
+            
+            System.Diagnostics.Debug.WriteLine($"[RefreshView] JavaScript returned: '{result}'");
+            
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                System.Diagnostics.Debug.WriteLine("[RefreshView] Empty result, defaulting to NOT at top");
+                return false;
+            }
+            
+            if (int.TryParse(result.Trim(), out int scrollTop))
+            {
+                System.Diagnostics.Debug.WriteLine($"[RefreshView] Parsed scroll position: {scrollTop}");
+                bool isAtTop = scrollTop == 0;
+                System.Diagnostics.Debug.WriteLine($"[RefreshView] Is at top: {isAtTop}");
+                return isAtTop;
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"[RefreshView] Could not parse scroll position: '{result}'");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[RefreshView] Error checking scroll position: {ex.Message}");
+            // On error, assume NOT at top to prevent unwanted refreshes
+            return false;
+        }
     }
 
     /// <summary>
@@ -81,29 +173,4 @@ public partial class MainPage : ContentPage
         }
     }
 #endif
-
-    private void OnRefreshing(object sender, EventArgs e)
-    {
-        try
-        {
-            // Notify the current Blazor page to refresh its data
-            RefreshService.RequestRefresh();
-        }
-        catch (Exception ex)
-        {
-            // Log the error but don't crash the app
-            System.Diagnostics.Debug.WriteLine($"Error during refresh: {ex.Message}");
-        }
-        finally
-        {
-            // Stop the refresh animation after a short delay to allow Blazor to respond
-            Task.Delay(1000).ContinueWith(_ => 
-            {
-                Microsoft.Maui.Controls.Application.Current?.Dispatcher.Dispatch(() => 
-                {
-                    refreshView.IsRefreshing = false;
-                });
-            });
-        }
-    }
 }

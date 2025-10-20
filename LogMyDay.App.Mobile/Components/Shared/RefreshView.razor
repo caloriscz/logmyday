@@ -102,7 +102,9 @@
     {
         Console.WriteLine($"RefreshView: OnTouchMove - clientY={clientY}, scrollTop={scrollTop}, startY={startY}");
         
-        if (isRefreshing || !IsEnabled || scrollTop > 0) 
+        // CRITICAL: Only allow pull-to-refresh when EXACTLY at top (scrollTop == 0)
+        // This prevents accidental refresh when user scrolls up from a scrolled position
+        if (isRefreshing || !IsEnabled || scrollTop != 0) 
         {
             Console.WriteLine($"RefreshView: Touch move blocked - isRefreshing={isRefreshing}, IsEnabled={IsEnabled}, scrollTop={scrollTop}");
             return;
@@ -111,7 +113,8 @@
         var deltaY = clientY - startY;
         Console.WriteLine($"RefreshView: deltaY={deltaY}");
         
-        if (deltaY > 0 && scrollTop <= 0)
+        // Only pull down (positive deltaY) when at exact top (scrollTop == 0)
+        if (deltaY > 0 && scrollTop == 0)
         {
             isPulling = true;
             pullDistance = Math.Min(deltaY * 0.5, MAX_PULL); // Apply resistance

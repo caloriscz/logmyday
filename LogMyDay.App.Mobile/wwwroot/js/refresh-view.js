@@ -46,7 +46,8 @@
             const refreshContent = element.querySelector('.refresh-content');
             const scrollTop = refreshContent ? refreshContent.scrollTop : 0;
             
-            // Only start tracking if we're at the top of the scroll
+            // CRITICAL: Only start tracking if we're EXACTLY at the top (scrollTop === 0)
+            // This prevents pull-to-refresh from activating when scrolling up from a scrolled position
             if (scrollTop === 0) {
                 instance.touchStartY = touch.clientY;
                 instance.touchStartScrollTop = scrollTop;
@@ -75,9 +76,10 @@
             
             // CRITICAL: Only activate pull-to-refresh when:
             // 1. Touch started at the very top (touchStartScrollTop === 0)
-            // 2. Still at the top or haven't scrolled (scrollTop <= 2 for tolerance)
+            // 2. STILL EXACTLY at the top (scrollTop === 0) - no tolerance!
             // 3. User is pulling DOWN (deltaY > 0)
-            if (instance.touchStartScrollTop === 0 && scrollTop <= 2 && deltaY > 0) {
+            // This prevents accidental refresh when scrolling up from below
+            if (instance.touchStartScrollTop === 0 && scrollTop === 0 && deltaY > 0) {
                 // Prevent default scroll behavior when pulling to refresh
                 // But only after significant pull to avoid interfering with normal touches
                 if (deltaY > 10) {
@@ -90,7 +92,7 @@
                 } catch (ex) {
                     console.error('RefreshView: Error in touchMove handler', ex);
                 }
-            } else if (scrollTop > 2 || deltaY < 0) {
+            } else if (scrollTop > 0 || deltaY < 0) {
                 // User has scrolled away from top or is scrolling up - disable pull-to-refresh
                 instance.isTracking = false;
             }
