@@ -16,7 +16,7 @@ public sealed class AuthService : IAuthService
     {
         _logger = logger;
     }
-    public async Task SignInAsync(HttpContext httpContext, User user)
+    public async Task SignInAsync(HttpContext httpContext, User user, bool rememberMe)
     {
         _logger.LogInformation("AuthService: Starting sign-in for User {UserId} ({Email})", user.Id, user.Email);
 
@@ -34,9 +34,24 @@ public sealed class AuthService : IAuthService
         var identity = new ClaimsIdentity(claims, AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
-        _logger.LogInformation("AuthService: Calling httpContext.SignInAsync with scheme '{Scheme}'", AuthenticationScheme);
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = rememberMe,
+            AllowRefresh = rememberMe
+        };
 
-        await httpContext.SignInAsync(AuthenticationScheme, principal);
+        if (rememberMe)
+        {
+            authProperties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30);
+        }
+
+        _logger.LogInformation(
+            "AuthService: Calling httpContext.SignInAsync with scheme '{Scheme}' (RememberMe={RememberMe}, ExpiresUtc={ExpiresUtc})",
+            AuthenticationScheme,
+            rememberMe,
+            authProperties.ExpiresUtc);
+
+        await httpContext.SignInAsync(AuthenticationScheme, principal, authProperties);
 
         _logger.LogInformation("AuthService.SignInAsync: Successfully signed in User {UserId} ({Email})", user.Id, user.Email);
     }
