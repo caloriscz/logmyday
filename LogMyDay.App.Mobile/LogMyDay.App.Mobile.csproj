@@ -16,7 +16,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0b1220" BaseSize="128,128" />
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Include="Resources\AppIcon\appicon.png" IsAppIcon="true">
 		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>

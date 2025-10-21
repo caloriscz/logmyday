@@ -1,5 +1,65 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="0" width="456" height="456" fill="#512BD4" />
-    <circle cx="228" cy="228" r="100" fill="white"/>
+<!-- LogMyDay splash (MAUI-safe SVG) -->
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LogMyDay loading">
+	<defs>
+		<!-- Subtle center glow behind the emblem (works in Skia/Maui) -->
+		<radialGradient id="panelGlow" cx="50%" cy="50%" r="55%">
+			<stop offset="0%" stop-color="#7EE7E7" stop-opacity="0.18"/>
+			<stop offset="60%" stop-color="#7EE7E7" stop-opacity="0.10"/>
+			<stop offset="100%" stop-color="#0B1220" stop-opacity="0"/>
+		</radialGradient>
+
+		<!-- Inner vignette to fake a soft shadow inside the emblem -->
+		<radialGradient id="innerShade" cx="50%" cy="50%" r="75%">
+			<stop offset="0%" stop-color="#1F2A37" stop-opacity="0.85"/>
+			<stop offset="70%" stop-color="#111827" stop-opacity="0.95"/>
+			<stop offset="100%" stop-color="#0B0F16" stop-opacity="1"/>
+		</radialGradient>
+
+		<!-- Stroke glow rings -->
+		<linearGradient id="ringStroke" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0%" stop-color="#6FDCE3" stop-opacity="0.55"/>
+			<stop offset="100%" stop-color="#5AB1FF" stop-opacity="0.35"/>
+		</linearGradient>
+	</defs>
+
+	<!-- Full background (dark, like the second screenshot) -->
+	<rect x="0" y="0" width="456" height="456" fill="#0B1220"/>
+
+	<!-- Soft square panel glow behind the emblem -->
+	<rect x="78" y="118" width="300" height="220" rx="22" ry="22" fill="url(#panelGlow)" opacity="0.7"/>
+
+	<!-- Concentric subtle rings -->
+	<circle cx="228" cy="228" r="124" fill="none" stroke="url(#ringStroke)" stroke-width="2" opacity="0.40"/>
+	<circle cx="228" cy="228" r="112" fill="none" stroke="url(#ringStroke)" stroke-width="1.5" opacity="0.28"/>
+
+	<!-- Emblem: dark disk with slight inner vignette -->
+	<circle cx="228" cy="228" r="100" fill="url(#innerShade)"/>
+
+	<!-- Emblem split (top light, bottom dark) – no masks/filters -->
+	<!-- Bottom half -->
+	<path d="M128 228a100 100 0 0 0 200 0Z" fill="#1F4F7B"/>
+	<!-- Top half -->
+	<path d="M128 228a100 100 0 0 1 200 0Z" fill="#7EE7E7" opacity="0.95"/>
+
+	<!-- Small dot on the rim -->
+	<circle cx="286" cy="188" r="16" fill="#64D2D0"/>
+
+	<!-- Outer fine stroke to crispen the emblem edge -->
+	<circle cx="228" cy="228" r="100" fill="none" stroke="#1B314B" stroke-width="2" opacity="0.9"/>
+
+	<!-- Static arc hint (spinner look) using stroke-dasharray; no animation -->
+	<circle cx="228" cy="228" r="119"
+			fill="none"
+			stroke="#6FDCE3"
+			stroke-width="3"
+			stroke-linecap="round"
+			stroke-dasharray="160 580"
+			opacity="0.55"/>
+
+	<!-- Loading label -->
+	<text x="228" y="420" text-anchor="middle"
+		  fill="#D1E1EC"
+		  font-family="Segoe UI, Roboto, Helvetica, Arial, system-ui, sans-serif"
+		  font-size="22"
+		  opacity="0.9">Loading…</text>
 </svg>
