@@ -109,12 +109,17 @@ public class AuthController : ControllerBase
 
     [HttpPost("login-form")]
     [IgnoreAntiforgeryToken]
-    public async Task<IActionResult> LoginForm([FromForm] string email, [FromForm] string password, CancellationToken cancellationToken)
+    public async Task<IActionResult> LoginForm(
+        [FromForm] string email,
+        [FromForm] string password,
+        [FromForm] bool remember = false,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogInformation("=== LOGIN FORM ATTEMPT START ===");
             _logger.LogInformation("Form login attempt for email: {Email}", email);
+            _logger.LogInformation("Remember me option selected: {Remember}", remember);
             _logger.LogInformation("Request URL: {RequestPath}", HttpContext.Request.Path);
             _logger.LogInformation("Request Method: {RequestMethod}", HttpContext.Request.Method);
             _logger.LogInformation("Request Headers: {Headers}", string.Join(", ", HttpContext.Request.Headers.Select(h => $"{h.Key}={h.Value}")));
@@ -150,8 +155,8 @@ public class AuthController : ControllerBase
             _logger.LogInformation("Cookie authentication settings: Scheme=lmd-cookie, Path={Path}, Domain={Domain}", 
                 HttpContext.Request.PathBase, HttpContext.Request.Host.Host);
             
-            _logger.LogInformation("Calling AuthService.SignInAsync...");
-            await _authService.SignInAsync(HttpContext, user);
+            _logger.LogInformation("Calling AuthService.SignInAsync... (RememberMe={Remember})", remember);
+            await _authService.SignInAsync(HttpContext, user, remember);
             _logger.LogInformation("AuthService.SignInAsync completed successfully");
             
             // Log cookie information
