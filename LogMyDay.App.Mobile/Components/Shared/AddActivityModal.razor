@@ -180,6 +180,12 @@
     private TimeOnly? timeValue = null;
     private decimal? decimalValue = null;
 
+    // State tracking fields
+    private bool dateStartedManuallyModified = false;
+    private int? lastInitializedTagId = null;
+    private DateTime? lastAppliedPreselectedDate = null;
+    private DateTime? lastObservedPreselectedDate = null;
+
     private TimeZoneInfo effectiveTimeZone = TimeZoneInfo.Local;
 
     private string modalId => ModalId;

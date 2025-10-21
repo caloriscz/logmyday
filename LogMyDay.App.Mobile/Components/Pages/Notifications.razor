@@ -8,6 +8,7 @@
 @inject NavigationManager Navigation
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject IJSRuntime JSRuntime
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <div class="max-w-7xl mx-auto px-6 py-6">
@@ -221,7 +222,7 @@
         Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
     }
 
-    private void PrepareModalForTag(int tagId)
+    private async Task PrepareModalForTag(int tagId)
     {
         preselectedTagId = tagId;
         var today = GetTodayInDisplayZone();
@@ -233,10 +234,32 @@
             PrimaryTagId = tagId
         };
         showAddActivityModal = true;
+     StateHasChanged();
+        
+        // Trigger the modal to show using JavaScript
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
+        }
+        catch (Exception ex)
+        {
+            // Log but don't throw - modal might still work via Blazor rendering
+            Console.WriteLine($"Error showing modal via JS: {ex.Message}");
+        }
     }
 
-    private void CloseAddActivityModal()
+    private async Task CloseAddActivityModal()
     {
+        // Hide modal via JavaScript first
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "addActivityModal");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error hiding modal via JS: {ex.Message}");
+        }
+     
         showAddActivityModal = false;
         preselectedTagId = null;
         errorMessage = null;
