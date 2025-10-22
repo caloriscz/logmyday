@@ -12,408 +12,453 @@
 @inject ILogger<Backup> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <h1 class="h3 mb-4">
-                <i class="fas fa-database me-2"></i>
-                Backup & Restore
-            </h1>
-        </div>
+<div class="mx-auto max-w-6xl px-4 py-6 space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">
+         <Icon Name="database" Class="inline h-8 w-8 mr-2" />
+   Backup & Restore
+     </h1>
+      <p class="text-sm text-gray-600 dark:text-slate-300">Export, import, and manage your activity data.</p>
     </div>
 
     @if (!string.IsNullOrEmpty(statusMessage))
     {
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="alert @(isError ? "alert-danger" : "alert-success") alert-dismissible fade show">
-                    <i class="fas @(isError ? "fa-exclamation-triangle" : "fa-check-circle") me-2"></i>
-                    @statusMessage
-                    <button type="button" class="btn-close" @onclick="ClearStatus"></button>
-                </div>
-            </div>
-        </div>
+        <div class="rounded-lg border @(isError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-green-200 bg-green-50 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-200") px-4 py-3 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-start gap-2">
+      <Icon Name="@(isError ? "exclamation-triangle" : "check-circle")" Class="h-5 w-5 mt-0.5 flex-shrink-0" />
+          <span class="text-sm">@statusMessage</span>
+  </div>
+                <button type="button" class="text-current hover:opacity-70 transition-opacity" @onclick="ClearStatus">
+           <Icon Name="close" Class="h-5 w-5" />
+           <span class="sr-only">Close</span>
+           </button>
+   </div>
+     </div>
     }
 
-    <div class="row">
+    <div class="grid gap-6 lg:grid-cols-2">
         <!-- Export Section -->
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-download me-2"></i>
-                        Export Data
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Export all your tags and activities to a JSON file for backup purposes.
-                    </p>
-                    
-                    @if (backupInfo != null)
-                    {
-                        <div class="mb-3">
-                            <h6>Current Database Statistics:</h6>
-                            <ul class="list-unstyled">
-                                <li><strong>Tags:</strong> @backupInfo.Metadata.TotalTags</li>
-                                <li><strong>Activities:</strong> @backupInfo.Metadata.TotalActivities</li>
-                                <li><strong>Input Types:</strong> @backupInfo.Metadata.TotalInputTypes</li>
-                                <li><strong>Patterns:</strong> @backupInfo.Metadata.TotalPatterns</li>
-                            </ul>
-                        </div>
-                    }
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+         <h2 class="text-lg font-semibold flex items-center gap-2">
+      <Icon Name="download" Class="h-5 w-5" />
+          Export Data
+      </h2>
+  </div>
+            <div class="p-6 space-y-4">
+       <p class="text-sm text-gray-700 dark:text-slate-200">
+        Export all your tags and activities to a JSON file for backup purposes.
+            </p>
+      
+  @if (backupInfo != null)
+        {
+     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+       <h3 class="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">Current Database Statistics:</h3>
+      <dl class="grid grid-cols-2 gap-3 text-sm">
+     <div>
+         <dt class="font-medium text-gray-600 dark:text-slate-400">Tags</dt>
+     <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTags</dd>
+         </div>
+          <div>
+  <dt class="font-medium text-gray-600 dark:text-slate-400">Activities</dt>
+           <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalActivities</dd>
+       </div>
+    <div>
+<dt class="font-medium text-gray-600 dark:text-slate-400">Input Types</dt>
+    <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalInputTypes</dd>
+   </div>
+  <div>
+    <dt class="font-medium text-gray-600 dark:text-slate-400">Patterns</dt>
+    <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalPatterns</dd>
+    </div>
+      </dl>
+         </div>
+     }
 
-                    <button class="btn btn-primary" 
-                            @onclick="ExportData" 
-                            disabled="@isExporting">
-                        @if (isExporting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                        }
-                        else
-                        {
-                            <i class="fas fa-download me-2"></i>
-                        }
-                        Export Data
-                    </button>
-                </div>
+  <button type="button" 
+         class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  @onclick="ExportData" 
+     disabled="@isExporting">
+   @if (isExporting)
+           {
+         <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+       <span>Exporting…</span>
+   }
+            else
+      {
+       <Icon Name="download" Class="h-4 w-4" />
+          <span>Export Data</span>
+        }
+      </button>
             </div>
+      </div>
+
+<!-- Import Section -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="border-b border-gray-200 bg-green-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+      <h2 class="text-lg font-semibold flex items-center gap-2">
+                <Icon Name="upload" Class="h-5 w-5" />
+       Import Data
+      </h2>
+            </div>
+   <div class="p-6 space-y-4">
+     <p class="text-sm text-gray-700 dark:text-slate-200">
+           Import tags and activities from a JSON backup file.
+                </p>
+
+       <div class="space-y-2">
+            <label for="fileInput" class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Backup File</label>
+        <InputFile id="fileInput" 
+    OnChange="OnFileSelected" 
+         accept=".json"
+       class="block w-full text-sm text-gray-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" />
         </div>
 
-        <!-- Import Section -->
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-upload me-2"></i>
-                        Import Data
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Import tags and activities from a JSON backup file.
-                    </p>
+       <div class="flex items-start gap-2">
+   <input type="checkbox" 
+            id="clearExisting" 
+   @bind="clearExistingData"
+      class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800">
+ <label for="clearExisting" class="text-sm font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
+     <Icon Name="exclamation-triangle" Class="h-4 w-4" />
+          Clear existing data before import
+       </label>
+     </div>
 
-                    <div class="mb-3">
-                        <label for="fileInput" class="form-label">Select Backup File</label>
-                        <InputFile id="fileInput" 
-                                  OnChange="OnFileSelected" 
-                                  accept=".json"
-                                  class="form-control" />
-                    </div>
+        @if (selectedFile != null)
+        {
+    <div class="text-sm text-gray-600 dark:text-slate-400">
+   Selected: <span class="font-medium">@selectedFile.Name</span> (@(selectedFile.Size / 1024)KB)
+                  </div>
+                }
 
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" 
-                               type="checkbox" 
-                               id="clearExisting" 
-                               @bind="clearExistingData">
-                        <label class="form-check-label text-warning" for="clearExisting">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            Clear existing data before import
-                        </label>
-                    </div>
+            <div class="flex flex-wrap gap-2">
+    <button type="button" 
+  class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+  @onclick="ValidateFile" 
+            disabled="@(selectedFile == null || isValidating)">
+       @if (isValidating)
+       {
+       <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+     <span>Validating…</span>
+    }
+   else
+             {
+            <Icon Name="check" Class="h-4 w-4" />
+       <span>Validate</span>
+   }
+          </button>
 
-                    @if (selectedFile != null)
-                    {
-                        <div class="mb-3">
-                            <small class="text-muted">
-                                Selected: @selectedFile.Name (@(selectedFile.Size / 1024)KB)
-                            </small>
-                        </div>
-                    }
-
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-secondary" 
-                                @onclick="ValidateFile" 
-                                disabled="@(selectedFile == null || isValidating)">
-                            @if (isValidating)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                            }
-                            else
-                            {
-                                <i class="fas fa-check me-2"></i>
-                            }
-                            Validate
-                        </button>
-
-                        <button class="btn btn-success" 
-                                @onclick="ImportData" 
-                                disabled="@(selectedFile == null || isImporting)">
-                            @if (isImporting)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                            }
-                            else
-                            {
-                                <i class="fas fa-upload me-2"></i>
-                            }
-                            Import
-                        </button>
-                    </div>
-                </div>
-            </div>        </div>
-
-        <!-- Excel Export Section -->
-        <div class="col-lg-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-file-excel me-2"></i>
-                        Excel Reports
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Generate Excel reports with activities data for selected tags.
-                    </p>
-
-                    <!-- Tag Selection -->
-                    <div class="mb-3">
-                        <label class="form-label">Select Tags:</label>
-                        @if (availableTags != null && availableTags.Any())
-                        {
-                            <div class="tag-selection" style="max-height: 200px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 0.375rem; padding: 0.5rem;">
-                                @foreach (var tag in availableTags)
-                                {
-                                    <div class="form-check">
-                                        <input class="form-check-input" 
-                                               type="checkbox" 
-                                               id="tag-@tag.Id"
-                                               @onchange="@((e) => ToggleTagSelection(tag.Id, (bool)e.Value!))" />
-                                        <label class="form-check-label" for="tag-@tag.Id">
-                                            @tag.Title
-                                        </label>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="text-muted">Loading tags...</div>
-                        }
-                    </div>
-
-                    <!-- Date Range -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Start Date:</label>
-                            <CultureAwareDatePicker Value="@excelStartDate" ValueChanged="@((DateTime? v) => excelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">End Date:</label>
-                            <CultureAwareDatePicker Value="@excelEndDate" ValueChanged="@((DateTime? v) => excelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
-                        </div>
-                    </div>
-
-                    @if (selectedTagIds.Any())
-                    {
-                        <div class="mb-3">
-                            <small class="text-muted">
-                                Selected @selectedTagIds.Count tag(s): 
-                                @string.Join(", ", availableTags?.Where(t => selectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())
-                            </small>
-                        </div>
-                    }
-
-                    @if (excelPreview != null)
-                    {
-                        <div class="mb-3">
-                            <div class="alert alert-info">
-                                <h6>Preview:</h6>
-                                <ul class="mb-0">
-                                    <li><strong>Activities:</strong> @excelPreview.TotalActivities</li>
-                                    <li><strong>Days:</strong> @excelPreview.TotalDays</li>
-                                    <li><strong>Period:</strong> @excelPreview.DateRangeStart?.ToString("dd/MM/yyyy") - @excelPreview.DateRangeEnd?.ToString("dd/MM/yyyy")</li>
-                                </ul>
-                            </div>
-                        </div>
-                    }
-
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-outline-info" 
-                                @onclick="PreviewExcelExport" 
-                                disabled="@(!selectedTagIds.Any() || isGeneratingPreview)">
-                            @if (isGeneratingPreview)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                            }
-                            else
-                            {
-                                <i class="fas fa-eye me-2"></i>
-                            }
-                            Preview
-                        </button>
-
-                        <button class="btn btn-info" 
-                                @onclick="GenerateExcelReport" 
-                                disabled="@(!selectedTagIds.Any() || isGeneratingExcel)">
-                            @if (isGeneratingExcel)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                            }
-                            else
-                            {
-                                <i class="fas fa-file-excel me-2"></i>
-                            }
-                            Generate Excel
-                        </button>
-                    </div>
-                </div>
+     <button type="button" 
+     class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          @onclick="ImportData" 
+ disabled="@(selectedFile == null || isImporting)">
+       @if (isImporting)
+       {
+      <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+     <span>Importing…</span>
+      }
+     else
+         {
+       <Icon Name="upload" Class="h-4 w-4" />
+          <span>Import</span>
+      }
+   </button>
+      </div>
             </div>
+      </div>
+
+     <!-- Excel Export Section -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+         <div class="border-b border-gray-200 bg-sky-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+      <Icon Name="document" Class="h-5 w-5" />
+       Excel Reports
+        </h2>
+    </div>
+     <div class="p-6 space-y-4">
+         <p class="text-sm text-gray-700 dark:text-slate-200">
+       Generate Excel reports with activities data for selected tags.
+             </p>
+
+            <!-- Tag Selection -->
+       <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Tags:</label>
+     @if (availableTags != null && availableTags.Any())
+        {
+         <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+           @foreach (var tag in availableTags)
+         {
+       <div class="flex items-center gap-2 py-1">
+             <input type="checkbox" 
+        id="tag-@tag.Id"
+      @onchange="@((e) => ToggleTagSelection(tag.Id, (bool)e.Value!))"
+        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
+            <label for="tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
+  @tag.Title
+         </label>
+   </div>
+ }
+             </div>
+       }
+        else
+             {
+   <div class="text-sm text-gray-500 dark:text-slate-400">Loading tags…</div>
+                 }
+ </div>
+
+    <!-- Date Range -->
+       <div class="grid gap-4 sm:grid-cols-2">
+    <div class="space-y-2">
+        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
+     <CultureAwareDatePicker Value="@excelStartDate" ValueChanged="@((DateTime? v) => excelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+     </div>
+  <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
+    <CultureAwareDatePicker Value="@excelEndDate" ValueChanged="@((DateTime? v) => excelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+         </div>
+            </div>
+
+          @if (selectedTagIds.Any())
+            {
+        <div class="text-sm text-gray-600 dark:text-slate-400">
+ Selected @selectedTagIds.Count tag(s): 
+        <span class="font-medium">@string.Join(", ", availableTags?.Where(t => selectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
+   </div>
+     }
+
+    @if (excelPreview != null)
+           {
+           <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-500/40 dark:bg-sky-500/20">
+          <h3 class="text-sm font-semibold text-sky-900 dark:text-sky-100 mb-2">Preview:</h3>
+            <dl class="grid grid-cols-2 gap-3 text-sm text-sky-800 dark:text-sky-200">
+    <div>
+        <dt class="font-medium">Activities</dt>
+      <dd>@excelPreview.TotalActivities</dd>
+          </div>
+           <div>
+           <dt class="font-medium">Days</dt>
+        <dd>@excelPreview.TotalDays</dd>
+             </div>
+         <div class="col-span-2">
+    <dt class="font-medium">Period</dt>
+    <dd>@excelPreview.DateRangeStart?.ToString("dd/MM/yyyy") - @excelPreview.DateRangeEnd?.ToString("dd/MM/yyyy")</dd>
+                 </div>
+      </dl>
+        </div>
+     }
+
+      <div class="flex flex-wrap gap-2">
+  <button type="button" 
+  class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+             @onclick="PreviewExcelExport" 
+        disabled="@(!selectedTagIds.Any() || isGeneratingPreview)">
+       @if (isGeneratingPreview)
+            {
+       <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+         <span>Loading…</span>
+ }
+ else
+         {
+          <Icon Name="eye" Class="h-4 w-4" />
+      <span>Preview</span>
+         }
+  </button>
+
+     <button type="button" 
+      class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+   @onclick="GenerateExcelReport" 
+     disabled="@(!selectedTagIds.Any() || isGeneratingExcel)">
+         @if (isGeneratingExcel)
+         {
+    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+           <span>Generating…</span>
+        }
+ else
+       {
+   <Icon Name="document" Class="h-4 w-4" />
+ <span>Generate Excel</span>
+       }
+           </button>
+         </div>
+          </div>
         </div>
     </div>
 
-    <!-- Second Row - Clear Data Section -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-trash me-2"></i>
-                        Danger Zone
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        <strong>Warning:</strong> This action will permanently delete all your data. 
-                        Make sure to export your data first if you want to keep it.
-                    </p>
+  <!-- Danger Zone Section -->
+    <div class="rounded-xl border border-rose-500 bg-white shadow-sm dark:border-rose-500 dark:bg-slate-900">
+        <div class="border-b border-rose-500 bg-rose-600 px-6 py-4 text-white dark:border-rose-500 rounded-t-xl">
+    <h2 class="text-lg font-semibold flex items-center gap-2">
+        <Icon Name="trash" Class="h-5 w-5" />
+       Danger Zone
+        </h2>
+        </div>
+     <div class="p-6 space-y-4">
+      <p class="text-sm text-gray-700 dark:text-slate-200">
+         <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> This action will permanently delete all your data. 
+         Make sure to export your data first if you want to keep it.
+       </p>
 
-                    <button class="btn btn-danger" 
-                            @onclick="ShowClearConfirmation"
-                            disabled="@isClearing">
-                        @if (isClearing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                        }
-                        else
-                        {
-                            <i class="fas fa-trash me-2"></i>
-                        }
-                        Clear All Data
-                    </button>
-                </div>
-            </div>
+  <button type="button" 
+      class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+       @onclick="ShowClearConfirmation"
+      disabled="@isClearing">
+   @if (isClearing)
+   {
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+        <span>Clearing…</span>
+     }
+     else
+ {
+      <Icon Name="trash" Class="h-4 w-4" />
+     <span>Clear All Data</span>
+ }
+      </button>
         </div>
     </div>
 
     <!-- Import Results Modal -->
     @if (importResult != null)
     {
-        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">
-                            @if (importResult.Success)
-                            {
-                                <i class="fas fa-check-circle text-success me-2"></i>
-                                <span>Import Successful</span>
-                            }
-                            else
-                            {
-                                <i class="fas fa-exclamation-triangle text-danger me-2"></i>
-                                <span>Import Failed</span>
-                            }
-                        </h5>
-                        <button type="button" class="btn-close" @onclick="() => importResult = null"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>@importResult.Message</p>
-                        
-                        @if (importResult.Success)
-                        {
-                            <h6>Import Statistics:</h6>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <ul class="list-unstyled">
-                                        <li><strong>Input Types:</strong> @importResult.Statistics.InputTypesImported imported, @importResult.Statistics.InputTypesSkipped skipped</li>
-                                        <li><strong>Patterns:</strong> @importResult.Statistics.PatternsImported imported, @importResult.Statistics.PatternsSkipped skipped</li>
-                                    </ul>
-                                </div>
-                                <div class="col-md-6">
-                                    <ul class="list-unstyled">
-                                        <li><strong>Tags:</strong> @importResult.Statistics.TagsImported imported, @importResult.Statistics.TagsSkipped skipped</li>
-                                        <li><strong>Activities:</strong> @importResult.Statistics.ActivitiesImported imported, @importResult.Statistics.ActivitiesSkipped skipped</li>
-                                    </ul>
-                                </div>
-                            </div>
-                            
-                            @if (importResult.Statistics.RecordsCleared > 0)
-                            {
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    @importResult.Statistics.RecordsCleared existing records were cleared before import.
-                                </div>
-                            }
-                        }
+     <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => importResult = null">
+       <div class="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+  <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+             @if (importResult.Success)
+             {
+   <Icon Name="check-circle" Class="h-5 w-5 text-green-600 dark:text-green-400" />
+           <span>Import Successful</span>
+      }
+      else
+ {
+          <Icon Name="exclamation-triangle" Class="h-5 w-5 text-rose-600 dark:text-rose-400" />
+         <span>Import Failed</span>
+      }
+          </h3>
+    <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => importResult = null">
+     <Icon Name="close" Class="h-5 w-5" />
+          <span class="sr-only">Close</span>
+        </button>
+       </div>
+           <div class="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-4">
+         <p class="text-sm text-gray-700 dark:text-slate-200">@importResult.Message</p>
+     
+        @if (importResult.Success)
+            {
+   <div>
+   <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">Import Statistics:</h4>
+   <div class="grid gap-4 sm:grid-cols-2">
+       <dl class="space-y-2 text-sm">
+                <div class="flex justify-between">
+    <dt class="font-medium text-gray-600 dark:text-slate-400">Input Types:</dt>
+         <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.InputTypesImported imported, @importResult.Statistics.InputTypesSkipped skipped</dd>
+      </div>
+     <div class="flex justify-between">
+   <dt class="font-medium text-gray-600 dark:text-slate-400">Patterns:</dt>
+       <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.PatternsImported imported, @importResult.Statistics.PatternsSkipped skipped</dd>
+  </div>
+        </dl>
+     <dl class="space-y-2 text-sm">
+            <div class="flex justify-between">
+        <dt class="font-medium text-gray-600 dark:text-slate-400">Tags:</dt>
+  <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TagsImported imported, @importResult.Statistics.TagsSkipped skipped</dd>
+    </div>
+     <div class="flex justify-between">
+    <dt class="font-medium text-gray-600 dark:text-slate-400">Activities:</dt>
+  <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.ActivitiesImported imported, @importResult.Statistics.ActivitiesSkipped skipped</dd>
+        </div>
+        </dl>
+    </div>
+                  
+     @if (importResult.Statistics.RecordsCleared > 0)
+      {
+                 <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200 flex items-start gap-2">
+          <Icon Name="info" Class="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <span>@importResult.Statistics.RecordsCleared existing records were cleared before import.</span>
+ </div>
+ }
+     </div>
+        }
 
-                        @if (importResult.Errors.Any())
-                        {
-                            <h6 class="text-danger">Errors:</h6>
-                            <ul class="text-danger">
-                                @foreach (var error in importResult.Errors)
-                                {
-                                    <li>@error</li>
-                                }
-                            </ul>
-                        }
+           @if (importResult.Errors.Any())
+            {
+  <div>
+     <h4 class="text-sm font-semibold text-rose-700 dark:text-rose-400 mb-2">Errors:</h4>
+        <ul class="list-disc list-inside space-y-1 text-sm text-rose-700 dark:text-rose-200">
+  @foreach (var error in importResult.Errors)
+      {
+          <li>@error</li>
+ }
+      </ul>
+              </div>
+             }
 
-                        @if (importResult.Warnings.Any())
-                        {
-                            <h6 class="text-warning">Warnings:</h6>
-                            <ul class="text-warning">
-                                @foreach (var warning in importResult.Warnings)
-                                {
-                                    <li>@warning</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @onclick="() => importResult = null">Close</button>
-                    </div>
-                </div>
-            </div>
+            @if (importResult.Warnings.Any())
+            {
+          <div>
+   <h4 class="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">Warnings:</h4>
+ <ul class="list-disc list-inside space-y-1 text-sm text-amber-700 dark:text-amber-200">
+     @foreach (var warning in importResult.Warnings)
+    {
+       <li>@warning</li>
+      }
+           </ul>
+          </div>
+      }
+   </div>
+           <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => importResult = null">Close</button>
+ </div>
+   </div>
         </div>
     }
 
     <!-- Clear Confirmation Modal -->
     @if (showClearConfirmation)
     {
-        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title text-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Confirm Data Deletion
-                        </h5>
-                        <button type="button" class="btn-close" @onclick="() => showClearConfirmation = false"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p><strong>Are you sure you want to delete ALL data?</strong></p>
-                        <p>This action cannot be undone. All tags, activities, input types, and patterns will be permanently deleted.</p>
-                        <p>Type <code>DELETE</code> to confirm:</p>
-                        <input type="text" class="form-control" @bind="confirmationText" placeholder="Type DELETE to confirm" />
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" @onclick="() => showClearConfirmation = false">Cancel</button>
-                        <button type="button" 
-                                class="btn btn-danger" 
-                                @onclick="ClearData" 
-                                disabled="@(confirmationText != "DELETE" || isClearing)">
-                            @if (isClearing)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span>
-                            }
-                            Delete All Data
-                        </button>
-                    </div>
-                </div>
-            </div>
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+ <div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+           <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+      <h3 class="text-lg font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-2">
+    <Icon Name="exclamation-triangle" Class="h-5 w-5" />
+          Confirm Data Deletion
+       </h3>
+     <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => showClearConfirmation = false">
+<Icon Name="close" Class="h-5 w-5" />
+      <span class="sr-only">Close</span>
+  </button>
         </div>
+   <div class="px-6 py-5 space-y-4">
+     <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">Are you sure you want to delete ALL data?</p>
+    <p class="text-sm text-gray-700 dark:text-slate-200">This action cannot be undone. All tags, activities, input types, and patterns will be permanently deleted.</p>
+         <div class="space-y-2">
+   <p class="text-sm text-gray-700 dark:text-slate-200">Type <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">DELETE</code> to confirm:</p>
+    <input type="text" 
+        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" 
+          @bind="confirmationText" 
+       placeholder="Type DELETE to confirm" />
+        </div>
+          </div>
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+         <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => showClearConfirmation = false">Cancel</button>
+           <button type="button" 
+       class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+          @onclick="ClearData" 
+      disabled="@(confirmationText != "DELETE" || isClearing)">
+          @if (isClearing)
+       {
+  <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+        <span>Deleting…</span>
+        }
+   else
+ {
+              <span>Delete All Data</span>
+     }
+          </button>
+    </div>
+     </div>
+     </div>
     }
 </div>
 
@@ -790,19 +835,19 @@
     window.downloadFile = (filename, contentBase64, contentType) => {
         const byteCharacters = atob(contentBase64);
         const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+     for (let i = 0; i < byteCharacters.length; i++) {
+     byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
-        const byteArray = new Uint8Array(byteNumbers);
+     const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: contentType });
         
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+    a.href = url;
         a.download = filename;
-        document.body.appendChild(a);
+  document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
     };
 </script>
