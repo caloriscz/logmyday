@@ -42,10 +42,60 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            // Export Units (global, no user filtering - include all units)
+            var units = await _context.Units
+                .Include(u => u.Quantity)
+                .Select(u => new UnitBackup
+                {
+                    Key = u.Key,
+                    Symbol = u.Symbol,
+                    AToBase = u.AToBase,
+                    BToBase = u.BToBase,
+                    Decimals = u.Decimals,
+                    QuantityKey = u.Quantity != null ? u.Quantity.Key : null
+                })
+                .ToListAsync();
+
+            // Export TagOptionLists with user filtering
+            var tagOptionListsQuery = _context.TagOptionLists.AsQueryable();
+            if (userId.HasValue)
+            {
+                tagOptionListsQuery = tagOptionListsQuery.Where(ol => ol.UserId == userId);
+            }
+
+            var tagOptionLists = await tagOptionListsQuery
+                .Select(ol => new TagOptionListBackup
+                {
+                    Name = ol.Name,
+                    UserId = ol.UserId
+                })
+                .ToListAsync();
+
+            // Export TagOptions with user filtering (via TagOptionList)
+            var tagOptionsQuery = _context.TagOptions
+                .Include(to => to.OptionList)
+                .AsQueryable();
+            
+            if (userId.HasValue)
+            {
+                tagOptionsQuery = tagOptionsQuery.Where(to => to.OptionList != null && to.OptionList.UserId == userId);
+            }
+
+            var tagOptions = await tagOptionsQuery
+                .Select(to => new TagOptionBackup
+                {
+                    Value = to.Value,
+                    DisplayName = to.DisplayName,
+                    TagOptionListKey = to.OptionList != null ? to.OptionList.Name : string.Empty
+                })
+                .ToListAsync();
+
             // Export Tags with user filtering
             var tagsQuery = _context.Tags
                 .Include(t => t.InputType)
                 .Include(t => t.Pattern)
+                .Include(t => t.Unit)
+                .Include(t => t.OptionList)
                 .AsQueryable();
 
             if (userId.HasValue)
@@ -63,7 +113,40 @@ public class BackupService : IBackupService
                     IsRepeatable = t.IsRepeatable,
                     IsRange = t.IsRange,
                     PatternName = t.Pattern != null ? t.Pattern.Name : null,
-                    UserId = t.UserId
+                    UserId = t.UserId,
+                    UnitKey = t.Unit != null ? t.Unit.Key : null,
+                    UnitSymbol = t.Unit != null ? t.Unit.Symbol : null,
+                    MinValue = t.MinValue,
+                    MaxValue = t.MaxValue,
+                    Step = t.Step,
+                    DefaultValue = t.DefaultValue,
+                    OptionListKey = t.OptionList != null ? t.OptionList.Name : null
+                })
+                .ToListAsync();
+
+            // Export Notifications with user filtering (via Tag)
+            var notificationsQuery = _context.Notifications
+                .Include(n => n.Tag)
+                .AsQueryable();
+            
+            if (userId.HasValue)
+            {
+                notificationsQuery = notificationsQuery.Where(n => n.Tag.UserId == userId);
+            }
+
+            var notifications = await notificationsQuery
+                .Select(n => new NotificationBackup
+                {
+                    TagKey = n.Tag.TagName,
+                    NotificationText = n.NotificationText,
+                    NotBeforeTime = n.NotBeforeTime,
+                    NotAfterTime = n.NotAfterTime,
+                    MaxNudges = n.MaxNudges,
+                    NudgeInterval = n.NudgeInterval,
+                    IsActive = n.IsActive,
+                    DateCreated = n.DateCreated,
+                    LastDeliveryDate = n.LastDeliveryDate,
+                    DeliveriesOnLastDate = n.DeliveriesOnLastDate
                 })
                 .ToListAsync();
 
@@ -94,20 +177,28 @@ public class BackupService : IBackupService
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.0",
+                    Version = "1.2",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
+                    TotalUnits = units.Count,
+                    TotalTagOptionLists = tagOptionLists.Count,
+                    TotalTagOptions = tagOptions.Count,
                     TotalTags = tags.Count,
+                    TotalNotifications = notifications.Count,
                     TotalActivities = activities.Count
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
+                Units = units,
+                TagOptionLists = tagOptionLists,
+                TagOptions = tagOptions,
                 Tags = tags,
+                Notifications = notifications,
                 Activities = activities
             };
 
-            _logger.LogInformation("Data export completed. Tags: {TagCount}, Activities: {ActivityCount}, InputTypes: {InputTypeCount}, Patterns: {PatternCount}",
-                tags.Count, activities.Count, inputTypes.Count, patterns.Count);
+            _logger.LogInformation("Data export completed. Tags: {TagCount}, Activities: {ActivityCount}, InputTypes: {InputTypeCount}, Patterns: {PatternCount}, Units: {UnitCount}, TagOptionLists: {TagOptionListCount}, TagOptions: {TagOptionCount}, Notifications: {NotificationCount}",
+                tags.Count, activities.Count, inputTypes.Count, patterns.Count, units.Count, tagOptionLists.Count, tagOptions.Count, notifications.Count);
 
             return backupData;
         }
@@ -147,10 +238,15 @@ public class BackupService : IBackupService
                     result.Statistics.RecordsCleared = await ClearDataAsync(userId);
                 }
 
-                // Import in order: InputTypes -> Patterns -> Tags -> Activities
+                // Import in correct dependency order:
+                // InputTypes -> Patterns -> Units -> TagOptionLists -> TagOptions -> Tags -> Notifications -> Activities
                 await ImportInputTypesAsync(backupData.InputTypes, result);
                 await ImportPatternsAsync(backupData.Patterns, result);
+                await ImportUnitsAsync(backupData.Units, result);
+                await ImportTagOptionListsAsync(backupData.TagOptionLists, result, userId);
+                await ImportTagOptionsAsync(backupData.TagOptions, result);
                 await ImportTagsAsync(backupData.Tags, result, userId);
+                await ImportNotificationsAsync(backupData.Notifications, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
 
                 await transaction.CommitAsync();
@@ -184,7 +280,9 @@ public class BackupService : IBackupService
 
         try
         {
-            // Clear activities first (due to foreign key constraints)
+            // Clear in reverse dependency order to avoid foreign key constraint violations
+            
+            // 1. Clear activities first (depends on tags)
             var activitiesQuery = _context.Activities.AsQueryable();
             if (userId.HasValue)
             {
@@ -194,7 +292,19 @@ public class BackupService : IBackupService
             _context.Activities.RemoveRange(activitiesToDelete);
             recordsCleared += activitiesToDelete.Count;
 
-            // Clear tags
+            // 2. Clear notifications (depends on tags)
+            var notificationsQuery = _context.Notifications
+                .Include(n => n.Tag)
+                .AsQueryable();
+            if (userId.HasValue)
+            {
+                notificationsQuery = notificationsQuery.Where(n => n.Tag.UserId == userId);
+            }
+            var notificationsToDelete = await notificationsQuery.ToListAsync();
+            _context.Notifications.RemoveRange(notificationsToDelete);
+            recordsCleared += notificationsToDelete.Count;
+
+            // 3. Clear tags (depends on units and option lists)
             var tagsQuery = _context.Tags.AsQueryable();
             if (userId.HasValue)
             {
@@ -204,7 +314,30 @@ public class BackupService : IBackupService
             _context.Tags.RemoveRange(tagsToDelete);
             recordsCleared += tagsToDelete.Count;
 
+            // 4. Clear tag options (depends on tag option lists)
+            var tagOptionsQuery = _context.TagOptions
+                .Include(to => to.OptionList)
+                .AsQueryable();
+            if (userId.HasValue)
+            {
+                tagOptionsQuery = tagOptionsQuery.Where(to => to.OptionList != null && to.OptionList.UserId == userId);
+            }
+            var tagOptionsToDelete = await tagOptionsQuery.ToListAsync();
+            _context.TagOptions.RemoveRange(tagOptionsToDelete);
+            recordsCleared += tagOptionsToDelete.Count;
+
+            // 5. Clear tag option lists
+            var tagOptionListsQuery = _context.TagOptionLists.AsQueryable();
+            if (userId.HasValue)
+            {
+                tagOptionListsQuery = tagOptionListsQuery.Where(ol => ol.UserId == userId);
+            }
+            var tagOptionListsToDelete = await tagOptionListsQuery.ToListAsync();
+            _context.TagOptionLists.RemoveRange(tagOptionListsToDelete);
+            recordsCleared += tagOptionListsToDelete.Count;
+
             // Clear patterns and input types only if clearing all data (no user filter)
+            // Units are global and not user-specific, so they're never cleared
             if (!userId.HasValue)
             {
                 var patternsToDelete = await _context.Patterns.ToListAsync();
@@ -294,6 +427,38 @@ public class BackupService : IBackupService
             result.IsValid = false;
         }
 
+        // Validate Unit references in tags
+        var unitKeys = backupData.Units.Select(u => u.Key).ToHashSet();
+        var invalidTagUnits = backupData.Tags
+            .Where(t => !string.IsNullOrEmpty(t.UnitKey) && !unitKeys.Contains(t.UnitKey))
+            .ToList();
+
+        if (invalidTagUnits.Any())
+        {
+            result.Warnings.Add($"Found {invalidTagUnits.Count} tags referencing non-existent units (will be skipped)");
+        }
+
+        // Validate TagOptionList references in tags
+        var tagOptionListNames = backupData.TagOptionLists.Select(ol => ol.Name).ToHashSet();
+        var invalidTagOptionLists = backupData.Tags
+            .Where(t => !string.IsNullOrEmpty(t.OptionListKey) && !tagOptionListNames.Contains(t.OptionListKey))
+            .ToList();
+
+        if (invalidTagOptionLists.Any())
+        {
+            result.Warnings.Add($"Found {invalidTagOptionLists.Count} tags referencing non-existent option lists (will be skipped)");
+        }
+
+        // Validate TagOptions reference existing TagOptionLists
+        var invalidTagOptions = backupData.TagOptions
+            .Where(to => !tagOptionListNames.Contains(to.TagOptionListKey))
+            .ToList();
+
+        if (invalidTagOptions.Any())
+        {
+            result.Warnings.Add($"Found {invalidTagOptions.Count} tag options referencing non-existent option lists (will be skipped)");
+        }
+
         return result;
     }
 
@@ -351,6 +516,100 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    private async Task ImportUnitsAsync(List<UnitBackup> units, BackupImportResult result)
+    {
+        var existingUnits = await _context.Units
+            .Select(u => u.Key)
+            .ToHashSetAsync();
+
+        // Get quantity lookup for foreign key resolution
+        var quantityLookup = await _context.Set<Quantity>()
+            .ToDictionaryAsync(q => q.Key, q => q.Id);
+
+        foreach (var unit in units)
+        {
+            if (existingUnits.Contains(unit.Key))
+            {
+                result.Statistics.UnitsSkipped++;
+                continue;
+            }
+
+            var entity = new Unit
+            {
+                Key = unit.Key,
+                Symbol = unit.Symbol,
+                AToBase = unit.AToBase,
+                BToBase = unit.BToBase,
+                Decimals = unit.Decimals,
+                QuantityId = !string.IsNullOrEmpty(unit.QuantityKey) && quantityLookup.ContainsKey(unit.QuantityKey)
+                    ? quantityLookup[unit.QuantityKey]
+                    : 0
+            };
+
+            _context.Units.Add(entity);
+            result.Statistics.UnitsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task ImportTagOptionListsAsync(List<TagOptionListBackup> tagOptionLists, BackupImportResult result, Guid? userId)
+    {
+        var existingTagOptionLists = await _context.TagOptionLists
+            .Where(ol => userId == null || ol.UserId == userId)
+            .Select(ol => ol.Name)
+            .ToHashSetAsync();
+
+        foreach (var list in tagOptionLists)
+        {
+            if (existingTagOptionLists.Contains(list.Name))
+            {
+                result.Statistics.TagOptionListsSkipped++;
+                continue;
+            }
+
+            var entity = new TagOptionList
+            {
+                Name = list.Name,
+                UserId = userId ?? list.UserId
+            };
+
+            _context.TagOptionLists.Add(entity);
+            result.Statistics.TagOptionListsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task ImportTagOptionsAsync(List<TagOptionBackup> tagOptions, BackupImportResult result)
+    {
+        // Get tag option list lookup
+        var tagOptionListLookup = await _context.TagOptionLists
+            .ToDictionaryAsync(ol => ol.Name, ol => ol.Id);
+
+        foreach (var option in tagOptions)
+        {
+            if (string.IsNullOrEmpty(option.TagOptionListKey) || !tagOptionListLookup.ContainsKey(option.TagOptionListKey))
+            {
+                result.Warnings.Add($"Skipping tag option '{option.Value}' - unknown list '{option.TagOptionListKey}'");
+                result.Statistics.TagOptionsSkipped++;
+                continue;
+            }
+
+            var entity = new TagOption
+            {
+                Value = option.Value,
+                DisplayName = option.DisplayName,
+                OptionListId = tagOptionListLookup[option.TagOptionListKey]
+            };
+
+            _context.TagOptions.Add(entity);
+            result.Statistics.TagOptionsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     private async Task ImportTagsAsync(List<TagBackup> tags, BackupImportResult result, Guid? userId)
     {
         // Get lookup dictionaries for references
@@ -359,6 +618,13 @@ public class BackupService : IBackupService
         
         var patternLookup = await _context.Patterns
             .ToDictionaryAsync(p => p.Name, p => p.Id);
+
+        var unitLookup = await _context.Units
+            .ToDictionaryAsync(u => u.Key, u => u.Id);
+
+        var tagOptionListLookup = await _context.TagOptionLists
+            .Where(ol => userId == null || ol.UserId == userId)
+            .ToDictionaryAsync(ol => ol.Name, ol => ol.Id);
 
         var existingTagNames = await _context.Tags
             .Where(t => userId == null || t.UserId == userId)
@@ -384,11 +650,67 @@ public class BackupService : IBackupService
                 IsRange = tag.IsRange,
                 PatternId = !string.IsNullOrEmpty(tag.PatternName) && patternLookup.ContainsKey(tag.PatternName)
                     ? patternLookup[tag.PatternName] : null,
+                UnitId = !string.IsNullOrEmpty(tag.UnitKey) && unitLookup.ContainsKey(tag.UnitKey)
+                    ? unitLookup[tag.UnitKey] : null,
+                MinValue = tag.MinValue,
+                MaxValue = tag.MaxValue,
+                Step = tag.Step,
+                DefaultValue = tag.DefaultValue,
+                OptionListId = !string.IsNullOrEmpty(tag.OptionListKey) && tagOptionListLookup.ContainsKey(tag.OptionListKey)
+                    ? tagOptionListLookup[tag.OptionListKey] : null,
                 UserId = userId ?? tag.UserId
             };
 
             _context.Tags.Add(entity);
             result.Statistics.TagsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task ImportNotificationsAsync(List<NotificationBackup> notifications, BackupImportResult result, Guid? userId)
+    {
+        // Get tag lookup
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        foreach (var notification in notifications)
+        {
+            if (string.IsNullOrEmpty(notification.TagKey) || !tagLookup.ContainsKey(notification.TagKey))
+            {
+                result.Warnings.Add($"Skipping notification for unknown tag '{notification.TagKey}'");
+                result.Statistics.NotificationsSkipped++;
+                continue;
+            }
+
+            // Check if notification already exists for this tag
+            var tagId = tagLookup[notification.TagKey];
+            var existingNotification = await _context.Notifications
+                .FirstOrDefaultAsync(n => n.TagId == tagId);
+
+            if (existingNotification != null)
+            {
+                result.Statistics.NotificationsSkipped++;
+                continue;
+            }
+
+            var entity = new Notification
+            {
+                TagId = tagId,
+                NotificationText = notification.NotificationText,
+                NotBeforeTime = notification.NotBeforeTime,
+                NotAfterTime = notification.NotAfterTime,
+                MaxNudges = notification.MaxNudges,
+                NudgeInterval = notification.NudgeInterval,
+                IsActive = notification.IsActive,
+                DateCreated = notification.DateCreated,
+                LastDeliveryDate = notification.LastDeliveryDate,
+                DeliveriesOnLastDate = notification.DeliveriesOnLastDate
+            };
+
+            _context.Notifications.Add(entity);
+            result.Statistics.NotificationsImported++;
         }
 
         await _context.SaveChangesAsync();

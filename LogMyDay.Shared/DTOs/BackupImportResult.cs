@@ -15,8 +15,16 @@ public class BackupImportStatistics
     public int InputTypesSkipped { get; set; }
     public int PatternsImported { get; set; }
     public int PatternsSkipped { get; set; }
+    public int UnitsImported { get; set; }
+    public int UnitsSkipped { get; set; }
+    public int TagOptionListsImported { get; set; }
+    public int TagOptionListsSkipped { get; set; }
+    public int TagOptionsImported { get; set; }
+    public int TagOptionsSkipped { get; set; }
     public int TagsImported { get; set; }
     public int TagsSkipped { get; set; }
+    public int NotificationsImported { get; set; }
+    public int NotificationsSkipped { get; set; }
     public int ActivitiesImported { get; set; }
     public int ActivitiesSkipped { get; set; }
     public int RecordsCleared { get; set; }
