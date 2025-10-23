@@ -361,7 +361,7 @@ public class BackupService : IBackupService
         }
     }
 
-    public async Task<BackupValidationResult> ValidateBackupDataAsync(BackupData backupData)
+    public Task<BackupValidationResult> ValidateBackupDataAsync(BackupData backupData)
     {
         var result = new BackupValidationResult { IsValid = true };
 
@@ -369,7 +369,7 @@ public class BackupService : IBackupService
         {
             result.IsValid = false;
             result.Errors.Add("Backup data is null");
-            return result;
+            return Task.FromResult(result);
         }
 
         // Validate metadata
@@ -459,7 +459,7 @@ public class BackupService : IBackupService
             result.Warnings.Add($"Found {invalidTagOptions.Count} tag options referencing non-existent option lists (will be skipped)");
         }
 
-        return result;
+        return Task.FromResult(result);
     }
 
     private async Task ImportInputTypesAsync(List<InputTypeBackup> inputTypes, BackupImportResult result)

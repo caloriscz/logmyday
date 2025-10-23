@@ -83,14 +83,13 @@
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Type</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Required</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Repeatable</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Time Granularity</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Is Range</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Granularity</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Range</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Unit</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Default</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Min</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Max</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Min/Max</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Step</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Option List</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Lists</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -142,13 +141,15 @@
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.UnitSymbol) ? "—" : tag.UnitSymbol)</td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.DefaultValue) ? "—" : tag.DefaultValue)</td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(tag.MinValue?.ToString() ?? "—")</td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(tag.MaxValue?.ToString() ?? "—")</td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(tag.Step?.ToString() ?? "—")</td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.OptionListName) ? "—" : tag.OptionListName)</td>
-                                    </tr>
-                                }
-                            </tbody>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            <span>@(tag.MinValue?.ToString() ?? "—")</span>/
+                                            <span>@(tag.MaxValue?.ToString() ?? "—")</span>
+                                        </td>
+<td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(tag.Step?.ToString() ?? "—")</td>
+<td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.OptionListName) ? "—" : tag.OptionListName)</td>
+</tr>
+}
+</tbody>
                         </table>
                     </div>
                 </div>

@@ -245,7 +245,7 @@
         Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
     }
 
-    private async Task PrepareModalForTag(int tagId)
+    private void PrepareModalForTag(int tagId)
     {
         preselectedTagId = tagId;
         var today = GetTodayInDisplayZone();

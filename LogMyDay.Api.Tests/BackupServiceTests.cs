@@ -12,6 +12,8 @@ namespace LogMyDay.Api.Tests;
 
 public class BackupServiceTests
 {
+    private static readonly string CurrentBackupVersion = new BackupMetadata().Version;
+
     private LogMyDayDbContext GetInMemoryContext()
     {
         var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
@@ -34,11 +36,11 @@ public class BackupServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.NotNull(result.Metadata);
-        Assert.Equal(0, result.Tags.Count);
-        Assert.Equal(0, result.Activities.Count);
-        Assert.Equal(0, result.InputTypes.Count);
-        Assert.Equal(0, result.Patterns.Count);
-        Assert.Equal("1.0", result.Metadata.Version);
+        Assert.Empty(result.Tags);
+        Assert.Empty(result.Activities);
+        Assert.Empty(result.InputTypes);
+        Assert.Empty(result.Patterns);
+        Assert.Equal(CurrentBackupVersion, result.Metadata.Version);
     }
 
     [Fact]
@@ -51,33 +53,35 @@ public class BackupServiceTests
 
         var backupData = new BackupData
         {
-            Metadata = new BackupMetadata { Version = "1.0" },
-            InputTypes = new List<InputTypeBackup>
-            {
-                new InputTypeBackup { Name = "Text" }
-            },
+            Metadata = new BackupMetadata { Version = CurrentBackupVersion },
+            InputTypes = new List<InputTypeBackup> { new InputTypeBackup { Name = "Text" } },
             Patterns = new List<PatternBackup>
             {
-                new PatternBackup { Name = "Email", PatternValue = ".*@.*", Description = "Email pattern" }
+                new PatternBackup
+                {
+                    Name = "Email",
+                    PatternValue = ".*@.*",
+                    Description = "Email pattern",
+                },
             },
             Tags = new List<TagBackup>
             {
-                new TagBackup 
-                { 
-                    TagName = "Work", 
+                new TagBackup
+                {
+                    TagName = "Work",
                     InputTypeName = "Text",
-                    PatternName = "Email"
-                }
+                    PatternName = "Email",
+                },
             },
             Activities = new List<ActivityBackup>
             {
-                new ActivityBackup 
-                { 
+                new ActivityBackup
+                {
                     TagName = "Work",
                     DateCreated = DateTime.UtcNow,
-                    DateStarted = DateTime.UtcNow
-                }
-            }
+                    DateStarted = DateTime.UtcNow,
+                },
+            },
         };
 
         // Act
@@ -101,11 +105,11 @@ public class BackupServiceTests
             Tags = new List<TagBackup>
             {
                 new TagBackup { TagName = "Work" },
-                new TagBackup { TagName = "Work" } // Duplicate
+                new TagBackup { TagName = "Work" }, // Duplicate
             },
             Activities = new List<ActivityBackup>(),
             InputTypes = new List<InputTypeBackup>(),
-            Patterns = new List<PatternBackup>()
+            Patterns = new List<PatternBackup>(),
         };
 
         // Act
@@ -134,29 +138,34 @@ public class BackupServiceTests
 
 public class BackupControllerTests
 {
+    private static readonly string CurrentBackupVersion = new BackupMetadata().Version;
+
     [Fact]
     public async Task GetBackupInfo_ShouldReturnOk_WithBackupMetadata()
     {
         // Arrange
         var mockBackupService = new Mock<IBackupService>();
         var mockLogger = new Mock<ILogger<BackupController>>();
-        var mockAuthService = new Mock<IAuthService>(); // Add this line
+        var mockAuthService = new Mock<IAuthService>();
 
         var backupData = new BackupData
         {
             Metadata = new BackupMetadata
             {
                 ExportDate = DateTime.UtcNow,
-                Version = "1.0",
+                Version = CurrentBackupVersion,
                 TotalTags = 5,
-                TotalActivities = 10
-            }
+                TotalActivities = 10,
+            },
         };
 
-        mockBackupService.Setup(s => s.ExportDataAsync(It.IsAny<Guid?>()))
-                        .ReturnsAsync(backupData);
+        mockBackupService.Setup(s => s.ExportDataAsync(It.IsAny<Guid?>())).ReturnsAsync(backupData);
 
-        var controller = new BackupController(mockBackupService.Object, mockLogger.Object, mockAuthService.Object); // Add mockAuthService.Object
+        var controller = new BackupController(
+            mockBackupService.Object,
+            mockLogger.Object,
+            mockAuthService.Object
+        );
 
         // Act
         var result = await controller.GetBackupInfo();
@@ -175,12 +184,15 @@ public class BackupControllerTests
         // Arrange
         var mockBackupService = new Mock<IBackupService>();
         var mockLogger = new Mock<ILogger<BackupController>>();
-        var mockAuthService = new Mock<IAuthService>(); // Add this line
+        var mockAuthService = new Mock<IAuthService>();
 
-        mockBackupService.Setup(s => s.ClearDataAsync(It.IsAny<Guid?>()))
-                        .ReturnsAsync(42);
+        mockBackupService.Setup(s => s.ClearDataAsync(It.IsAny<Guid?>())).ReturnsAsync(42);
 
-        var controller = new BackupController(mockBackupService.Object, mockLogger.Object, mockAuthService.Object); // Add mockAuthService.Object
+        var controller = new BackupController(
+            mockBackupService.Object,
+            mockLogger.Object,
+            mockAuthService.Object
+        );
 
         // Act
         var result = await controller.ClearData();
