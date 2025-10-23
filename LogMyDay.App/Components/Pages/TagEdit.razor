@@ -52,9 +52,8 @@
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type (optional)</label>
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
                         <InputSelect @bind-Value="editTag.TypeId" class="@InputCss" disabled="@isSaving">
-                            <option value="">(None)</option>
                             @foreach (var type in inputTypes)
                             {
                                 <option value="@type.Id">@type.Name</option>
@@ -62,7 +61,7 @@
                         </InputSelect>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid gap-4 sm:grid-cols-3">
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
                             <InputCheckbox @bind-Value="editTag.IsRequired" class="@CheckboxCss" disabled="@isSaving" />
                             Required
@@ -71,24 +70,27 @@
                             <InputCheckbox @bind-Value="editTag.IsRepeatable" class="@CheckboxCss" disabled="@isSaving" />
                             Repeatable
                         </label>
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="editTag.IsRange" class="@CheckboxCss" disabled="@isSaving" />
+                            Range
+                        </label>
                     </div>
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Time Granularity</label>
                         <InputSelect @bind-Value="editTag.TimeGranularity" class="@InputCss" disabled="@isSaving">
-                            @foreach (var granularity in Enum.GetValues<TimeGranularity>())
+                            @foreach (var granularity in OrderedGranularityOptions)
                             {
                                 <option value="@granularity">@granularity</option>
                             }
                         </InputSelect>
                     </div>
 
-                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                        <InputCheckbox @bind-Value="editTag.IsRange" class="@CheckboxCss" disabled="@isSaving" />
-                        Is Range
-                    </label>
-
-                    <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
+                            <InputText @bind-Value="editTag.DefaultValue" class="@InputCss" disabled="@isSaving" />
+                        </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
                             <InputNumber @bind-Value="editTag.MinValue" class="@InputCss" TValue="double?" disabled="@isSaving" />
@@ -101,11 +103,6 @@
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
                             <InputNumber @bind-Value="editTag.Step" class="@InputCss" TValue="double?" disabled="@isSaving" />
                         </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
-                        <InputText @bind-Value="editTag.DefaultValue" class="@InputCss" disabled="@isSaving" />
                     </div>
 
                     <div class="space-y-2">
@@ -342,6 +339,12 @@
     [Parameter]
     public int Id { get; set; }
 
+    private static readonly IReadOnlyList<TimeGranularity> OrderedGranularityOptions = Enum
+        .GetValues<TimeGranularity>()
+        .OrderBy(g => g == TimeGranularity.Daily ? 0 : g == TimeGranularity.Exact ? 2 : 1)
+        .ThenBy(g => g.ToString())
+        .ToArray();
+
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string CheckboxCss = "h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800";
 
@@ -372,7 +375,7 @@
             editTag = new TagRequest
             {
                 Tag = tag.Title,
-                TypeId = tag.TypeId ?? 0,
+                TypeId = ResolveTypeId(tag.TypeId),
                 IsRequired = tag.IsRequired,
                 IsRepeatable = tag.IsRepeatable,
                 TimeGranularity = tag.TimeGranularity,
@@ -384,6 +387,8 @@
                 DefaultValue = tag.DefaultValue,
                 OptionListId = tag.OptionListId
             };
+
+            EnsureValidTypeSelection();
 
             tagTitle = tag.Title;
             PageTitleService.SetTitle(tag.Title);
@@ -673,6 +678,33 @@
     private void GoBack()
     {
         Navigation.NavigateTo("/tags");
+    }
+
+    private void EnsureValidTypeSelection()
+    {
+        if (editTag is null)
+        {
+            return;
+        }
+
+        editTag.TypeId = ResolveTypeId(editTag.TypeId);
+    }
+
+    private int ResolveTypeId(int? typeId)
+    {
+        if (typeId.HasValue && inputTypes.Any(it => it.Id == typeId.Value))
+        {
+            return typeId.Value;
+        }
+
+        return GetDefaultInputTypeId();
+    }
+
+    private int GetDefaultInputTypeId()
+    {
+        var integerType = inputTypes.FirstOrDefault(it => string.Equals(it.Name, "Integer", System.StringComparison.OrdinalIgnoreCase));
+
+        return integerType?.Id ?? inputTypes.FirstOrDefault()?.Id ?? 0;
     }
 
     private sealed class NotificationViewModel

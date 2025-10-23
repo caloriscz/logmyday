@@ -8,7 +8,7 @@ public class TagRequest
     public int TypeId { get; set; }
     public bool IsRequired { get; set; } // Added for required checkbox
     public bool IsRepeatable { get; set; } = true;
-    public TimeGranularity TimeGranularity { get; set; } = TimeGranularity.Exact;
+    public TimeGranularity TimeGranularity { get; set; } = TimeGranularity.Daily;
     public bool IsRange { get; set; } = false;
 
     public int? UnitId { get; set; }

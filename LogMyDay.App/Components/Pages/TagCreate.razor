@@ -51,9 +51,8 @@
                     </div>
 
                     <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type (optional)</label>
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
                         <InputSelect @bind-Value="newTag.TypeId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
-                            <option value="">(None)</option>
                             @foreach (var type in inputTypes)
                             {
                                 <option value="@type.Id">@type.Name</option>
@@ -61,7 +60,7 @@
                         </InputSelect>
                     </div>
 
-                    <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid gap-4 sm:grid-cols-3">
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
                             <InputCheckbox @bind-Value="newTag.IsRequired" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Required
@@ -70,24 +69,27 @@
                             <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Repeatable
                         </label>
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            Range
+                        </label>
                     </div>
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Time Granularity</label>
                         <InputSelect @bind-Value="newTag.TimeGranularity" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
-                            @foreach (var granularity in Enum.GetValues<TimeGranularity>())
+                            @foreach (var granularity in OrderedGranularityOptions)
                             {
                                 <option value="@granularity">@granularity</option>
                             }
                         </InputSelect>
                     </div>
 
-                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                        <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
-                        Is Range
-                    </label>
-
-                    <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
+                            <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                        </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
                             <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
@@ -100,11 +102,6 @@
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
                             <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
                         </div>
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
-                        <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
                     </div>
 
                     <div class="space-y-2">
@@ -173,13 +170,19 @@
 </div>
 
 @code {
+    private static readonly IReadOnlyList<TimeGranularity> OrderedGranularityOptions = Enum
+        .GetValues<TimeGranularity>()
+        .OrderBy(g => g == TimeGranularity.Daily ? 0 : g == TimeGranularity.Exact ? 2 : 1)
+        .ThenBy(g => g.ToString())
+        .ToArray();
+
     private TagRequest newTag = new()
     {
         Tag = string.Empty,
-        TypeId = 1,
+        TypeId = 0,
         IsRequired = false,
         IsRepeatable = true,
-        TimeGranularity = TimeGranularity.Exact,
+        TimeGranularity = TimeGranularity.Daily,
         IsRange = false,
         UnitId = null,
         MinValue = null,
@@ -204,6 +207,7 @@
         try
         {
             inputTypes = await ActivityApi.GetInputTypesAsync();
+            ApplyInputTypeDefaults();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -294,5 +298,26 @@
     private void GoBack()
     {
         Navigation.NavigateTo("/tags");
+    }
+
+    private void ApplyInputTypeDefaults()
+    {
+        if (inputTypes.Count == 0)
+        {
+            return;
+        }
+
+        if (!inputTypes.Any(it => it.Id == newTag.TypeId))
+        {
+            newTag.TypeId = GetDefaultInputTypeId();
+        }
+    }
+
+    private int GetDefaultInputTypeId()
+    {
+        var integerType = inputTypes
+            .FirstOrDefault(it => string.Equals(it.Name, "Integer", StringComparison.OrdinalIgnoreCase));
+
+        return integerType?.Id ?? inputTypes[0].Id;
     }
 }
