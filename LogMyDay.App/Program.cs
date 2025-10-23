@@ -39,10 +39,7 @@ services.AddDbContext<LogMyDayDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
-// Add memory cache for authentication tracking
 services.AddMemoryCache();
-
-// Add HttpContextAccessor for Blazor components
 services.AddHttpContextAccessor();
 
 // Configure cookie authentication (default scheme) and basic auth for mobile
@@ -64,7 +61,7 @@ services.AddAuthentication(options =>
             {
                 return "basic";
             }
-            
+
             // Otherwise, use cookie auth
             return "lmd-cookie";
         };
@@ -77,7 +74,7 @@ services.AddAuthentication(options =>
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
-        options.LoginPath = "/login"; // Redirect to Blazor login page
+        options.LoginPath = "/login";
         options.LogoutPath = "/api/auth/logout";
         options.AccessDeniedPath = "/access-denied";
         options.Events.OnRedirectToLogin = context =>
@@ -119,7 +116,7 @@ services.AddAuthentication(options =>
         };
         options.Events.OnValidatePrincipal = context =>
         {
-            Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}", 
+            Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}",
                 context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
             return Task.CompletedTask;
         };
@@ -147,7 +144,6 @@ services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Lax;
 });
 
-// Configure rate limiting for brute-force protection
 services.AddRateLimiter(options =>
 {
     // General API rate limiting using sliding window
@@ -157,7 +153,7 @@ services.AddRateLimiter(options =>
         opt.PermitLimit = 100; // 100 requests per minute per IP
         opt.SegmentsPerWindow = 6; // 10-second segments
     });
-    
+
     // Stricter authentication endpoint limiting
     options.AddSlidingWindowLimiter("auth", opt =>
     {
@@ -165,8 +161,7 @@ services.AddRateLimiter(options =>
         opt.PermitLimit = 10; // 10 auth attempts per 15 minutes per IP
         opt.SegmentsPerWindow = 3; // 5-minute segments
     });
-    
-    // Global rejection behavior
+
     options.RejectionStatusCode = 429; // Too Many Requests
 });
 
@@ -188,7 +183,7 @@ services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExportService>();
 
 // UI services
-services.AddScoped<LogMyDay.App.Services.IPageTitleService, LogMyDay.App.Services.PageTitleService>();
+services.AddScoped<IPageTitleService, PageTitleService>();
 services.AddScoped<IUserPreferencesService, UserPreferencesService>();
 
 // Authentication and user services
@@ -323,27 +318,27 @@ app.UseHttpsRedirection();
 app.Use(async (context, next) =>
 {
     var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-    logger.LogInformation("=== HTTP REQUEST ===");
-    logger.LogInformation("Method: {Method}", context.Request.Method);
-    logger.LogInformation("Path: {Path}", context.Request.Path);
-    logger.LogInformation("QueryString: {QueryString}", context.Request.QueryString);
-    logger.LogInformation("Headers: {Headers}", string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
-    
+    logger.LogInformation("========== HTTP REQUEST ==========");
+    logger.LogInformation("= Method: {Method}", context.Request.Method);
+    logger.LogInformation("= Path: {Path}", context.Request.Path);
+    logger.LogInformation("= QueryString: {QueryString}", context.Request.QueryString);
+    logger.LogInformation("= Headers: {Headers}", string.Join(", ", context.Request.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
+
     if (context.Request.HasFormContentType && context.Request.Method == "POST")
     {
         // Read form data for POST requests
         var form = await context.Request.ReadFormAsync();
-        logger.LogInformation("Form Data: {FormData}", string.Join(", ", form.Select(f => $"{f.Key}={f.Value}")));
+        logger.LogInformation("= Form Data: {FormData}", string.Join(", ", form.Select(f => $"{f.Key}={f.Value}")));
     }
-    
-    logger.LogInformation("User Authenticated: {IsAuthenticated}", context.User?.Identity?.IsAuthenticated);
-    logger.LogInformation("User Name: {UserName}", context.User?.Identity?.Name ?? "null");
-    
+
+    logger.LogInformation("= User Authenticated: {IsAuthenticated}", context.User?.Identity?.IsAuthenticated);
+    logger.LogInformation("= User Name: {UserName}", context.User?.Identity?.Name ?? "null");
+
     await next();
-    
-    logger.LogInformation("Response Status: {StatusCode}", context.Response.StatusCode);
-    logger.LogInformation("Response Headers: {ResponseHeaders}", string.Join(", ", context.Response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
-    logger.LogInformation("=== HTTP REQUEST END ===");
+
+    logger.LogInformation("= Response Status: {StatusCode}", context.Response.StatusCode);
+    logger.LogInformation("= Response Headers: {ResponseHeaders}", string.Join(", ", context.Response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}")));
+    logger.LogInformation("========== HTTP REQUEST END ==========");
 });
 
 // Enable rate limiting
@@ -362,7 +357,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
     // Referrer policy
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    
+
     await next();
 });
 
