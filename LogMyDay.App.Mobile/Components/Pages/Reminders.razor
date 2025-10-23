@@ -1,5 +1,6 @@
 @page "/reminders"
 @using System.Globalization
+@using System.Net
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Mobile.Components.Shared
 @using LogMyDay.App.Mobile.Services
@@ -54,6 +55,13 @@
                             <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded">Required</span>
                         </div>
                         
+                        @if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
+                        {
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
+                            </div>
+                        }
+                        
                         <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                             <div class="flex items-center gap-1">
                                 <i class="bi bi-clock"></i>
@@ -75,12 +83,25 @@
                             }
                         </div>
                         
-                        <div class="mt-3">
-                            <button class="w-full px-3 py-2 border border-primary-600 text-primary-600 dark:text-primary-400 rounded-md hover:bg-primary-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-1" 
+                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) ? "grid-cols-2" : "grid-cols-1")">
+                            <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1" 
                                     @onclick="@(() => PrepareModalForTag(tag.Id))">
                                 <i class="bi bi-plus-circle"></i>
                                 <span>Add Activity</span>
                             </button>
+                            @if (HasDefaultValue(tag))
+                            {
+                                <button class="@GetQuickAddButtonClasses(tag)" 
+                                        @onclick="@(() => QuickAddDefaultAsync(tag))" 
+                                        disabled="@IsQuickAddDisabled(tag)">
+                                    <i class="bi bi-check-circle"></i>
+                                    <span>Use Default</span>
+                                    @if (IsQuickAddInProgress(tag.Id))
+                                    {
+                                        <div class="inline-block animate-spin text-lg">⟳</div>
+                                    }
+                                </button>
+                            }
                         </div>
                     </div>
                 }
@@ -134,6 +155,8 @@
     private ActivityRequest newActivity = new();
     private int? preselectedTagId;
     private bool showAddActivityModal = false;
+    private bool shouldShowModalAfterRender = false;
+    private readonly HashSet<int> quickAddInProgress = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -234,17 +257,24 @@
             PrimaryTagId = tagId
         };
         showAddActivityModal = true;
-     StateHasChanged();
-        
-        // Trigger the modal to show using JavaScript
-        try
+        shouldShowModalAfterRender = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldShowModalAfterRender && showAddActivityModal)
         {
-            await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
-        }
-        catch (Exception ex)
-        {
-            // Log but don't throw - modal might still work via Blazor rendering
-            Console.WriteLine($"Error showing modal via JS: {ex.Message}");
+            shouldShowModalAfterRender = false;
+            try
+            {
+                await Task.Delay(50); // Small delay to ensure DOM is ready
+                await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - modal might still work via Blazor rendering
+                Console.WriteLine($"Error showing modal via JS: {ex.Message}");
+            }
         }
     }
 
@@ -316,5 +346,109 @@
     {
         var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
         return date.ToString(pattern, displayCulture);
+    }
+
+    private bool HasDefaultValue(TagResponse tag)
+        => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
+
+    private bool IsQuickAddDisabled(TagResponse tag)
+        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
+
+    private bool IsQuickAddInProgress(int tagId)
+        => quickAddInProgress.Contains(tagId);
+
+    private string GetQuickAddButtonClasses(TagResponse tag)
+    {
+        var baseClasses = "px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-1";
+
+        if (IsQuickAddDisabled(tag))
+        {
+            return $"{baseClasses} bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50";
+        }
+
+        return $"{baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800";
+    }
+
+    private string? GetDefaultValueLabel(TagResponse tag)
+    {
+        var value = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (tag.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                return option.DisplayName ?? option.Value;
+            }
+        }
+
+        return value;
+    }
+
+    private string? ResolveDefaultValue(TagResponse tag)
+    {
+        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
+        {
+            return tag.DefaultValue;
+        }
+
+        return null;
+    }
+
+    private async Task QuickAddDefaultAsync(TagResponse tag)
+    {
+        var defaultValue = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(defaultValue))
+        {
+            errorMessage = "No default value is configured for this tag.";
+            return;
+        }
+
+        if (!quickAddInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = defaultValue,
+                DateStarted = startDate
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            await LoadRequiredTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "The activity could not be created with the default value.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding default activity: {ex.Message}";
+        }
+        finally
+        {
+            quickAddInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
     }
 }

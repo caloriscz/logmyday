@@ -438,6 +438,8 @@ public class ActivityService : IActivityService
         var requiredDailyTags = await _context.Tags
             .Where(t => t.UserId == userId && t.IsRequired && t.TimeGranularity == TimeGranularity.Daily)
             .Include(t => t.InputType)
+            .Include(t => t.Unit)
+            .Include(t => t.OptionList)
             .ToListAsync();
 
         // Find tags that don't have activities for the specified date
@@ -460,7 +462,15 @@ public class ActivityService : IActivityService
                     IsRequired = tag.IsRequired,
                     IsRepeatable = tag.IsRepeatable,
                     TimeGranularity = tag.TimeGranularity,
-                    IsRange = tag.IsRange
+                    IsRange = tag.IsRange,
+                    UnitId = tag.UnitId,
+                    UnitSymbol = tag.Unit?.Symbol,
+                    MinValue = tag.MinValue,
+                    MaxValue = tag.MaxValue,
+                    Step = tag.Step,
+                    DefaultValue = tag.DefaultValue,
+                    OptionListId = tag.OptionListId,
+                    OptionListName = tag.OptionList?.Name
                 });
             }
         }
