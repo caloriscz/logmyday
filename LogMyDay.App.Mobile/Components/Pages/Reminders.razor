@@ -1,4 +1,4 @@
-﻿@page "/notifications"
+@page "/reminders"
 @using System.Globalization
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Mobile.Components.Shared
@@ -13,7 +13,7 @@
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <div class="max-w-7xl mx-auto px-6 py-6">
         <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Reminders</h1>
             <div class="flex items-center gap-2">
                 <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
                     &lt;
@@ -22,7 +22,7 @@
                 <button class="btn-secondary" @onclick="NextDay" title="Next Day">
                     &gt;
                 </button>
-                <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors" @onclick="RefreshNotifications">
+                <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors" @onclick="RefreshReminders">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </div>
@@ -32,7 +32,7 @@
         {
             <div class="text-center">
                 <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
-                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading notifications...</p>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading reminders...</p>
             </div>
         }
         else if (unfilledRequiredTags?.Any() == true)
@@ -142,7 +142,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        PageTitleService.SetTitle("Notifications");
+        PageTitleService.SetTitle("Reminders");
 
         // Load user preferences
         userPreferences = await UserPreferencesService.GetAsync();
@@ -200,7 +200,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error loading notifications: {ex.Message}";
+            errorMessage = $"Error loading reminders: {ex.Message}";
             unfilledRequiredTags = new List<TagResponse>();
             allTags = new List<TagResponse>();
             optionLists = new List<TagOptionListResponse>();
@@ -212,7 +212,7 @@
         }
     }
 
-    private async Task RefreshNotifications()
+    private async Task RefreshReminders()
     {
         await LoadRequiredTags();
     }
@@ -267,7 +267,7 @@
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
-        // Refresh the notifications list
+        // Refresh the reminders list
         await LoadRequiredTags();
         
         // Close the modal

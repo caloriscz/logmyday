@@ -27,6 +27,11 @@ else
         {
             <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-around bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-xl z-50"
                  style="padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(4rem + env(safe-area-inset-bottom, 0px));">
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/reminders") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/reminders"))">
+                    <i class="bi bi-bell text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Reminders</span>
+                </button>
                 <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/activities") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/activities"))">
                     <i class="bi bi-calendar3 text-2xl mb-1"></i>
@@ -36,11 +41,6 @@ else
                         @onclick="@(() => NavigateTo("/tags"))">
                     <i class="bi bi-tags text-2xl mb-1"></i>
                     <span class="text-xs font-medium">Tags</span>
-                </button>
-                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/notifications") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                        @onclick="@(() => NavigateTo("/notifications"))">
-                    <i class="bi bi-bell text-2xl mb-1"></i>
-                    <span class="text-xs font-medium">Notifications</span>
                 </button>
                 <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/quick"))">
