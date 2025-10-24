@@ -348,14 +348,53 @@ public class ActivityService : IActivityService
         return MapToResponse(activity);
     }
 
-    public Task<ActivityResponse> Update(
-        int id,
-        DateTime dateCreated,
-        DateTime? dateFinished,
-        Guid userId
-    )
+    public async Task<ActivityResponse> Update(int id, ActivityRequest request, Guid userId)
     {
-        throw new NotImplementedException();
+        var activity = await _context
+            .Activities.Include(a => a.Tag)
+            .ThenInclude(t => t.InputType)
+            .Where(a => a.Id == id && a.UserId == userId)
+            .SingleOrDefaultAsync()
+            ?? throw new KeyNotFoundException("Activity not found");
+
+        var tagId = request.PrimaryTagId ?? activity.TagId;
+        var tag = await _context.Tags.FindAsync(tagId);
+        if (tag == null)
+        {
+            throw new ArgumentException("Invalid tag ID");
+        }
+
+        if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
+        {
+            if (
+                await HasActivityForTimeGranularity(
+                    tag.Id,
+                    request.DateStarted,
+                    userId,
+                    excludeActivityId: id
+                )
+            )
+            {
+                throw new InvalidOperationException(
+                    $"An activity for this tag already exists for the selected {tag.TimeGranularity.ToString().ToLower()} period. This tag is not repeatable."
+                );
+            }
+        }
+
+        activity.TagId = tag.Id;
+        activity.DateStarted = request.DateStarted;
+        activity.DateFinished = tag.IsRange ? request.DateFinished : null;
+        activity.Description = request.Description;
+
+        await _context.SaveChangesAsync();
+
+        await _context.Entry(activity).Reference(a => a.Tag).LoadAsync();
+        if (activity.Tag is not null)
+        {
+            await _context.Entry(activity.Tag).Reference(t => t.InputType).LoadAsync();
+        }
+
+        return MapToResponse(activity);
     }
 
     private ActivityResponse MapToResponse(Activity calendar)
@@ -388,7 +427,8 @@ public class ActivityService : IActivityService
     public async Task<bool> HasActivityForTimeGranularity(
         int tagId,
         DateTime dateStarted,
-        Guid userId
+        Guid userId,
+        int? excludeActivityId = null
     )
     {
         var tag = await _context.Tags.FindAsync(tagId);
@@ -435,14 +475,20 @@ public class ActivityService : IActivityService
         }
 
         // Check if there's already an activity for this tag in the specified range
-        return await _context
+        var query = _context
             .Activities.Where(a =>
                 a.TagId == tagId
                 && a.UserId == userId
                 && a.DateStarted >= startRange
                 && a.DateStarted <= endRange
-            )
-            .AnyAsync();
+            );
+
+        if (excludeActivityId.HasValue)
+        {
+            query = query.Where(a => a.Id != excludeActivityId.Value);
+        }
+
+        return await query.AnyAsync();
     }
 
     public async Task<List<ActivityResponse>> GetByYear(int year, Guid userId, int? tagId = null)

@@ -7,7 +7,7 @@ public interface IActivityService
     Task<ActivityResponse> GetById(int id, Guid userId);
     Task<List<ActivityResponse>> GetAll(Guid userId);
     Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId);
-    Task<ActivityResponse> Update(int id, DateTime dateCreated, DateTime? dateFinished, Guid userId);
+    Task<ActivityResponse> Update(int id, ActivityRequest request, Guid userId);
     Task<bool> Delete(int id, Guid userId);
     Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId);
     Task<PagedResult<ActivityResponse>> GetPaged(
@@ -42,6 +42,6 @@ public interface IActivityService
     );
     Task<List<ActivityResponse>> GetByYear(int year, Guid userId, int? tagId = null);
     Task<List<int>> GetAvailableYears(Guid userId, int? tagId = null);
-    Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted, Guid userId);
+    Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted, Guid userId, int? excludeActivityId = null);
     Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId);
 }

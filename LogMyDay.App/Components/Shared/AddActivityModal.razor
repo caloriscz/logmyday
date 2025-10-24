@@ -15,7 +15,7 @@
 <div class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4" @onclick="HandleBackdropClick">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
         <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add New Activity</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(IsEditMode ? "Edit Activity" : "Add New Activity")</h3>
             <button type="button" @onclick="HandleCloseClick" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -30,7 +30,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <label class="@LabelCss" for="@($"{modalId}PrimaryTag")">Primary Tag</label>
-                        <InputSelect id="@($"{modalId}PrimaryTag")" @bind-Value="Activity.PrimaryTagId" class="@InputCss" @bind-Value:after="OnTagSelectionChanged">
+                        <InputSelect id="@($"{modalId}PrimaryTag")" @bind-Value="Activity.PrimaryTagId" class="@InputCss" @bind-Value:after="() => OnTagSelectionChanged()">
                             <option value="">-- Select Tag --</option>
                             @if (AvailableTags != null)
                             {
@@ -132,15 +132,18 @@
                         </div>
                     }
 
-                    <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" for="@($"{modalId}AddAnother")">
-                            <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="@CheckboxCss" id="@($"{modalId}AddAnother")" />
-                            <span>Add another activity after saving</span>
-                        </label>
-                        <p class="@HelperTextCss">
-                            Keep the form open with the same tag and date selected for quick entry of multiple activities.
-                        </p>
-                    </div>
+                    @if (!IsEditMode)
+                    {
+                        <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" for="@($"{modalId}AddAnother")">
+                                <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="@CheckboxCss" id="@($"{modalId}AddAnother")" />
+                                <span>Add another activity after saving</span>
+                            </label>
+                            <p class="@HelperTextCss">
+                                Keep the form open with the same tag and date selected for quick entry of multiple activities.
+                            </p>
+                        </div>
+                    }
                 </div>
 
                 <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
@@ -148,7 +151,7 @@
                         Cancel
                     </button>
                     <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                        Save Activity
+                        @(IsEditMode ? "Update Activity" : "Save Activity")
                     </button>
                 </div>
             </EditForm>
@@ -172,6 +175,9 @@
     [Parameter] public DateTime? PreselectedDate { get; set; }
     [Parameter] public CultureInfo? DisplayCulture { get; set; }
     [Parameter] public TimeZoneInfo? DisplayTimeZone { get; set; }
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public int? ActivityId { get; set; }
+    [Parameter] public EventCallback OnActivityUpdated { get; set; }
 
     private const string LabelCss = "block text-sm font-medium text-gray-700 dark:text-gray-200";
     private const string InputCss = "mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -222,7 +228,6 @@
 
     protected override void OnParametersSet()
     {
-        // Update effective culture if DisplayCulture parameter changes
         if (DisplayCulture is not null)
         {
             effectiveCulture = DisplayCulture;
@@ -233,30 +238,62 @@
             effectiveTimeZone = DisplayTimeZone;
         }
 
-        // Set preselected tag if provided
-        if (PreselectedTagId.HasValue && Activity.PrimaryTagId != PreselectedTagId.Value)
+        if (IsEditMode)
+        {
+            AddAnotherAfterSave = false;
+        }
+
+        if (!IsEditMode && PreselectedTagId.HasValue && Activity.PrimaryTagId != PreselectedTagId.Value)
         {
             Activity.PrimaryTagId = PreselectedTagId.Value;
-            OnTagSelectionChanged();
         }
-        
-        // Set preselected date if provided
-        if (PreselectedDate.HasValue)
+
+        if (!IsEditMode)
         {
-            var today = GetTodayInDisplayZone();
-            Activity.DateStarted = PreselectedDate.Value.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : PreselectedDate.Value.Date;
-            dateStartedInput = PreselectedDate.Value.Date;
+            if (PreselectedDate.HasValue)
+            {
+                var today = GetTodayInDisplayZone();
+                Activity.DateStarted = PreselectedDate.Value.Date == today
+                    ? GetCurrentDateTimeInDisplayZone()
+                    : PreselectedDate.Value.Date;
+                dateStartedInput = PreselectedDate.Value.Date;
+            }
+            else if (Activity.DateStarted == default)
+            {
+                Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
+                dateStartedInput = GetTodayInDisplayZone();
+            }
         }
-        else if (Activity.DateStarted == default)
+        else
         {
-            Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
-            dateStartedInput = GetTodayInDisplayZone();
+            if (Activity.DateStarted == default)
+            {
+                Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
+            }
+
+            dateStartedInput = Activity.DateStarted.Date;
+            dateFinishedInput = Activity.DateFinished?.Date;
         }
-        
-        // Update selected tag when activity changes
-        OnTagSelectionChanged();
+
+        OnTagSelectionChanged(preserveExistingValues: IsEditMode);
+
+        if (IsEditMode && selectedTag is not null)
+        {
+            if (selectedTag.TimeGranularity != TimeGranularity.Exact && selectedTag.TimeGranularity != TimeGranularity.Hourly)
+            {
+                dateStartedInput = Activity.DateStarted.Date;
+            }
+
+            if (selectedTag.IsRange)
+            {
+                dateFinishedInput = Activity.DateFinished?.Date;
+            }
+            else
+            {
+                Activity.DateFinished = null;
+                dateFinishedInput = null;
+            }
+        }
     }
 
     private DateTime GetCurrentDateTimeInDisplayZone()
@@ -268,13 +305,15 @@
     {
         try
         {
-            // Check for duplicates if tag is selected and not repeatable
             if (Activity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
             {
-                // Only skip duplicate check for Exact granularity since it allows precise timing
                 if (selectedTag.TimeGranularity != TimeGranularity.Exact)
                 {
-                    var duplicateCheck = await ActivityApi.CheckDuplicate(Activity.PrimaryTagId.Value, Activity.DateStarted);
+                    var duplicateCheck = await ActivityApi.CheckDuplicate(
+                        Activity.PrimaryTagId.Value,
+                        Activity.DateStarted,
+                        IsEditMode ? ActivityId : null);
+
                     if (duplicateCheck.HasDuplicate)
                     {
                         var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
@@ -284,17 +323,28 @@
                 }
             }
 
+            if (IsEditMode && ActivityId.HasValue)
+            {
+                await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+
+                if (OnActivityUpdated.HasDelegate)
+                {
+                    await OnActivityUpdated.InvokeAsync();
+                }
+
+                await HandleCloseClick();
+                return;
+            }
+
             await ActivityApi.CreateCalendarItem(Activity);
             await OnActivityCreated.InvokeAsync(Activity);
 
-            // Close the modal after successful submission only if not adding another
             if (!AddAnotherAfterSave)
             {
                 await HandleCloseClick();
             }
             else
             {
-                // Reset form for adding another activity but keep tag and date
                 ResetFormForAnother();
             }
         }
@@ -304,10 +354,9 @@
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
-            // Handle validation errors from the server
             var content = await ex.GetContentAsAsync<string>();
-            Logger.LogWarning("Validation error creating activity: {Content}", content);
-            
+            Logger.LogWarning("Validation error saving activity: {Content}", content);
+
             if (content != null && content.Contains("already exists"))
             {
                 await OnError.InvokeAsync($"Activity with tag '{selectedTag?.Title}' already exists for this time period. This tag is not repeatable.");
@@ -319,18 +368,42 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error creating activity");
-            await OnError.InvokeAsync("An unexpected error occurred while creating the activity. Please try again.");
+            Logger.LogError(ex, "Error saving activity");
+            await OnError.InvokeAsync("An unexpected error occurred while saving the activity. Please try again.");
         }
     }
 
-    private void OnTagSelectionChanged()
+    private void OnTagSelectionChanged(bool preserveExistingValues = false)
     {
         if (Activity.PrimaryTagId.HasValue && AvailableTags != null)
         {
             selectedTag = AvailableTags.FirstOrDefault(t => t.Id == Activity.PrimaryTagId.Value);
             selectedOptionList = null;
             selectedOptionValue = null;
+
+            if (selectedTag?.OptionListId is int listId)
+            {
+                if (OptionListLookup != null && OptionListLookup.TryGetValue(listId, out var lookupList))
+                {
+                    selectedOptionList = lookupList;
+                }
+                else if (OptionLists != null)
+                {
+                    selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
+                }
+
+                if (selectedOptionList is not null && (selectedOptionList.Options is null || selectedOptionList.Options.Count == 0))
+                {
+                    Logger.LogWarning("Tag {TagId} references option list {OptionListId} without any options. Falling back to manual entry.", selectedTag.Id, selectedOptionList.Id);
+                    selectedOptionList = null;
+                }
+            }
+
+            if (preserveExistingValues)
+            {
+                ApplyExistingValuesToInputs();
+                return;
+            }
 
             if (selectedTag?.IsRange != true)
             {
@@ -345,31 +418,11 @@
             timeValue = null;
             decimalValue = null;
 
-            if (selectedTag?.OptionListId is int listId)
+            if (selectedOptionList is not null)
             {
-                if (OptionListLookup != null && OptionListLookup.TryGetValue(listId, out var lookupList))
-                {
-                    selectedOptionList = lookupList;
-                }
-                else if (OptionLists != null)
-                {
-                    selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
-                }
-
-                if (selectedOptionList is not null)
-                {
-                    if (selectedOptionList.Options is null || selectedOptionList.Options.Count == 0)
-                    {
-                        Logger.LogWarning("Tag {TagId} references option list {OptionListId} without any options. Falling back to manual entry.", selectedTag.Id, selectedOptionList.Id);
-                        selectedOptionList = null;
-                    }
-                    else
-                    {
-                        selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
-                        Activity.Description = selectedOptionValue ?? string.Empty;
-                        return;
-                    }
-                }
+                selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
+                Activity.Description = selectedOptionValue ?? string.Empty;
+                return;
             }
 
             switch (selectedTag?.TypeId)
@@ -435,7 +488,7 @@
                     break;
             }
         }
-        else
+        else if (!preserveExistingValues)
         {
             selectedTag = null;
             selectedOptionList = null;
@@ -448,6 +501,92 @@
             dateValue = null;
             timeValue = null;
             decimalValue = null;
+        }
+    }
+
+    private void ApplyExistingValuesToInputs()
+    {
+        if (selectedTag is null)
+        {
+            return;
+        }
+
+        var description = Activity.Description ?? string.Empty;
+
+        if (selectedOptionList is not null)
+        {
+            selectedOptionValue = description;
+            Activity.Description = description;
+        }
+
+        switch (selectedTag.TypeId)
+        {
+            case 1:
+                if (int.TryParse(description, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedInt))
+                {
+                    integerValue = parsedInt;
+                    Activity.Description = parsedInt.ToString(CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    integerValue = null;
+                }
+                break;
+            case 2:
+                Activity.Description = description;
+                break;
+            case 3:
+                booleanValue = bool.TryParse(description, out var parsedBool) && parsedBool;
+                Activity.Description = booleanValue ? "true" : "false";
+                break;
+            case 4:
+                if (DateTime.TryParse(description, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedDate))
+                {
+                    dateValue = parsedDate.Date;
+                }
+                else
+                {
+                    dateValue = Activity.DateStarted.Date;
+                }
+
+                Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+                break;
+            case 5:
+                if (TimeOnly.TryParse(description, CultureInfo.InvariantCulture, out var parsedTime))
+                {
+                    timeValue = parsedTime;
+                }
+                else
+                {
+                    timeValue = TimeOnly.FromDateTime(Activity.DateStarted);
+                }
+
+                Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+                break;
+            case 6:
+                if (decimal.TryParse(description, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedDecimal))
+                {
+                    decimalValue = parsedDecimal;
+                    Activity.Description = parsedDecimal.ToString("0.#############################", CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    decimalValue = null;
+                }
+                break;
+            default:
+                Activity.Description = description;
+                break;
+        }
+
+        if (selectedTag.IsRange)
+        {
+            dateFinishedInput = Activity.DateFinished?.Date;
+        }
+        else
+        {
+            Activity.DateFinished = null;
+            dateFinishedInput = null;
         }
     }
     

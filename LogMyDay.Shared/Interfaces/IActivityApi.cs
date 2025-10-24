@@ -6,7 +6,9 @@ using Refit;
 public interface IActivityApi
 {
     [Get("/api/activities/{id}")]
-    Task<ActivityResponse> GetCalendarById(int id);    [Get("/api/activities")]
+    Task<ActivityResponse> GetCalendarById(int id);
+
+    [Get("/api/activities")]
     Task<PagedResult<ActivityResponse>> GetActivities(
         int pageNumber = 1,
         int pageSize = 20,
@@ -46,12 +48,16 @@ public interface IActivityApi
     Task<ActivityResponse> CreateCalendarItem([Body] ActivityRequest calendarRequest);
 
     [Put("/api/activities/{id}")]
-    Task<ActivityResponse> UpdateCalendarItem(int id, [Body] DateTime dateCreated, DateTime? dateFinished);
+    Task<ActivityResponse> UpdateCalendarItem(int id, [Body] ActivityRequest request);
 
     [Delete("/api/activities/{id}")]
-    Task Delete(int id);    [Post("/api/activities/by-date")]
-    Task<List<ActivityResponse>> GetCalendarByDate(ActivityRequest request);    [Get("/api/activities/check-duplicate")]
-    Task<DuplicateCheckResponse> CheckDuplicate(int tagId, DateTime dateStarted);
+    Task Delete(int id);
+
+    [Post("/api/activities/by-date")]
+    Task<List<ActivityResponse>> GetCalendarByDate(ActivityRequest request);
+
+    [Get("/api/activities/check-duplicate")]
+    Task<DuplicateCheckResponse> CheckDuplicate(int tagId, DateTime dateStarted, int? activityId = null);
 
     [Get("/api/activities/required-daily-tags-unfilled")]
     // Legacy endpoint: kept for future experiments with required-tag reminders.

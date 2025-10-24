@@ -52,10 +52,12 @@ public class ActivitiesController : BaseApiController
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] DateTime dateCreated, DateTime? dateFinished)
+    public async Task<IActionResult> Update(int id, [FromBody] ActivityRequest request)
     {
         var userId = GetCurrentUserId();
-        return Ok(await _activityService.Update(id, dateCreated, dateFinished, userId));
+        var updatedActivity = await _activityService.Update(id, request, userId);
+
+        return Ok(updatedActivity);
     }
 
     [HttpDelete("{id}")]
@@ -108,10 +110,14 @@ public class ActivitiesController : BaseApiController
     }
 
     [HttpGet("check-duplicate")]
-    public async Task<IActionResult> CheckDuplicate([FromQuery] int tagId, [FromQuery] DateTime dateStarted)
+    public async Task<IActionResult> CheckDuplicate(
+        [FromQuery] int tagId,
+        [FromQuery] DateTime dateStarted,
+        [FromQuery] int? activityId = null)
     {
         var userId = GetCurrentUserId();
-        var hasDuplicate = await _activityService.HasActivityForTimeGranularity(tagId, dateStarted, userId);
+        var hasDuplicate = await _activityService.HasActivityForTimeGranularity(tagId, dateStarted, userId, activityId);
+
         return Ok(new DuplicateCheckResponse { HasDuplicate = hasDuplicate });
     }
 
