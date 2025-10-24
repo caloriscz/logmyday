@@ -1,4 +1,5 @@
 ﻿@page "/calendar"
+@using System.Collections.Generic
 @using System.Linq
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Services
@@ -92,41 +93,54 @@
                                 <tr>
                                     @foreach (var day in week)
                                     {
-                                        <td class="h-24 border border-gray-200 bg-white align-top p-2 dark:border-slate-800 dark:bg-slate-900/70">
+                                        <td class="h-20 border border-gray-200 bg-white p-0 dark:border-slate-800 dark:bg-slate-900/70">
                                             @if (day.HasValue)
                                             {
-                                                <div class="text-xs font-semibold text-gray-700 dark:text-slate-200">@day.Value.Day</div>
-
                                                 var key = day.Value.ToString("yyyy-MM-dd");
-                                                if (activitiesByDate != null && activitiesByDate.TryGetValue(key, out var values) && values.Count > 0)
-                                                {
-                                                    <div class="mt-2 flex flex-col gap-1">
-                                                        @foreach (var value in values)
-                                                        {
-                                                            var inlineText = GetInlineText(value);
-                                                            var isTruncated = IsTruncated(value);
+                                                List<string>? dayValues = null;
 
-                                                            if (isTruncated)
-                                                            {
-                                                                <button type="button" class="@ValueButtonCss" title="Click to view full description" @onclick="() => ShowDescriptionModal(value)">
-                                                                    @inlineText
-                                                                </button>
-                                                            }
-                                                            else
-                                                            {
-                                                                <span class="@ValueBadgeCss">@inlineText</span>
-                                                            }
-                                                        }
-                                                    </div>
-                                                }
-                                                else
+                                                if (activitiesByDate != null && activitiesByDate.TryGetValue(key, out var rawValues))
                                                 {
-                                                    <span class="@EmptyBadgeCss">-</span>
+                                                    dayValues = rawValues;
                                                 }
+
+                                                var hasValues = dayValues != null && dayValues.Count > 0;
+
+                                                <div class="flex h-full flex-col items-center justify-center gap-1.5 p-2">
+                                                    <div class="text-xs font-semibold text-gray-900 dark:text-slate-100">@day.Value.Day</div>
+
+                                                    @if (hasValues && dayValues != null)
+                                                    {
+                                                        <div class="flex w-full flex-wrap justify-center gap-0.5">
+                                                            @foreach (var value in dayValues)
+                                                            {
+                                                                var inlineText = GetInlineText(value);
+                                                                var isTruncated = IsTruncated(value);
+
+                                                                if (isTruncated)
+                                                                {
+                                                                    <button type="button" class="@ValueButtonCss" title="Click to view full description" @onclick="() => ShowDescriptionModal(value)">
+                                                                        @inlineText
+                                                                    </button>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="@ValueBadgeCss">@inlineText</span>
+                                                                }
+                                                            }
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="flex w-full justify-center">
+                                                            <span class="@EmptyBadgeCss">-</span>
+                                                        </div>
+                                                    }
+                                                </div>
                                             }
                                             else
                                             {
-                                                <span class="block h-full"></span>
+                                                <div class="h-full bg-gray-50 dark:bg-slate-900/40"></div>
                                             }
                                         </td>
                                     }
@@ -159,9 +173,9 @@
 @code {
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
-    private const string ValueBadgeCss = "inline-flex items-center justify-center rounded-md bg-emerald-500 px-2 py-1 text-xs font-semibold text-white shadow-sm dark:bg-emerald-500/80";
-    private const string ValueButtonCss = "inline-flex items-center justify-center rounded-md bg-emerald-500 px-2 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:bg-emerald-500/80 dark:hover:bg-emerald-500 dark:focus-visible:ring-offset-slate-900";
-    private const string EmptyBadgeCss = "inline-flex items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-200";
+    private const string ValueBadgeCss = "flex w-full min-h-[1.75rem] items-center justify-center rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm dark:bg-emerald-500/80";
+    private const string ValueButtonCss = "flex w-full min-h-[1.75rem] items-center justify-center rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:bg-emerald-500/80 dark:hover:bg-emerald-500 dark:focus-visible:ring-offset-slate-900";
+    private const string EmptyBadgeCss = "flex w-full min-h-[1.75rem] items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-200";
     private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
     private const string OrderButtonActive = "inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900";
     private const string OrderDescending = "desc";
