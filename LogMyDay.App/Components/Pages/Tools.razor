@@ -4,76 +4,57 @@
 @using System.Text.Json
 @using Microsoft.AspNetCore.Components.Forms
 @using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
 @inject IBackupService BackupService
 @inject IExcelExportService ExcelExportService
 @inject IJSRuntime JSRuntime
 @inject ILogger<Tools> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="container mt-4">
-    <h2 class="mb-4">Tools & Utilities</h2>
-    <p class="text-muted mb-4">Helpful tools to enhance your activity logging experience</p>
+<div class="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-1">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Tools & Utilities</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Helpful tools to enhance your activity logging experience.</p>
+    </div>
 
-    <div class="row">
-        <!-- Breathing Techniques -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">
-                        <i class="bi bi-tools me-2"></i>
-                        Practice Breathing 2
-                    </h5>
-                    <p class="card-text">
-                        Practice guided breathing exercises and track your sessions and save them as activities with customizable tags.
-                    </p>
-                </div>
-                <div class="card-footer text-muted">
-                    <a href="/tools/breathing" class="btn btn-primary">
-                        <i class="bi bi-play-circle me-1"></i>
-                        Start Breathing
-                    </a>
-                </div>
+    <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="flex h-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-1 flex-col space-y-3 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Practice Breathing</h2>
+                <p class="text-sm text-gray-600 dark:text-slate-300">
+                    Practice guided breathing exercises and track your sessions, saving them as activities with customizable tags.
+                </p>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <a href="/tools/breathing" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">
+                    <span>Start Breathing</span>
+                </a>
             </div>
         </div>
 
-        <!-- Breathing Techniques -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title">
-                        <i class="bi bi-tools me-2"></i>
-                        Exercise
-                    </h5>
-                    <p class="card-text">
-                        HIIT trainer and other exercise routines.
-                    </p>
-
-                </div>
-                <div class="card-footer text-muted">
-                    <div class="mt-auto">
-                        <a href="/tools/exercise" class="btn btn-primary">
-                            <i class="bi bi-play-circle me-1"></i>
-                            Start Exercise
-                        </a>
-                    </div>
-                </div>
+        <div class="flex h-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-1 flex-col space-y-3 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Exercise</h2>
+                <p class="text-sm text-gray-600 dark:text-slate-300">
+                    HIIT trainer and other exercise routines to keep you moving.
+                </p>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <a href="/tools/exercise" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">
+                    <span>Start Exercise</span>
+                </a>
             </div>
         </div>
+    </div>
 
-        <!-- Additional Information Section -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="alert alert-info">
-                    <h6 class="alert-heading">
-                        <i class="bi bi-info-circle me-2"></i>
-                        About Tools
-                    </h6>
-                    <p class="mb-0">
-                        These tools are designed to complement your activity logging workflow.
-                        Each tool can save results directly to your activity log using your configured tags,
-                        making it easy to track various aspects of your daily routine.
-                    </p>
-                </div>
+    <div class="rounded-xl border border-sky-200 bg-sky-50 px-6 py-5 text-sky-900 shadow-sm dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-100">
+        <div class="flex items-start gap-3">
+            <Icon Name="info" Class="h-5 w-5 flex-shrink-0" />
+            <div class="space-y-1">
+                <h3 class="text-sm font-semibold">About Tools</h3>
+                <p class="text-sm">
+                    These tools are designed to complement your activity logging workflow. Each tool can save results directly to your activity log using your configured tags, making it easy to track various aspects of your daily routine.
+                </p>
             </div>
         </div>
     </div>

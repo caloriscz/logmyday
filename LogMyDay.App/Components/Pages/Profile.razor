@@ -10,149 +10,141 @@
 @inject ILogger<Profile> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="container-fluid px-4 py-4">
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
-        <h2 class="mb-0">My Profile</h2>
-        <div class="text-muted small">
-            Manage your personal information and password.
-        </div>
+<div class="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-1">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">My Profile</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Manage your personal information and password.</p>
     </div>
 
     @if (isLoading)
     {
-        <div class="d-flex align-items-center gap-2">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
+        <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
             <span>Loading profile...</span>
         </div>
     }
     else if (!string.IsNullOrEmpty(loadErrorMessage))
     {
-        <div class="alert alert-danger" role="alert">
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
             @loadErrorMessage
         </div>
     }
     else
     {
-        <div class="row g-4">
-            <div class="col-12 col-xl-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-light">
-                        <h5 class="card-title mb-0">Profile Information</h5>
-                    </div>
-                    <div class="card-body">
-                        @if (!string.IsNullOrEmpty(profileStatusMessage))
-                        {
-                            <div class="alert @(profileStatusIsError ? "alert-danger" : "alert-success")" role="alert">
-                                @profileStatusMessage
-                            </div>
-                        }
-
-                        <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
-                            <DataAnnotationsValidator />
-                            <ValidationSummary class="text-sm text-red-600 dark:text-red-400 mb-4" />
-
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileEmail">Email</label>
-                                    <InputText id="profileEmail" @bind-Value="profile.Email" class="form-control" autocomplete="email" readonly />
-                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Email cannot be changed.</div>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileDisplayName">Display Name (optional)</label>
-                                    <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="form-control" autocomplete="name" placeholder="Enter your display name" />
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileCulture">Culture</label>
-                                    <SearchableSelect @bind-Value="profile.Culture"
-                                                      Id="profileCulture"
-                                                      Options="CultureOptions"
-                                                      Placeholder="Select culture"
-                                                      SearchPlaceholder="Search cultures"
-                                                      ShowValueInList="true" />
-                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="profileTimeZone">Time Zone</label>
-                                    <SearchableSelect @bind-Value="profile.TimeZone"
-                                                      Id="profileTimeZone"
-                                                      Options="TimeZoneOptions"
-                                                      Placeholder="Select time zone"
-                                                      SearchPlaceholder="Search time zones"
-                                                      ShowValueInList="true" />
-                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</div>
-                                </div>
-                            </div>
-
-                            <div class="mt-6">
-                                <button type="submit" class="btn btn-primary" disabled="@isSavingProfile">
-                                    @if (isSavingProfile)
-                                    {
-                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                        <span>Saving...</span>
-                                    }
-                                    else
-                                    {
-                                        <span><i class="bi bi-save me-1"></i>Save Changes</span>
-                                    }
-                                </button>
-                            </div>
-                        </EditForm>
-                    </div>
+        <div class="grid gap-6 xl:grid-cols-2">
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="rounded-t-xl border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700">
+                    <h2 class="text-lg font-semibold">Profile Information</h2>
                 </div>
-            </div>
+                <div class="space-y-5 p-6">
+                    @if (!string.IsNullOrEmpty(profileStatusMessage))
+                    {
+                        <div class="rounded-lg border @(profileStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
+                            @profileStatusMessage
+                        </div>
+                    }
 
-            <div class="col-12 col-xl-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-light">
-                        <h5 class="card-title mb-0">Change Password</h5>
-                    </div>
-                    <div class="card-body">
-                        @if (!string.IsNullOrEmpty(passwordStatusMessage))
-                        {
-                            <div class="alert @(passwordStatusIsError ? "alert-danger" : "alert-success")" role="alert">
-                                @passwordStatusMessage
-                            </div>
-                        }
+                    <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
 
-                        <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
-                            <DataAnnotationsValidator />
-                            <ValidationSummary class="text-sm text-red-600 dark:text-red-400 mb-4" />
-
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="currentPassword">Current Password</label>
-                                    <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="form-control" autocomplete="current-password" placeholder="Enter current password" />
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="newPassword">New Password</label>
-                                    <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="form-control" autocomplete="new-password" placeholder="Enter new password" />
-                                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Minimum 10 characters.</div>
-                                </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileEmail">Email</label>
+                                <InputText id="profileEmail" @bind-Value="profile.Email" class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="email" readonly />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Email cannot be changed.</p>
                             </div>
 
-                            <div class="mt-6">
-                                <button type="submit" class="btn btn-primary" disabled="@isChangingPassword">
-                                    @if (isChangingPassword)
-                                    {
-                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                        <span>Updating...</span>
-                                    }
-                                    else
-                                    {
-                                        <span><i class="bi bi-shield-lock me-1"></i>Update Password</span>
-                                    }
-                                </button>
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileDisplayName">Display Name (optional)</label>
+                                <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="name" placeholder="Enter your display name" />
                             </div>
-                        </EditForm>
-                    </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileCulture">Culture</label>
+                                <SearchableSelect @bind-Value="profile.Culture"
+                                                  Id="profileCulture"
+                                                  Options="CultureOptions"
+                                                  Placeholder="Select culture"
+                                                  SearchPlaceholder="Search cultures"
+                                                  ShowValueInList="true" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</p>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileTimeZone">Time Zone</label>
+                                <SearchableSelect @bind-Value="profile.TimeZone"
+                                                  Id="profileTimeZone"
+                                                  Options="TimeZoneOptions"
+                                                  Placeholder="Select time zone"
+                                                  SearchPlaceholder="Search time zones"
+                                                  ShowValueInList="true" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isSavingProfile">
+                                @if (isSavingProfile)
+                                {
+                                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <span>Save Changes</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
                 </div>
-            </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="rounded-t-xl border-b border-gray-200 bg-slate-700 px-6 py-4 text-white dark:border-slate-700">
+                    <h2 class="text-lg font-semibold">Change Password</h2>
+                </div>
+                <div class="space-y-5 p-6">
+                    @if (!string.IsNullOrEmpty(passwordStatusMessage))
+                    {
+                        <div class="rounded-lg border @(passwordStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
+                            @passwordStatusMessage
+                        </div>
+                    }
+
+                    <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="currentPassword">Current Password</label>
+                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newPassword">New Password</label>
+                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isChangingPassword">
+                                @if (isChangingPassword)
+                                {
+                                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    <span>Updating...</span>
+                                }
+                                else
+                                {
+                                    <span>Update Password</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </section>
         </div>
     }
 </div>
