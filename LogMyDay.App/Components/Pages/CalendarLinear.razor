@@ -10,7 +10,7 @@
     .grid-linear-legend, .grid-linear-month {
         display: grid;
         grid-template-columns: 2.25rem repeat(42, 1.125rem);
-        column-gap: 2px;
+        column-gap: 4px;
         align-items: center;
         width: max-content;
         position: relative;
@@ -242,10 +242,10 @@
     private double CalculateDividerPosition(int afterColumn)
     {
         // Calculate the left position for a vertical divider BETWEEN weeks
-        // Position it in the gap between the last day of one week and first day of next week
+        // Position it in the middle of the gap between the last day of one week and first day of next week
         const double labelWidth = 2.25 * 16; // 2.25rem in pixels (assuming 16px base)
         const double cellWidth = 1.125 * 16; // 1.125rem in pixels  
-        const double gap = 2; // 2px
+        const double gap = 4; // 4px (updated to match CSS)
         
         // Position divider in the middle of the gap AFTER the specified column
         return labelWidth + (afterColumn * (cellWidth + gap)) - (gap / 2);
