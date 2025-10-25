@@ -1,0 +1,284 @@
+@page "/calendar-linear"
+@using System.Globalization
+@using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+
+<style>
+    /* Fixed 42-column grid for linear calendar */
+    .grid-linear-legend, .grid-linear-month {
+        display: grid;
+        grid-template-columns: 2.2rem repeat(42, 1.25rem);
+        column-gap: 2px;
+        align-items: center;
+        width: max-content;
+        position: relative;
+    }
+
+    .day-cell, .blank-cell {
+        width: 1.25rem;
+        height: 1.25rem;
+        text-align: center;
+    }
+
+    .day-num {
+        font-size: 11px;
+        line-height: 1.25rem;
+        font-weight: 500;
+    }
+
+    .legend-text {
+        font-size: 10px;
+        line-height: 1rem;
+        font-weight: 500;
+        text-align: center;
+    }
+
+    /* Vertical week dividers */
+    .week-divider {
+        position: absolute;
+        top: 2px;
+        bottom: 2px;
+        width: 1px;
+        background: rgb(226 232 240);
+        opacity: 0.6;
+    }
+</style>
+
+<div class="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Linear Calendar</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Year-as-rows calendar view with week-aligned layout.</p>
+    </div>
+
+    <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+                <label for="weekStartPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Week starts</label>
+                <select id="weekStartPicker" class="@InputCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
+                    <option value="1">Monday</option>
+                    <option value="0">Sunday</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" class="@GetOrderButtonClass(OrderDescending)" @onclick="@(() => ChangeOrder(OrderDescending))">Newest First</button>
+                <button type="button" class="@GetOrderButtonClass(OrderAscending)" @onclick="@(() => ChangeOrder(OrderAscending))">Oldest First</button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button type="button" class="@NavButtonCss" @onclick="PrevYear">Previous Year</button>
+            <div class="text-sm font-semibold text-gray-900 dark:text-slate-100">@currentYear</div>
+            <button type="button" class="@NavButtonCss" @onclick="NextYear">Next Year</button>
+        </div>
+    </div>
+
+    <!-- Global weekday legend -->
+    <section class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="overflow-x-auto">
+            <div class="grid-linear-legend">
+                @* Month label spacer *@
+                <div class="text-xs font-semibold text-gray-500 dark:text-slate-400">&nbsp;</div>
+                
+                @* 42 weekday labels (repeating pattern) *@
+                @for (int i = 0; i < FixedCells; i++)
+                {
+                    var weekdayName = GetWeekdayName(i);
+                    <div class="legend-text text-gray-500 dark:text-slate-400">@weekdayName</div>
+                }
+
+                @* Week dividers for legend (always at fixed positions) *@
+                @for (int weekNum = 1; weekNum < 6; weekNum++)
+                {
+                    var leftPos = CalculateDividerPosition(weekNum * 7);
+                    <div class="week-divider" style="left: @(leftPos)px;"></div>
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- Year rows -->
+    <section class="space-y-3">
+        @foreach (var month in GetMonthsToRender())
+        {
+            var monthData = GetMonthLinearGrid(currentYear, month, weekStartsOn);
+            
+            <div class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="overflow-x-auto">
+                    <div class="grid-linear-month">
+                        @* Month label *@
+                        <div class="text-right pr-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
+                            @monthData.MonthLabel
+                        </div>
+
+                        @* Leading blank cells *@
+                        @for (int i = 0; i < monthData.LeadingBlanks; i++)
+                        {
+                            <div class="blank-cell rounded-md border border-transparent invisible">
+                                <div class="day-num">&nbsp;</div>
+                            </div>
+                        }
+
+                        @* Day cells *@
+                        @foreach (var day in monthData.Days)
+                        {
+                            <div class="day-cell rounded-md border border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-900/70">
+                                <div class="day-num text-gray-900 dark:text-slate-100">@day</div>
+                            </div>
+                        }
+
+                        @* Trailing blank cells *@
+                        @for (int i = 0; i < monthData.TrailingBlanks; i++)
+                        {
+                            <div class="blank-cell rounded-md border border-transparent invisible">
+                                <div class="day-num">&nbsp;</div>
+                            </div>
+                        }
+
+                        @* Week dividers (always at fixed positions: after columns 7, 14, 21, 28, 35) *@
+                        @for (int weekNum = 1; weekNum < 6; weekNum++)
+                        {
+                            var leftPos = CalculateDividerPosition(weekNum * 7);
+                            <div class="week-divider" style="left: @(leftPos)px;"></div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+
+    <footer class="text-xs text-gray-500 dark:text-slate-400">
+        Linear planner: each month uses a fixed 42-cell grid; week ends align across all months.
+    </footer>
+</div>
+
+@code {
+    private const string InputCss = "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderDescending = "desc";
+    private const string OrderAscending = "asc";
+    private const int FixedCells = 42; // 6 weeks × 7 days
+
+    private static readonly string[] WeekdayNamesStartingMonday = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+    private static readonly string[] WeekdayNamesStartingSunday = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    private int currentYear = DateTime.Now.Year;
+    private DayOfWeek weekStartsOn = DayOfWeek.Monday;
+    private string orderBy = OrderDescending;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Linear Calendar");
+    }
+
+    private class MonthLinearData
+    {
+        public string MonthLabel { get; set; } = string.Empty;
+        public int LeadingBlanks { get; set; }
+        public List<int> Days { get; set; } = new();
+        public int TrailingBlanks { get; set; }
+    }
+
+    private IEnumerable<int> GetMonthsToRender()
+    {
+        if (string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase))
+        {
+            return Enumerable.Range(1, 12);
+        }
+
+        return Enumerable.Range(1, 12).Reverse();
+    }
+
+    private MonthLinearData GetMonthLinearGrid(int year, int month, DayOfWeek weekStartsOn)
+    {
+        var firstDay = new DateTime(year, month, 1);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        
+        // Calculate leading blank cells needed to align first day with correct weekday
+        var firstDayOfWeek = firstDay.DayOfWeek;
+        var leadingBlanks = GetAdjustedWeekdayIndex(firstDayOfWeek, weekStartsOn);
+
+        // Generate day numbers
+        var days = Enumerable.Range(1, daysInMonth).ToList();
+
+        // Calculate trailing blanks to reach 42 cells
+        var trailingBlanks = FixedCells - leadingBlanks - daysInMonth;
+
+        return new MonthLinearData
+        {
+            MonthLabel = month.ToString("00"),
+            LeadingBlanks = leadingBlanks,
+            Days = days,
+            TrailingBlanks = trailingBlanks
+        };
+    }
+
+    private string GetWeekdayName(int columnIndex)
+    {
+        // Get weekday name for a specific column (0-41)
+        var names = weekStartsOn == DayOfWeek.Monday 
+            ? WeekdayNamesStartingMonday 
+            : WeekdayNamesStartingSunday;
+
+        return names[columnIndex % 7];
+    }
+
+    private double CalculateDividerPosition(int afterColumn)
+    {
+        // Calculate the left position for a vertical divider after a specific column
+        // Formula: label width + (column number * (cell width + gap)) - (gap / 2)
+        const double labelWidth = 2.2 * 16; // 2.2rem in pixels (assuming 16px base)
+        const double cellWidth = 1.25 * 16; // 1.25rem in pixels
+        const double gap = 2; // 2px
+        
+        return labelWidth + (afterColumn * (cellWidth + gap)) - (gap / 2);
+    }
+
+    private int GetAdjustedWeekdayIndex(DayOfWeek dayOfWeek, DayOfWeek weekStartsOn)
+    {
+        // Convert DayOfWeek to 0-6 index adjusted for week start day
+        var dayIndex = (int)dayOfWeek;
+        var startIndex = (int)weekStartsOn;
+        return (dayIndex - startIndex + 7) % 7;
+    }
+
+    private string GetOrderButtonClass(string order)
+    {
+        return string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase)
+            ? OrderButtonActive
+            : OrderButtonInactive;
+    }
+
+    private void OnWeekStartChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            weekStartsOn = (DayOfWeek)value;
+        }
+    }
+
+    private void PrevYear()
+    {
+        currentYear--;
+    }
+
+    private void NextYear()
+    {
+        currentYear++;
+    }
+
+    private void ChangeOrder(string order)
+    {
+        if (string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        orderBy = order;
+    }
+}
