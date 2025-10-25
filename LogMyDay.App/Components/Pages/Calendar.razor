@@ -10,11 +10,18 @@
 @inject NavigationManager Navigation
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject IJSRuntime JSRuntime
 
 <div class="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
-    <div class="space-y-2">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Calendar</h1>
-        <p class="text-sm text-gray-600 dark:text-slate-300">Review how often a tag appears across each month and year.</p>
+    <div class="flex items-center justify-between">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Calendar</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Review how often a tag appears across each month and year.</p>
+        </div>
+        <button type="button" class="@NavButtonCss" @onclick="NavigateToLinearView">
+            <Icon Name="bars-3" Class="h-4 w-4 mr-1" />
+            Linear Calendar
+        </button>
     </div>
 
     <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -288,6 +295,27 @@
         await LoadTags();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && tags != null && tags.Any())
+        {
+            try
+            {
+                var savedTagId = await JSRuntime.InvokeAsync<int?>("tagPersistence.getSelectedTag");
+                if (savedTagId.HasValue && tags.Any(t => t.Id == savedTagId.Value))
+                {
+                    selectedTagId = savedTagId.Value;
+                    await LoadActivitiesForTag(savedTagId.Value);
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // Ignore errors loading saved tag preference
+            }
+        }
+    }
+
     private async Task LoadPreferencesAsync()
     {
         try
@@ -347,11 +375,13 @@
         if (int.TryParse(e.Value?.ToString(), out var tagId))
         {
             selectedTagId = tagId;
+            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", tagId);
             await LoadActivitiesForTag(tagId);
         }
         else
         {
             selectedTagId = null;
+            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", null);
             activitiesByDate = null;
             availableYears.Clear();
             hasNextYear = false;
@@ -780,5 +810,10 @@
     {
         var today = GetTodayInDisplayZone();
         return date.Date == today ? GetCurrentDateTimeInDisplayZone() : date.Date;
+    }
+
+    private void NavigateToLinearView()
+    {
+        Navigation.NavigateTo("/calendar-linear");
     }
 }
