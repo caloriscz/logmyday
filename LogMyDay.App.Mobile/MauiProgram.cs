@@ -15,7 +15,7 @@ public static class MauiProgram
         
         var builder = MauiApp.CreateBuilder();
         System.Diagnostics.Debug.WriteLine("MauiProgram: MauiApp builder created");
-        
+
         builder
             .UseMauiApp<App>()
             .UseMauiCommunityToolkit()
@@ -23,6 +23,13 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
+
+        builder.ConfigureMauiHandlers(handlers =>
+        {
+#if ANDROID
+            handlers.AddHandler(typeof(LogMyDay.App.Mobile.Controls.CustomRefreshView), typeof(LogMyDay.App.Mobile.Platforms.Android.CustomRefreshViewHandler));
+#endif
+        });
 
         builder.Logging.ClearProviders();
         builder.Logging.AddDebug();
