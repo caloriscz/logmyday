@@ -1,19 +1,19 @@
 #if ANDROID
 using Android.Content;
+using Android.Views;
 using AndroidX.SwipeRefreshLayout.Widget;
 using Microsoft.Maui.Handlers;
-using Microsoft.Maui.Platform;
 
 namespace LogMyDay.App.Mobile.Platforms.Android;
 
 internal class CustomRefreshViewHandler : RefreshViewHandler
 {
-    protected override MauiSwipeRefreshLayout CreatePlatformView()
+    protected override SwipeRefreshLayout CreatePlatformView()
     {
         return new GuardedSwipeRefreshLayout(Context, this);
     }
 
-    private sealed class GuardedSwipeRefreshLayout : MauiSwipeRefreshLayout
+    private sealed class GuardedSwipeRefreshLayout : SwipeRefreshLayout
     {
         private readonly CustomRefreshViewHandler _handler;
 
@@ -39,7 +39,7 @@ internal class CustomRefreshViewHandler : RefreshViewHandler
             return false;
         }
 
-        private bool CanViewScrollUp(Android.Views.View? view)
+        private bool CanViewScrollUp(View? view)
         {
             if (view is null)
             {
@@ -59,7 +59,7 @@ internal class CustomRefreshViewHandler : RefreshViewHandler
                 return webView.ScrollY > tolerancePx;
             }
 
-            if (view is Android.Views.ViewGroup group)
+            if (view is ViewGroup group)
             {
                 for (int i = 0; i < group.ChildCount; i++)
                 {
