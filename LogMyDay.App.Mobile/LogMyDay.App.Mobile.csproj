@@ -13,6 +13,9 @@
 		<ApplicationId>com.logmyday.mobile</ApplicationId>
 		<ApplicationTitle>LogMyDay Mobile</ApplicationTitle>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+		
+		<!-- DEBUGGING FIX: Disable Hot Reload - causes debugger to hang when stopping -->
+		<HotReloadEnabled>false</HotReloadEnabled>
 	</PropertyGroup>
 
 	<ItemGroup>
