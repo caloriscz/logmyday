@@ -1,0 +1,16 @@
+{
+  "App": {
+    "WebUrl": "your-api-url",
+    "DefaultPage": "/"
+  },
+  "Api": {
+    "BaseUrl": "your-api-url",
+    "Username": "api-username",
+    "Password": "api-password"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information"
+    }
+  }
+}

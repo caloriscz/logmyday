@@ -1,0 +1,85 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# User-specific files
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# Node modules and build artifacts
+**/node_modules/
+**/dist/
+**/.npm/
+**/.cache/
+
+# Logs
+**/Logs/
+**/*.log
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+**/*.swp
+**/*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets and sensitive data
+secrets/
+**/*.pfx
+**/*.p12
+**/*.key
+**/*.pem
+**/appsettings.Development.json
+**/appsettings.*.json
+!**/appsettings.json
+!**/appsettings.Docker.json
+
+# Test results
+**/TestResults/
+**/*.trx
+
+# Documentation
+*.md
+LICENSE
+.github/
+
+# Package files
+**/*.nupkg
+**/*.snupkg
+
+# Temporary files
+**/tmp/
+**/temp/
+**/*.tmp
+
+# MAUI specific (not needed for server build)
+LogMyDay.App.Mobile/
+TestCulture/
+
+# Migration files
+MIGRATION_STATUS.md
+TAILWIND_*.md
+
+# Build scripts
+build/build-tailwind.ps1
+build/deploy-mobile-fix.ps1

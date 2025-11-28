@@ -1,0 +1,59 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="LogMyDay - Personal activity logging application" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="msapplication-config" content="/images/favicon/browserconfig.xml" />
+    <title>LogMyDay</title>
+    <base href="/" />    
+    <link rel="stylesheet" href="@Assets["css/tailwind.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["LogMyDay.App.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["vendor/air-datepicker/air-datepicker.min.css"]" />
+    <ImportMap />
+    
+    <!-- Prevent FOUC - Initialize theme before page render -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('lmd-theme') || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="57x57" href="/images/favicon/apple-57x57-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="60x60" href="/images/favicon/apple-60x60-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/images/favicon/apple-72x72-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="76x76" href="/images/favicon/apple-76x76-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="/images/favicon/apple-114x114-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/images/favicon/apple-120x120-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/images/favicon/apple-144x144-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/images/favicon/apple-152x152-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon/apple-180x180-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/images/favicon/android-chrome-192x192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/images/favicon/favicon-96x96.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon/favicon-16x16.png" />
+    <link rel="shortcut icon" href="/images/favicon/favicon.ico" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="@Assets["vendor/air-datepicker/air-datepicker.min.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
+    <script src="@Assets["js/air-datepicker-integration.js"]"></script>
+    <script src="@Assets["js/tagPersistence.js"]"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>

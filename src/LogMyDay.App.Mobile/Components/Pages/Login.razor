@@ -1,0 +1,213 @@
+@page "/"
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject LogMyDay.App.Mobile.Services.IApiContext ApiContext
+@inject LogMyDay.App.Mobile.Services.IApiClientProvider ApiProvider
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+
+<PageTitle>Login - LogMyDay</PageTitle>
+
+@if (!_shouldRender)
+{
+    <!-- Don't render anything while checking authentication -->
+    <div></div>
+}
+else
+{
+    <!-- Modern Dark Login Page - Always dark, never themed -->
+    <div class="login-dark-bg flex items-start justify-center px-6 pb-8">
+        <div class="w-full max-w-md mt-6">
+        <!-- Logo and Branding -->
+        <div class="text-center mb-6">
+            <div class="flex justify-center mb-3">
+                <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden">
+                    <img src="images/favicon.png" alt="LogMyDay Logo" class="w-14 h-14 object-contain" />
+                </div>
+            </div>
+            <h1 class="text-2xl font-bold text-white mb-1">LogMyDay</h1>
+            <p class="text-slate-400 text-sm">Track your daily activities</p>
+        </div>
+
+        <!-- Login Form - No Card Background -->
+        <div>
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <!-- Server URL -->
+                <div class="mb-4">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Server URL:</label>
+                    <InputText @bind-Value="loginModel.ServerUrl"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
+                               placeholder="https://logmyday.tadata.cz" />
+                    <ValidationMessage For="@(() => loginModel.ServerUrl)" class="text-red-400 text-sm mt-1" />
+                    <p class="text-slate-500 text-xs mt-1">Enter your LogMyDay server URL</p>
+                </div>
+
+                <!-- Username -->
+                <div class="mb-4">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Username:</label>
+                    <InputText @bind-Value="loginModel.Username"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
+                               placeholder="Enter username" />
+                    <ValidationMessage For="@(() => loginModel.Username)" class="text-red-400 text-sm mt-1" />
+                </div>
+
+                <!-- Password -->
+                <div class="mb-4">
+                    <label class="block text-slate-300 text-sm font-medium mb-2">Password:</label>
+                    <InputText type="password"
+                               @bind-Value="loginModel.Password"
+                               class="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all backdrop-blur-sm"
+                               placeholder="Enter password" />
+                    <ValidationMessage For="@(() => loginModel.Password)" class="text-red-400 text-sm mt-1" />
+                </div>
+
+                <!-- Error Message -->
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm backdrop-blur-sm" role="alert">
+                        <div class="flex items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>@errorMessage</span>
+                        </div>
+                    </div>
+                }
+
+                <!-- Login Button -->
+                <div class="flex justify-center mt-6">
+                    <button type="submit"
+                            class="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        }
+                        Login
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-6">
+            <p class="text-slate-500 text-xs">Secure connection • Your data is encrypted</p>
+        </div>
+    </div>
+    </div>
+}
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+    private bool isLoading = false;
+    private bool _shouldRender = false;
+
+    protected override void OnInitialized()
+    {
+        // If already authenticated, redirect immediately and don't render
+        if (AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/reminders", true);
+            return;
+        }
+
+        // Allow rendering only if not authenticated
+        _shouldRender = true;
+        
+        // Load saved config from preferences (without constructing HttpClient prematurely)
+        loginModel.ServerUrl = Preferences.Get("ServerUrl", "https://logmyday.tadata.cz");
+        loginModel.Username = Preferences.Get("Username", "");
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            // Validate server URL
+            var serverUrl = loginModel.ServerUrl?.Trim();
+            if (string.IsNullOrEmpty(serverUrl))
+            {
+                errorMessage = "Server URL is required.";
+                return;
+            }
+
+            // Configure context (builds new clients implicitly on first use)
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var serverUri))
+            {
+                errorMessage = "Invalid server URL format.";
+                return;
+            }
+
+            ApiContext.Configure(serverUri, loginModel.Username, loginModel.Password);
+            Preferences.Set("ServerUrl", serverUri.ToString().TrimEnd('/'));
+            Preferences.Set("Username", loginModel.Username);
+
+            try
+            {
+                // Simple validation call: fetch tags (or a health endpoint if available)
+                var tags = await ApiProvider.Activity.GetTags();
+
+                try
+                {
+                    if (!string.IsNullOrEmpty(loginModel.Password))
+                    {
+                        await SecureStorage.Default.SetAsync("Password", loginModel.Password);
+                    }
+                    else
+                    {
+                        await SecureStorage.Default.SetAsync("Password", string.Empty);
+                    }
+                }
+                catch (Exception storageEx)
+                {
+                    Logger.LogWarning(storageEx, "Failed to persist password for automatic login");
+                }
+                AuthService.SetAuthenticated(true);
+            }
+            catch (Refit.ApiException apiEx) when (apiEx.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                errorMessage = "Invalid username or password.";
+                ApiContext.Clear();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Connection failed: {ex.Message}";
+                ApiContext.Clear();
+            }
+        }
+        catch (UriFormatException)
+        {
+            errorMessage = "Invalid server URL format. Please enter a valid URL like https://example.com";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login failed: {ex.Message}";
+            Logger.LogError(ex, "Login error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required]
+        [Url(ErrorMessage = "Please enter a valid URL")]
+        public string ServerUrl { get; set; } = "https://logmyday.tadata.cz";
+
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

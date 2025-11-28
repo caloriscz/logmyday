@@ -1,0 +1,26 @@
+@using LogMyDay.App.Services
+@inject IPageTitleService PageTitleService
+@implements IDisposable
+
+<PageTitle>@currentTitle</PageTitle>
+
+@code {
+    private string currentTitle = "LogMyDay";
+
+    protected override void OnInitialized()
+    {
+        currentTitle = PageTitleService.CurrentTitle;
+        PageTitleService.TitleChanged += OnTitleChanged;
+    }
+
+    private void OnTitleChanged(object? sender, string newTitle)
+    {
+        currentTitle = newTitle;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PageTitleService.TitleChanged -= OnTitleChanged;
+    }
+}

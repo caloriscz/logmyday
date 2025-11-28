@@ -1,0 +1,71 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Version>0.1.0.0</Version>
+		<AssemblyVersion>0.1.0.0</AssemblyVersion>
+		<FileVersion>0.1.0.0</FileVersion>
+	</PropertyGroup>
+
+	<Target Name="CleanPrecompressedArtifacts" BeforeTargets="Build">
+		<RemoveDir Directories="$(BaseIntermediateOutputPath)\staticwebassets" />
+	</Target>
+
+	<!-- Build Tailwind CSS with Vite (skip in Docker builds) -->
+	<Target Name="BuildTailwindCSS" BeforeTargets="BeforeBuild" Condition="'$(SkipBuildTailwindCSS)' != 'true'">
+		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)..\ui" />
+		<ItemGroup>
+			<TailwindCSSFiles Include="$(ProjectDir)..\ui\dist\css\*.css" />
+			<TailwindJSFiles Include="$(ProjectDir)..\ui\dist\js\*.js" />
+			<TailwindVendorFiles Include="$(ProjectDir)..\ui\dist\vendor\**\*.*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(TailwindCSSFiles)" DestinationFolder="$(ProjectDir)wwwroot\css" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(TailwindJSFiles)" DestinationFolder="$(ProjectDir)wwwroot\js" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(TailwindVendorFiles)" DestinationFiles="@(TailwindVendorFiles->'$(ProjectDir)wwwroot\\vendor\\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+	</Target>
+
+
+	<ItemGroup>
+		<None Remove="LogMyDay.App.csproj.Backup.tmp" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+	  <Content Include="appsettings.Development.json.dist" />
+	  <Content Include="appsettings.json.dist" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Refit.HttpClientFactory" Version="8.0.0" />
+		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+		<PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\LogMyDay.Api\LogMyDay.Api.csproj" />
+		<ProjectReference Include="..\LogMyDay.Domain\LogMyDay.Domain.csproj" />
+		<ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
+		<ProjectReference Include="..\LogMyDay.UI\LogMyDay.UI.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="wwwroot\lib\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Update="wwwroot\images\favicon.png">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,12 @@
+/* Compact date picker for daily navigation */
+.date-picker-compact {
+    width: auto;
+    max-width: 180px;
+}
+
+/* Ensure date picker is properly sized on mobile */
+@media (max-width: 576px) {
+    .date-picker-compact {
+        max-width: 150px;
+    }
+}

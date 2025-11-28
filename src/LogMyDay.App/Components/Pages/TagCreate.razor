@@ -1,0 +1,323 @@
+@page "/tags/new"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Linq
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject ILogger<TagCreate> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Create Tag</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Define a new tag with the correct metadata and defaults.</p>
+        </div>
+        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
+            <Icon Name="chevron-left" Class="h-4 w-4" />
+            Back to Tags
+        </a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @loadError
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            Loading form data…
+        </div>
+    }
+    else
+    {
+        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <EditForm Model="newTag" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Title</label>
+                        <InputText @bind-Value="newTag.Tag" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
+                        <InputSelect @bind-Value="newTag.TypeId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
+                            @foreach (var type in inputTypes)
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="newTag.IsRequired" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            Required
+                        </label>
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            Repeatable
+                        </label>
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                            <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            Range
+                        </label>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Time Granularity</label>
+                        <InputSelect @bind-Value="newTag.TimeGranularity" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
+                            @foreach (var granularity in OrderedGranularityOptions)
+                            {
+                                <option value="@granularity">@granularity</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
+                            <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
+                            <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
+                            <InputNumber @bind-Value="newTag.MaxValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
+                            <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Unit (optional)</label>
+                        @if (availableUnits.Count > 0)
+                        {
+                            <InputSelect @bind-Value="newTag.UnitId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                                <option value="">(None)</option>
+                                @foreach (var unit in availableUnits)
+                                {
+                                    <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-sm dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
+                                No units yet. <a href="/units" class="font-semibold underline">Let's create your first unit.</a>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Option List (optional)</label>
+                        @if (availableOptionLists.Count > 0)
+                        {
+                            <InputSelect @bind-Value="newTag.OptionListId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                                <option value="">(None)</option>
+                                @foreach (var list in availableOptionLists)
+                                {
+                                    <option value="@list.Id">@list.Name</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-sm dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
+                                No option lists yet. <a href="/option-lists" class="font-semibold underline">Let's create your first list.</a>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                            @errorMessage
+                        </div>
+                    }
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            }
+                            Create Tag
+                        </button>
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </section>
+    }
+</div>
+
+@code {
+    private static readonly IReadOnlyList<TimeGranularity> OrderedGranularityOptions = Enum
+        .GetValues<TimeGranularity>()
+        .OrderBy(g => g == TimeGranularity.Daily ? 0 : g == TimeGranularity.Exact ? 2 : 1)
+        .ThenBy(g => g.ToString())
+        .ToArray();
+
+    private TagRequest newTag = new()
+    {
+        Tag = string.Empty,
+        TypeId = 0,
+        IsRequired = false,
+        IsRepeatable = true,
+        TimeGranularity = TimeGranularity.Daily,
+        IsRange = false,
+        UnitId = null,
+        MinValue = null,
+        MaxValue = null,
+        Step = null,
+        DefaultValue = null,
+        OptionListId = null
+    };
+
+    private List<InputTypeDto> inputTypes = new();
+    private List<UnitResponse> availableUnits = new();
+    private List<TagOptionListResponse> availableOptionLists = new();
+    private string? errorMessage;
+    private string? loadError;
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Create Tag");
+
+        try
+        {
+            inputTypes = await ActivityApi.GetInputTypesAsync();
+            ApplyInputTypeDefaults();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            isLoading = false;
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error loading input types: {ex.Message}";
+            Logger.LogError(ex, "Failed to load input types while creating tag");
+        }
+
+        await LoadSupportingData();
+        isLoading = false;
+    }
+
+    private async Task LoadSupportingData()
+    {
+        try
+        {
+            availableUnits = (await ActivityApi.GetUnitsAsync())
+                .OrderBy(u => u.QuantityKey)
+                .ThenBy(u => u.Key)
+                .ToList();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            isLoading = false;
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load units while creating tag");
+        }
+
+        try
+        {
+            availableOptionLists = (await ActivityApi.GetTagOptionListsAsync())
+                .OrderBy(l => l.Name)
+                .ToList();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            isLoading = false;
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load option lists while creating tag");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var tagId = await ActivityApi.CreateTag(newTag);
+            if (tagId <= 0)
+            {
+                Logger.LogWarning("API returned non-positive tag ID ({TagId}) after creation", tagId);
+                Navigation.NavigateTo("/tags");
+                return;
+            }
+
+            Navigation.NavigateTo($"/tags/edit/{tagId}");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating tag: {ex.Message}";
+            Logger.LogError(ex, "Error creating tag");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/tags");
+    }
+
+    private void ApplyInputTypeDefaults()
+    {
+        if (inputTypes.Count == 0)
+        {
+            return;
+        }
+
+        if (!inputTypes.Any(it => it.Id == newTag.TypeId))
+        {
+            newTag.TypeId = GetDefaultInputTypeId();
+        }
+    }
+
+    private int GetDefaultInputTypeId()
+    {
+        var integerType = inputTypes
+            .FirstOrDefault(it => string.Equals(it.Name, "Integer", StringComparison.OrdinalIgnoreCase));
+
+        return integerType?.Id ?? inputTypes[0].Id;
+    }
+}

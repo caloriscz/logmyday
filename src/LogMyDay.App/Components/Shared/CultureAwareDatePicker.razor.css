@@ -1,0 +1,93 @@
+/* Culture-aware date picker wrapper */
+.culture-aware-datepicker-wrapper {
+    position: relative;
+    display: inline-flex;
+    width: auto;
+}
+
+.culture-aware-datepicker-wrapper.stretch {
+    width: 100%;
+}
+
+.culture-aware-datepicker-wrapper.stretch input {
+    width: 100%;
+}
+
+.culture-aware-datepicker-wrapper input {
+    cursor: pointer;
+}
+
+.culture-aware-datepicker-wrapper input[readonly] {
+    cursor: pointer;
+}
+
+culture-aware-datepicker-wrapper input:disabled {
+    cursor: not-allowed;
+}
+
+/* Air Datepicker theme overrides */
+.air-datepicker {
+    font-family: inherit;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 15px 30px rgba(15, 23, 42, 0.12);
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.air-datepicker .air-datepicker-cell.-selected- {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.air-datepicker .air-datepicker-cell.-selected-:hover {
+    background: #1d4ed8;
+}
+
+.air-datepicker .air-datepicker-time {
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.air-datepicker .air-datepicker-time--column input {
+    background-color: transparent;
+    color: inherit;
+}
+
+.air-datepicker .air-datepicker-nav {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.air-datepicker .air-datepicker-nav--action:hover,
+.air-datepicker .air-datepicker-button:hover {
+    background-color: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+}
+
+/* Dark theme overrides */
+.dark .air-datepicker {
+    background-color: #111827;
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #e5e7eb;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
+}
+
+.dark .air-datepicker .air-datepicker-nav,
+.dark .air-datepicker .air-datepicker-time {
+    border-color: rgba(148, 163, 184, 0.15);
+}
+
+.dark .air-datepicker .air-datepicker-cell {
+    color: #e5e7eb;
+}
+
+.dark .air-datepicker .air-datepicker-cell.-selected-,
+.dark .air-datepicker .air-datepicker-cell.-selected-:hover {
+    background: #3b82f6;
+    color: #0f172a;
+}
+
+.dark .air-datepicker .air-datepicker-nav--action:hover,
+.dark .air-datepicker .air-datepicker-button:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #bfdbfe;
+}

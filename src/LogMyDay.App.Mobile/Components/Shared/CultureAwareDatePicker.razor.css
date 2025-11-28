@@ -1,0 +1,145 @@
+/* Culture-aware date picker wrapper */
+.culture-aware-datepicker-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.culture-aware-datepicker-wrapper input {
+    cursor: pointer;
+    /* Mobile-friendly touch target size */
+    min-height: 44px;
+    font-size: 16px; /* Prevent zoom on iOS */
+}
+
+.culture-aware-datepicker-wrapper input[readonly] {
+    background-color: var(--bs-body-bg);
+    cursor: pointer;
+}
+
+.culture-aware-datepicker-wrapper input:disabled {
+    cursor: not-allowed;
+}
+
+/* Flatpickr theme overrides for Bootstrap and mobile compatibility */
+.flatpickr-calendar {
+    font-family: var(--bs-body-font-family);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-radius: var(--bs-border-radius);
+    /* Mobile-friendly sizing */
+    font-size: 16px;
+    width: 100%;
+    max-width: 350px;
+}
+
+/* Make navigation arrows visible and touch-friendly */
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    fill: var(--bs-body-color) !important;
+    opacity: 0.7;
+    /* Larger touch targets for mobile */
+    padding: 12px;
+}
+
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    fill: var(--bs-primary) !important;
+    opacity: 1;
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+    fill: inherit;
+    /* Larger arrows for better visibility on mobile */
+    width: 18px;
+    height: 18px;
+}
+
+/* Mobile-friendly day cells */
+.flatpickr-day {
+    /* Larger touch targets */
+    height: 44px;
+    line-height: 44px;
+    max-width: 44px;
+    font-size: 16px;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.flatpickr-day:hover {
+    background: var(--bs-light);
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+/* Weekday headers - mobile friendly */
+.flatpickr-weekdays {
+    height: 44px;
+}
+
+.flatpickr-weekday {
+    font-size: 14px;
+    line-height: 44px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 576px) {
+    .flatpickr-calendar {
+        max-width: 100%;
+        left: 0 !important;
+        right: 0 !important;
+        margin: 0 auto;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .flatpickr-calendar {
+        background: var(--bs-dark);
+        border-color: var(--bs-border-color);
+    }
+
+    .flatpickr-months,
+    .flatpickr-weekdays {
+        background: var(--bs-dark);
+    }
+
+    .flatpickr-day {
+        color: var(--bs-body-color);
+    }
+
+    .flatpickr-day:hover {
+        background: var(--bs-secondary);
+        color: var(--bs-body-color);
+    }
+
+    /* Dark mode arrows */
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+        fill: var(--bs-light) !important;
+    }
+
+    .flatpickr-months .flatpickr-prev-month:hover,
+    .flatpickr-months .flatpickr-next-month:hover {
+        fill: var(--bs-primary) !important;
+    }
+
+    .culture-aware-datepicker-wrapper input[readonly] {
+        background-color: var(--bs-dark);
+    }
+}

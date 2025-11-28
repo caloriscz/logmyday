@@ -1,0 +1,341 @@
+@page "/profile"
+@using System.ComponentModel.DataAnnotations
+@using System.Net
+@using Refit
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
+@inject IAuthApi AuthApi
+@inject IUsersApi UsersApi
+@inject IAccountApi AccountApi
+@inject ILogger<Profile> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-1">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">My Profile</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Manage your personal information and password.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+            <span>Loading profile...</span>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadErrorMessage))
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @loadErrorMessage
+        </div>
+    }
+    else
+    {
+        <div class="grid gap-6 xl:grid-cols-2">
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="rounded-t-xl border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700">
+                    <h2 class="text-lg font-semibold">Profile Information</h2>
+                </div>
+                <div class="space-y-5 p-6">
+                    @if (!string.IsNullOrEmpty(profileStatusMessage))
+                    {
+                        <div class="rounded-lg border @(profileStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
+                            @profileStatusMessage
+                        </div>
+                    }
+
+                    <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileEmail">Email</label>
+                                <InputText id="profileEmail" @bind-Value="profile.Email" class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="email" readonly />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Email cannot be changed.</p>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileDisplayName">Display Name (optional)</label>
+                                <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="name" placeholder="Enter your display name" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileCulture">Culture</label>
+                                <SearchableSelect @bind-Value="profile.Culture"
+                                                  Id="profileCulture"
+                                                  Options="CultureOptions"
+                                                  Placeholder="Select culture"
+                                                  SearchPlaceholder="Search cultures"
+                                                  ShowValueInList="true" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</p>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileTimeZone">Time Zone</label>
+                                <SearchableSelect @bind-Value="profile.TimeZone"
+                                                  Id="profileTimeZone"
+                                                  Options="TimeZoneOptions"
+                                                  Placeholder="Select time zone"
+                                                  SearchPlaceholder="Search time zones"
+                                                  ShowValueInList="true" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Pick an IANA time zone (e.g., Europe/Vienna).</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isSavingProfile">
+                                @if (isSavingProfile)
+                                {
+                                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <span>Save Changes</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="rounded-t-xl border-b border-gray-200 bg-slate-700 px-6 py-4 text-white dark:border-slate-700">
+                    <h2 class="text-lg font-semibold">Change Password</h2>
+                </div>
+                <div class="space-y-5 p-6">
+                    @if (!string.IsNullOrEmpty(passwordStatusMessage))
+                    {
+                        <div class="rounded-lg border @(passwordStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
+                            @passwordStatusMessage
+                        </div>
+                    }
+
+                    <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="currentPassword">Current Password</label>
+                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
+                            </div>
+
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newPassword">New Password</label>
+                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isChangingPassword">
+                                @if (isChangingPassword)
+                                {
+                                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    <span>Updating...</span>
+                                }
+                                else
+                                {
+                                    <span>Update Password</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly IReadOnlyList<SelectOption> CultureOptions = CultureCatalog.All;
+    private static readonly IReadOnlyList<SelectOption> TimeZoneOptions = TimeZoneCatalog.All;
+
+    private Guid? userId;
+    private bool isLoading = true;
+    private string? loadErrorMessage;
+
+    private ProfileModel profile = new();
+    private bool isSavingProfile;
+    private string? profileStatusMessage;
+    private bool profileStatusIsError;
+
+    private ChangePasswordModel passwordModel = new();
+    private bool isChangingPassword;
+    private string? passwordStatusMessage;
+    private bool passwordStatusIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("My Profile");
+        
+        try
+        {
+            loadErrorMessage = null;
+            isLoading = true;
+
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            userId = currentUser.Id;
+            profile = new ProfileModel
+            {
+                Email = currentUser.Email,
+                DisplayName = currentUser.DisplayName ?? string.Empty,
+                Culture = currentUser.Culture,
+                TimeZone = currentUser.TimeZone
+            };
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            Logger.LogWarning(ex, "User is not authorized to access profile page");
+            loadErrorMessage = "You are not authorized to view this page.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load profile information");
+            loadErrorMessage = "Failed to load profile information. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (userId == null || isSavingProfile)
+        {
+            return;
+        }
+
+        isSavingProfile = true;
+        SetProfileStatus(null);
+
+        try
+        {
+            var request = new UpdateUserDto(
+                profile.Email.Trim(),
+                string.IsNullOrWhiteSpace(profile.DisplayName) ? null : profile.DisplayName.Trim(),
+                null,
+                profile.Culture.Trim(),
+                profile.TimeZone.Trim());
+
+            var updatedUser = await UsersApi.UpdateUserAsync(userId.Value, request);
+            profile.Email = updatedUser.Email;
+            profile.DisplayName = updatedUser.DisplayName ?? string.Empty;
+            profile.Culture = updatedUser.Culture;
+            profile.TimeZone = updatedUser.TimeZone;
+
+            SetProfileStatus("Profile updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to update profile");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update profile.";
+            SetProfileStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while updating profile");
+            SetProfileStatus("An unexpected error occurred while saving your profile.", true);
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (isChangingPassword)
+        {
+            return;
+        }
+
+        isChangingPassword = true;
+        SetPasswordStatus(null);
+
+        try
+        {
+            var request = new ChangePasswordDto(
+                passwordModel.CurrentPassword,
+                passwordModel.NewPassword);
+
+            await AccountApi.ChangePasswordAsync(request);
+            passwordModel = new ChangePasswordModel();
+
+            SetPasswordStatus("Password updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to change password");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to change password.";
+            SetPasswordStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while changing password");
+            SetPasswordStatus("An unexpected error occurred while changing your password.", true);
+        }
+        finally
+        {
+            isChangingPassword = false;
+        }
+    }
+
+    private void SetProfileStatus(string? message, bool isError = false)
+    {
+        profileStatusMessage = message;
+        profileStatusIsError = isError;
+    }
+
+    private void SetPasswordStatus(string? message, bool isError = false)
+    {
+        passwordStatusMessage = message;
+        passwordStatusIsError = isError;
+    }
+
+    private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
+    {
+        if (!string.IsNullOrWhiteSpace(exception.Content))
+        {
+            return exception.Content;
+        }
+
+        try
+        {
+            var problemDetails = await exception.GetContentAsAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+            return problemDetails?.Detail ?? problemDetails?.Title;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed class ProfileModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = string.Empty;
+
+        [Required]
+        public string TimeZone { get; set; } = string.Empty;
+    }
+
+    private sealed class ChangePasswordModel
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(10, ErrorMessage = "New password must be at least 10 characters long.")]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+}

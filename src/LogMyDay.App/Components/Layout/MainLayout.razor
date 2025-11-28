@@ -1,0 +1,624 @@
+﻿@inherits LayoutComponentBase
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using Microsoft.AspNetCore.Components.Authorization
+@using LogMyDay.App.Components.Shared
+@inject NavigationManager Navigation
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject ILogger<MainLayout> Logger
+@implements IAsyncDisposable
+
+@if (IsLoginPage)
+{
+    Logger.LogInformation("MainLayout: Rendering login page. Current URL: {Url}", Navigation.Uri);
+    <DynamicPageTitle />
+    <article class="px-4">
+        @Body
+    </article>
+}
+else if (IsCheckingAuth)
+{
+    Logger.LogInformation("MainLayout: Checking authentication state. Current URL: {Url}", Navigation.Uri);
+    <DynamicPageTitle />
+    <div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
+        <div class="text-center">
+            <div class="inline-block w-12 h-12 border-4 border-primary-600 dark:border-primary-400 border-t-transparent rounded-full animate-spin" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p class="mt-4 text-gray-700 dark:text-gray-300">Checking authentication...</p>
+        </div>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    Logger.LogWarning("MainLayout: User not authenticated, redirecting to login. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
+    Navigation.NavigateTo("/login", true);
+}
+else
+{
+    Logger.LogInformation("MainLayout: User authenticated, rendering main app. Current URL: {Url}, IsAuthenticated: {IsAuthenticated}", Navigation.Uri, IsAuthenticated);
+    <DynamicPageTitle />
+    <div class="min-h-screen bg-gray-50 dark:bg-slate-950">
+        <NavMenu />
+        <main class="mx-auto max-w-screen-2xl px-4 py-6 bg-gray-50 dark:bg-slate-950">
+            @Body
+        </main>
+    </div>
+}
+
+<div id="blazor-error-ui" class="fixed bottom-0 left-0 right-0 z-[9999] bg-danger-600 text-white px-4 py-3 shadow-lg hidden" data-nosnippet>
+    <div class="flex items-center justify-between max-w-screen-2xl mx-auto">
+        <span>An unhandled error has occurred.</span>
+        <div class="flex items-center gap-3">
+            <a href="." class="text-white underline hover:no-underline">Reload</a>
+            <button class="text-white text-2xl leading-none hover:opacity-70" onclick="document.getElementById('blazor-error-ui').classList.add('hidden')">&times;</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add New Activity Modal -->
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 overflow-y-auto" @onclick="CloseModalBackground">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="fixed inset-0 bg-black/50 transition-opacity"></div>
+            
+            <!-- Modal Content -->
+            <div class="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl transform transition-all lg:max-h-[90vh] overflow-hidden" @onclick:stopPropagation>
+                <!-- Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Add New Activity</h2>
+                    <button @onclick="CloseModal" type="button" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                        <Icon Name="close" Class="w-6 h-6" />
+                    </button>
+                </div>
+                
+                <!-- Body -->
+                <div class="px-6 py-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
+                    <EditForm Model="newActivity" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 p-3 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 rounded-lg text-danger-600 dark:text-danger-400 text-sm" />
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="form-label">Primary Tag:</label>
+                                <InputSelect @bind-Value="newActivity.PrimaryTagId" class="form-select" @ref="primaryTagSelect" tabindex="1" @bind-Value:after="OnTagSelectionChanged" @onfocus="EnsureTagsLoaded">
+                                    <option value="">-- Select Tag --</option>
+                                    @if (tags != null)
+                                    {
+                                        foreach (var tag in tags)
+                                        {
+                                            <option value="@tag.Id">@tag.Title</option>
+                                        }
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div>
+                                @if (selectedTag?.TypeId.HasValue == true)
+                                {
+                                    @if (selectedTag.TypeId == 1) // Integer
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="form-input" tabindex="2"
+                                            placeholder="Enter numeric value" step="1" />
+                                    }
+                                    else if (selectedTag.TypeId == 2) // String
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                            placeholder="Enter text value" />
+                                    }
+                                    else if (selectedTag.TypeId == 3) // Boolean
+                                    {
+                                        <div class="flex items-center gap-2">
+                                            <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-checkbox" tabindex="2" id="booleanInput" />
+                                            <label class="form-label !mb-0" for="booleanInput">Value</label>
+                                        </div>
+                                    }
+                                    else if (selectedTag.TypeId == 4) // Date
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <CultureAwareDatePicker Value="@dateValue" ValueChanged="@OnDateValueInputChanged" ValueChangedAfter="@OnDateValueChanged" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                    }
+                                    else if (selectedTag.TypeId == 5) // Time
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="form-input" tabindex="2" />
+                                    }
+                                    else if (selectedTag.TypeId == 6) // Decimal, precision 2
+                                    {
+                                        <label class="form-label">Value:</label>
+                                        <input type="number" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="form-input" tabindex="2"
+                                            placeholder="Enter decimal value" step="0.01" />
+                                    }
+                                    else
+                                    {
+                                        <label class="form-label">Description:</label>
+                                        <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                            placeholder="Enter activity description" />
+                                    }
+                                }
+                                else
+                                {
+                                    <label class="form-label">Description:</label>
+                                    <InputText @bind-Value="newActivity.Description" class="form-input" tabindex="2"
+                                        placeholder="Enter activity description" />
+                                }
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="form-label">Date Started:</label>
+                                    @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                    {
+                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="true" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                    }
+                                    else
+                                    {
+                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="false" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                    }
+                                </div>
+                                
+                                @if (selectedTag?.IsRange == true)
+                                {
+                                    <div>
+                                        <label class="form-label">Date Finished (optional):</label>
+                                        @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
+                                        {
+                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="true" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                        }
+                                        else
+                                        {
+                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="false" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <div class="alert-danger" role="alert">
+                                    @errorMessage
+                                </div>
+                            }
+                            
+                            <div>
+                                <div class="flex items-start gap-2">
+                                    <input class="form-checkbox mt-0.5" type="checkbox" @bind="addAnotherAfterSave" id="addAnotherCheck">
+                                    <div class="flex-1">
+                                        <label class="form-label !mb-1 cursor-pointer" for="addAnotherCheck">
+                                            <span class="flex items-center gap-1">
+                                                <Icon Name="plus" Class="w-4 h-4" />
+                                                <span>Add another activity after saving</span>
+                                            </span>
+                                        </label>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Keep the form open with selected tag and date, but reset description
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <button type="button" @onclick="CloseModal" class="btn-secondary">Cancel</button>
+                            <button type="submit" class="btn-primary">
+                                Add Activity
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // Modal-related variables
+    private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
+    private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
+    private string? errorMessage;
+    private LogMyDay.Shared.DTOs.TagResponse? selectedTag;
+    private bool addAnotherAfterSave = false;
+    private bool showModal = false;
+    
+    // Input type value helpers
+    private bool booleanValue = false;
+    private DateTime? dateValue = null;
+    private int? integerValue = null;
+    private TimeOnly? timeValue = null;
+    private decimal? decimalValue = null;
+    
+    // Keyboard shortcuts
+    private bool keyboardListenerAdded = false;
+    private InputSelect<int?>? primaryTagSelect;
+
+    private bool IsLoginPage
+    {
+        get
+        {
+            var uri = new Uri(Navigation.Uri);
+            var path = uri.AbsolutePath.Trim('/');
+            var isLogin = path.Equals("login", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("forgot-password", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("reset-password", StringComparison.OrdinalIgnoreCase);
+            Logger.LogDebug("MainLayout.IsLoginPage: URL='{Url}', IsLoginPage={IsLoginPage}", Navigation.Uri, isLogin);
+            return isLogin;
+        }
+    }
+    private bool IsAuthenticated { get; set; } = false;
+    private bool IsCheckingAuth { get; set; } = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("MainLayout.OnInitializedAsync: Starting initialization. Current URL: {Url}", Navigation.Uri);
+        
+        InitializeNewActivity();
+        
+        // Check authentication state if not on login page
+        if (!IsLoginPage)
+        {
+            Logger.LogInformation("MainLayout.OnInitializedAsync: Not on login page, checking authentication state. URL: {Url}", Navigation.Uri);
+            
+            // Check if this is a redirect from login (URL contains no query parameters and is just "/")
+            var uri = new Uri(Navigation.Uri);
+            var isLoginRedirect = uri.PathAndQuery == "/" || (uri.LocalPath == "/" && string.IsNullOrEmpty(uri.Query));
+            
+            if (isLoginRedirect)
+            {
+                Logger.LogInformation("MainLayout.OnInitializedAsync: Detected potential login redirect, giving extra time for auth state");
+                // Give more time for authentication state to be processed after login redirect
+                await Task.Delay(250);
+            }
+            
+            await CheckAuthenticationState();
+        }
+        else
+        {
+            Logger.LogInformation("MainLayout.OnInitializedAsync: On login page, skipping authentication check. URL: {Url}", Navigation.Uri);
+            IsCheckingAuth = false;
+        }
+        
+        Logger.LogInformation("MainLayout.OnInitializedAsync: Completed initialization. IsAuthenticated: {IsAuthenticated}, IsCheckingAuth: {IsCheckingAuth}", IsAuthenticated, IsCheckingAuth);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsLoginPage && IsAuthenticated)
+        {
+            await SetupKeyboardShortcuts();
+            
+            // Load tags if user is authenticated and haven't loaded them yet
+            if (tags == null)
+            {
+                await LoadTags();
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task CheckAuthenticationState()
+    {
+        try
+        {
+            Logger.LogInformation("Checking authentication state in MainLayout");
+            
+            // Try up to 3 times with a small delay to handle timing issues after login
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+                IsAuthenticated = authState.User?.Identity?.IsAuthenticated == true;
+                
+                Logger.LogInformation("Authentication state check (attempt {Attempt}): IsAuthenticated={IsAuthenticated}, User={User}", 
+                    attempt, IsAuthenticated, authState.User?.Identity?.Name ?? "null");
+                
+                // If authenticated, break out of retry loop
+                if (IsAuthenticated)
+                {
+                    break;
+                }
+                
+                // If not authenticated and this isn't the last attempt, wait and retry
+                if (attempt < 3)
+                {
+                    await Task.Delay(100); // Small delay to allow cookie processing
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking authentication state in MainLayout");
+            IsAuthenticated = false;
+        }
+        finally
+        {
+            IsCheckingAuth = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            tags = await ActivityApi.GetTags();
+            OnTagSelectionChanged();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // Ignore auth errors - user might not be logged in yet
+        }
+        catch (Exception)
+        {
+            // Ignore other errors - will retry on next modal open
+        }
+    }
+
+    private void InitializeNewActivity()
+    {
+        newActivity.DateStarted = DateTime.Now;
+    }
+
+    public void OpenModal()
+    {
+        showModal = true;
+        StateHasChanged();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        StateHasChanged();
+    }
+
+    private void CloseModalBackground(Microsoft.AspNetCore.Components.Web.MouseEventArgs e)
+    {
+        // Only close if clicking the backdrop itself, not the modal content
+        CloseModal();
+    }
+
+    private async Task SetupKeyboardShortcuts()
+    {
+        if (!keyboardListenerAdded)
+        {
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+window.layoutKeyboardHandler = function(event) {{
+    if (event.ctrlKey && event.key === 'm') {{
+        event.preventDefault();
+        DotNet.invokeMethodAsync('LogMyDay.App', 'OpenAddActivityModal');
+    }}
+}};
+document.addEventListener('keydown', window.layoutKeyboardHandler);
+");
+            keyboardListenerAdded = true;
+        }
+    }
+
+    [JSInvokable("OpenAddActivityModal")]
+    public static void OpenAddActivityModal()
+    {
+        // This will be called from JavaScript
+        // We'll trigger an event or use a different approach
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (keyboardListenerAdded)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+if (window.layoutKeyboardHandler) {
+    document.removeEventListener('keydown', window.layoutKeyboardHandler);
+    delete window.layoutKeyboardHandler;
+}
+");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Check for duplicates if tag is selected and not repeatable
+            if (newActivity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
+            {
+                // Only skip duplicate check for Exact granularity since it allows precise timing
+                if (selectedTag.TimeGranularity != LogMyDay.Domain.Enums.TimeGranularity.Exact)
+                {
+                    var duplicateCheck = await ActivityApi.CheckDuplicate(newActivity.PrimaryTagId.Value, newActivity.DateStarted);
+                    if (duplicateCheck.HasDuplicate)
+                    {
+                        var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                        errorMessage = $"An activity for this tag already exists for the selected {granularityText} period. This tag is not repeatable.";
+                        return;
+                    }
+                }
+            }
+
+            await ActivityApi.CreateCalendarItem(newActivity);
+            
+            // Store current values for "Add Another" functionality
+            var keepTagId = newActivity.PrimaryTagId;
+            var keepDate = newActivity.DateStarted;
+            
+            newActivity = new();
+            InitializeNewActivity();
+            
+            if (addAnotherAfterSave)
+            {
+                // Keep selected tag and date, but reset description
+                newActivity.PrimaryTagId = keepTagId;
+                newActivity.DateStarted = keepDate;
+            }
+            else
+            {
+                selectedTag = null; // Reset selected tag only if not adding another
+            }
+            
+            integerValue = null; // Reset integer value
+            booleanValue = false; // Reset boolean value
+            dateValue = null; // Reset date value
+            timeValue = null; // Reset time value
+            decimalValue = null; // Reset decimal value
+            errorMessage = null;
+
+            // Close the modal after successful submission only if not adding another
+            if (!addAnotherAfterSave)
+            {
+                CloseModal();
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // Handle validation errors from the server
+            var content = await ex.GetContentAsAsync<string>();
+            Logger.LogWarning("Validation error creating activity: {Content}", content);
+            if (content != null && content.Contains("already exists"))
+            {
+                errorMessage = "An activity for this tag already exists for the selected period. This tag is not repeatable.";
+            }
+            else
+            {
+                errorMessage = $"Validation error: {content ?? ex.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating activity");
+            errorMessage = $"Error creating activity: {ex.Message}";
+        }
+    }
+
+    private void OnTagSelectionChanged()
+    {
+        if (newActivity.PrimaryTagId.HasValue)
+        {
+            selectedTag = tags?.FirstOrDefault(t => t.Id == newActivity.PrimaryTagId.Value);
+            
+            // Clear DateFinished if the selected tag is not a range type
+            if (selectedTag?.IsRange != true)
+            {
+                newActivity.DateFinished = null;
+            }
+            
+            // Initialize input type values and clear description
+            newActivity.Description = null;
+            if (selectedTag?.TypeId == 1) // Integer
+            {
+                integerValue = null;
+                newActivity.Description = string.Empty;
+            }
+            else if (selectedTag?.TypeId == 3) // Boolean
+            {
+                booleanValue = false;
+                newActivity.Description = "false";
+            }
+            else if (selectedTag?.TypeId == 4) // Date
+            {
+                dateValue = DateTime.Today;
+                newActivity.Description = DateTime.Today.ToString("yyyy-MM-dd");
+            }
+            else if (selectedTag?.TypeId == 5) // Time
+            {
+                timeValue = TimeOnly.FromDateTime(DateTime.Now);
+                newActivity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+            }
+            else if (selectedTag?.TypeId == 6) // Decimal, precision 2
+            {
+                decimalValue = null;
+                newActivity.Description = string.Empty;
+            }
+        }
+        else
+        {
+            selectedTag = null;
+            newActivity.DateFinished = null;
+            newActivity.Description = null;
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
+            timeValue = null;
+            decimalValue = null;
+        }
+    }
+    
+    private void OnIntegerValueChanged()
+    {
+        newActivity.Description = integerValue?.ToString() ?? string.Empty;
+    }
+    
+    private void OnBooleanValueChanged()
+    {
+        newActivity.Description = booleanValue.ToString().ToLower();
+    }
+    
+    private void OnDateValueChanged()
+    {
+        newActivity.Description = dateValue?.ToString("yyyy-MM-dd") ?? string.Empty;
+    }
+    
+    private void OnDateValueInputChanged(DateTime? value)
+    {
+        dateValue = value;
+        OnDateValueChanged();
+    }
+    
+    private void OnTimeValueChanged()
+    {
+        newActivity.Description = timeValue?.ToString("HH:mm") ?? string.Empty;
+    }
+    
+    private void OnDecimalValueChanged()
+    {
+        // Round to 2 decimal places if value has higher precision
+        if (decimalValue.HasValue)
+        {
+            var rounded = Math.Round(decimalValue.Value, 2);
+            if (rounded != decimalValue.Value)
+            {
+                decimalValue = rounded;
+            }
+            newActivity.Description = rounded.ToString("F2");
+        }
+        else
+        {
+            newActivity.Description = string.Empty;
+        }
+    }
+
+    private async Task EnsureTagsLoaded()
+    {
+        if (tags == null && !IsLoginPage && IsAuthenticated)
+        {
+            await LoadTags();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await AuthApi.LogoutAsync();
+        }
+        catch (Exception)
+        {
+            // Ignore logout errors - we'll redirect anyway
+        }
+        finally
+        {
+            IsAuthenticated = false;
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

@@ -1,0 +1,1287 @@
+/* Import Bootstrap Icons - Remove this if not working */
+/* @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"); */
+
+/* ========================================
+   LOADING SPINNER
+   ======================================== */
+
+.spinner {
+    border-radius: 50%;
+    border-color: #60a5fa; /* blue-400 */
+    border-top-color: transparent;
+    animation: spinner-rotation 0.8s linear infinite;
+}
+
+@keyframes spinner-rotation {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ========================================
+   TAILWIND MODAL STYLES
+   ======================================== */
+
+/* Modal animations are now handled inline with Tailwind classes */
+/* No custom modal CSS needed - using pure Tailwind utilities */
+
+/* Modal header */
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+[data-bs-theme="dark"] .modal-header {
+    border-bottom-color: #374151;
+}
+
+/* Modal body */
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.modal-fullscreen-lg-down .modal-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Modal footer */
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    border-top-color: #374151;
+}
+
+/* Modal title */
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+[data-bs-theme="dark"] .modal-title {
+    color: #f9fafb;
+}
+
+/* Close button */
+.btn-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    color: #111827;
+}
+
+[data-bs-theme="dark"] .btn-close {
+    color: #9ca3af;
+}
+
+[data-bs-theme="dark"] .btn-close:hover {
+    color: #f9fafb;
+}
+
+/* Animation classes */
+.modal-fade-enter {
+    opacity: 0;
+}
+
+.modal-fade-enter-active {
+    opacity: 1;
+    transition: opacity 300ms ease-in-out;
+}
+
+.modal-fade-exit {
+    opacity: 1;
+}
+
+.modal-fade-exit-active {
+    opacity: 0;
+    transition: opacity 300ms ease-in-out;
+}
+
+/* ========================================
+   END TAILWIND MODAL STYLES
+   ======================================== */
+
+/* CSS Variables for Light/Dark Theme */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #212529;
+    --navbar-bg: #f8f9fa;
+    --navbar-text: #212529;
+    --card-bg: #ffffff;
+    --border-color: #dee2e6;
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+[data-bs-theme="dark"] {
+    --bg-color: #212529;
+    --text-color: #ffffff;
+    --navbar-bg: #343a40;
+    --navbar-text: #ffffff;
+    --card-bg: #2d3339;
+    --border-color: #495057;
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* Force dark theme on body and common elements */
+[data-bs-theme="dark"] body {
+    background-color: var(--bg-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .page-card,
+[data-bs-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Comprehensive dark theme coverage */
+[data-bs-theme="dark"] .container,
+[data-bs-theme="dark"] .container-fluid,
+[data-bs-theme="dark"] main,
+[data-bs-theme="dark"] .row,
+[data-bs-theme="dark"] .col {
+    color: var(--text-color);
+}
+
+[data-bs-theme="dark"] h1, 
+[data-bs-theme="dark"] h2, 
+[data-bs-theme="dark"] h3, 
+[data-bs-theme="dark"] h4, 
+[data-bs-theme="dark"] h5, 
+[data-bs-theme="dark"] h6,
+[data-bs-theme="dark"] p,
+[data-bs-theme="dark"] span,
+[data-bs-theme="dark"] label {
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .table,
+[data-bs-theme="dark"] .table th,
+[data-bs-theme="dark"] .table td {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Tailwind dark mode for form controls */
+.dark .form-control,
+.dark .form-select,
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+    color: rgb(226 232 240) !important; /* slate-200 - softer than slate-100 */
+    border-color: rgb(51 65 85) !important; /* slate-700 */
+}
+
+.dark .form-control:focus,
+.dark .form-select:focus,
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+    color: rgb(226 232 240) !important; /* slate-200 */
+    border-color: rgb(14 165 233) !important; /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25) !important;
+}
+
+.dark .form-control:focus-visible,
+.dark .form-select:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible {
+    outline: none !important;
+    border-color: rgb(14 165 233) !important; /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25) !important;
+}
+
+.dark .form-control::placeholder,
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+/* Dark theme readonly state */
+.dark .form-control[readonly],
+.dark .form-select[readonly],
+.dark input[readonly],
+.dark select[readonly],
+.dark textarea[readonly] {
+    background-color: rgb(15 23 42) !important; /* slate-900 - darker for readonly */
+    color: rgb(148 163 184) !important; /* slate-400 - muted */
+    border-color: rgb(30 41 59) !important; /* slate-800 */
+    cursor: not-allowed !important;
+}
+
+/* Dark theme disabled state */
+.dark .form-control:disabled,
+.dark .form-select:disabled,
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+    background-color: rgb(15 23 42) !important; /* slate-900 */
+    color: rgb(100 116 139) !important; /* slate-500 - very muted */
+    border-color: rgb(30 41 59) !important; /* slate-800 */
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+[data-bs-theme="dark"] .form-check-input {
+    background-color: #495057 !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .form-check-input:checked {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+[data-bs-theme="dark"] .navbar {
+    background: var(--navbar-bg) !important;
+}
+
+[data-bs-theme="dark"] .navbar-brand,
+[data-bs-theme="dark"] .nav-link {
+    color: var(--navbar-text) !important;
+}
+
+/* Override for dark theme brand */
+[data-bs-theme="dark"] .navbar-brand,
+[data-bs-theme="dark"] .navbar-brand span {
+    color: #f8f9fa !important;
+}
+
+/* Override Bootstrap's own dark theme styles */
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+}
+
+[data-bs-theme="dark"] .text-dark {
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+[data-bs-theme="dark"] .border {
+    border-color: var(--border-color) !important;
+}
+
+html, body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Professional Navigation */
+.top-navigation {
+    background: linear-gradient(135deg, var(--navbar-bg) 0%, rgba(13, 110, 253, 0.1) 100%) !important;
+    box-shadow: 0 2px 4px var(--shadow);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--navbar-text) !important;
+}
+
+/* Ensure brand is visible in light theme */
+:root .navbar-brand,
+[data-bs-theme="light"] .navbar-brand {
+    color: #212529 !important;
+}
+
+/* More specific rule to override Bootstrap */
+.navbar .navbar-brand,
+.navbar-expand-lg .navbar-brand,
+html .navbar-brand,
+body .navbar-brand {
+    color: #212529 !important;
+}
+
+/* Force dark text in light theme */
+html:not([data-bs-theme="dark"]) .navbar-brand,
+[data-bs-theme="light"] .navbar-brand,
+.navbar-light .navbar-brand {
+    color: #212529 !important;
+}
+
+.brand-icon {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+}
+
+.nav-link {
+    color: var(--navbar-text) !important;
+    font-weight: 500;
+    padding: 0.5rem 1rem !important;
+    margin: 0 0.25rem;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: var(--primary-color);
+    color: white !important;
+    transform: translateY(-1px);
+}
+
+.nav-link i {
+    margin-right: 0.5rem;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background-color: var(--primary-color);
+    color: white;
+    transform: rotate(180deg);
+}
+
+/* Professional Cards */
+.page-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.page-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px var(--shadow);
+}
+
+a, .btn-link {
+    color: var(--primary-color);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid #e50000;
+}
+
+.validation-message {
+    color: #e50000;
+}
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA9NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+.darker-border-checkbox.form-check-input {
+    border-color: #929292;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}
+
+/* Calendar Styles */
+.calendar-grid {
+    max-width: 300px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: white;
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.calendar-day-header {
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #6c757d;
+    border-right: 1px solid #dee2e6;
+}
+
+.calendar-day-header:last-child {
+    border-right: none;
+}
+
+.calendar-body {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-day {
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    cursor: pointer;
+    border-right: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    transition: background-color 0.15s ease-in-out;
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.calendar-day:hover {
+    background-color: #e9ecef;
+}
+
+.calendar-day:last-child {
+    border-right: none;
+}
+
+.calendar-day.other-month {
+    color: #adb5bd;
+    background-color: #f8f9fa;
+}
+
+.calendar-day.selected {
+    background-color: #0d6efd;
+    color: white;
+    font-weight: 600;
+}
+
+.calendar-day.today {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: 600;
+}
+
+.calendar-day.selected.today {
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* Body and layout improvements for top navigation */
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Container improvements */
+.container, .container-fluid {
+    padding-top: 0;
+    margin-top: 0;
+}
+
+/* Ensure proper spacing for the new layout */
+main {
+    min-height: calc(100vh - 80px); /* Adjust based on navbar height */
+}
+
+/* Page-specific card styles */
+.page-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 767.98px) {
+    .page-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Enhanced Professional Styling - Consistent with Tailwind */
+.form-control, .form-select {
+    border-radius: 0.375rem; /* rounded-md */
+    border: 1px solid rgb(209 213 219); /* gray-300 */
+    background-color: rgb(255 255 255); /* white */
+    color: rgb(17 24 39); /* gray-900 */
+    padding: 0.5rem 0.75rem; /* px-3 py-2 */
+    font-size: 0.875rem; /* text-sm */
+    line-height: 1.5rem; /* leading-6 */
+    width: 100%; /* w-full */
+    transition: all 0.15s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: rgb(14 165 233); /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+    background-color: rgb(255 255 255); /* white */
+}
+
+.form-control:focus-visible, .form-select:focus-visible {
+    outline: none;
+    border-color: rgb(14 165 233); /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+}
+
+.form-control::placeholder {
+    color: rgb(156 163 175); /* gray-400 */
+}
+
+/* Readonly state */
+.form-control[readonly], .form-select[readonly] {
+    background-color: rgb(243 244 246); /* gray-100 */
+    color: rgb(107 114 128); /* gray-500 */
+    cursor: not-allowed;
+    border-color: rgb(229 231 235); /* gray-200 */
+}
+
+/* Disabled state */
+.form-control:disabled, .form-select:disabled {
+    background-color: rgb(243 244 246); /* gray-100 */
+    color: rgb(156 163 175); /* gray-400 */
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Smooth theme transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Enhanced button styling */
+.btn-outline-secondary {
+    border-color: var(--border-color);
+    color: var(--text-color);
+    background: var(--card-bg);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+/* CRITICAL MOBILE PADDING FIXES - HIGHEST PRIORITY */
+/* Force override all Bootstrap padding on mobile devices */
+@media screen and (max-width: 768px) {
+    /* Target all possible padding classes and elements */
+    .px-4, 
+    .content.px-4, 
+    .container-fluid.px-4,
+    .container.px-4,
+    article.content,
+    main article.content,
+    .page .content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Very specific override for the main layout */
+    .page main article.content.px-4 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Additional containers that might have padding */
+    .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* Even smaller screens */
+@media screen and (max-width: 576px) {
+    .px-4, 
+    .content.px-4, 
+    .container-fluid.px-4,
+    .container.px-4,
+    article.content,
+    main article.content,
+    .page .content,
+    .page main article.content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .container-fluid {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+}
+
+/* Mobile-responsive improvements */
+@media (max-width: 767.98px) {
+    .page-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Reduce excessive padding on mobile */
+    .content.px-4,
+    article.content.px-4,
+    .px-4,
+    .container-fluid.px-4,
+    main article.content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* Navigation buttons on mobile */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile card styling - Tailwind-based */
+.card {
+    background-color: rgb(255 255 255); /* white */
+    border: 1px solid rgb(229 231 235); /* gray-200 */
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 1rem; /* p-4 */
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* shadow */
+    margin-bottom: 0.75rem; /* mb-3 */
+}
+
+[data-bs-theme="dark"] .card {
+    background-color: rgb(31 41 55); /* gray-800 */
+    border-color: rgb(55 65 81); /* gray-700 */
+}
+
+.card-title {
+    color: rgb(37 99 235); /* primary-600 */
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .card-title {
+    color: rgb(96 165 250); /* primary-400 */
+}
+
+/* Alert styles - Tailwind-based */
+.alert-danger {
+    background-color: rgb(254 242 242); /* red-50 */
+    color: rgb(220 38 38); /* red-600 */
+    border: 1px solid rgb(252 165 165); /* red-300 */
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgb(127 29 29); /* red-900 */
+    color: rgb(252 165 165); /* red-300 */
+    border-color: rgb(185 28 28); /* red-700 */
+}
+
+.alert-info {
+    background-color: rgb(239 246 255); /* blue-50 */
+    color: rgb(37 99 235); /* blue-600 */
+    border: 1px solid rgb(191 219 254); /* blue-200 */
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgb(30 58 138); /* blue-900 */
+    color: rgb(147 197 253); /* blue-300 */
+    border-color: rgb(30 64 175); /* blue-800 */
+}
+
+/* Button styles - Tailwind-based */
+.btn-secondary {
+    background-color: rgb(243 244 246); /* gray-100 */
+    color: rgb(55 65 81); /* gray-700 */
+    border: 1px solid rgb(229 231 235); /* gray-200 */
+    border-radius: 0.375rem; /* rounded-md */
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    font-size: 0.875rem; /* text-sm */
+    line-height: 1.25rem;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: rgb(229 231 235); /* gray-200 */
+    border-color: rgb(209 213 219); /* gray-300 */
+}
+
+[data-bs-theme="dark"] .btn-secondary {
+    background-color: rgb(55 65 81); /* gray-700 */
+    color: rgb(243 244 246); /* gray-100 */
+    border-color: rgb(75 85 99); /* gray-600 */
+}
+
+[data-bs-theme="dark"] .btn-secondary:hover:not(:disabled) {
+    background-color: rgb(75 85 99); /* gray-600 */
+    border-color: rgb(107 114 128); /* gray-500 */
+}
+
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem; /* text-xs */
+    line-height: 1rem;
+}
+
+.btn-danger {
+    background-color: rgb(220 38 38); /* red-600 */
+    color: white;
+    border: 1px solid rgb(220 38 38);
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: rgb(185 28 28); /* red-700 */
+    border-color: rgb(185 28 28);
+}
+
+[data-bs-theme="dark"] .btn-danger {
+    background-color: rgb(239 68 68); /* red-500 */
+    border-color: rgb(239 68 68);
+}
+
+[data-bs-theme="dark"] .btn-danger:hover:not(:disabled) {
+    background-color: rgb(220 38 38); /* red-600 */
+    border-color: rgb(220 38 38);
+}
+
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+/* Date picker styling */
+.date-picker-compact {
+    min-width: 140px;
+    max-width: 180px;
+    font-size: 0.875rem; /* text-sm */
+    padding: 0.5rem 0.75rem;
+}
+
+.culture-aware-datepicker-wrapper {
+    display: inline-block;
+}
+
+.culture-aware-datepicker-wrapper .form-control {
+    cursor: pointer;
+}
+
+/* Navigation button styling */
+.btn-outline-secondary.btn-sm {
+    border-width: 1px;
+    font-weight: 500;
+}
+
+.btn-outline-secondary.btn-sm:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-outline-secondary.btn-sm:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Mobile navigation buttons - minimum 44px touch targets */
+.mobile-nav-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+    margin: 2px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.mobile-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+}
+
+/* Additional spacing for mobile navigation container */
+@media (max-width: 767.98px) {
+    .mobile-nav-container {
+        gap: 8px !important;
+    }
+    
+    .mobile-nav-btn {
+        min-width: 48px;
+        min-height: 48px;
+        margin: 4px;
+    }
+}
+
+/* Very small screens - further reduce padding */
+@media (max-width: 575.98px) {
+    .content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .page-card {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .container, .container-fluid {
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    
+    /* Override Bootstrap px-4 class for mobile */
+    article.content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    /* Reduce container padding even more on very small screens */
+    .container-fluid.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    /* Force override for main layout */
+    main article.content {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Table styling */
+.table {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.table th {
+    background-color: var(--navbar-bg);
+    color: var(--navbar-text);
+    border-color: var(--border-color);
+}
+
+.table td {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+/* BOOTSTRAP 5.3 CONTAINER PADDING OVERRIDE FOR MOBILE */
+/* Override Bootstrap's default container horizontal padding on small breakpoints */
+@media (max-width: 576px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* ========================================
+   MOBILE APP LAYOUT - Tailwind-based
+   ======================================== */
+
+/* Mobile Container - Full height layout with bottom navigation */
+.mobile-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: rgb(249 250 251); /* gray-50 */
+}
+
+.dark .mobile-container {
+    background-color: rgb(17 24 39); /* gray-900 */
+}
+
+/* Mobile Content - Scrollable area above bottom navigation */
+.mobile-content {
+    flex: 1 1 0%;
+    overflow-y: auto;
+    padding-bottom: 5rem; /* Space for bottom navigation */
+    /* Safe area insets for modern devices */
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Normalize page wrappers so short screens do not force scrolling */
+.mobile-content > .min-h-screen {
+    min-height: 100%;
+}
+
+.mobile-content > .min-h-screen.pb-20 {
+    padding-bottom: 0;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background-color: rgb(255 255 255); /* white */
+    border-top: 1px solid rgb(229 231 235); /* gray-200 */
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    z-index: 50;
+    /* Safe area insets for modern devices with notches */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+[data-bs-theme="dark"] .mobile-nav {
+    background-color: rgb(31 41 55); /* gray-800 */
+    border-top-color: rgb(55 65 81); /* gray-700 */
+}
+
+/* Mobile Navigation Item */
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0%;
+    padding: 0.5rem 0.25rem;
+    color: rgb(75 85 99); /* gray-600 */
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    /* Minimum touch target size for accessibility */
+    min-height: 48px;
+    min-width: 48px;
+}
+
+[data-bs-theme="dark"] .mobile-nav-item {
+    color: rgb(156 163 175); /* gray-400 */
+}
+
+.mobile-nav-item:hover {
+    color: rgb(37 99 235); /* primary-600 */
+    background-color: rgb(243 244 246); /* gray-100 */
+}
+
+[data-bs-theme="dark"] .mobile-nav-item:hover {
+    color: rgb(96 165 250); /* primary-400 */
+    background-color: rgb(55 65 81); /* gray-700 */
+}
+
+.mobile-nav-item.active {
+    color: rgb(37 99 235); /* primary-600 */
+    font-weight: 600;
+}
+
+[data-bs-theme="dark"] .mobile-nav-item.active {
+    color: rgb(96 165 250); /* primary-400 */
+}
+
+.mobile-nav-item i {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.mobile-nav-item div:last-child {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+}
+
+/* Floating Action Button (FAB) */
+.fab {
+    position: fixed;
+    bottom: 5rem; /* Position above mobile nav */
+    right: 1rem;
+    width: 3.5rem; /* 14 * 0.25rem = 56px */
+    height: 3.5rem;
+    border-radius: 9999px; /* fully rounded */
+    background-color: rgb(37 99 235); /* primary-600 */
+    color: white;
+    border: none;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    z-index: 40; /* Above content, below modals */
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    cursor: pointer;
+}
+
+/* Hide FAB when modal is open */
+[data-modal]:not(.hidden) ~ .fab,
+body:has([data-modal]:not(.hidden)) .fab {
+    display: none !important;
+}
+
+[data-bs-theme="dark"] .fab {
+    background-color: rgb(59 130 246); /* primary-500 */
+}
+
+.fab:hover {
+    background-color: rgb(29 78 216); /* primary-700 */
+    transform: scale(1.05);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+[data-bs-theme="dark"] .fab:hover {
+    background-color: rgb(37 99 235); /* primary-600 */
+}
+
+.fab:active {
+    transform: scale(0.95);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.fab i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.fab:hover i {
+    transform: scale(1.1);
+}
+
+.already-work {
+    background-color: darkred !important;
+}
+
+/* ========================================
+   LOGIN PAGE - ALWAYS DARK (NON-THEMED)
+   ======================================== */
+/* This class ensures login page is always dark regardless of system theme */
+.login-dark-bg {
+    background: linear-gradient(to bottom right, #1e293b, #334155, #1e293b) !important;
+    background-attachment: fixed !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    /* Prevent white background on overscroll */
+    overscroll-behavior: none !important;
+}
+
+.login-dark-bg * {
+    /* Ensure all child elements don't get themed */
+    color-scheme: dark;
+}
+
+/* Loading screen - matches login page */
+#app {
+    background: linear-gradient(to bottom right, #1e293b, #334155, #1e293b);
+    min-height: 100vh;
+    color: #e2e8f0; /* slate-200 for text visibility */
+}
+
+/* Better touch feedback for mobile */
+@media (hover: none) {
+    .fab:hover {
+        transform: none;
+        background-color: rgb(37 99 235); /* primary-600 */
+    }
+    
+    [data-bs-theme="dark"] .fab:hover {
+        background-color: rgb(59 130 246); /* primary-500 */
+    }
+    
+    .fab:active {
+        transform: scale(0.95);
+        background-color: rgb(29 78 216); /* primary-700 */
+    }
+    
+    [data-bs-theme="dark"] .fab:active {
+        background-color: rgb(37 99 235); /* primary-600 */
+    }
+}
+
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+    
+    /* Adjust FAB position for mobile navigation */
+    .fab {
+        bottom: 1rem;
+        right: 1rem;
+        width: 56px;
+        height: 56px;
+    }
+}

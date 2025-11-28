@@ -1,0 +1,46 @@
+@using LogMyDay.App.Services
+@inject IPageTitleService PageTitleService
+@inherits Microsoft.AspNetCore.Components.ComponentBase
+@implements IDisposable
+
+<DynamicPageTitle />
+
+@ChildContent
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(Title))
+        {
+            PageTitleService.SetTitle(Title);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(Title))
+        {
+            PageTitleService.SetTitle(Title);
+        }
+    }
+
+    protected void SetPageTitle(string title)
+    {
+        PageTitleService.SetTitle(title);
+    }
+
+    protected void SetRawPageTitle(string title)
+    {
+        PageTitleService.SetRawTitle(title);
+    }
+
+    public void Dispose()
+    {
+    }
+}

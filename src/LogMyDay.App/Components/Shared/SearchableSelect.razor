@@ -1,0 +1,89 @@
+@inherits SearchableSelectBase
+
+<div class="relative w-full">
+    <!-- Select Button -->
+    <button type="button"
+            id="@Id"
+            class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm leading-6 text-left rounded-lg border transition-colors
+                   bg-white dark:bg-slate-800
+                   border-gray-300 dark:border-slate-700
+                   text-gray-900 dark:text-slate-100
+                   hover:border-gray-400 dark:hover:border-slate-600
+                   focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-sky-500 focus:border-transparent
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   @FieldClass"
+            disabled="@Disabled"
+            @onclick="ToggleDropdown"
+            @onkeydown="HandleToggleKeyDown">
+        <span class="flex-1 truncate">@SelectedLabel</span>
+        <svg class="w-4 h-4 flex-shrink-0 transition-transform @(isOpen ? "rotate-180" : "")" 
+             fill="none" 
+             stroke="currentColor" 
+             viewBox="0 0 24 24"
+             aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+
+    @if (isOpen)
+    {
+        <!-- Dropdown Menu -->
+        <div class="absolute z-50 w-full min-w-full max-w-xl mt-1 rounded-lg shadow-lg shadow-black/30 overflow-hidden
+                    bg-white dark:bg-slate-900
+                    border border-gray-200 dark:border-slate-700"
+             @ref="menuRef" 
+             @onclick:stopPropagation="true">
+            
+            <!-- Search Input -->
+            <div class="p-2 border-b border-gray-200 dark:border-slate-800/60">
+                <input type="text"
+                       class="w-full px-3 py-2 text-sm rounded-md transition-colors
+                              bg-gray-50 dark:bg-slate-800
+                              border border-gray-300 dark:border-slate-700
+                              text-gray-900 dark:text-slate-100
+                              placeholder-gray-400 dark:placeholder-slate-400
+                              focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-sky-500 focus:border-transparent"
+                       placeholder="@SearchPlaceholder"
+                       @bind="searchText"
+                       @bind:event="oninput"
+                       @bind:after="OnSearchChanged"
+                       @onkeydown="HandleSearchKeyDown"
+                       @ref="searchInputRef" />
+            </div>
+            
+            <!-- Options List -->
+            <div class="max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
+                @if (FilteredOptions.Count == 0)
+                {
+                    <div class="px-3 py-3 text-sm text-gray-500 dark:text-slate-400">
+                        No matches
+                    </div>
+                }
+                else
+                {
+                    @foreach (var option in FilteredOptions)
+                    {
+                        var isSelected = option.Value == CurrentValueAsString;
+                        <button type="button"
+                                class="w-full text-left px-3 py-1.5 text-sm transition-colors border-b cursor-pointer
+                                       @(isSelected 
+                                           ? "bg-primary-50 dark:bg-sky-900/30 text-primary-700 dark:text-sky-300 border-primary-100 dark:border-sky-800/40" 
+                                           : "hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-900 dark:text-slate-100 border-gray-100 dark:border-slate-800/60")
+                                       focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900"
+                                title="@option.Label"
+                                @onclick="() => SelectOption(option)">
+                            <div class="flex flex-col gap-0.5">
+                                <span class="truncate font-medium">@option.Label</span>
+                                @if (ShowValueInList && !string.IsNullOrEmpty(option.Value))
+                                {
+                                    <span class="truncate text-xs opacity-70">@option.Value</span>
+                                }
+                            </div>
+                        </button>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+

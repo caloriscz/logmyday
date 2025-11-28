@@ -1,0 +1,519 @@
+@page "/option-lists"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using System.Linq
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<OptionLists> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Option Lists</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Create reusable option lists to power tag dropdowns.</p>
+        </div>
+        <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
+            <Icon Name="plus" Class="h-4 w-4" />
+            Add Option List
+        </button>
+    </div>
+
+    <section class="space-y-4">
+        @if (isLoading)
+        {
+            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading option lists…</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+        else if (lists.Count == 0)
+        {
+            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                No option lists yet. Use the button above to create your first reusable list.
+            </div>
+        }
+        else
+        {
+            <div class="hidden md:block">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead class="bg-gray-50 dark:bg-slate-800">
+                            <tr>
+                                <th scope="col" class="px-1 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
+                                <th scope="col" class="px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Name</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Scope</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Options</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                            @foreach (var list in lists)
+                            {
+                                <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                    <td class="px-1 w-[56px] py-3">
+                                        <div class="flex justify-end">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="pencil" Class="h-4 w-4" />
+                                            </button>
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="trash" Class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-1 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@list.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                        @if (list.IsGlobal)
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">Global</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-900 ring-1 ring-gray-500/20 dark:bg-gray-600/20 dark:text-gray-300 dark:ring-gray-500/30">Personal</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@list.Options.Count</td>
+
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="space-y-3 md:hidden">
+                @foreach (var list in lists)
+                {
+                    <div class="rounded-xl border @(list.IsGlobal ? "border-sky-500 dark:border-sky-600" : "border-gray-200 dark:border-slate-700") bg-white p-4 shadow-sm dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                    @list.Name
+                                    @if (list.IsGlobal)
+                                    {
+                                        <span class="ml-2 inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">Global</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-900 ring-1 ring-gray-500/20 dark:bg-gray-600/20 dark:text-gray-300 dark:ring-gray-500/30">Personal</span>
+                                    }
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-600 dark:text-slate-400">@list.Options.Count option(s)</p>
+                            </div>
+                        </div>
+
+                        @if (list.Options.Any())
+                        {
+                            <div class="mt-4">
+                                <dt class="mb-2 text-sm font-medium text-gray-600 dark:text-slate-400">Options:</dt>
+                                <dd class="flex flex-wrap gap-2">
+                                    @foreach (var option in list.Options.Take(5))
+                                    {
+                                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 ring-1 ring-gray-500/10 dark:bg-slate-700 dark:text-slate-200 dark:ring-slate-600">
+                                            @(string.IsNullOrWhiteSpace(option.DisplayName) ? option.Value : option.DisplayName)
+                                        </span>
+                                    }
+                                    @if (list.Options.Count > 5)
+                                    {
+                                        <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-500/20 dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-500/30">
+                                            +@(list.Options.Count - 5) more
+                                        </span>
+                                    }
+                                </dd>
+                            </div>
+                        }
+
+                        <div class="mt-4 flex justify-end gap-2">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(list)" disabled="@(isBusy || list.IsGlobal)">
+                                <Icon Name="pencil" Class="h-4 w-4" />
+                                <span>Edit</span>
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
+                                <Icon Name="trash" Class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                Total option lists: @lists.Count
+            </div>
+        }
+    </section>
+</div>
+
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isBusy) CloseModal(); }">
+        <div class="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(isEditing ? "Edit Option List" : "Add Option List")</h2>
+                    <p class="text-sm text-gray-600 dark:text-slate-400">Define the list name and reusable values.</p>
+                </div>
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                    <Icon Name="close" Class="h-5 w-5" />
+                    <span class="sr-only">Close</span>
+                </button>
+            </div>
+
+            <EditForm Model="listForm" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mx-6 mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @formError
+                    </div>
+                }
+
+                <div class="max-h-[70vh] overflow-y-auto px-6 py-5">
+                    <div class="space-y-5">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="listName">List Name</label>
+                            <InputText id="listName" @bind-Value="listForm.Name" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Options</label>
+                                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-primary-500/40 dark:bg-primary-500/20 dark:text-primary-200 dark:hover:bg-primary-500/30 dark:focus-visible:ring-offset-slate-900" @onclick="AddOption" disabled="@isBusy">
+                                    <Icon Name="plus" Class="h-4 w-4" />
+                                    Add Option
+                                </button>
+                            </div>
+
+                            @if (listForm.Options.Count == 0)
+                            {
+                                <p class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">Add at least one option.</p>
+                            }
+                            else
+                            {
+                                <div class="space-y-3">
+                                    @for (var i = 0; i < listForm.Options.Count; i++)
+                                    {
+                                        var option = listForm.Options[i];
+
+                                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800/60" @key="option">
+                                            <div class="flex flex-col gap-3 md:flex-row md:items-end">
+                                                <div class="md:flex-1 space-y-2">
+                                                    <label class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-slate-300" for="@($"value_option_{i}")">Value</label>
+                                                    <InputText id="@($"value_option_{i}")" @bind-Value="option.Value" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" disabled="@isBusy" />
+                                                </div>
+                                                <div class="md:flex-1 space-y-2">
+                                                    <label class="text-xs font-medium uppercase tracking-wide text-gray-600 dark:text-slate-300" for="@($"display_option_{i}")">Display Name</label>
+                                                    <InputText id="@($"display_option_{i}")" @bind-Value="option.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" disabled="@isBusy" />
+                                                </div>
+                                                <div class="md:w-32">
+                                                    <button type="button" class="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-600 shadow-sm transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10 dark:focus-visible:ring-offset-slate-900" @onclick="() => RemoveOption(option)" disabled="@isBusy">
+                                                        <Icon Name="trash" Class="h-4 w-4" />
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isBusy">
+                        @if (isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="save" Class="h-4 w-4" />
+                            <span>@(isEditing ? "Save Changes" : "Create List")</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (listPendingDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete option list</h3>
+            </div>
+            <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                Delete <strong>@listPendingDelete.Name</strong>? This action cannot be undone.
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelDelete" disabled="@isBusy">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="DeleteList" disabled="@isBusy">
+                    @if (isBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Deleting…</span>
+                    }
+                    else
+                    {
+                        <Icon Name="trash" Class="h-4 w-4" />
+                        <span>Delete</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<TagOptionListResponse> lists = new();
+    private TagOptionListRequest listForm = CreateDefaultForm();
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingListId;
+    private bool showModal;
+    private TagOptionListResponse? listPendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Option Lists");
+        await LoadListsAsync();
+    }
+
+    private async Task LoadListsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var results = await ActivityApi.GetTagOptionListsAsync();
+            lists.Clear();
+            lists.AddRange(results.OrderBy(l => l.Name));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view option lists.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load option lists: {ex.Message}";
+            Logger.LogError(ex, "Failed to load option lists");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isEditing = false;
+        editingListId = null;
+        listForm = CreateDefaultForm();
+        formError = null;
+        showModal = true;
+    }
+
+    private void OpenEditModal(TagOptionListResponse list)
+    {
+        if (isBusy || list.IsGlobal)
+        {
+            return;
+        }
+
+        isEditing = true;
+        editingListId = list.Id;
+        listForm = new TagOptionListRequest
+        {
+            Name = list.Name,
+            Options = list.Options
+                .Select(o => new TagOptionRequest { Id = o.Id, Value = o.Value, DisplayName = o.DisplayName })
+                .ToList()
+        };
+
+        formError = null;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        showModal = false;
+        ResetForm();
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!ValidateForm())
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            if (editingListId.HasValue)
+            {
+                await ActivityApi.UpdateTagOptionList(editingListId.Value, listForm);
+            }
+            else
+            {
+                await ActivityApi.CreateTagOptionList(listForm);
+            }
+
+            await LoadListsAsync();
+            showModal = false;
+            ResetForm();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Option list API error");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error saving option list");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(listForm.Name))
+        {
+            formError = "Name is required.";
+            return false;
+        }
+
+        if (listForm.Options.Count == 0)
+        {
+            formError = "Add at least one option.";
+            return false;
+        }
+
+        if (listForm.Options.Any(o => string.IsNullOrWhiteSpace(o.Value)))
+        {
+            formError = "Each option must have a value.";
+            return false;
+        }
+
+        formError = null;
+        return true;
+    }
+
+    private void AddOption()
+    {
+        listForm.Options.Add(new TagOptionRequest { Value = string.Empty, DisplayName = string.Empty });
+    }
+
+    private void RemoveOption(TagOptionRequest option)
+    {
+        if (listForm.Options.Contains(option))
+        {
+            listForm.Options.Remove(option);
+        }
+    }
+
+    private void ConfirmDelete(TagOptionListResponse list)
+    {
+        if (list.IsGlobal)
+        {
+            return;
+        }
+
+        listPendingDelete = list;
+    }
+
+    private void CancelDelete()
+    {
+        listPendingDelete = null;
+    }
+
+    private async Task DeleteList()
+    {
+        if (listPendingDelete == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            await ActivityApi.DeleteTagOptionList(listPendingDelete.Id);
+            await LoadListsAsync();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Failed to delete option list");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error deleting option list");
+        }
+        finally
+        {
+            isBusy = false;
+            listPendingDelete = null;
+        }
+    }
+
+    private void ResetForm()
+    {
+        isEditing = false;
+        editingListId = null;
+        listForm = CreateDefaultForm();
+        formError = null;
+    }
+
+    private static TagOptionListRequest CreateDefaultForm()
+    {
+        return new TagOptionListRequest
+        {
+            Name = string.Empty,
+            Options = new List<TagOptionRequest>
+            {
+                new() { Value = string.Empty, DisplayName = string.Empty }
+            }
+        };
+    }
+}

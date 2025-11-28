@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>LogMyDay Mobile</title>
+    <base href="/" />
+
+    <link href="css/tailwind.css" rel="stylesheet" />
+    <link href="app.css" rel="stylesheet" />
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .mobile-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="d-flex justify-content-center align-items-center vh-100">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5 class="mb-3">LogMyDay Mobile</h5>
+                <p class="text-muted">Loading Blazor Hybrid App...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display: none;">
+        <div class="alert alert-danger m-3">
+            <h4>🚨 Application Error</h4>
+            <p>An unhandled error has occurred.</p>
+            <button class="btn btn-warning" onclick="window.location.reload()">🔄 Reload</button>
+            <button class="btn btn-secondary ms-2" onclick="this.parentElement.parentElement.style.display='none'">Dismiss</button>
+        </div>
+    </div>
+    
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+    
+    <script>
+        console.log('📱 LogMyDay Mobile: Starting Blazor Hybrid (following SideNote pattern)...');
+        
+        // Simple initialization - let MAUI handle the bridge setup
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('📱 DOM loaded, checking for Blazor...');
+            
+            // Wait a moment for MAUI to set up the bridge, then start Blazor
+            setTimeout(() => {
+                if (window.Blazor && typeof window.Blazor.start === 'function') {
+                    console.log('📱 Starting Blazor manually...');
+                    window.Blazor.start();
+                } else {
+                    console.error('📱 Blazor object not found after DOM load');
+                    document.getElementById('blazor-error-ui').style.display = 'block';
+                    document.getElementById('app').style.display = 'none';
+                }
+            }, 500); // Give MAUI bridge 500ms to initialize
+        });
+        
+        // Global error handling
+        window.addEventListener('error', (event) => {
+            console.error('📱 Global error:', event.error);
+            if (event.error && event.error.message && 
+                event.error.message.includes('receiveMessage')) {
+                console.error('📱 Detected receiveMessage error - this is a MAUI bridge issue');
+                document.getElementById('blazor-error-ui').style.display = 'block';
+                document.getElementById('app').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

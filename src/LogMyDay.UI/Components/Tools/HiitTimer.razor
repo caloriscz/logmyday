@@ -1,0 +1,535 @@
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@using Microsoft.JSInterop
+@inject IActivityApi ActivityApi
+@inject IJSRuntime JSRuntime
+@inject ILogger<HiitTimer> Logger
+
+<div class="hiit-shell">
+    <main class="frame hiit-frame">
+        <!-- SETTINGS -->
+        <section id="settings" class="screen settings active">
+            <div class="section">
+                <h3>SETS</h3>
+                <div class="counter-row">
+                    <button class="btn" id="setsMinus" aria-label="Decrease sets">−</button>
+                    <div class="value" id="setsVal">6</div>
+                    <button class="btn" id="setsPlus" aria-label="Increase sets">+</button>
+                </div>
+            </div>
+            <div class="section">
+                <h3>WORK</h3>
+                <div class="counter-row">
+                    <button class="btn" id="workMinus" aria-label="Decrease work time">−</button>
+                    <div class="value" id="workVal">00:30</div>
+                    <button class="btn" id="workPlus" aria-label="Increase work time">+</button>
+                </div>
+            </div>
+            <div class="section">
+                <h3>REST</h3>
+                <div class="counter-row">
+                    <button class="btn" id="restMinus" aria-label="Decrease rest time">−</button>
+                    <div class="value" id="restVal">00:15</div>
+                    <button class="btn" id="restPlus" aria-label="Increase rest time">+</button>
+                </div>
+            </div>
+            <div class="start-footer">
+                <button id="startBtn" class="primary-action">▶ START</button>
+            </div>
+        </section>
+
+        <!-- ACTIVE -->
+        <section id="active" class="screen">
+            <div class="stage" id="stage" style="--stage-color:var(--prepare)">
+                <div class="sets" id="setsRemain">6</div>
+                <div class="digits" id="digits">00:05</div>
+                <div class="label" id="stageLabel">GET READY</div>
+            </div>
+            <div class="active-actions">
+                <div class="footer" id="activeFooter">
+                    <button class="stop" id="stopBtn">STOP</button>
+                    <button class="add" id="addSetBtn">+1 SET</button>
+                    <button class="pause" id="pauseBtn">PAUSE</button>
+                </div>
+
+                @if (ShowSaveControls)
+                {
+                    <div class="save-panel">
+                        <select @bind="selectedTagId" class="tag-select" disabled="@(isLoading || availableTags == null)">
+                            @if (isLoading)
+                            {
+                                <option>Loading tags...</option>
+                            }
+                            else if (availableTags?.Any() == true)
+                            {
+                                <option value="0">Select tag to save workout</option>
+                                @foreach (var tag in availableTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                            else
+                            {
+                                <option>No integer tags available</option>
+                            }
+                        </select>
+
+                        <button @onclick="SaveHiitSession" class="save-btn" disabled="@(selectedTagId == 0 || sessionTime.TotalSeconds < 30 || saveCountdown > 0)">
+                            @if (saveCountdown > 0)
+                            {
+                                <span>@saveCountdown s</span>
+                            }
+                            else
+                            {
+                                <span>Save Session</span>
+                            }
+                        </button>
+
+                        @if (sessionTime.TotalSeconds > 0)
+                        {
+                            <div class="session-summary">
+                                <small>Session: @sessionTime.ToString("mm\\:ss") | Sets: @completedSets</small>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    </main>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-info mt-3 text-center">
+            @statusMessage
+        </div>
+    }
+</div>
+
+<style>
+    .hiit-shell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0 12px 24px;
+    }
+
+    .hiit-frame {
+        --hiit-surface: rgba(15, 23, 42, 0.78);
+        --hiit-border: rgba(148, 163, 184, 0.35);
+        --hiit-text: #e2e8f0;
+        --hiit-muted: #94a3b8;
+        --hiit-accent: #22c55e;
+        --hiit-accent-dark: #15803d;
+        --prepare: #3b82f6;
+        --work: #22c55e;
+        --rest: #f59e0b;
+    }
+
+    .frame {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 0 12px 24px;
+        background: transparent;
+    }
+
+    .screen {
+        display: none;
+    }
+
+        .screen.active {
+            display: block;
+        }
+
+    .settings {
+        padding: 24px 0 4px;
+    }
+
+    .section {
+        margin: 20px 0;
+    }
+
+        .section h3 {
+            margin: 0 0 14px;
+            text-align: center;
+            font-weight: 800;
+            letter-spacing: .18em;
+            color: var(--hiit-muted);
+        }
+
+    .counter-row {
+        display: grid;
+        grid-template-columns: 52px 1fr 52px;
+        align-items: center;
+        justify-items: center;
+        gap: 20px;
+        max-width: 260px;
+        margin: 0 auto;
+    }
+
+    .frame .btn {
+        height: 52px;
+        width: 52px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+        background: rgba(15, 23, 42, 0.82);
+        color: var(--hiit-text);
+        font-size: 30px;
+        border: 1px solid var(--hiit-border);
+        transition: transform .15s ease;
+        flex-shrink: 0;
+    }
+
+        .frame .btn:active {
+            transform: scale(.96);
+        }
+
+    .value {
+        font-variant-numeric: tabular-nums;
+        font-size: 50px;
+        font-weight: 800;
+        color: #f8fafc;
+        min-width: 120px;
+        text-align: center;
+    }
+
+    .start-footer {
+        margin-top: 28px;
+        display: flex;
+        justify-content: center;
+    }
+
+    .primary-action {
+        border: 0;
+        padding: 14px 34px;
+        border-radius: 999px;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: .14em;
+        color: #0f172a;
+        background: linear-gradient(135deg, #facc15, #34d399);
+        box-shadow: 0 18px 38px rgba(52, 211, 153, 0.3);
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+        .primary-action:active {
+            transform: translateY(1px);
+            box-shadow: 0 12px 26px rgba(52, 211, 153, 0.28);
+        }
+
+    .stage {
+        --stage-color: var(--prepare);
+        background: var(--stage-color);
+        color: #0f172a;
+        min-height: 360px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        align-items: center;
+        justify-items: center;
+        padding: 32px 20px 40px;
+        position: relative;
+        border-radius: 28px;
+        margin: 0;
+        margin-bottom: 24px;
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28);
+        overflow: hidden;
+    }
+
+        .stage::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,var(--shade,0));
+            pointer-events: none;
+            transition: background .15s linear;
+        }
+
+        .stage .sets {
+            margin-top: 6px;
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: .28em;
+        }
+
+    .digits {
+        font-variant-numeric: tabular-nums;
+        font-size: 104px;
+        font-weight: 900;
+    }
+
+    .label {
+        font-weight: 900;
+        letter-spacing: .18em;
+        opacity: .7;
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+
+    @@media (min-width:700px) {
+        .digits {
+            font-size: 128px;
+        }
+    }
+
+    .active-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 0 0 20px;
+    }
+
+    .footer {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 0 6px;
+    }
+
+        .footer button {
+            border: 0;
+            padding: 14px 10px;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: .12em;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 15px;
+        }
+
+    .frame #activeFooter .stop {
+        background: #ef4444;
+    }
+
+    .frame #activeFooter .add {
+        background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    }
+
+    .frame #activeFooter .pause {
+        background: rgba(15, 23, 42, 0.82);
+        border: 1px solid var(--hiit-border);
+    }
+
+    .save-panel {
+        text-align: center;
+        padding: 0 16px;
+    }
+
+    .tag-select {
+        width: 100%;
+        max-width: 320px;
+        margin: 0 auto 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--hiit-border);
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.7);
+        color: var(--hiit-text);
+        font-size: 15px;
+    }
+
+    .save-btn {
+        padding: 12px 32px;
+        border: none;
+        border-radius: 24px;
+        background: linear-gradient(135deg, #0ea5e9, #6366f1);
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 15px;
+        box-shadow: 0 18px 32px rgba(99, 102, 241, 0.24);
+        transition: transform .15s ease, opacity .15s ease;
+    }
+
+    .save-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .save-btn:not(:disabled):active {
+        transform: translateY(1px);
+    }
+
+    .session-summary {
+        color: var(--hiit-muted);
+        font-size: 12px;
+        margin-top: 10px;
+    }
+
+    .alert {
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .alert-info {
+        background-color: #dbeafe;
+        border: 1px solid #93c5fd;
+        color: #1d4ed8;
+    }
+</style>
+
+@code {
+    [Parameter] public bool ShowSaveControls { get; set; } = true;
+
+    // Blazor state variables
+    private int selectedTagId = 0;
+    private bool isLoading = false;
+    private int saveCountdown = 0;
+    private string statusMessage = "";
+    private List<TagResponse>? availableTags;
+    private System.Threading.Timer? cooldownTimer;
+    private DateTime sessionStartTime;
+    private TimeSpan sessionTime = TimeSpan.Zero;
+    private int completedSets = 0;
+    private System.Threading.Timer? sessionTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ShowSaveControls)
+        {
+            try
+            {
+                isLoading = true;
+                StateHasChanged();
+                
+                var allTags = await ActivityApi.GetTags();
+                availableTags = allTags?.Where(t => t.TypeId == 1).ToList(); // Integer input type
+                
+                Logger.LogInformation("Loaded {Count} integer tags for HIIT timer", availableTags?.Count ?? 0);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load tags for HIIT timer");
+                statusMessage = "Failed to load tags. You won't be able to save sessions.";
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize the HIIT timer module with a small delay to ensure DOM is ready
+            try
+            {
+                await Task.Delay(100); // Small delay to ensure DOM is fully rendered
+                var module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "/_content/LogMyDay.UI/js/components/hiit-timer.js");
+                var hiit = await module.InvokeAsync<IJSObjectReference>("initializeHiitTimer");
+                await hiit.InvokeVoidAsync("init");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load HIIT timer JavaScript module: {Error}", ex.Message);
+            }
+
+            if (ShowSaveControls)
+            {
+                // Setup session tracking timer
+                sessionStartTime = DateTime.Now;
+                sessionTimer = new System.Threading.Timer(UpdateSessionTimer, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+            }
+        }
+    }
+
+    private void UpdateSessionTimer(object? state)
+    {
+        if (!ShowSaveControls) return;
+        
+        // Update session time from JavaScript HIIT timer state
+        InvokeAsync(async () => 
+        {
+            try 
+            {
+                var jsState = await JSRuntime.InvokeAsync<string>("eval", "JSON.stringify(window.hiitTimerState || {})");
+                
+                if (!string.IsNullOrEmpty(jsState))
+                {
+                    dynamic? timerState = System.Text.Json.JsonSerializer.Deserialize<object>(jsState);
+                    
+                    if (timerState != null)
+                    {
+                        var jsStartTime = await JSRuntime.InvokeAsync<string>("eval", "window.hiitTimerState && window.hiitTimerState.sessionStartTime ? window.hiitTimerState.sessionStartTime.toISOString() : null");
+                        if (!string.IsNullOrEmpty(jsStartTime) && DateTime.TryParse(jsStartTime, out var startTime))
+                        {
+                            sessionStartTime = startTime;
+                            sessionTime = DateTime.Now - sessionStartTime;
+                        }
+                        
+                        var totalSets = await JSRuntime.InvokeAsync<int>("eval", "window.hiitTimerState ? window.hiitTimerState.setsTotal : 0");
+                        var setsLeft = await JSRuntime.InvokeAsync<int>("eval", "window.hiitTimerState ? window.hiitTimerState.setsLeft : 0");
+                        completedSets = Math.Max(0, totalSets - setsLeft);
+                        
+                        StateHasChanged();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error updating HIIT session timer");
+            }
+        });
+    }
+
+    private async Task SaveHiitSession()
+    {
+        if (!ShowSaveControls || selectedTagId == 0 || sessionTime.TotalSeconds < 30 || saveCountdown > 0)
+            return;
+
+        try
+        {
+            var sessionMinutes = (int)Math.Round(sessionTime.TotalMinutes);
+            if (sessionMinutes < 1) sessionMinutes = 1; // Minimum 1 minute
+            
+            var request = new ActivityRequest
+            {
+                DateStarted = sessionStartTime,
+                Description = sessionMinutes.ToString(), // Store minutes as description for integer tags
+                PrimaryTagId = selectedTagId
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            
+            statusMessage = $"HIIT session saved! Duration: {sessionMinutes} minutes, Sets: {completedSets}";
+            Logger.LogInformation("HIIT session saved: {Minutes} minutes, {Sets} sets", sessionMinutes, completedSets);
+            
+            // Start cooldown
+            saveCountdown = 60;
+            cooldownTimer = new System.Threading.Timer(DecrementCooldown, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save HIIT session");
+            statusMessage = "Failed to save session. Please try again.";
+        }
+        
+        StateHasChanged();
+    }
+
+    private void DecrementCooldown(object? state)
+    {
+        if (saveCountdown > 0)
+        {
+            saveCountdown--;
+            InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            cooldownTimer?.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        cooldownTimer?.Dispose();
+        sessionTimer?.Dispose();
+    }
+}

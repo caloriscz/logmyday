@@ -1,0 +1,298 @@
+@inject NavigationManager Navigation
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using Microsoft.AspNetCore.Components.Authorization
+@using Refit
+@using System.Net
+@using System.Reflection
+@using System.Security.Claims
+
+<nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+    <div class="mx-auto max-w-screen-2xl px-4">
+        <div class="flex items-center justify-between h-16">
+            <!-- Logo/Brand -->
+            <a href="" class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                <img src="images/favicon.png" alt="LogMyDay logo" class="h-8 w-8 rounded-md shadow-sm" loading="lazy" />
+                <span>LogMyDay</span>
+                <span class="text-xs opacity-60">v@(GetAppVersion())</span>
+            </a>
+
+            <!-- Desktop Navigation -->
+            <div class="hidden lg:flex items-center gap-1">
+                <NavLink href="" Match="NavLinkMatch.All" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="home" Class="w-4 h-4" />
+                    <span>Home</span>
+                </NavLink>
+                <NavLink href="activities" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="calendar" Class="w-4 h-4" />
+                    <span>Activities</span>
+                </NavLink>
+                <NavLink href="tags" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="tag" Class="w-4 h-4" />
+                    <span>Tags</span>
+                </NavLink>
+                <NavLink href="units" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="chart" Class="w-4 h-4" />
+                    <span>Units</span>
+                </NavLink>
+                <NavLink href="option-lists" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="list" Class="w-4 h-4" />
+                    <span>Lists</span>
+                </NavLink>
+                <NavLink href="calendar" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="calendar" Class="w-4 h-4" />
+                    <span>Calendar</span>
+                </NavLink>
+                <NavLink href="backup" 
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="database" Class="w-4 h-4" />
+                    <span>Backup</span>
+                </NavLink>
+                @if (isAdminUser)
+                {
+                    <NavLink href="users" 
+                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="user" Class="w-4 h-4" />
+                        <span>Users</span>
+                    </NavLink>
+                }
+            </div>
+
+            <!-- Right Section: Theme Toggle + Account Menu -->
+            <div class="flex items-center gap-2">
+                <!-- Theme Toggle -->
+                <ThemeToggle />
+                
+                <!-- Account Dropdown -->
+                <div class="relative">
+                    <button @onclick="ToggleUserMenu" 
+                            type="button"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            title="@DisplayEmail"
+                            aria-label="Account menu"
+                            aria-expanded="@showUserMenu">
+                        <Icon Name="user" Class="w-5 h-5" />
+                        <Icon Name="chevron-down" Class="w-4 h-4" />
+                    </button>
+                    
+                    @if (showUserMenu)
+                    {
+                        <div class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                            <NavLink href="profile" @onclick="() => showUserMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="user" Class="w-4 h-4 flex-shrink-0" />
+                                <span class="break-words flex-1">@DisplayEmail</span>
+                            </NavLink>
+                            <hr class="my-1 border-gray-200 dark:border-gray-700" />
+                            <NavLink href="profile" @onclick="() => showUserMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="user" Class="w-4 h-4" />
+                                <span>Profile</span>
+                            </NavLink>
+                            <button @onclick="Logout" type="button"
+                                    class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20">
+                                <Icon Name="arrow-right" Class="w-4 h-4" />
+                                <span>Logout</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+                
+                <!-- Mobile Menu Toggle -->
+                <button @onclick="ToggleMobileMenu" 
+                        type="button" 
+                        class="lg:hidden p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        aria-label="Toggle navigation"
+                        aria-expanded="@showMobileMenu">
+                    <Icon Name="bars-3" Class="w-6 h-6" />
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile Navigation -->
+        @if (showMobileMenu)
+        {
+            <div class="lg:hidden py-4 border-t border-gray-200 dark:border-gray-700 animate-slide-down">
+                <div class="flex flex-col gap-1">
+                    <NavLink href="" Match="NavLinkMatch.All" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="home" Class="w-5 h-5" />
+                        <span>Home</span>
+                    </NavLink>
+                    <NavLink href="activities" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="calendar" Class="w-5 h-5" />
+                        <span>Activities</span>
+                    </NavLink>
+                    <NavLink href="tags" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="tag" Class="w-5 h-5" />
+                        <span>Tags</span>
+                    </NavLink>
+                    <NavLink href="units" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="chart" Class="w-5 h-5" />
+                        <span>Units</span>
+                    </NavLink>
+                    <NavLink href="option-lists" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="list" Class="w-5 h-5" />
+                        <span>Lists</span>
+                    </NavLink>
+                    <NavLink href="calendar" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="calendar" Class="w-5 h-5" />
+                        <span>Calendar</span>
+                    </NavLink>
+                    <NavLink href="backup" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="database" Class="w-5 h-5" />
+                        <span>Backup</span>
+                    </NavLink>
+                    @if (isAdminUser)
+                    {
+                        <NavLink href="users" @onclick="() => showMobileMenu = false"
+                                 class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                 ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                            <Icon Name="user" Class="w-5 h-5" />
+                            <span>Users</span>
+                        </NavLink>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</nav>
+
+@implements IDisposable
+
+@code {
+    private bool isAdminUser = false;
+    private string? currentUserEmail;
+    private bool showMobileMenu = false;
+    private bool showUserMenu = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        await RefreshUserInfoAsync();
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            var authState = await task;
+            await RefreshUserInfoAsync(authState);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            isAdminUser = false;
+            currentUserEmail = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshUserInfoAsync(AuthenticationState? authState = null)
+    {
+        try
+        {
+            authState ??= await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            isAdminUser = user?.Claims.Any(c => c.Type == "is_admin" && string.Equals(c.Value, "true", StringComparison.OrdinalIgnoreCase)) == true;
+
+            if (user?.Identity?.IsAuthenticated == true)
+            {
+                try
+                {
+                    var currentUser = await AuthApi.GetCurrentUserAsync();
+                    currentUserEmail = currentUser.Email;
+                }
+                catch (Refit.ApiException apiEx) when (apiEx.StatusCode == HttpStatusCode.Unauthorized || apiEx.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    currentUserEmail = user.FindFirst(ClaimTypes.Email)?.Value ?? user.Identity?.Name;
+                }
+            }
+            else
+            {
+                currentUserEmail = null;
+            }
+        }
+        catch
+        {
+            isAdminUser = false;
+            currentUserEmail = null;
+        }
+    }
+
+    private void ToggleMobileMenu()
+    {
+        showMobileMenu = !showMobileMenu;
+        if (showMobileMenu)
+        {
+            showUserMenu = false; // Close user menu when opening mobile menu
+        }
+    }
+
+    private void ToggleUserMenu()
+    {
+        showUserMenu = !showUserMenu;
+        if (showUserMenu)
+        {
+            showMobileMenu = false; // Close mobile menu when opening user menu
+        }
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await AuthApi.LogoutAsync();
+        }
+        catch (Exception)
+        {
+            // Ignore logout errors - we'll redirect anyway
+        }
+        finally
+        {
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    private string GetAppVersion()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version;
+        return version?.ToString(3) ?? "Unknown"; // Returns major.minor.build
+    }
+
+    private string DisplayEmail => string.IsNullOrWhiteSpace(currentUserEmail) ? "Account" : currentUserEmail;
+
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+}

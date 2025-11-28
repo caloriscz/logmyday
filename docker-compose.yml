@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  logmyday-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: logmyday-app
+    ports:
+      - "9099:9099"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Non-sensitive configuration
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:9099
+      # Database configuration (using host.docker.internal to access host machine)
+      - DB_HOST=host.docker.internal,1439
+      - DB_NAME=logmyday
+      - DB_USER=sa
+      # API base address
+      - Api__BaseAddress=${API_BASE_URL:-http://localhost:9099}
+      # Email SMTP configuration
+      - Email__SmtpServer=${SMTP_SERVER:-smtp.example.com}
+      - Email__SmtpPort=${SMTP_PORT:-587}
+      - Email__UseSsl=${SMTP_USE_SSL:-true}
+      - Email__UserName=${SMTP_USERNAME:-noreply@example.com}
+      - Email__SenderEmail=${SMTP_SENDER_EMAIL:-noreply@example.com}
+      - Email__SenderName=${SMTP_SENDER_NAME:-LogMyDay}
+      - Email__PasswordResetUrl=${PASSWORD_RESET_URL:-http://localhost:9099/reset-password}
+      # Rate limiting
+      - Security__RateLimit__MaxAttemptsPerWindow=${RATE_LIMIT_MAX_ATTEMPTS:-5}
+      - Security__RateLimit__WindowMinutes=${RATE_LIMIT_WINDOW_MINUTES:-15}
+      - Security__RateLimit__LockoutMinutes=${RATE_LIMIT_LOCKOUT_MINUTES:-30}
+    secrets:
+      - db_password
+      - smtp_password
+    volumes:
+      # Persistent logs
+      - logmyday-logs:/app/Logs
+    networks:
+      - logmyday-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9099/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  smtp_password:
+    file: ./secrets/smtp_password.txt
+
+volumes:
+  logmyday-logs:
+    driver: local
+
+networks:
+  logmyday-network:
+    driver: bridge
+
+# Optional: SQL Server container (commented by default since you're using external DB)
+# Uncomment this if you want to test with a local containerized SQL Server
+#
+# services:
+#   sqlserver:
+#     image: mcr.microsoft.com/mssql/server:2022-latest
+#     container_name: logmyday-sqlserver
+#     environment:
+#       - ACCEPT_EULA=Y
+#       - MSSQL_SA_PASSWORD_FILE=/run/secrets/sa_password
+#       - MSSQL_PID=Developer
+#     secrets:
+#       - sa_password
+#     ports:
+#       - "1433:1433"
+#     volumes:
+#       - sqlserver-data:/var/opt/mssql
+#     networks:
+#       - logmyday-network
+#     restart: unless-stopped
+#
+# secrets:
+#   sa_password:
+#     file: ./secrets/sa_password.txt
+#
+# volumes:
+#   sqlserver-data:
+#     driver: local

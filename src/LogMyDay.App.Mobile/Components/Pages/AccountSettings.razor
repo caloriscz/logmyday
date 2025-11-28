@@ -1,0 +1,236 @@
+@page "/settings/account"
+@using System.ComponentModel.DataAnnotations
+@using LogMyDay.App.Mobile.Models
+@using LogMyDay.Shared.Preferences
+@inject IAuthApi AuthApi
+@inject IUsersApi UsersApi
+@inject IUserPreferencesService UserPreferencesService
+@inject ILogger<AccountSettings> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Account Settings - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <TopBar Title="Account settings" BackUrl="/settings" ShowReload="false" />
+    
+    <div class="max-w-7xl mx-auto px-6 py-4">
+        @if (isLoading)
+        {
+            <div class="flex items-center gap-2 py-4">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+                <span class="text-gray-600 dark:text-gray-400">Loading your profile...</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadErrorMessage))
+        {
+            <div class="alert-danger">
+                @loadErrorMessage
+            </div>
+        }
+        else
+        {
+            <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="alert-danger mb-4" />
+
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <div class="@(statusIsError ? "alert-danger" : "alert-success") mb-4">
+                        @statusMessage
+                    </div>
+                }
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="email">Email</label>
+                    <InputText id="email" @bind-Value="profile.Email" 
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" 
+                        autocomplete="email" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="displayName">Display name</label>
+                    <InputText id="displayName" @bind-Value="profile.DisplayName" 
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" 
+                        autocomplete="name" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Optional. This is shown in the app when available.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="culture">Culture</label>
+                    <SearchableSelect @bind-Value="profile.Culture"
+                                      Id="culture"
+                                      Options="CultureOptions"
+                                      Placeholder="Select culture"
+                                      SearchPlaceholder="Search cultures"
+                                      ShowValueInList="true" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Pick a culture (e.g., Deutsch (Österreich) — de-AT).</div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300" for="timezone">Time zone</label>
+                    <SearchableSelect @bind-Value="profile.TimeZone"
+                                      Id="timezone"
+                                      Options="TimeZoneOptions"
+                                      Placeholder="Select time zone"
+                                      SearchPlaceholder="Search time zones"
+                                      ShowValueInList="true" />
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Pick an IANA time zone (e.g., Europe/Vienna).</div>
+                </div>
+
+                <button type="submit" 
+                        class="w-full px-4 py-3 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
+                        disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="inline-block animate-spin">⟳</span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-save"></i>
+                        <span>Save changes</span>
+                    }
+                </button>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<SelectOption> CultureOptions = CultureCatalog.All;
+    private static readonly IReadOnlyList<SelectOption> TimeZoneOptions = TimeZoneCatalog.All;
+
+    private Guid? userId;
+    private AccountSettingsModel profile = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? statusMessage;
+    private bool statusIsError;
+    private string? loadErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            isLoading = true;
+            loadErrorMessage = null;
+
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            userId = currentUser.Id;
+
+            profile = new AccountSettingsModel
+            {
+                Email = currentUser.Email,
+                DisplayName = currentUser.DisplayName ?? string.Empty,
+                Culture = currentUser.Culture,
+                TimeZone = currentUser.TimeZone
+            };
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized || ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            Logger.LogWarning(ex, "User is not authorized to load account settings");
+            loadErrorMessage = "You are not authorized to view this page.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load account settings");
+            loadErrorMessage = "Failed to load profile information. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (userId == null || isSaving)
+        {
+            return;
+        }
+
+        isSaving = true;
+        SetStatus(null);
+
+        try
+        {
+            var request = new UpdateUserDto(
+                profile.Email.Trim(),
+                string.IsNullOrWhiteSpace(profile.DisplayName) ? null : profile.DisplayName.Trim(),
+                null,
+                profile.Culture.Trim(),
+                profile.TimeZone.Trim());
+
+            var updatedUser = await UsersApi.UpdateUserAsync(userId.Value, request);
+
+            profile.Email = updatedUser.Email;
+            profile.DisplayName = updatedUser.DisplayName ?? string.Empty;
+            profile.Culture = updatedUser.Culture;
+            profile.TimeZone = updatedUser.TimeZone;
+
+            // Invalidate user preferences cache so new culture/timezone settings are loaded
+            UserPreferencesService.InvalidateCache();
+
+            SetStatus("Profile updated successfully.");
+        }
+        catch (Refit.ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to update profile");
+            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to update profile.";
+            SetStatus(message, true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while updating profile");
+            SetStatus("An unexpected error occurred while saving your profile.", true);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void SetStatus(string? message, bool isError = false)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private static async Task<string?> ExtractErrorMessageAsync(Refit.ApiException exception)
+    {
+        if (!string.IsNullOrWhiteSpace(exception.Content))
+        {
+            return exception.Content;
+        }
+
+        try
+        {
+            var problem = await exception.GetContentAsAsync<ApiError>();
+            return problem?.Detail ?? problem?.Title;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed class AccountSettingsModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+
+        [Required]
+        public string Culture { get; set; } = string.Empty;
+
+        [Required]
+        public string TimeZone { get; set; } = string.Empty;
+    }
+}

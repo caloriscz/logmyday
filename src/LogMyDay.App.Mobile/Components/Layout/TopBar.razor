@@ -1,0 +1,64 @@
+@* TopBar Component - Consistent header with back button, heading, and reload functionality *@
+
+<div class="flex items-center justify-between gap-3 h-12 px-6 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+        @if (!string.IsNullOrEmpty(BackUrl))
+        {
+            <button @onclick="HandleBack" 
+                    class="flex-shrink-0 flex items-center justify-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                    aria-label="Go back">
+                <i class="bi bi-arrow-left text-xl"></i>
+            </button>
+        }
+        
+        <h1 class="text-lg font-bold text-gray-900 dark:text-white truncate flex-1">
+            @Title
+        </h1>
+    </div>
+
+    @if (ShowReload)
+    {
+        <button @onclick="HandleReload"
+                class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Reload page">
+            <i class="bi bi-arrow-clockwise text-xl"></i>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? BackUrl { get; set; }
+
+    [Parameter]
+    public bool ShowReload { get; set; } = true;
+
+    [Parameter]
+    public EventCallback OnReload { get; set; }
+
+    [Inject]
+    private NavigationManager? Navigation { get; set; }
+
+    private void HandleBack()
+    {
+        if (!string.IsNullOrEmpty(BackUrl) && Navigation != null)
+        {
+            Navigation.NavigateTo(BackUrl);
+        }
+    }
+
+    private async Task HandleReload()
+    {
+        if (OnReload.HasDelegate)
+        {
+            await OnReload.InvokeAsync();
+        }
+        else if (Navigation != null)
+        {
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+    }
+}

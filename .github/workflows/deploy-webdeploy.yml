@@ -1,0 +1,114 @@
+name: Deploy Web Application
+
+on:
+  push:
+    tags:
+      - '*'
+    paths-ignore:
+      - '**.md'
+      - 'src/LogMyDay.App.Mobile/**'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Build target to run'
+        required: true
+        default: 'Default'
+        type: choice
+        options:
+          - Default
+          - FastDeploy
+          - CI
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    
+    env:
+      LMD_SERVER: ${{ secrets.LMD_SERVER }}
+      LMD_PORT: ${{ secrets.LMD_PORT }}
+      LMD_SITE: ${{ secrets.LMD_SITE }}
+      LMD_LOGIN: ${{ secrets.LMD_LOGIN }}
+      LMD_PASSWORD: ${{ secrets.LMD_PASSWORD }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Cache Cake tools
+        uses: actions/cache@v4
+        with:
+          path: build/tools
+          key: ${{ runner.os }}-cake-tools-${{ hashFiles('build/tools/packages.config') }}
+          restore-keys: |
+            ${{ runner.os }}-cake-tools-
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Run build script
+        working-directory: build
+        run: |
+          $target = "${{ github.event.inputs.target }}"
+          if ([string]::IsNullOrEmpty($target)) {
+            $target = "Default"
+          }
+          
+          Write-Host "Running build target: $target"
+          .\build.ps1 -Target $target -Verbosity Verbose
+        shell: powershell
+
+      - name: Upload deployment package
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: build/artifacts/LogMyDay.App.zip
+          retention-days: 7
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build/publish/
+          retention-days: 3
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          Write-Host "✅ Deployment completed successfully!" -ForegroundColor Green
+          Write-Host "🌐 Application should now be available at your hosting provider"
+          Write-Host "📦 Deployment package is available as an artifact for 7 days"
+        shell: powershell
+
+      - name: Deployment Failed
+        if: failure()
+        run: |
+          Write-Host "❌ Deployment failed!" -ForegroundColor Red
+          Write-Host "Check the build logs for detailed error information"
+          Write-Host "Build logs and artifacts have been uploaded for review"
+          Write-Host ""
+          Write-Host "Common troubleshooting steps:" -ForegroundColor Yellow
+          Write-Host "1. Verify GitHub secrets are correctly set:"
+          Write-Host "   - LMD_SERVER (Web Deploy server hostname)"
+          Write-Host "   - LMD_PORT (Web Deploy port, usually 8172)"
+          Write-Host "   - LMD_SITE (Target site name)"
+          Write-Host "   - LMD_LOGIN (Web Deploy username)"
+          Write-Host "   - LMD_PASSWORD (Web Deploy password)"
+          Write-Host "2. Ensure Web Deploy is installed on target server"
+          Write-Host "3. Verify Management Service is running on target server"
+          Write-Host "4. Check firewall settings for the specified port"
+        shell: powershell

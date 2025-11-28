@@ -1,0 +1,294 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject IApiContext ApiContext
+@inject IApiClientProvider ApiProvider
+@inject ILogger<Layout.MainLayout> Logger
+@inject NotificationNavigationService NotificationNavigation
+@implements IDisposable
+@using System.Net
+@using System.Collections.Generic
+@using Microsoft.Maui.Storage
+@using Refit
+
+@if (_isCheckingAuthentication)
+{
+    <LoadingScreen Message="Checking authentication..." SubMessage="Please wait while we verify your session" />
+}
+else
+{
+    <div class="mobile-container">
+        <div class="mobile-content" data-refresh-scrollable="true">
+            @Body
+        </div>
+
+        @* Only show navigation if user is authenticated and not on login page *@
+        @if (AuthService.IsAuthenticated && !IsLoginPage)
+        {
+            <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-around bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-xl z-50"
+                 style="padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(4rem + env(safe-area-inset-bottom, 0px));">
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/reminders") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/reminders"))">
+                    <i class="bi bi-bell text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Reminders</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsToolsSectionActive() ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/tools"))">
+                    <i class="bi bi-tools text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Tools</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/quick"))">
+                    <i class="bi bi-lightning text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Quick</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/activities") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/activities"))">
+                    <i class="bi bi-calendar3 text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Activities</span>
+                </button>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/settings") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/settings"))">
+                    <i class="bi bi-gear text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Settings</span>
+                </button>
+            </nav>
+        }
+    </div>
+}
+
+@code {
+    private bool _isCheckingAuthentication = true;
+    private bool IsLoginPage => GetCurrentPath().Equals("login", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsActive(string path)
+    {
+        try
+        {
+            var currentPath = GetCurrentPath();
+            var targetPath = path.TrimStart('/');
+
+            if (string.Equals(currentPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                return false;
+            }
+
+            return currentPath.StartsWith(targetPath + "/", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool IsToolsSectionActive()
+    {
+        return IsActive("/tools") || IsActive("/breathing") || IsActive("/exercise");
+    }
+
+    private string GetCurrentPath()
+    {
+        try
+        {
+            var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri);
+            return currentPath ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private void NavigateTo(string path)
+    {
+        try
+        {
+            Navigation.NavigateTo(path);
+            System.Diagnostics.Debug.WriteLine($"MainLayout: Navigated to {path}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MainLayout: Navigation error: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        System.Diagnostics.Debug.WriteLine("MainLayout: Conditional layout initialized");
+        AuthService.AuthenticationChanged += OnAuthenticationChanged;
+        NotificationNavigation.NavigationRequested += OnNotificationNavigationRequested;
+
+        // Show loading screen while checking authentication
+        _isCheckingAuthentication = true;
+        StateHasChanged();
+
+        await TryRestoreSessionAsync();
+
+        // If authentication was restored successfully, redirect to activities BEFORE hiding loading screen
+        if (AuthService.IsAuthenticated && IsLoginPage)
+        {
+            Navigation.NavigateTo("/reminders", true);
+        }
+
+        await HandlePendingNotificationAsync();
+
+        // Hide loading screen after authentication check completes
+        _isCheckingAuthentication = false;
+        StateHasChanged();
+    }
+
+    private void OnAuthenticationChanged(bool isAuthenticated)
+    {
+        System.Diagnostics.Debug.WriteLine($"===== MainLayout: Auth changed to {isAuthenticated}");
+        InvokeAsync(StateHasChanged);
+
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+        else
+        {
+            // If user just logged in, navigate to activities page
+            Navigation.NavigateTo("/reminders");
+            _ = InvokeAsync(HandlePendingNotificationAsync);
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthenticationChanged -= OnAuthenticationChanged;
+        NotificationNavigation.NavigationRequested -= OnNotificationNavigationRequested;
+    }
+
+    private bool _restoreAttempted;
+
+    private async Task TryRestoreSessionAsync()
+    {
+        if (_restoreAttempted || AuthService.IsAuthenticated)
+        {
+            return;
+        }
+
+        _restoreAttempted = true;
+
+        try
+        {
+            var serverUrl = Preferences.Get("ServerUrl", string.Empty);
+            var username = Preferences.Get("Username", string.Empty);
+
+            if (string.IsNullOrWhiteSpace(serverUrl) || string.IsNullOrWhiteSpace(username))
+            {
+                return;
+            }
+
+            string? password = null;
+
+            try
+            {
+                password = await SecureStorage.Default.GetAsync("Password");
+            }
+            catch (Exception storageEx)
+            {
+                Logger?.LogWarning(storageEx, "Failed to access secure storage while restoring session.");
+
+                return;
+            }
+
+            if (string.IsNullOrEmpty(password))
+            {
+                return;
+            }
+
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var serverUri))
+            {
+                Logger?.LogWarning("Stored server URL '{ServerUrl}' is invalid and cannot be used to restore the session.", serverUrl);
+
+                return;
+            }
+
+            ApiContext.Configure(serverUri, username, password);
+
+            if (ApiProvider is not null)
+            {
+                try
+                {
+                    await ApiProvider.Activity.GetTags();
+                }
+                catch (ApiException apiEx) when (apiEx.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    Logger?.LogWarning(apiEx, "Stored credentials are no longer valid. Clearing stored password.");
+                    ApiContext.Clear();
+                    Preferences.Remove("Password");
+                    SecureStorage.Default.Remove("Password");
+                    AuthService.SetAuthenticated(false);
+
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogWarning(ex, "Failed to validate stored credentials. Proceeding with optimistic authentication.");
+                }
+            }
+
+            AuthService.SetAuthenticated(true);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Unexpected error while attempting to restore authentication state.");
+        }
+    }
+
+    private async Task HandlePendingNotificationAsync()
+    {
+        var pending = NotificationNavigation.PeekPendingIntent();
+        if (pending != null)
+        {
+            await HandleNotificationNavigationAsync(pending);
+        }
+    }
+
+    private void OnNotificationNavigationRequested(object? sender, NotificationPayload payload)
+    {
+        InvokeAsync(() => HandleNotificationNavigationAsync(payload));
+    }
+
+    private Task HandleNotificationNavigationAsync(NotificationPayload payload)
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+
+            return Task.CompletedTask;
+        }
+
+        var targetUri = BuildNotificationTargetUri(payload);
+        Navigation.NavigateTo(targetUri, forceLoad: false);
+        NotificationNavigation.ClearPendingIntent();
+
+        return Task.CompletedTask;
+    }
+
+    private static string BuildNotificationTargetUri(NotificationPayload payload)
+    {
+        var parameters = new List<string> { "source=notification" };
+
+        if (payload.TagId.HasValue)
+        {
+            parameters.Add($"tagId={payload.TagId.Value}");
+        }
+
+        if (payload.LocalDate.HasValue)
+        {
+            parameters.Add($"date={payload.LocalDate.Value:yyyy-MM-dd}");
+        }
+
+        return parameters.Count > 0 ? "/activities?" + string.Join("&", parameters) : "/activities";
+    }
+}

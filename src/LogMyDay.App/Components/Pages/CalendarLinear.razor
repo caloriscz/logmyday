@@ -1,0 +1,974 @@
+@page "/calendar-linear"
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Preferences
+@using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+@inject IJSRuntime JSRuntime
+
+<style>
+    .linear-calendar-container {
+        --linear-label-width: 2.25rem;
+        --linear-cell-width: 1.2rem;
+        --linear-cell-height: 2.2rem;
+        --linear-cell-gap: 0.28rem;
+        --linear-day-font: 12px;
+        --linear-value-font: 12px;
+        --linear-legend-font: 11px;
+        --linear-divider-offset: 0.18rem;
+        --linear-step: calc(var(--linear-cell-width) + var(--linear-cell-gap));
+    }
+
+    @@media (min-width: 1024px) {
+        .linear-calendar-container {
+            --linear-label-width: 2.5rem;
+            --linear-cell-width: 1.55rem;
+            --linear-cell-height: 2.5rem;
+            --linear-cell-gap: 0.32rem;
+            --linear-day-font: 14px;
+            --linear-value-font: 14px;
+            --linear-legend-font: 12px;
+            --linear-divider-offset: 0.24rem;
+            --linear-step: calc(var(--linear-cell-width) + var(--linear-cell-gap));
+        }
+    }
+
+    .linear-calendar-container .grid-linear-legend,
+    .linear-calendar-container .grid-linear-month {
+        display: grid;
+        grid-template-columns: var(--linear-label-width) repeat(42, var(--linear-cell-width));
+        column-gap: var(--linear-cell-gap);
+        align-items: center;
+        width: max-content;
+        position: relative;
+    }
+
+    .linear-calendar-container .day-cell,
+    .linear-calendar-container .blank-cell {
+        width: var(--linear-cell-width);
+        min-height: var(--linear-cell-height);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        padding-top: 0.1rem;
+    }
+
+    .linear-calendar-container .day-num {
+        font-size: var(--linear-day-font);
+        line-height: 1;
+        font-weight: 500;
+    }
+
+    .linear-calendar-container .day-value {
+        font-size: var(--linear-value-font);
+        line-height: 1.1;
+        font-weight: 500;
+        margin-top: 0.1rem;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .linear-calendar-container .legend-text {
+        font-size: var(--linear-legend-font);
+        line-height: 1rem;
+        font-weight: 500;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .linear-calendar-container .month-label {
+        border-right: 2px solid rgb(203 213 225);
+        margin-right: 4px;
+    }
+
+    .dark .linear-calendar-container .month-label {
+        border-right-color: rgb(100 116 139);
+    }
+
+    .linear-calendar-container .week-divider {
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background-color: rgb(167 139 250);
+        opacity: 0.6;
+        border-radius: 9999px;
+        pointer-events: none;
+    }
+
+    .dark .linear-calendar-container .week-divider {
+        background-color: rgb(196 181 253);
+        opacity: 0.5;
+    }
+
+    .linear-calendar-container .calendar-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+
+<div class="linear-calendar-container mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Linear Calendar</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Year-as-rows calendar view with week-aligned layout.</p>
+        </div>
+        <button type="button" class="@NavButtonCss" @onclick="NavigateToGridView">
+            <Icon Name="grid-3x3" Class="h-4 w-4 mr-1" />
+            Grid Calendar
+        </button>
+    </div>
+
+    <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="w-full max-w-sm space-y-2">
+                <label for="tagPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Select Tag</label>
+                <select id="tagPicker" class="@InputCss" value="@(selectedTagId?.ToString() ?? string.Empty)" @onchange="OnTagChangedHandler">
+                    <option value="">Select a tag...</option>
+                    @if (tags != null)
+                    {
+                        foreach (var tag in tags.OrderBy(t => t.Title))
+                        {
+                            <option value="@tag.Id">@tag.Title</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label for="weekStartPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Week starts</label>
+                <select id="weekStartPicker" class="@WeekPickerCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
+                    <option value="1">Monday</option>
+                    <option value="0">Sunday</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <div class="flex items-center gap-2">
+                <button type="button" class="@GetOrderButtonClass(OrderDescending)" @onclick="@(() => ChangeOrder(OrderDescending))">Newest First</button>
+                <button type="button" class="@GetOrderButtonClass(OrderAscending)" @onclick="@(() => ChangeOrder(OrderAscending))">Oldest First</button>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
+                <button type="button" class="@NavButtonCss" @onclick="PrevYear" disabled="@(!hasPreviousYear)">Previous</button>
+                <div class="text-sm text-gray-600 dark:text-slate-300">
+                    <span class="font-semibold text-gray-900 dark:text-slate-100">@currentYear</span>
+                    <span class="ml-2">(@availableYears.Count year@(availableYears.Count == 1 ? "" : "s") available)</span>
+                </div>
+                <button type="button" class="@NavButtonCss" @onclick="NextYear" disabled="@(!hasNextYear)">Next</button>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @errorMessage
+        </div>
+    }
+
+    @if (!selectedTagId.HasValue)
+    {
+        <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            Select a tag to view calendar data.
+        </div>
+    }
+    else if (activitiesByDate == null)
+    {
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            Loading calendar data...
+        </div>
+    }
+    else if (activitiesByDate.Count == 0)
+    {
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            No activities found for this tag in @currentYear.
+        </div>
+    }
+    else
+    {
+    <!-- Calendar container with horizontal scroll -->
+    <div class="calendar-scroll overflow-x-auto pb-1">
+        <div class="space-y-3 inline-block min-w-full">
+            <!-- Global weekday legend -->
+            <section class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="grid-linear-legend">
+                    @* Month label spacer *@
+                    <div class="month-label text-xs font-semibold text-gray-500 dark:text-slate-400">&nbsp;</div>
+                    
+                    @* 42 weekday labels (repeating pattern) *@
+                    @for (int i = 0; i < FixedCells; i++)
+                    {
+                        var weekdayName = GetWeekdayName(i);
+                        <div class="legend-text text-gray-500 dark:text-slate-400">@weekdayName</div>
+                    }
+
+                    @* Week dividers for legend (always at fixed positions) *@
+                    @for (int weekNum = 1; weekNum < 6; weekNum++)
+                    {
+                        var offset = weekNum * 7;
+                        var dividerStyle = $"left: calc(var(--linear-label-width) + (var(--linear-step) * {offset}) - (var(--linear-cell-gap) / 2) + var(--linear-divider-offset));";
+                        <div class="week-divider" style="@dividerStyle"></div>
+                    }
+                </div>
+            </section>
+
+            <!-- Year rows -->
+            <section class="space-y-3">
+                @foreach (var month in GetMonthsToRender())
+                {
+                    var monthData = GetMonthLinearGrid(currentYear, month, weekStartsOn);
+                    
+                    <div class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div class="grid-linear-month">
+                            @* Month label *@
+                            <div class="month-label text-right pr-1 text-sm font-bold text-gray-800 dark:text-slate-100">
+                                @monthData.MonthLabel
+                            </div>
+
+                            @* Leading blank cells *@
+                            @for (int i = 0; i < monthData.LeadingBlanks; i++)
+                            {
+                                <div class="blank-cell rounded-md border border-transparent invisible">
+                                    <div class="day-num">&nbsp;</div>
+                                </div>
+                            }
+
+                            @* Day cells *@
+                            @foreach (var day in monthData.Days)
+                            {
+                                var dayDate = new DateTime(currentYear, month, day);
+                                var key = dayDate.ToString("yyyy-MM-dd");
+                                List<string>? dayValues = null;
+                                var hasValues = activitiesByDate != null && activitiesByDate.TryGetValue(key, out dayValues) && dayValues.Count > 0;
+                                var displayValue = hasValues && dayValues != null ? GetTruncatedValue(dayValues[0]) : "";
+
+                                <button type="button" class="day-cell rounded-md border border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-900/70 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1" @onclick="() => OpenDayActivitiesModal(dayDate)">
+                                    <div class="day-num text-gray-900 dark:text-slate-100">@day</div>
+                                    @if (hasValues && dayValues != null)
+                                    {
+                                        <div class="day-value text-emerald-600 dark:text-emerald-400" title="@dayValues[0]">@displayValue</div>
+                                    }
+                                </button>
+                            }
+
+                            @* Trailing blank cells *@
+                            @for (int i = 0; i < monthData.TrailingBlanks; i++)
+                            {
+                                <div class="blank-cell rounded-md border border-transparent invisible">
+                                    <div class="day-num">&nbsp;</div>
+                                </div>
+                            }
+
+                            @* Week dividers (always at fixed positions: after columns 7, 14, 21, 28, 35) *@
+                            @for (int weekNum = 1; weekNum < 6; weekNum++)
+                            {
+                                var offset = weekNum * 7;
+                                var dividerStyle = $"left: calc(var(--linear-label-width) + (var(--linear-step) * {offset}) - (var(--linear-cell-gap) / 2) + var(--linear-divider-offset));";
+                                <div class="week-divider" style="@dividerStyle"></div>
+                            }
+                        </div>
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+
+    }
+
+    <footer class="text-xs text-gray-500 dark:text-slate-400">
+        Linear planner: each month uses a fixed 42-cell grid; week ends align across all months.
+    </footer>
+</div>
+
+@if (showDayActivitiesModal && selectedDayForModal.HasValue)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/70" @onclick="CloseDayModal"></div>
+        <div class="relative z-10 w-full max-w-2xl space-y-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">Activities for @FormatModalDate(selectedDayForModal.Value)</h3>
+                    <p class="text-sm text-gray-600 dark:text-slate-300">@GetSelectedTagTitle()</p>
+                </div>
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="CloseDayModal" aria-label="Close">
+                    <Icon Name="x" Class="h-4 w-4" />
+                </button>
+            </div>
+            <div class="space-y-3 max-h-[55vh] overflow-y-auto">
+                @if (!string.IsNullOrEmpty(dayModalError))
+                {
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @dayModalError
+                    </div>
+                }
+                else if (isDayModalLoading)
+                {
+                    <div class="flex h-24 items-center justify-center text-sm text-gray-600 dark:text-slate-300">
+                        Loading activities…
+                    </div>
+                }
+                else if (dayActivities.Count == 0)
+                {
+                    <div class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        No activities recorded for this date.
+                    </div>
+                }
+                else
+                {
+                    @foreach (var activity in dayActivities)
+                    {
+                        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="space-y-1">
+                                    <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100">@activity.PrimaryTagName</h4>
+                                    @{ var displayValue = FormatActivityValue(activity);
+                                       if (!string.IsNullOrWhiteSpace(displayValue))
+                                       {
+                                           <p class="text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                       }
+                                    }
+                                    <p class="text-xs text-gray-500 dark:text-slate-400">@FormatActivityTime(activity)</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => StartEditDayActivity(activity)" aria-label="Edit activity">
+                                        <Icon Name="pencil" Class="w-4 h-4" />
+                                    </button>
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivityFromDay(activity.Id)" aria-label="Delete activity">
+                                        <Icon Name="trash" Class="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900" @onclick="StartCreateDayActivity" disabled="@(!selectedTagId.HasValue)">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    Add Activity
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showActivityEditor && tags != null && modalActivity != null)
+{
+    <AddActivityModal
+        Activity="modalActivity"
+        AvailableTags="tags"
+        OptionLists="optionLists"
+        OptionListLookup="optionListLookup"
+        DisplayCulture="displayCulture"
+        DisplayTimeZone="displayTimeZone"
+        ErrorMessage="@activityEditorError"
+        IsEditMode="isEditMode"
+        ActivityId="editingActivityId"
+        PreselectedTagId="@(!isEditMode ? selectedTagId : null)"
+        PreselectedDate="@(!isEditMode ? selectedDayForModal : null)"
+        OnActivityCreated="OnDayActivityCreated"
+        OnActivityUpdated="OnDayActivityUpdated"
+        OnCanceled="CloseActivityEditor"
+        OnError="OnDayModalError"
+        ModalId="linearCalendarDayActivityModal" />
+}
+
+@code {
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string WeekPickerCss = "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
+    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderDescending = "desc";
+    private const string OrderAscending = "asc";
+    private const int FixedCells = 42; // 6 weeks × 7 days
+    private const int MaxValueCharacters = 3; // Limit activity values to 3 characters
+
+    private static readonly string[] WeekdayNamesStartingMonday = { "Mo", "Tu", "We", "Th", "Fr", "Sa", "Su" };
+    private static readonly string[] WeekdayNamesStartingSunday = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
+
+    private IList<TagResponse>? tags;
+    private Dictionary<string, List<string>>? activitiesByDate;
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+    private List<ActivityResponse> dayActivities = new();
+
+    private int? selectedTagId;
+    private string? errorMessage;
+    private int currentYear = DateTime.Now.Year;
+    private List<int> availableYears = new();
+    private bool hasNextYear;
+    private bool hasPreviousYear;
+    private DayOfWeek weekStartsOn = DayOfWeek.Sunday; // Default, will be set from culture
+    private string orderBy = OrderDescending;
+    
+    private bool showDayActivitiesModal;
+    private bool isDayModalLoading;
+    private string? dayModalError;
+    private DateTime? selectedDayForModal;
+
+    private bool showActivityEditor;
+    private bool isEditMode;
+    private int? editingActivityId;
+    private ActivityRequest modalActivity = new();
+    private string? activityEditorError;
+    
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private UserPreferencesSnapshot? userPreferences;
+    private EffectivePreferences? effectivePreferences;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Linear Calendar");
+        await LoadPreferencesAsync();
+        await LoadTags();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && tags != null && tags.Any())
+        {
+            try
+            {
+                var savedTagId = await JSRuntime.InvokeAsync<int?>("tagPersistence.getSelectedTag");
+                if (savedTagId.HasValue && tags.Any(t => t.Id == savedTagId.Value))
+                {
+                    selectedTagId = savedTagId.Value;
+                    await LoadActivitiesForTag(savedTagId.Value);
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // Ignore errors loading saved tag preference
+            }
+        }
+    }
+
+    private class MonthLinearData
+    {
+        public string MonthLabel { get; set; } = string.Empty;
+        public int LeadingBlanks { get; set; }
+        public List<int> Days { get; set; } = new();
+        public int TrailingBlanks { get; set; }
+    }
+
+    private IEnumerable<int> GetMonthsToRender()
+    {
+        if (string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase))
+        {
+            return Enumerable.Range(1, 12);
+        }
+
+        return Enumerable.Range(1, 12).Reverse();
+    }
+
+    private MonthLinearData GetMonthLinearGrid(int year, int month, DayOfWeek weekStartsOn)
+    {
+        var firstDay = new DateTime(year, month, 1);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        
+        // Calculate leading blank cells needed to align first day with correct weekday
+        var firstDayOfWeek = firstDay.DayOfWeek;
+        var leadingBlanks = GetAdjustedWeekdayIndex(firstDayOfWeek, weekStartsOn);
+
+        // Generate day numbers
+        var days = Enumerable.Range(1, daysInMonth).ToList();
+
+        // Calculate trailing blanks to reach 42 cells
+        var trailingBlanks = FixedCells - leadingBlanks - daysInMonth;
+
+        return new MonthLinearData
+        {
+            MonthLabel = month.ToString("00"),
+            LeadingBlanks = leadingBlanks,
+            Days = days,
+            TrailingBlanks = trailingBlanks
+        };
+    }
+
+    private string GetWeekdayName(int columnIndex)
+    {
+        // Get weekday name for a specific column (0-41)
+        var names = weekStartsOn == DayOfWeek.Monday 
+            ? WeekdayNamesStartingMonday 
+            : WeekdayNamesStartingSunday;
+
+        return names[columnIndex % 7];
+    }
+
+    private int GetAdjustedWeekdayIndex(DayOfWeek dayOfWeek, DayOfWeek weekStartsOn)
+    {
+        // Convert DayOfWeek to 0-6 index adjusted for week start day
+        var dayIndex = (int)dayOfWeek;
+        var startIndex = (int)weekStartsOn;
+        return (dayIndex - startIndex + 7) % 7;
+    }
+
+    private string GetOrderButtonClass(string order)
+    {
+        return string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase)
+            ? OrderButtonActive
+            : OrderButtonInactive;
+    }
+
+    private void OnWeekStartChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            weekStartsOn = (DayOfWeek)value;
+        }
+    }
+
+    private async Task PrevYear()
+    {
+        if (selectedTagId.HasValue && hasPreviousYear)
+        {
+            var currentIndex = availableYears.IndexOf(currentYear);
+            if (currentIndex > 0)
+            {
+                currentYear = availableYears[currentIndex - 1];
+                await LoadActivitiesForTag(selectedTagId.Value);
+            }
+        }
+        else
+        {
+            currentYear--;
+        }
+    }
+
+    private async Task NextYear()
+    {
+        if (selectedTagId.HasValue && hasNextYear)
+        {
+            var currentIndex = availableYears.IndexOf(currentYear);
+            if (currentIndex >= 0 && currentIndex < availableYears.Count - 1)
+            {
+                currentYear = availableYears[currentIndex + 1];
+                await LoadActivitiesForTag(selectedTagId.Value);
+            }
+        }
+        else
+        {
+            currentYear++;
+        }
+    }
+
+    private void ChangeOrder(string order)
+    {
+        if (string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        orderBy = order;
+    }
+
+    private async Task LoadPreferencesAsync()
+    {
+        try
+        {
+            userPreferences = await UserPreferencesService.GetAsync();
+            displayCulture = userPreferences.Culture;
+            displayTimeZone = userPreferences.TimeZone;
+            effectivePreferences = userPreferences.Preferences;
+            
+            // Set week start day from culture
+            weekStartsOn = displayCulture.DateTimeFormat.FirstDayOfWeek;
+        }
+        catch
+        {
+            displayCulture = CultureInfo.CurrentCulture;
+            displayTimeZone = TimeZoneInfo.Local;
+            effectivePreferences = null;
+            
+            // Set week start day from current culture
+            weekStartsOn = displayCulture.DateTimeFormat.FirstDayOfWeek;
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            tags = await ActivityApi.GetTags();
+            await EnsureOptionListsLoadedAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading tags: {ex.Message}";
+        }
+    }
+
+    private async Task EnsureOptionListsLoadedAsync()
+    {
+        if (optionLists != null && optionListLookup != null)
+        {
+            return;
+        }
+
+        try
+        {
+            optionLists = await ActivityApi.GetTagOptionListsAsync();
+            optionListLookup = optionLists?.ToDictionary(list => list.Id) ?? new Dictionary<int, TagOptionListResponse>();
+        }
+        catch
+        {
+            optionLists ??= new List<TagOptionListResponse>();
+            optionListLookup ??= new Dictionary<int, TagOptionListResponse>();
+        }
+    }
+
+    private async Task OnTagChangedHandler(ChangeEventArgs e)
+    {
+        showDayActivitiesModal = false;
+        showActivityEditor = false;
+        dayModalError = null;
+        activityEditorError = null;
+
+        if (int.TryParse(e.Value?.ToString(), out var tagId))
+        {
+            selectedTagId = tagId;
+            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", tagId);
+            await LoadActivitiesForTag(tagId);
+        }
+        else
+        {
+            selectedTagId = null;
+            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", null);
+            activitiesByDate = null;
+            availableYears.Clear();
+            hasNextYear = false;
+            hasPreviousYear = false;
+        }
+    }
+
+    private async Task LoadActivitiesForTag(int tagId)
+    {
+        try
+        {
+            await EnsureOptionListsLoadedAsync();
+
+            availableYears = (await ActivityApi.GetAvailableYears(tagId))?
+                .Distinct()
+                .OrderByDescending(year => year)
+                .ToList() ?? new List<int>();
+
+            if (availableYears.Count > 0 && !availableYears.Contains(currentYear))
+            {
+                currentYear = availableYears[0];
+            }
+            else if (availableYears.Count == 0)
+            {
+                currentYear = DateTime.Now.Year;
+            }
+
+            var activities = await ActivityApi.GetActivitiesByYear(currentYear, tagId);
+
+            activitiesByDate = activities?
+                .GroupBy(a => a.DateStarted.ToString("yyyy-MM-dd"))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(a => a.Description ?? string.Empty).ToList())
+                ?? new Dictionary<string, List<string>>();
+
+            var currentIndex = availableYears.IndexOf(currentYear);
+            hasPreviousYear = currentIndex > 0;
+            hasNextYear = currentIndex >= 0 && currentIndex < availableYears.Count - 1;
+
+            errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading activities: {ex.Message}";
+            activitiesByDate = new Dictionary<string, List<string>>();
+        }
+    }
+
+    private async Task OpenDayActivitiesModal(DateTime date)
+    {
+        if (!selectedTagId.HasValue)
+        {
+            return;
+        }
+
+        selectedDayForModal = date;
+        showDayActivitiesModal = true;
+        isDayModalLoading = true;
+        dayModalError = null;
+
+        await EnsureOptionListsLoadedAsync();
+
+        try
+        {
+            await LoadDayActivitiesAsync();
+        }
+        finally
+        {
+            isDayModalLoading = false;
+        }
+    }
+
+    private async Task LoadDayActivitiesAsync()
+    {
+        if (!selectedTagId.HasValue || selectedDayForModal is null)
+        {
+            dayActivities = new List<ActivityResponse>();
+            return;
+        }
+
+        try
+        {
+            var start = selectedDayForModal.Value.Date;
+            var end = start.AddDays(1).AddTicks(-1);
+            var result = await ActivityApi.GetActivities(1, 200, orderBy, selectedTagId, start, end, null);
+
+            dayActivities = string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase)
+                ? result.Items.OrderBy(a => a.DateStarted).ToList()
+                : result.Items.OrderByDescending(a => a.DateStarted).ToList();
+        }
+        catch (Exception ex)
+        {
+            dayModalError = $"Error loading day activities: {ex.Message}";
+            dayActivities = new List<ActivityResponse>();
+        }
+    }
+
+    private void CloseDayModal()
+    {
+        showDayActivitiesModal = false;
+        isDayModalLoading = false;
+        selectedDayForModal = null;
+        dayModalError = null;
+        dayActivities.Clear();
+
+        showActivityEditor = false;
+        activityEditorError = null;
+    }
+
+    private void StartCreateDayActivity()
+    {
+        if (!selectedTagId.HasValue || selectedDayForModal is null)
+        {
+            return;
+        }
+
+        isEditMode = false;
+        editingActivityId = null;
+        modalActivity = new ActivityRequest
+        {
+            PrimaryTagId = selectedTagId,
+            DateStarted = GetDefaultStartForDate(selectedDayForModal.Value),
+            DateFinished = null,
+            Description = null
+        };
+
+        activityEditorError = null;
+        showActivityEditor = true;
+    }
+
+    private void StartEditDayActivity(ActivityResponse activity)
+    {
+        isEditMode = true;
+        editingActivityId = activity.Id;
+
+        modalActivity = new ActivityRequest
+        {
+            PrimaryTagId = activity.PrimaryTagId,
+            Description = activity.Description,
+            DateStarted = ConvertToDisplayZone(activity.DateStarted),
+            DateFinished = activity.DateFinished.HasValue
+                ? ConvertToDisplayZone(activity.DateFinished.Value)
+                : null
+        };
+
+        activityEditorError = null;
+        showActivityEditor = true;
+    }
+
+    private async Task DeleteActivityFromDay(int activityId)
+    {
+        try
+        {
+            await ActivityApi.Delete(activityId);
+            await RefreshDayModalData();
+        }
+        catch (Exception ex)
+        {
+            dayModalError = $"Error deleting activity: {ex.Message}";
+        }
+    }
+
+    private async Task OnDayActivityCreated(ActivityRequest _)
+    {
+        showActivityEditor = false;
+        activityEditorError = null;
+        await RefreshDayModalData();
+    }
+
+    private async Task OnDayActivityUpdated()
+    {
+        showActivityEditor = false;
+        activityEditorError = null;
+        await RefreshDayModalData();
+    }
+
+    private async Task OnDayModalError(string error)
+    {
+        activityEditorError = error;
+        await Task.CompletedTask;
+    }
+
+    private void CloseActivityEditor()
+    {
+        showActivityEditor = false;
+        activityEditorError = null;
+    }
+
+    private async Task RefreshDayModalData()
+    {
+        if (selectedTagId.HasValue)
+        {
+            await LoadActivitiesForTag(selectedTagId.Value);
+        }
+
+        if (showDayActivitiesModal && selectedDayForModal.HasValue)
+        {
+            await LoadDayActivitiesAsync();
+        }
+    }
+
+    private string FormatModalDate(DateTime date)
+    {
+        return date.ToString("D", displayCulture);
+    }
+
+    private string GetSelectedTagTitle()
+    {
+        if (!selectedTagId.HasValue)
+        {
+            return "No tag selected";
+        }
+
+        var tag = tags?.FirstOrDefault(t => t.Id == selectedTagId.Value);
+        return tag?.Title ?? $"Tag #{selectedTagId.Value}";
+    }
+
+    private string FormatActivityValue(ActivityResponse activity)
+    {
+        var rawValue = activity.PrimaryTagValue ?? activity.Description ?? string.Empty;
+        var tag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
+        var valueForDisplay = rawValue;
+
+        if (tag?.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, rawValue, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                valueForDisplay = option.DisplayName ?? option.Value;
+            }
+        }
+        else if (tag?.TypeId == 1 && long.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+        {
+            valueForDisplay = intValue.ToString(displayCulture);
+        }
+        else if (tag?.TypeId == 6 && decimal.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+        {
+            valueForDisplay = decimalValue.ToString("0.#############################", displayCulture);
+        }
+
+        if (tag is not null && !string.IsNullOrWhiteSpace(tag.UnitSymbol) && !string.IsNullOrWhiteSpace(valueForDisplay))
+        {
+            valueForDisplay = $"{valueForDisplay} {tag.UnitSymbol}";
+        }
+
+        return valueForDisplay;
+    }
+
+    private string FormatActivityTime(ActivityResponse activity)
+    {
+        var culture = displayCulture;
+        var timePattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var datePattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+
+        var startLocal = ConvertToDisplayZone(activity.DateStarted);
+        var startDate = startLocal.ToString(datePattern, culture);
+        var startTime = startLocal.ToString(timePattern, culture);
+
+        if (!activity.DateFinished.HasValue)
+        {
+            return $"{startDate} • {startTime}";
+        }
+
+        var endLocal = ConvertToDisplayZone(activity.DateFinished.Value);
+        var endDate = endLocal.ToString(datePattern, culture);
+        var endTime = endLocal.ToString(timePattern, culture);
+
+        if (startLocal.Date == endLocal.Date)
+        {
+            return $"{startDate} • {startTime} – {endTime}";
+        }
+
+        return $"{startDate} {startTime} – {endDate} {endTime}";
+    }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+
+    private DateTime ConvertToDisplayZone(DateTime dateTime)
+    {
+        if (dateTime.Kind == DateTimeKind.Utc)
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(dateTime, displayTimeZone);
+        }
+
+        if (dateTime.Kind == DateTimeKind.Local)
+        {
+            return displayTimeZone.Equals(TimeZoneInfo.Local)
+                ? dateTime
+                : TimeZoneInfo.ConvertTime(dateTime, TimeZoneInfo.Local, displayTimeZone);
+        }
+
+        var unspecified = DateTime.SpecifyKind(dateTime, DateTimeKind.Local);
+        return displayTimeZone.Equals(TimeZoneInfo.Local)
+            ? unspecified
+            : TimeZoneInfo.ConvertTime(unspecified, TimeZoneInfo.Local, displayTimeZone);
+    }
+
+    private DateTime GetDefaultStartForDate(DateTime date)
+    {
+        var today = GetTodayInDisplayZone();
+        return date.Date == today ? GetCurrentDateTimeInDisplayZone() : date.Date;
+    }
+
+    private void NavigateToGridView()
+    {
+        Navigation.NavigateTo("/calendar");
+    }
+
+    private static string GetTruncatedValue(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "";
+        }
+
+        return value.Length <= MaxValueCharacters ? value : value.Substring(0, MaxValueCharacters);
+    }
+}

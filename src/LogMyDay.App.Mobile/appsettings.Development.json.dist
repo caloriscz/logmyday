@@ -1,0 +1,17 @@
+{
+  "App": {
+    "WebUrl": "your-api-url",
+    "DefaultPage": "/"
+  },
+  "Api": {
+    "BaseUrl": "your-api-url",
+    "Username": "api-usrename",
+    "Password": "api-password"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore.Components.WebView": "Debug"
+    }
+  }
+}

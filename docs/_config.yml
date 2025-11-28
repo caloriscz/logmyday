@@ -1,0 +1,22 @@
+﻿title: LogMyDay Documentation
+description: Guides for installing, running, and using LogMyDay across platforms.
+remote_theme: just-the-docs/just-the-docs
+plugins:
+  - jekyll-remote-theme
+color_scheme: light
+url: https://caloriscz.github.io
+baseurl: /logmyday
+permalink: pretty
+search_enabled: true
+
+aux_links:
+  LogMyDay Repository: https://github.com/caloriscz/logmyday
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+  - README.md
+
+project_version: 0.6.0.0

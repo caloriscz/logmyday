@@ -1,0 +1,453 @@
+@page "/reminders"
+@using System.Globalization
+@using System.Net
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Mobile.Components.Shared
+@using LogMyDay.App.Mobile.Services
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+@inject IJSRuntime JSRuntime
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
+
+    <div class="max-w-7xl mx-auto px-6 py-4">
+        <!-- Date Navigation -->
+        <div class="flex items-center justify-center gap-2 mb-6">
+            <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
+                &lt;
+            </button>
+            <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="inline-block" Placeholder="Select date" />
+            <button class="btn-secondary" @onclick="NextDay" title="Next Day">
+                &gt;
+            </button>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="text-center">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading reminders...</p>
+            </div>
+        }
+        else if (unfilledRequiredTags?.Any() == true)
+        {
+            <div class="alert-info mb-6">
+                <i class="bi bi-info-circle"></i>
+                You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach (var tag in unfilledRequiredTags)
+                {
+                    <div class="card border-l-4 border-yellow-500">
+                        <div class="flex justify-between items-start mb-2">
+                            <h5 class="font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                @tag.Title
+                            </h5>
+                            <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded">Required</span>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
+                        {
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
+                            </div>
+                        }
+
+                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            <div class="flex items-center gap-1">
+                                <i class="bi bi-clock"></i>
+                                <span>Time Granularity: @tag.TimeGranularity</span>
+                            </div>
+                            @if (tag.IsRepeatable)
+                            {
+                                <div class="flex items-center gap-1">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                    <span>Repeatable</span>
+                                </div>
+                            }
+                            @if (tag.IsRange)
+                            {
+                                <div class="flex items-center gap-1">
+                                    <i class="bi bi-arrows-expand"></i>
+                                    <span>Range Values</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) ? "grid-cols-2" : "grid-cols-1")">
+                            <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
+                                    @onclick="@(() => PrepareModalForTag(tag.Id))">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>Add Activity</span>
+                            </button>
+                            @if (HasDefaultValue(tag))
+                            {
+                                <button class="@GetQuickAddButtonClasses(tag)"
+                                        @onclick="@(() => QuickAddDefaultAsync(tag))"
+                                        disabled="@IsQuickAddDisabled(tag)">
+                                    <i class="bi bi-check-circle"></i>
+                                    <span>Use Default</span>
+                                    @if (IsQuickAddInProgress(tag.Id))
+                                    {
+                                        <div class="inline-block animate-spin text-lg">⟳</div>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert-success">
+                <i class="bi bi-check-circle"></i>
+                Great! All required tags have been filled for @FormatDate(selectedDate).
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert-danger mt-4">
+                <i class="bi bi-exclamation-triangle"></i>
+                @errorMessage
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Add Activity Modal -->
+@if (showAddActivityModal && allTags != null && newActivity != null)
+{
+    <AddActivityModal Activity="newActivity"
+                      AvailableTags="allTags"
+                      OptionLists="optionLists"
+                      OptionListLookup="optionListLookup"
+                      DisplayCulture="displayCulture"
+                      DisplayTimeZone="displayTimeZone"
+                      ErrorMessage="@errorMessage"
+                      PreselectedTagId="preselectedTagId"
+                      PreselectedDate="selectedDate"
+                      OnActivityCreated="OnActivityCreated"
+                      OnCanceled="CloseAddActivityModal"
+                      OnError="OnError"
+                      ModalId="addActivityModal" />
+}
+
+@code {
+    private List<TagResponse>? unfilledRequiredTags;
+    private IList<TagResponse>? allTags;
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+    private DateTime selectedDate = DateTime.Today;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private ActivityRequest newActivity = new();
+    private int? preselectedTagId;
+    private bool showAddActivityModal = false;
+    private bool shouldShowModalAfterRender = false;
+    private readonly HashSet<int> quickAddInProgress = new();
+
+    // User preferences and localization
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Reminders");
+        userPreferences = await UserPreferencesService.GetAsync();
+        displayCulture = userPreferences.Culture;
+        displayTimeZone = userPreferences.TimeZone;
+
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
+
+        newActivity = new ActivityRequest
+        {
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date
+        };
+
+        await LoadRequiredTags();
+    }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+
+    private async Task LoadRequiredTags()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            StateHasChanged();
+
+            // Load both unfilled required tags and all tags for the modal
+            var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
+            var allTagsTask = ActivityApi.GetTags();
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+
+            await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
+
+            unfilledRequiredTags = await unfilledTask;
+            allTags = await allTagsTask;
+            optionLists = await optionListsTask;
+
+            if (optionLists is not null)
+            {
+                optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+
+            // Update new activity with the selected date
+            var today = GetTodayInDisplayZone();
+            newActivity.DateStarted = selectedDate.Date == today ? GetCurrentDateTimeInDisplayZone() : selectedDate.Date;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // Authentication expired (e.g., password changed)
+            // DynamicAuthHandler will trigger automatic logout and redirect
+            errorMessage = "Your session has expired. Redirecting to login...";
+            unfilledRequiredTags = new List<TagResponse>();
+            allTags = new List<TagResponse>();
+            optionLists = new List<TagOptionListResponse>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading reminders: {ex.Message}";
+            unfilledRequiredTags = new List<TagResponse>();
+            allTags = new List<TagResponse>();
+            optionLists = new List<TagOptionListResponse>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshReminders()
+    {
+        await LoadRequiredTags();
+    }
+
+    private void NavigateToAddActivity(int tagId)
+    {
+        Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
+    }
+
+    private void PrepareModalForTag(int tagId)
+    {
+        preselectedTagId = tagId;
+        var today = GetTodayInDisplayZone();
+        newActivity = new ActivityRequest
+        {
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date,
+            PrimaryTagId = tagId
+        };
+        showAddActivityModal = true;
+        shouldShowModalAfterRender = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldShowModalAfterRender && showAddActivityModal)
+        {
+            shouldShowModalAfterRender = false;
+            try
+            {
+                await Task.Delay(50); // Small delay to ensure DOM is ready
+                await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - modal might still work via Blazor rendering
+                Console.WriteLine($"Error showing modal via JS: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task CloseAddActivityModal()
+    {
+        // Hide modal via JavaScript first
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "addActivityModal");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error hiding modal via JS: {ex.Message}");
+        }
+
+        showAddActivityModal = false;
+        preselectedTagId = null;
+        errorMessage = null;
+    }
+
+    private async Task OnActivityCreated(ActivityRequest activity)
+    {
+        // Refresh the reminders list
+        await LoadRequiredTags();
+
+        showAddActivityModal = false;
+
+        // Reset the form but keep the date
+        var today = GetTodayInDisplayZone();
+        newActivity = new ActivityRequest
+        {
+            DateStarted = selectedDate.Date == today
+                ? GetCurrentDateTimeInDisplayZone()
+                : selectedDate.Date
+        };
+        preselectedTagId = null;
+        errorMessage = null;
+    }
+
+    private async Task OnDatePickerValueChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            selectedDate = newDate.Value;
+            await LoadRequiredTags();
+        }
+    }
+
+    private async Task OnError(string error)
+    {
+        errorMessage = error;
+        await Task.CompletedTask;
+    }
+
+    private async Task PreviousDay()
+    {
+        selectedDate = selectedDate.AddDays(-1);
+        await LoadRequiredTags();
+    }
+
+    private async Task NextDay()
+    {
+        selectedDate = selectedDate.AddDays(1);
+        await LoadRequiredTags();
+    }
+
+    private string FormatDate(DateTime date)
+    {
+        var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
+        return date.ToString(pattern, displayCulture);
+    }
+
+    private bool HasDefaultValue(TagResponse tag)
+        => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
+
+    private bool IsQuickAddDisabled(TagResponse tag)
+        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
+
+    private bool IsQuickAddInProgress(int tagId)
+        => quickAddInProgress.Contains(tagId);
+
+    private string GetQuickAddButtonClasses(TagResponse tag)
+    {
+        var baseClasses = "px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-1";
+
+        if (IsQuickAddDisabled(tag))
+        {
+            return $"{baseClasses} bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50";
+        }
+
+        return $"{baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800";
+    }
+
+    private string? GetDefaultValueLabel(TagResponse tag)
+    {
+        var value = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (tag.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                return option.DisplayName ?? option.Value;
+            }
+        }
+
+        return value;
+    }
+
+    private string? ResolveDefaultValue(TagResponse tag)
+    {
+        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
+        {
+            return tag.DefaultValue;
+        }
+
+        return null;
+    }
+
+    private async Task QuickAddDefaultAsync(TagResponse tag)
+    {
+        var defaultValue = ResolveDefaultValue(tag);
+        if (string.IsNullOrWhiteSpace(defaultValue))
+        {
+            errorMessage = "No default value is configured for this tag.";
+            return;
+        }
+
+        if (!quickAddInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = defaultValue,
+                DateStarted = startDate
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            await LoadRequiredTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "The activity could not be created with the default value.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding default activity: {ex.Message}";
+        }
+        finally
+        {
+            quickAddInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+}

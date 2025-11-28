@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+    <rect width="456" height="456" fill="#0B1220"/>
+    
+    <!-- Simple circle placeholder -->
+    <circle cx="228" cy="228" r="80" fill="#7EE7E7" opacity="0.9"/>
+    <circle cx="228" cy="228" r="60" fill="#1F4F7B"/>
+    
+    <text x="228" y="400" text-anchor="middle"
+          fill="#D1E1EC"
+          font-family="sans-serif"
+          font-size="22">Loading…</text>
+</svg>

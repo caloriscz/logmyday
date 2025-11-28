@@ -1,0 +1,54 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=False"
+  },
+  "Security": {
+    "RateLimit": {
+      "MaxAttemptsPerWindow": 3,
+      "WindowMinutes": 10,
+      "LockoutMinutes": 5,
+      "TrackByIP": true,
+      "TrackByUsername": true
+    }
+  },
+  "Api": {
+    "BaseAddress": "https://localhost:7064"
+  },
+  "Email": {
+    "SmtpServer": "smtp.your-provider.com",
+    "SmtpPort": 587,
+    "UseSsl": true,
+    "UserName": "smtp-user",
+    "Password": "smtp-password",
+    "SenderEmail": "no-reply@your-domain.com",
+    "SenderName": "LogMyDay",
+    "PasswordResetUrl": "https://localhost:7064/reset-password"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "System": "Warning"
+      }
+    },
+    "Enrich": [ "FromLogContext" ],
+    "WriteTo": [
+      { "Name": "Console" },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "C:/Logs/logmyday.dev.log",
+          "rollingInterval": "Day",
+          "shared": true
+        }
+      }
+    ]
+  }
+}

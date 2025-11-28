@@ -1,0 +1,522 @@
+@page "/quick"
+@using LogMyDay.App.Mobile.Models
+@using LogMyDay.App.Mobile.Services
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@inject AuthenticationService AuthService
+@inject NavigationManager Navigation
+@inject QuickActivityService QuickActivityService
+@inject IActivityApi ActivityApi
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Quick Activities - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="Quick Activities" ShowReload="true" OnReload="LoadQuickButtons" />
+    
+    <div class="max-w-7xl mx-auto px-6 py-4">
+
+        @if (isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+            </div>
+        }
+        else if (quickButtons.Count == 0)
+        {
+            <!-- Empty State -->
+            <div class="text-center py-12">
+                <i class="bi bi-lightning-charge text-6xl text-gray-400 block mb-3"></i>
+                <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400 mb-3">No Quick Activities Yet</h4>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Create quick activity buttons for one-tap logging!</p>
+                <button type="button" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors" data-modal-show="addQuickActivityModal">
+                    <i class="bi bi-plus-lg"></i> Create Your First Quick Activity
+                </button>
+            </div>
+        }
+        else
+        {
+            <!-- Quick Activity Buttons -->
+            <div class="space-y-3">
+                @foreach (var button in quickButtons)
+                {
+                    <div class="card @(button.IsEnabled ? "hover:shadow-lg cursor-pointer" : "opacity-60 cursor-not-allowed")"
+                         @onclick="@(() => UseQuickActivity(button))">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-grow">
+                                <h5 class="font-semibold mb-1 @(button.IsEnabled ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-600")">
+                                    @button.Name
+                                </h5>
+                                <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <span>
+                                        <i class="bi bi-tag"></i> @button.TagName
+                                    </span>
+                                    @if (!string.IsNullOrEmpty(button.Value))
+                                    {
+                                        <span>
+                                            <i class="bi bi-arrow-right"></i> @button.Value
+                                        </span>
+                                    }
+                                </div>
+                                @if (!button.IsEnabled)
+                                {
+                                    <small class="text-yellow-600 dark:text-yellow-400">
+                                        <i class="bi bi-clock"></i> Cooling down...
+                                    </small>
+                                }
+                            </div>
+                            <div class="flex items-center gap-2">
+                                @if (button.IsEnabled)
+                                {
+                                    <i class="bi bi-lightning-charge text-primary-600 dark:text-primary-400 text-2xl"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-hourglass-split text-gray-400 text-2xl"></i>
+                                }
+                                <button class="btn-danger text-sm"
+                                        @onclick:stopPropagation="true"
+                                        @onclick="@(() => DeleteQuickActivity(button))"
+                                        title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="@(isError ? "alert-danger" : "alert-success") mt-4">
+                @statusMessage
+                <button type="button" class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" @onclick="ClearStatus">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<button type="button" class="fab" data-modal-show="addQuickActivityModal" title="Add Quick Activity">
+    <i class="bi bi-plus-lg"></i>
+</button>
+
+<!-- Add Quick Activity Modal - Full Screen Overlay -->
+<div id="addQuickActivityModal" data-modal class="hidden fixed inset-0 z-[60] bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="addQuickActivityModalLabel">
+    <div data-modal-content class="w-full h-full flex flex-col">
+        <!-- Modal Header - Fixed at top -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+            <h5 class="text-xl font-semibold text-gray-900 dark:text-gray-100" id="addQuickActivityModalLabel">Add Quick Activity</h5>
+            <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-3 -mr-2" data-modal-hide="addQuickActivityModal" aria-label="Close">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        
+        <!-- Modal Body - Scrollable content -->
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <EditForm id="addQuickActivityForm" Model="newQuickActivity" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-red-600 dark:text-red-400 mb-4" />
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Tag:</label>
+                        <InputSelect @bind-Value="newQuickActivity.TagId" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" @bind-Value:after="OnTagSelectionChanged">
+                            <option value="0">-- Select Tag --</option>
+                            @if (availableTags != null)
+                            {
+                                foreach (var tag in availableTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Button Name:</label>
+                        <InputText @bind-Value="newQuickActivity.Name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="Enter button name" />
+                    </div>
+
+                    @if (selectedTag != null && selectedTag.TypeId.HasValue)
+                    {
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Predefined Value:</label>
+                            @switch (selectedTag.TypeId.Value)
+                            {
+                                case 1: // Integer
+                                    <input type="number" @bind="newQuickActivity.Value" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        placeholder="Enter numeric value" />
+                                    break;
+                                case 2: // String
+                                    <InputText @bind-Value="newQuickActivity.Value" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        placeholder="Enter text value" />
+                                    break;
+                                case 3: // Boolean
+                                    <InputSelect @bind-Value="newQuickActivity.Value" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                                        <option value="">-- Select Value --</option>
+                                        <option value="true">True</option>
+                                        <option value="false">False</option>
+                                    </InputSelect>
+                                    break;
+                                case 4: // Date
+                                    <InputText @bind-Value="newQuickActivity.Value" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        placeholder="YYYY-MM-DD" />
+                                    break;
+                                default:
+                                    <InputText @bind-Value="newQuickActivity.Value" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        placeholder="Enter value" />
+                                    break;
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert-danger" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+                </EditForm>
+            </div>
+            
+            <!-- Modal Footer - Fixed at bottom -->
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" class="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-base font-medium" data-modal-hide="addQuickActivityModal">Cancel</button>
+                    <button type="submit" form="addQuickActivityForm" class="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium shadow-sm">
+                        Add Quick Activity
+                    </button>
+                </div>
+            </div>
+        </div>
+</div>
+
+<!-- Custom CSS -->
+<style>
+    .fab {
+        position: fixed;
+        bottom: 90px; /* Above mobile navigation (80px + 10px padding) */
+        right: 20px;
+        width: 56px;
+        height: 56px;
+        background-color: var(--bs-primary);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1030;
+        transition: all 0.3s ease;
+    }
+
+    .fab:hover {
+        background-color: var(--bs-primary);
+        transform: scale(1.1);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .fab:active {
+        transform: scale(0.95);
+    }
+
+    .quick-activity-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        min-height: 80px;
+    }
+
+    .card-enabled {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-enabled:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-enabled:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+    }
+
+    .card-disabled {
+        opacity: 0.6;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .quick-activity-card .card-body {
+        padding: 1rem 1.25rem;
+    }
+
+    /* Tool card styles */
+    .tool-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        min-height: 80px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .tool-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        border-color: var(--bs-primary);
+    }
+
+    .tool-card:active {
+        transform: translateY(0);
+        transition: all 0.1s ease;
+    }
+
+    .tool-icon-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background-color: rgba(var(--bs-primary-rgb), 0.1);
+    }
+</style>
+
+@code {
+    private List<QuickActivityButton> quickButtons = new();
+    private List<TagResponse> availableTags = new();
+    private QuickActivityButton newQuickActivity = new();
+    private TagResponse? selectedTag;
+    private bool isLoading = true;
+    private string statusMessage = "";
+    private bool isError = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Redirect to login if not authenticated
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        await LoadQuickButtons();
+        await LoadTags();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadQuickButtons()
+    {
+        try
+        {
+            isLoading = true;
+            quickButtons = await QuickActivityService.GetQuickButtonsAsync();
+            
+            // Subscribe to changes
+            QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
+            QuickActivityService.QuickButtonsChanged += OnQuickButtonsChanged;
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to load quick activities: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            var tagsList = await ActivityApi.GetTags();
+            availableTags = tagsList.ToList();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // Authentication expired - DynamicAuthHandler will trigger automatic logout
+            ShowError("Your session has expired. Redirecting to login...");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to load tags: {ex.Message}");
+        }
+    }
+
+    private void OnQuickButtonsChanged(object? sender, List<QuickActivityButton> updatedButtons)
+    {
+        quickButtons = updatedButtons;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTagSelectionChanged()
+    {
+        if (newQuickActivity.TagId > 0)
+        {
+            selectedTag = availableTags?.FirstOrDefault(t => t.Id == newQuickActivity.TagId);
+            if (selectedTag != null)
+            {
+                // Pre-fill button name with tag title if empty
+                if (string.IsNullOrEmpty(newQuickActivity.Name))
+                {
+                    newQuickActivity.Name = selectedTag.Title;
+                }
+            }
+        }
+        else
+        {
+            selectedTag = null;
+            newQuickActivity.Value = null;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            if (newQuickActivity.TagId <= 0)
+            {
+                errorMessage = "Please select a tag.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(newQuickActivity.Name))
+            {
+                errorMessage = "Please enter a button name.";
+                return;
+            }
+
+            var selectedTagName = availableTags.FirstOrDefault(t => t.Id == newQuickActivity.TagId)?.Title ?? "";
+            
+            var quickButton = new QuickActivityButton
+            {
+                Name = newQuickActivity.Name,
+                TagId = newQuickActivity.TagId,
+                TagName = selectedTagName,
+                Value = newQuickActivity.Value
+            };
+
+            await QuickActivityService.AddQuickButtonAsync(quickButton);
+            
+            // Reset form
+            newQuickActivity = new();
+            selectedTag = null;
+            errorMessage = null;
+            
+            ShowSuccess($"Quick activity '{quickButton.Name}' created!");
+
+            // Close the modal
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("hideModal", "addQuickActivityModal");
+            }
+            catch (InvalidOperationException)
+            {
+                // Ignore JavaScript interop errors during static rendering
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to create quick activity: {ex.Message}";
+        }
+    }
+
+    private async Task UseQuickActivity(QuickActivityButton button)
+    {
+        if (!button.IsEnabled)
+            return;
+
+        try
+        {
+            // Create activity with predefined description value if available
+            var description = !string.IsNullOrEmpty(button.Value) 
+                ? button.Value 
+                : $"Quick activity: {button.Name}";
+
+            var activity = new ActivityRequest
+            {
+                Description = description,
+                DateStarted = DateTime.Now,
+                PrimaryTagId = button.TagId
+            };
+
+            await ActivityApi.CreateCalendarItem(activity);
+            
+            // Update button state (trigger cooldown)
+            await QuickActivityService.UseButtonAsync(button.Id);
+            
+            ShowSuccess($"Activity '{button.Name}' logged successfully!");
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to log activity: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteQuickActivity(QuickActivityButton button)
+    {
+        var confirmed = await ShowConfirm("Delete Quick Activity", 
+            $"Are you sure you want to delete '{button.Name}'?");
+        
+        if (confirmed)
+        {
+            try
+            {
+                await QuickActivityService.RemoveQuickButtonAsync(button.Id);
+                ShowSuccess($"Quick activity '{button.Name}' deleted.");
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Failed to delete quick activity: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task<bool> ShowConfirm(string title, string message)
+    {
+        return await JSRuntime.InvokeAsync<bool>("confirm", $"{title}\n\n{message}");
+    }
+
+    private void ShowSuccess(string message)
+    {
+        statusMessage = message;
+        isError = false;
+        StateHasChanged();
+        _ = Task.Delay(3000).ContinueWith(_ => ClearStatus());
+    }
+
+    private void ShowError(string message)
+    {
+        statusMessage = message;
+        isError = true;
+        StateHasChanged();
+    }
+
+    private void ClearStatus()
+    {
+        statusMessage = "";
+        isError = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
+    }
+}
+
+
+

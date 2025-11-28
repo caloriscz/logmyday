@@ -1,0 +1,103 @@
+@using System.Globalization
+@using Microsoft.JSInterop
+@using LogMyDay.Shared.Preferences
+@using LogMyDay.App.Mobile.Services
+@inject IJSRuntime JSRuntime
+@inject IUserPreferencesService UserPreferencesService
+@implements IAsyncDisposable
+
+<div class="culture-aware-datepicker-wrapper">
+    <input type="@(EnableTime ? "datetime-local" : "date")" 
+           id="@elementId" 
+           class="form-control @CssClass" 
+           placeholder="@Placeholder"
+           value="@HtmlInputValue"
+           @onchange="OnInputChanged"
+           disabled="@Disabled" />
+</div>
+
+@code {
+    private string elementId = $"datepicker_{Guid.NewGuid():N}";
+    private UserPreferencesSnapshot? userPreferences;
+
+    [Parameter]
+    public DateTime? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool EnableTime { get; set; } = false;
+
+    [Parameter]
+    public string CssClass { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Select date";
+
+    [Parameter]
+    public bool AllowManualInput { get; set; } = false;
+
+    [Parameter]
+    public bool Disabled { get; set; } = false;
+
+    // HTML5 date/datetime-local input expects format: yyyy-MM-dd or yyyy-MM-ddTHH:mm
+    private string HtmlInputValue
+    {
+        get
+        {
+            if (Value == null)
+                return string.Empty;
+
+            return EnableTime 
+                ? Value.Value.ToString("yyyy-MM-ddTHH:mm")
+                : Value.Value.ToString("yyyy-MM-dd");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            userPreferences = await UserPreferencesService.GetAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Warning: Could not load user preferences for CultureAwareDatePicker: {ex.Message}");
+        }
+    }
+
+    private async Task OnInputChanged(ChangeEventArgs e)
+    {
+        try
+        {
+            var inputValue = e.Value?.ToString();
+            
+            if (string.IsNullOrWhiteSpace(inputValue))
+            {
+                await ValueChanged.InvokeAsync(null);
+                return;
+            }
+
+            // Parse HTML5 date/datetime-local format (always in ISO format)
+            if (DateTime.TryParse(inputValue, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDate))
+            {
+                await ValueChanged.InvokeAsync(parsedDate);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to parse date: {inputValue}");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error parsing date in CultureAwareDatePicker: {ex.Message}");
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        // No cleanup needed for native HTML5 inputs
+        return ValueTask.CompletedTask;
+    }
+}

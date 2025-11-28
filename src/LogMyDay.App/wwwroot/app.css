@@ -1,0 +1,862 @@
+/* Import Bootstrap Icons - Remove this if not working */
+/* @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"); */
+
+/* CSS Variables for Light/Dark Theme */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #212529;
+    --navbar-bg: #f8f9fa;
+    --navbar-text: #212529;
+    --card-bg: #ffffff;
+    --border-color: #dee2e6;
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+[data-bs-theme="dark"] {
+    --bg-color: #212529;
+    --text-color: #ffffff;
+    --navbar-bg: #343a40;
+    --navbar-text: #ffffff;
+    --card-bg: #2d3339;
+    --border-color: #495057;
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* Force dark theme on body and common elements */
+[data-bs-theme="dark"] body {
+    background-color: var(--bg-color) !important;
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .page-card,
+[data-bs-theme="dark"] .card {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Comprehensive dark theme coverage */
+[data-bs-theme="dark"] .container,
+[data-bs-theme="dark"] .container-fluid,
+[data-bs-theme="dark"] main,
+[data-bs-theme="dark"] .row,
+[data-bs-theme="dark"] .col {
+    color: var(--text-color);
+}
+
+[data-bs-theme="dark"] h1, 
+[data-bs-theme="dark"] h2, 
+[data-bs-theme="dark"] h3, 
+[data-bs-theme="dark"] h4, 
+[data-bs-theme="dark"] h5, 
+[data-bs-theme="dark"] h6,
+[data-bs-theme="dark"] p,
+[data-bs-theme="dark"] span,
+[data-bs-theme="dark"] label {
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .table,
+[data-bs-theme="dark"] .table th,
+[data-bs-theme="dark"] .table td {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select,
+[data-bs-theme="dark"] input,
+[data-bs-theme="dark"] select,
+[data-bs-theme="dark"] textarea {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+    color: rgb(226 232 240) !important; /* slate-200 - softer than slate-100 */
+    border-color: rgb(51 65 85) !important; /* slate-700 */
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus,
+[data-bs-theme="dark"] input:focus,
+[data-bs-theme="dark"] select:focus,
+[data-bs-theme="dark"] textarea:focus {
+    background-color: rgb(30 41 59) !important; /* slate-800 */
+    color: rgb(226 232 240) !important; /* slate-200 */
+    border-color: rgb(14 165 233) !important; /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .form-control:focus-visible,
+[data-bs-theme="dark"] .form-select:focus-visible,
+[data-bs-theme="dark"] input:focus-visible,
+[data-bs-theme="dark"] select:focus-visible,
+[data-bs-theme="dark"] textarea:focus-visible {
+    outline: none !important;
+    border-color: rgb(14 165 233) !important; /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25) !important;
+}
+
+[data-bs-theme="dark"] .form-control::placeholder,
+[data-bs-theme="dark"] input::placeholder,
+[data-bs-theme="dark"] textarea::placeholder {
+    color: rgb(148 163 184) !important; /* slate-400 */
+}
+
+/* Dark theme readonly state */
+[data-bs-theme="dark"] .form-control[readonly],
+[data-bs-theme="dark"] .form-select[readonly],
+[data-bs-theme="dark"] input[readonly],
+[data-bs-theme="dark"] select[readonly],
+[data-bs-theme="dark"] textarea[readonly] {
+    background-color: rgb(15 23 42) !important; /* slate-900 - darker for readonly */
+    color: rgb(148 163 184) !important; /* slate-400 - muted */
+    border-color: rgb(30 41 59) !important; /* slate-800 */
+    cursor: not-allowed !important;
+}
+
+/* Dark theme disabled state */
+[data-bs-theme="dark"] .form-control:disabled,
+[data-bs-theme="dark"] .form-select:disabled,
+[data-bs-theme="dark"] input:disabled,
+[data-bs-theme="dark"] select:disabled,
+[data-bs-theme="dark"] textarea:disabled {
+    background-color: rgb(15 23 42) !important; /* slate-900 */
+    color: rgb(100 116 139) !important; /* slate-500 - very muted */
+    border-color: rgb(30 41 59) !important; /* slate-800 */
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+[data-bs-theme="dark"] .form-check-input {
+    background-color: #495057 !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .form-check-input:checked {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary:hover {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+[data-bs-theme="dark"] .navbar {
+    background: var(--navbar-bg) !important;
+}
+
+[data-bs-theme="dark"] .navbar-brand,
+[data-bs-theme="dark"] .nav-link {
+    color: var(--navbar-text) !important;
+}
+
+/* Override for dark theme brand */
+[data-bs-theme="dark"] .navbar-brand,
+[data-bs-theme="dark"] .navbar-brand span {
+    color: #f8f9fa !important;
+}
+
+/* Override Bootstrap's own dark theme styles */
+[data-bs-theme="dark"] .bg-light {
+    background-color: var(--card-bg) !important;
+}
+
+[data-bs-theme="dark"] .text-dark {
+    color: var(--text-color) !important;
+}
+
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+[data-bs-theme="dark"] .border {
+    border-color: var(--border-color) !important;
+}
+
+html, body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Professional Navigation */
+.top-navigation {
+    background: linear-gradient(135deg, var(--navbar-bg) 0%, rgba(13, 110, 253, 0.1) 100%) !important;
+    box-shadow: 0 2px 4px var(--shadow);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--navbar-text) !important;
+}
+
+/* Ensure brand is visible in light theme */
+:root .navbar-brand,
+[data-bs-theme="light"] .navbar-brand {
+    color: #212529 !important;
+}
+
+/* More specific rule to override Bootstrap */
+.navbar .navbar-brand,
+.navbar-expand-lg .navbar-brand,
+html .navbar-brand,
+body .navbar-brand {
+    color: #212529 !important;
+}
+
+/* Force dark text in light theme */
+html:not([data-bs-theme="dark"]) .navbar-brand,
+[data-bs-theme="light"] .navbar-brand,
+.navbar-light .navbar-brand {
+    color: #212529 !important;
+}
+
+.brand-icon {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: bold;
+}
+
+.nav-link {
+    color: var(--navbar-text) !important;
+    font-weight: 500;
+    padding: 0.5rem 1rem !important;
+    margin: 0 0.25rem;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+    background-color: var(--primary-color);
+    color: white !important;
+    transform: translateY(-1px);
+}
+
+.nav-link i {
+    margin-right: 0.5rem;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background-color: var(--primary-color);
+    color: white;
+    transform: rotate(180deg);
+}
+
+/* Professional Cards */
+.page-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.page-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px var(--shadow);
+}
+
+a, .btn-link {
+    color: var(--primary-color);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--info-color));
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid #e50000;
+}
+
+.validation-message {
+    color: #e50000;
+}
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA9NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+.darker-border-checkbox.form-check-input {
+    border-color: #929292;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}
+
+/* Calendar Styles */
+.calendar-grid {
+    max-width: 300px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background: white;
+}
+
+.calendar-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.calendar-day-header {
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #6c757d;
+    border-right: 1px solid #dee2e6;
+}
+
+.calendar-day-header:last-child {
+    border-right: none;
+}
+
+.calendar-body {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-day {
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    cursor: pointer;
+    border-right: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    transition: background-color 0.15s ease-in-out;
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.calendar-day:hover {
+    background-color: #e9ecef;
+}
+
+.calendar-day:last-child {
+    border-right: none;
+}
+
+.calendar-day.other-month {
+    color: #adb5bd;
+    background-color: #f8f9fa;
+}
+
+.calendar-day.selected {
+    background-color: #0d6efd;
+    color: white;
+    font-weight: 600;
+}
+
+.calendar-day.today {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: 600;
+}
+
+.calendar-day.selected.today {
+    background-color: #0d6efd;
+    color: white;
+}
+
+/* Body and layout improvements for top navigation */
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Container improvements */
+.container, .container-fluid {
+    padding-top: 0;
+    margin-top: 0;
+}
+
+/* Ensure proper spacing for the new layout */
+main {
+    min-height: calc(100vh - 80px); /* Adjust based on navbar height */
+}
+
+/* Page-specific card styles */
+.page-card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 767.98px) {
+    .page-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Enhanced Professional Styling - Consistent with Tailwind */
+.form-control, .form-select {
+    border-radius: 0.375rem; /* rounded-md */
+    border: 1px solid rgb(209 213 219); /* gray-300 */
+    background-color: rgb(255 255 255); /* white */
+    color: rgb(17 24 39); /* gray-900 */
+    padding: 0.5rem 0.75rem; /* px-3 py-2 */
+    font-size: 0.875rem; /* text-sm */
+    line-height: 1.5rem; /* leading-6 */
+    width: 100%; /* w-full */
+    transition: all 0.15s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: rgb(14 165 233); /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+    background-color: rgb(255 255 255); /* white */
+}
+
+.form-control:focus-visible, .form-select:focus-visible {
+    outline: none;
+    border-color: rgb(14 165 233); /* sky-500 */
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+}
+
+.form-control::placeholder {
+    color: rgb(156 163 175); /* gray-400 */
+}
+
+/* Readonly state */
+.form-control[readonly], .form-select[readonly] {
+    background-color: rgb(243 244 246); /* gray-100 */
+    color: rgb(107 114 128); /* gray-500 */
+    cursor: not-allowed;
+    border-color: rgb(229 231 235); /* gray-200 */
+}
+
+/* Disabled state */
+.form-control:disabled, .form-select:disabled {
+    background-color: rgb(243 244 246); /* gray-100 */
+    color: rgb(156 163 175); /* gray-400 */
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Smooth theme transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Enhanced button styling */
+.btn-outline-secondary {
+    border-color: var(--border-color);
+    color: var(--text-color);
+    background: var(--card-bg);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--shadow);
+}
+
+/* CRITICAL MOBILE PADDING FIXES - HIGHEST PRIORITY */
+/* Force override all Bootstrap padding on mobile devices */
+@media screen and (max-width: 768px) {
+    /* Target all possible padding classes and elements */
+    .px-4, 
+    .content.px-4, 
+    .container-fluid.px-4,
+    .container.px-4,
+    article.content,
+    main article.content,
+    .page .content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Very specific override for the main layout */
+    .page main article.content.px-4 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    
+    /* Additional containers that might have padding */
+    .container-fluid {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* Even smaller screens */
+@media screen and (max-width: 576px) {
+    .px-4, 
+    .content.px-4, 
+    .container-fluid.px-4,
+    .container.px-4,
+    article.content,
+    main article.content,
+    .page .content,
+    .page main article.content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .container-fluid {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+}
+
+/* Mobile-responsive improvements */
+@media (max-width: 767.98px) {
+    .page-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Reduce excessive padding on mobile */
+    .content.px-4,
+    article.content.px-4,
+    .px-4,
+    .container-fluid.px-4,
+    main article.content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* Navigation buttons on mobile */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile card styling */
+.card {
+    box-shadow: 0 2px 4px var(--shadow);
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+}
+
+.card-title {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+/* Navigation button styling */
+.btn-outline-secondary.btn-sm {
+    border-width: 1px;
+    font-weight: 500;
+}
+
+.btn-outline-secondary.btn-sm:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-outline-secondary.btn-sm:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Mobile navigation buttons - minimum 44px touch targets */
+.mobile-nav-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+    margin: 2px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.mobile-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #f8f9fa;
+}
+
+/* Additional spacing for mobile navigation container */
+@media (max-width: 767.98px) {
+    .mobile-nav-container {
+        gap: 8px !important;
+    }
+    
+    .mobile-nav-btn {
+        min-width: 48px;
+        min-height: 48px;
+        margin: 4px;
+    }
+}
+
+/* Very small screens - further reduce padding */
+@media (max-width: 575.98px) {
+    .content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .page-card {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .container, .container-fluid {
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+    }
+    
+    /* Override Bootstrap px-4 class for mobile */
+    article.content.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    .px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    /* Reduce container padding even more on very small screens */
+    .container-fluid.px-4 {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+    
+    /* Force override for main layout */
+    main article.content {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Table styling */
+.table {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.table th {
+    background-color: var(--navbar-bg);
+    color: var(--navbar-text);
+    border-color: var(--border-color);
+}
+
+.table td {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+/* BOOTSTRAP 5.3 CONTAINER PADDING OVERRIDE FOR MOBILE */
+/* Override Bootstrap's default container horizontal padding on small breakpoints */
+@media (max-width: 576px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+    .container,
+    .container-fluid,
+    .container-sm,
+    .container-md,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}
+
+/* Floating Action Button (FAB) */
+.fab {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 8px var(--shadow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    z-index: 1050; /* Above modals */
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.fab:hover {
+    background-color: #0b5ed7; /* Darker primary */
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px var(--shadow);
+}
+
+.fab:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px var(--shadow);
+}
+
+.fab i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.fab:hover i {
+    transform: scale(1.1);
+}
+
+/* Better touch feedback for mobile */
+@media (hover: none) {
+    .fab:hover {
+        transform: none;
+        background-color: var(--primary-color);
+    }
+    
+    .fab:active {
+        transform: scale(0.95);
+        background-color: #0b5ed7;
+    }
+}
+
+/* Mobile Modal Enhancements */
+@media (max-width: 992px) {
+    .modal-fullscreen-lg-down .modal-body {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 120px); /* Account for header and footer */
+    }
+    
+    .modal-fullscreen-lg-down .modal-header {
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--navbar-bg);
+    }
+    
+    .modal-fullscreen-lg-down .modal-footer {
+        border-top: 1px solid var(--border-color);
+        background-color: var(--card-bg);
+    }
+    
+    /* Adjust FAB position for mobile navigation */
+    .fab {
+        bottom: 1rem;
+        right: 1rem;
+        width: 56px;
+        height: 56px;
+    }
+}

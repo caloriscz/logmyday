@@ -1,0 +1,797 @@
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Logging
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<AddActivityModal> Logger
+@inject IUserPreferencesService UserPreferencesService
+
+<!-- Add New Activity Modal -->
+<div class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4" @onclick="HandleBackdropClick">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(IsEditMode ? "Edit Activity" : "Add New Activity")</h3>
+            <button type="button" @onclick="HandleCloseClick" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            <EditForm Model="Activity" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-sm text-red-600 dark:text-red-400" />
+
+                <div class="space-y-5">
+                    <div class="space-y-2">
+                        <label class="@LabelCss" for="@($"{modalId}PrimaryTag")">Primary Tag</label>
+                        <InputSelect id="@($"{modalId}PrimaryTag")" @bind-Value="Activity.PrimaryTagId" class="@InputCss" @bind-Value:after="() => OnTagSelectionChanged()">
+                            <option value="">-- Select Tag --</option>
+                            @if (AvailableTags != null)
+                            {
+                                @foreach (var tag in AvailableTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="space-y-2">
+                        @if (selectedOptionList is TagOptionListResponse optionList)
+                        {
+                            <label class="@LabelCss" for="@($"{modalId}OptionSelect")">Value</label>
+                            <InputSelect id="@($"{modalId}OptionSelect")" class="@InputCss" @bind-Value="selectedOptionValue" @bind-Value:after="OnOptionValueChanged">
+                                <option value="">-- Select an option --</option>
+                                @foreach (var option in (optionList.Options ?? Enumerable.Empty<TagOptionResponse>()))
+                                {
+                                    <option value="@option.Value">@(!string.IsNullOrWhiteSpace(option.DisplayName) ? option.DisplayName : option.Value)</option>
+                                }
+                            </InputSelect>
+                        }
+                        else if (selectedTag?.TypeId.HasValue == true)
+                        {
+                            @switch (selectedTag.TypeId.Value)
+                            {
+                                case 1: // Integer
+                                    <label class="@LabelCss">Value @if (!string.IsNullOrWhiteSpace(selectedTag?.UnitSymbol)) { <span class="@HelperTextCss">(@selectedTag.UnitSymbol)</span> }</label>
+                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="@InputCss" placeholder="Enter numeric value" step="1" />
+                                    break;
+                                case 2: // String
+                                    <label class="@LabelCss">Value</label>
+                                    <input type="text" @bind="Activity.Description" class="@InputCss" placeholder="Enter text value" />
+                                    break;
+                                case 3: // Boolean
+                                    <label class="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-200" for="@($"{modalId}BoolCheck")">
+                                        <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="@CheckboxCss" id="@($"{modalId}BoolCheck")" />
+                                        <span>@selectedTag.Title</span>
+                                    </label>
+                                    break;
+                                case 4: // Date
+                                    <label class="@LabelCss">Date</label>
+                                    <CultureAwareDatePicker Value="@dateValue" ValueChanged="@OnDateValueInputChanged" />
+                                    break;
+                                case 5: // Time
+                                    <label class="@LabelCss">Time</label>
+                                    <input type="time" @bind="timeValue" @bind:after="OnTimeValueChanged" class="@InputCss" />
+                                    break;
+                                case 6: // Decimal
+                                    <label class="@LabelCss">Value @if (!string.IsNullOrWhiteSpace(selectedTag?.UnitSymbol)) { <span class="@HelperTextCss">(@selectedTag.UnitSymbol)</span> }</label>
+                                    <input type="number" step="0.01" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="@InputCss" placeholder="Enter decimal value" />
+                                    break;
+                                default:
+                                    <label class="@LabelCss">Description</label>
+                                    <input type="text" @bind="Activity.Description" class="@InputCss" placeholder="Enter activity description" />
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            <label class="@LabelCss">Description</label>
+                            <input type="text" @bind="Activity.Description" class="@InputCss" placeholder="Enter activity description" />
+                        }
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="@LabelCss">Start Date &amp; Time</label>
+                            @if (selectedTag?.TimeGranularity == TimeGranularity.Exact || selectedTag?.TimeGranularity == TimeGranularity.Hourly)
+                            {
+                                <CultureAwareDatePicker Value="@Activity.DateStarted" ValueChanged="@((DateTime? v) => { Activity.DateStarted = v ?? DateTime.Now; })" EnableTime="true" />
+                            }
+                            else
+                            {
+                                <CultureAwareDatePicker Value="@dateStartedInput" ValueChanged="@OnDateStartedInputChanged" />
+                            }
+                        </div>
+                        @if (selectedTag?.IsRange == true)
+                        {
+                            <div class="space-y-2">
+                                <label class="@LabelCss">End Date &amp; Time</label>
+                                @if (selectedTag?.TimeGranularity == TimeGranularity.Exact || selectedTag?.TimeGranularity == TimeGranularity.Hourly)
+                                {
+                                    <CultureAwareDatePicker Value="@Activity.DateFinished" ValueChanged="@((DateTime? v) => { Activity.DateFinished = v; })" EnableTime="true" />
+                                }
+                                else
+                                {
+                                    <CultureAwareDatePicker Value="@dateFinishedInput" ValueChanged="@OnDateFinishedInputChanged" />
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-200">
+                            @ErrorMessage
+                        </div>
+                    }
+
+                    @if (!IsEditMode)
+                    {
+                        <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200" for="@($"{modalId}AddAnother")">
+                                <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="@CheckboxCss" id="@($"{modalId}AddAnother")" />
+                                <span>Add another activity after saving</span>
+                            </label>
+                            <p class="@HelperTextCss">
+                                Keep the form open with the same tag and date selected for quick entry of multiple activities.
+                            </p>
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+                    <button type="button" @onclick="HandleCloseClick" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
+                        Cancel
+                    </button>
+                    <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        @(IsEditMode ? "Update Activity" : "Save Activity")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ActivityRequest Activity { get; set; } = new();
+    [Parameter] public IList<TagResponse>? AvailableTags { get; set; }
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public IReadOnlyDictionary<int, TagOptionListResponse>? OptionListLookup { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public bool AddAnotherAfterSave { get; set; } = false;
+    [Parameter] public EventCallback<bool> AddAnotherAfterSaveChanged { get; set; }
+    [Parameter] public EventCallback<ActivityRequest> OnActivityCreated { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public string ModalId { get; set; } = "addActivityModal";
+    [Parameter] public int? PreselectedTagId { get; set; }
+    [Parameter] public DateTime? PreselectedDate { get; set; }
+    [Parameter] public CultureInfo? DisplayCulture { get; set; }
+    [Parameter] public TimeZoneInfo? DisplayTimeZone { get; set; }
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public int? ActivityId { get; set; }
+    [Parameter] public EventCallback OnActivityUpdated { get; set; }
+
+    private const string LabelCss = "block text-sm font-medium text-gray-700 dark:text-gray-200";
+    private const string InputCss = "mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+    private const string CheckboxCss = "h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600";
+    private const string HelperTextCss = "text-xs text-gray-500 dark:text-gray-400";
+
+    private TagResponse? selectedTag;
+    private TagOptionListResponse? selectedOptionList;
+    private string? selectedOptionValue;
+    
+    // Input type value helpers
+    private bool booleanValue = false;
+    private DateTime? dateValue = null;
+    private int? integerValue = null;
+    private TimeOnly? timeValue = null;
+    private decimal? decimalValue = null;
+    
+    // Date input helpers for non-exact time granularities
+    private DateTime? dateStartedInput = null;
+    private DateTime? dateFinishedInput = null;
+
+    // Localization fields
+    private CultureInfo effectiveCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo effectiveTimeZone = TimeZoneInfo.Local;
+
+    // Track if any activities were created during this modal session
+    private bool anyActivitiesCreated = false;
+
+    private string modalId => ModalId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserPreferencesAsync();
+    }
+
+    private async Task LoadUserPreferencesAsync()
+    {
+        try
+        {
+            var preferences = await UserPreferencesService.GetAsync();
+            effectiveCulture = DisplayCulture ?? preferences.Culture;
+            effectiveTimeZone = DisplayTimeZone ?? preferences.TimeZone;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load user preferences, using defaults");
+            effectiveCulture = DisplayCulture ?? CultureInfo.CurrentCulture;
+            effectiveTimeZone = DisplayTimeZone ?? TimeZoneInfo.Local;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (DisplayCulture is not null)
+        {
+            effectiveCulture = DisplayCulture;
+        }
+
+        if (DisplayTimeZone is not null)
+        {
+            effectiveTimeZone = DisplayTimeZone;
+        }
+
+        if (IsEditMode)
+        {
+            AddAnotherAfterSave = false;
+        }
+
+        if (!IsEditMode && PreselectedTagId.HasValue && Activity.PrimaryTagId != PreselectedTagId.Value)
+        {
+            Activity.PrimaryTagId = PreselectedTagId.Value;
+        }
+
+        if (!IsEditMode)
+        {
+            if (PreselectedDate.HasValue)
+            {
+                var today = GetTodayInDisplayZone();
+                Activity.DateStarted = PreselectedDate.Value.Date == today
+                    ? GetCurrentDateTimeInDisplayZone()
+                    : PreselectedDate.Value.Date;
+                dateStartedInput = PreselectedDate.Value.Date;
+            }
+            else if (Activity.DateStarted == default)
+            {
+                Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
+                dateStartedInput = GetTodayInDisplayZone();
+            }
+        }
+        else
+        {
+            if (Activity.DateStarted == default)
+            {
+                Activity.DateStarted = GetCurrentDateTimeInDisplayZone();
+            }
+
+            dateStartedInput = Activity.DateStarted.Date;
+            dateFinishedInput = Activity.DateFinished?.Date;
+        }
+
+        OnTagSelectionChanged(preserveExistingValues: IsEditMode);
+
+        if (IsEditMode && selectedTag is not null)
+        {
+            if (selectedTag.TimeGranularity != TimeGranularity.Exact && selectedTag.TimeGranularity != TimeGranularity.Hourly)
+            {
+                dateStartedInput = Activity.DateStarted.Date;
+            }
+
+            if (selectedTag.IsRange)
+            {
+                dateFinishedInput = Activity.DateFinished?.Date;
+            }
+            else
+            {
+                Activity.DateFinished = null;
+                dateFinishedInput = null;
+            }
+        }
+    }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, effectiveTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            if (Activity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
+            {
+                if (selectedTag.TimeGranularity != TimeGranularity.Exact)
+                {
+                    var duplicateCheck = await ActivityApi.CheckDuplicate(
+                        Activity.PrimaryTagId.Value,
+                        Activity.DateStarted,
+                        IsEditMode ? ActivityId : null);
+
+                    if (duplicateCheck.HasDuplicate)
+                    {
+                        var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                        await OnError.InvokeAsync($"Activity with tag '{selectedTag.Title}' already exists for this {granularityText}. This tag is not repeatable.");
+                        return;
+                    }
+                }
+            }
+
+            if (IsEditMode && ActivityId.HasValue)
+            {
+                await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+
+                if (OnActivityUpdated.HasDelegate)
+                {
+                    await OnActivityUpdated.InvokeAsync();
+                }
+
+                await HandleCloseClick();
+                return;
+            }
+
+            await ActivityApi.CreateCalendarItem(Activity);
+            anyActivitiesCreated = true;
+
+            if (!AddAnotherAfterSave)
+            {
+                await OnActivityCreated.InvokeAsync(Activity);
+                await HandleCloseClick();
+            }
+            else
+            {
+                // Don't invoke OnActivityCreated yet - keep modal open
+                ResetFormForAnother();
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await OnError.InvokeAsync("Authentication failed. Please refresh and try again.");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var content = await ex.GetContentAsAsync<string>();
+            Logger.LogWarning("Validation error saving activity: {Content}", content);
+
+            if (content != null && content.Contains("already exists"))
+            {
+                await OnError.InvokeAsync($"Activity with tag '{selectedTag?.Title}' already exists for this time period. This tag is not repeatable.");
+            }
+            else
+            {
+                await OnError.InvokeAsync($"Validation error: {content ?? "Invalid data provided."}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving activity");
+            await OnError.InvokeAsync("An unexpected error occurred while saving the activity. Please try again.");
+        }
+    }
+
+    private void OnTagSelectionChanged(bool preserveExistingValues = false)
+    {
+        if (Activity.PrimaryTagId.HasValue && AvailableTags != null)
+        {
+            selectedTag = AvailableTags.FirstOrDefault(t => t.Id == Activity.PrimaryTagId.Value);
+            selectedOptionList = null;
+            selectedOptionValue = null;
+
+            if (selectedTag?.OptionListId is int listId)
+            {
+                if (OptionListLookup != null && OptionListLookup.TryGetValue(listId, out var lookupList))
+                {
+                    selectedOptionList = lookupList;
+                }
+                else if (OptionLists != null)
+                {
+                    selectedOptionList = OptionLists.FirstOrDefault(list => list.Id == listId);
+                }
+
+                if (selectedOptionList is not null && (selectedOptionList.Options is null || selectedOptionList.Options.Count == 0))
+                {
+                    Logger.LogWarning("Tag {TagId} references option list {OptionListId} without any options. Falling back to manual entry.", selectedTag.Id, selectedOptionList.Id);
+                    selectedOptionList = null;
+                }
+            }
+
+            if (preserveExistingValues)
+            {
+                ApplyExistingValuesToInputs();
+                return;
+            }
+
+            if (selectedTag?.IsRange != true)
+            {
+                Activity.DateFinished = null;
+                dateFinishedInput = null;
+            }
+
+            Activity.Description = null;
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
+            timeValue = null;
+            decimalValue = null;
+
+            if (selectedOptionList is not null)
+            {
+                selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
+                Activity.Description = selectedOptionValue ?? string.Empty;
+                return;
+            }
+
+            switch (selectedTag?.TypeId)
+            {
+                case 1:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && int.TryParse(selectedTag.DefaultValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var defaultInt))
+                    {
+                        integerValue = defaultInt;
+                        Activity.Description = defaultInt.ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        Activity.Description = string.Empty;
+                    }
+                    break;
+                case 2:
+                    Activity.Description = selectedTag.DefaultValue ?? string.Empty;
+                    break;
+                case 3:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && bool.TryParse(selectedTag.DefaultValue, out var defaultBool))
+                    {
+                        booleanValue = defaultBool;
+                    }
+                    Activity.Description = booleanValue ? "true" : "false";
+                    break;
+                case 4:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && DateTime.TryParse(selectedTag.DefaultValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var defaultDate))
+                    {
+                        dateValue = defaultDate.Date;
+                    }
+                    else
+                    {
+                        dateValue = Activity.DateStarted.Date;
+                    }
+
+                    Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+                    break;
+                case 5:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && TimeOnly.TryParse(selectedTag.DefaultValue, CultureInfo.InvariantCulture, out var defaultTime))
+                    {
+                        timeValue = defaultTime;
+                    }
+                    else
+                    {
+                        timeValue = TimeOnly.FromDateTime(Activity.DateStarted);
+                    }
+
+                    Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+                    break;
+                case 6:
+                    if (!string.IsNullOrWhiteSpace(selectedTag.DefaultValue) && decimal.TryParse(selectedTag.DefaultValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var defaultDecimal))
+                    {
+                        decimalValue = defaultDecimal;
+                        Activity.Description = defaultDecimal.ToString("0.#############################", CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        Activity.Description = string.Empty;
+                    }
+                    break;
+                default:
+                    Activity.Description = string.Empty;
+                    break;
+            }
+        }
+        else if (!preserveExistingValues)
+        {
+            selectedTag = null;
+            selectedOptionList = null;
+            selectedOptionValue = null;
+            Activity.DateFinished = null;
+            dateFinishedInput = null;
+            Activity.Description = null;
+            integerValue = null;
+            booleanValue = false;
+            dateValue = null;
+            timeValue = null;
+            decimalValue = null;
+        }
+    }
+
+    private void ApplyExistingValuesToInputs()
+    {
+        if (selectedTag is null)
+        {
+            return;
+        }
+
+        var description = Activity.Description ?? string.Empty;
+
+        if (selectedOptionList is not null)
+        {
+            selectedOptionValue = description;
+            Activity.Description = description;
+        }
+
+        switch (selectedTag.TypeId)
+        {
+            case 1:
+                if (int.TryParse(description, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedInt))
+                {
+                    integerValue = parsedInt;
+                    Activity.Description = parsedInt.ToString(CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    integerValue = null;
+                }
+                break;
+            case 2:
+                Activity.Description = description;
+                break;
+            case 3:
+                booleanValue = bool.TryParse(description, out var parsedBool) && parsedBool;
+                Activity.Description = booleanValue ? "true" : "false";
+                break;
+            case 4:
+                if (DateTime.TryParse(description, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedDate))
+                {
+                    dateValue = parsedDate.Date;
+                }
+                else
+                {
+                    dateValue = Activity.DateStarted.Date;
+                }
+
+                Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+                break;
+            case 5:
+                if (TimeOnly.TryParse(description, CultureInfo.InvariantCulture, out var parsedTime))
+                {
+                    timeValue = parsedTime;
+                }
+                else
+                {
+                    timeValue = TimeOnly.FromDateTime(Activity.DateStarted);
+                }
+
+                Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+                break;
+            case 6:
+                if (decimal.TryParse(description, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedDecimal))
+                {
+                    decimalValue = parsedDecimal;
+                    Activity.Description = parsedDecimal.ToString("0.#############################", CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    decimalValue = null;
+                }
+                break;
+            default:
+                Activity.Description = description;
+                break;
+        }
+
+        if (selectedTag.IsRange)
+        {
+            dateFinishedInput = Activity.DateFinished?.Date;
+        }
+        else
+        {
+            Activity.DateFinished = null;
+            dateFinishedInput = null;
+        }
+    }
+    
+    private void OnIntegerValueChanged()
+    {
+        Activity.Description = integerValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private void OnBooleanValueChanged()
+    {
+        Activity.Description = booleanValue ? "true" : "false";
+    }
+
+    private void OnDateValueChanged()
+    {
+        Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private void OnTimeValueChanged()
+    {
+        Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private void OnDecimalValueChanged()
+    {
+        // Round to 2 decimal places if value has higher precision
+        if (decimalValue.HasValue)
+        {
+            var rounded = Math.Round(decimalValue.Value, 2);
+            if (rounded != decimalValue.Value)
+            {
+                decimalValue = rounded;
+            }
+            Activity.Description = rounded.ToString("0.#############################", CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            Activity.Description = string.Empty;
+        }
+    }
+
+    private void OnOptionValueChanged()
+    {
+        Activity.Description = selectedOptionValue ?? string.Empty;
+    }
+
+    private static string? ResolveDefaultOptionValue(TagResponse? tag, TagOptionListResponse optionList)
+    {
+        if (optionList.Options is null || optionList.Options.Count == 0)
+        {
+            return null;
+        }
+
+        if (tag is null)
+        {
+            return optionList.Options.FirstOrDefault()?.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
+        {
+            var match = optionList.Options.FirstOrDefault(o => string.Equals(o.Value, tag.DefaultValue, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                return match.Value;
+            }
+        }
+
+        return optionList.Options.FirstOrDefault()?.Value;
+    }
+
+    private void OnDateValueInputChanged(DateTime? value)
+    {
+        dateValue = value;
+        OnDateValueChanged();
+    }
+
+    private void OnDateStartedInputChanged(DateTime? value)
+    {
+        dateStartedInput = value;
+        OnDateStartedChanged();
+    }
+
+    private void OnDateFinishedInputChanged(DateTime? value)
+    {
+        dateFinishedInput = value;
+        OnDateFinishedChanged();
+    }
+
+    private void OnDateStartedChanged()
+    {
+        if (dateStartedInput.HasValue)
+        {
+            Activity.DateStarted = dateStartedInput.Value.Date;
+        }
+    }
+
+    private void OnDateFinishedChanged()
+    {
+        if (dateFinishedInput.HasValue)
+        {
+            Activity.DateFinished = dateFinishedInput.Value.Date;
+        }
+    }
+
+    private async Task OnAddAnotherChanged()
+    {
+        if (AddAnotherAfterSaveChanged.HasDelegate)
+        {
+            await AddAnotherAfterSaveChanged.InvokeAsync(AddAnotherAfterSave);
+        }
+    }
+
+    public void ResetForm()
+    {
+        Activity = new ActivityRequest
+        {
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        dateStartedInput = GetTodayInDisplayZone();
+        selectedTag = null;
+        selectedOptionList = null;
+        selectedOptionValue = null;
+        integerValue = null;
+        booleanValue = false;
+        dateValue = null;
+        timeValue = null;
+        decimalValue = null;
+        dateFinishedInput = null;
+        anyActivitiesCreated = false; // Reset tracking when form is reset
+    }
+
+    private void ResetFormForAnother()
+    {
+        // Keep tag and date, reset only the description and input values
+        var keepTagId = Activity.PrimaryTagId;
+        var keepDateStarted = Activity.DateStarted;
+        var keepDateFinished = Activity.DateFinished;
+
+        // Reset input values but keep tag selection
+        integerValue = null;
+        booleanValue = false;
+        dateValue = null;
+        timeValue = null;
+        decimalValue = null;
+        selectedOptionValue = null;
+
+        // Reset description based on tag type
+        if (selectedOptionList is not null)
+        {
+            selectedOptionValue = ResolveDefaultOptionValue(selectedTag, selectedOptionList);
+            Activity.Description = selectedOptionValue ?? string.Empty;
+        }
+        else if (selectedTag?.TypeId == 3) // Boolean
+        {
+            booleanValue = false;
+            Activity.Description = "false";
+        }
+        else if (selectedTag?.TypeId == 4) // Date
+        {
+            dateValue = keepDateStarted.Date;
+            Activity.Description = dateValue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+        else if (selectedTag?.TypeId == 5) // Time
+        {
+            timeValue = TimeOnly.FromDateTime(keepDateStarted);
+            Activity.Description = timeValue?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+        else
+        {
+            Activity.Description = string.Empty;
+        }
+        
+        // Restore preserved values
+        Activity.PrimaryTagId = keepTagId;
+        Activity.DateStarted = keepDateStarted;
+        Activity.DateFinished = keepDateFinished;
+    }
+    
+    private async Task HandleCloseClick()
+    {
+        // If activities were created but we're closing without invoking OnActivityCreated,
+        // notify the parent to refresh by invoking it with a null activity
+        if (anyActivitiesCreated && OnActivityCreated.HasDelegate)
+        {
+            await OnActivityCreated.InvokeAsync(null!);
+        }
+        
+        anyActivitiesCreated = false; // Reset for next time modal opens
+        await OnCanceled.InvokeAsync();
+    }
+    
+    private async Task HandleBackdropClick()
+    {
+        // If activities were created but are closing without invoking OnActivityCreated, notify parent to refresh by invoking it with a null activity
+        if (anyActivitiesCreated && OnActivityCreated.HasDelegate)
+        {
+            await OnActivityCreated.InvokeAsync(null!);
+        }
+        
+        anyActivitiesCreated = false; // Reset for next time modal opens
+        await OnCanceled.InvokeAsync();
+    }
+}

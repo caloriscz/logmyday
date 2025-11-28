@@ -1,0 +1,417 @@
+@page "/option-lists"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Mobile.Services
+@using System.Net
+@using System.Linq
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject ILogger<OptionLists> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="container-fluid px-6">
+    <div class="row">
+        <div class="col-lg-5">
+            <h3>@(isEditing ? "Edit Option List" : "Add Option List")</h3>
+            <EditForm Model="listForm" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <InputText @bind-Value="listForm.Name" class="form-control" />
+                </div>
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <label class="form-label mb-0">Options</label>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddOption" disabled="@isBusy">Add Option</button>
+                </div>
+                @if (listForm.Options.Count == 0)
+                {
+                    <p class="text-muted">Add at least one option.</p>
+                }
+                else
+                {
+                    <div class="list-group mb-3">
+                        @foreach (var option in listForm.Options)
+                        {
+                            <div class="list-group-item" @key="option">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label">Value</label>
+                                        <InputText @bind-Value="option.Value" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label">Display Name</label>
+                                        <InputText @bind-Value="option.DisplayName" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2 text-md-end">
+                                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => RemoveOption(option)" disabled="@isBusy">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@isBusy">@(isEditing ? "Save" : "Add")</button>
+                    @if (isEditing)
+                    {
+                        <button type="button" class="btn btn-secondary" @onclick="CancelEdit" disabled="@isBusy">Cancel</button>
+                    }
+                </div>
+            </EditForm>
+        </div>
+        <div class="col-lg-7 mt-5 mt-lg-0">
+            <h3>Option Lists</h3>
+            @if (isLoading)
+            {
+                <p><em>Loading lists…</em></p>
+            }
+            else if (!string.IsNullOrEmpty(loadError))
+            {
+                <div class="alert alert-danger">@loadError</div>
+            }
+            else if (lists.Count == 0)
+            {
+                <p class="text-muted">No option lists yet. Create your first list to reuse values in tags.</p>
+            }
+            else
+            {
+                <!-- Desktop Table View -->
+                <div class="hidden md:block">
+                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead class="bg-gray-50 dark:bg-slate-800">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Name</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Scope</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Options</th>
+                                    <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                                @foreach (var list in lists)
+                                {
+                                    <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                        <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@list.Name</td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @if (list.IsGlobal)
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">Global</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-900 ring-1 ring-gray-500/20 dark:bg-gray-600/20 dark:text-gray-300 dark:ring-gray-500/30">Personal</span>
+                                            }
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@list.Options.Count</td>
+                                        <td class="px-4 py-3 text-right">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800 me-2" @onclick="() => BeginEdit(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="pencil" Class="w-4 h-4" />
+                                            </button>
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
+                                                <Icon Name="trash" Class="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Mobile Card View -->
+                <div class="space-y-3 md:hidden">
+                    @foreach (var list in lists)
+                    {
+                        <div class="rounded-xl border @(list.IsGlobal ? "border-sky-500 dark:border-sky-600" : "border-gray-200 dark:border-slate-700") bg-white p-4 shadow-sm dark:bg-slate-900">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                        @list.Name
+                                        @if (list.IsGlobal)
+                                        {
+                                            <span class="ml-2 inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">Global</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-900 ring-1 ring-gray-500/20 dark:bg-gray-600/20 dark:text-gray-300 dark:ring-gray-500/30">Personal</span>
+                                        }
+                                    </h3>
+                                    <p class="mt-1 text-sm text-gray-600 dark:text-slate-400">@list.Options.Count option(s)</p>
+                                </div>
+                            </div>
+                            
+                            @if (list.Options.Any())
+                            {
+                                <div class="mt-4">
+                                    <dt class="text-sm font-medium text-gray-600 dark:text-slate-400 mb-2">Options:</dt>
+                                    <dd class="flex flex-wrap gap-2">
+                                        @foreach (var option in list.Options.Take(5))
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 ring-1 ring-gray-500/10 dark:bg-slate-700 dark:text-slate-200 dark:ring-slate-600">
+                                                @(string.IsNullOrWhiteSpace(option.DisplayName) ? option.Value : option.DisplayName)
+                                            </span>
+                                        }
+                                        @if (list.Options.Count > 5)
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-500/20 dark:bg-slate-600 dark:text-slate-300 dark:ring-slate-500/30">
+                                                +@(list.Options.Count - 5) more
+                                            </span>
+                                        }
+                                    </dd>
+                                </div>
+                            }
+
+                            <div class="mt-4 flex justify-end gap-2">
+                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => BeginEdit(list)" disabled="@(isBusy || list.IsGlobal)">
+                                    <Icon Name="pencil" Class="w-4 h-4" />
+                                    <span>Edit</span>
+                                </button>
+                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(list)" disabled="@(isBusy || list.IsGlobal)">
+                                    <Icon Name="trash" Class="w-4 h-4" />
+                                    <span>Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (listPendingDelete != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete option list</h5>
+                </div>
+                <div class="modal-body">
+                    <p>Delete <strong>@listPendingDelete.Name</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CancelDelete" disabled="@isBusy">Cancel</button>
+                    <button class="btn btn-danger" @onclick="DeleteList" disabled="@isBusy">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<TagOptionListResponse> lists = new();
+    private TagOptionListRequest listForm = new()
+    {
+        Name = string.Empty,
+        Options = new List<TagOptionRequest>
+        {
+            new() { Value = string.Empty, DisplayName = string.Empty }
+        }
+    };
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingListId;
+    private TagOptionListResponse? listPendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Option Lists");
+        await LoadListsAsync();
+    }
+
+    private async Task LoadListsAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var results = await ActivityApi.GetTagOptionListsAsync();
+            lists.Clear();
+            lists.AddRange(results.OrderBy(l => l.Name));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view option lists.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load option lists: {ex.Message}";
+            Logger.LogError(ex, "Failed to load option lists");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!ValidateForm())
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            if (editingListId.HasValue)
+            {
+                await ActivityApi.UpdateTagOptionList(editingListId.Value, listForm);
+            }
+            else
+            {
+                await ActivityApi.CreateTagOptionList(listForm);
+            }
+
+            await LoadListsAsync();
+            ResetForm();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Option list API error");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error saving option list");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(listForm.Name))
+        {
+            formError = "Name is required.";
+            return false;
+        }
+
+        if (listForm.Options.Count == 0)
+        {
+            formError = "Add at least one option.";
+            return false;
+        }
+
+        if (listForm.Options.Any(o => string.IsNullOrWhiteSpace(o.Value)))
+        {
+            formError = "Each option must have a value.";
+            return false;
+        }
+
+        formError = null;
+        return true;
+    }
+
+    private void AddOption()
+    {
+        listForm.Options.Add(new TagOptionRequest { Value = string.Empty, DisplayName = string.Empty });
+    }
+
+    private void RemoveOption(TagOptionRequest option)
+    {
+        if (listForm.Options.Contains(option))
+        {
+            listForm.Options.Remove(option);
+        }
+    }
+
+    private void BeginEdit(TagOptionListResponse list)
+    {
+        if (list.IsGlobal)
+        {
+            return;
+        }
+
+        isEditing = true;
+        editingListId = list.Id;
+        listForm = new TagOptionListRequest
+        {
+            Name = list.Name,
+            Options = list.Options
+                .Select(o => new TagOptionRequest { Id = o.Id, Value = o.Value, DisplayName = o.DisplayName })
+                .ToList()
+        };
+    }
+
+    private void CancelEdit()
+    {
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        isEditing = false;
+        editingListId = null;
+        listForm = new TagOptionListRequest
+        {
+            Name = string.Empty,
+            Options = new List<TagOptionRequest>
+            {
+                new() { Value = string.Empty, DisplayName = string.Empty }
+            }
+        };
+    }
+
+    private void ConfirmDelete(TagOptionListResponse list)
+    {
+        if (list.IsGlobal)
+        {
+            return;
+        }
+
+        listPendingDelete = list;
+    }
+
+    private void CancelDelete()
+    {
+        listPendingDelete = null;
+    }
+
+    private async Task DeleteList()
+    {
+        if (listPendingDelete == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            await ActivityApi.DeleteTagOptionList(listPendingDelete.Id);
+            await LoadListsAsync();
+        }
+        catch (Refit.ApiException ex)
+        {
+            formError = ex.Content ?? ex.Message;
+            Logger.LogError(ex, "Failed to delete option list");
+        }
+        catch (Exception ex)
+        {
+            formError = ex.Message;
+            Logger.LogError(ex, "Unexpected error deleting option list");
+        }
+        finally
+        {
+            isBusy = false;
+            listPendingDelete = null;
+        }
+    }
+}

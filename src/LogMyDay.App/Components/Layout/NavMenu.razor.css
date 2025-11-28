@@ -1,0 +1,217 @@
+/* Top Navigation Styles */
+.top-navigation {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    padding: 0.5rem 0;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white !important;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar-brand:hover {
+    color: #f8f9fa !important;
+    text-decoration: none;
+}
+
+.brand-icon {
+    font-size: 1.75rem;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.25rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.nav-link:hover {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.1);
+    text-decoration: none;
+}
+
+.nav-link.active {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+}
+
+.nav-icon {
+    font-size: 1rem;
+    min-width: 1.2rem;
+    text-align: center;
+}
+
+.navbar-toggler {
+    border: none;
+    background-color: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    transition: color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navbar-toggler:focus {
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.35);
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='currentColor' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+[data-bs-theme="light"] .navbar-toggler {
+    color: rgba(33, 37, 41, 0.8);
+}
+
+[data-bs-theme="light"] .navbar-toggler:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+[data-bs-theme="dark"] .navbar-toggler {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Account dropdown */
+.account-dropdown {
+    position: relative;
+}
+
+.top-navigation .account-menu-toggle {
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.top-navigation .account-menu-toggle:hover,
+.top-navigation .account-menu-toggle:focus {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.75);
+}
+
+
+.top-navigation .account-menu-toggle::after {
+    display: none;
+}
+
+[data-bs-theme="light"] .top-navigation .account-menu-toggle {
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #1c1c1c;
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+[data-bs-theme="light"] .top-navigation .account-menu-toggle:hover,
+[data-bs-theme="light"] .top-navigation .account-menu-toggle:focus {
+    color: #1c1c1c;
+    background-color: #fff;
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
+.account-dropdown-menu {
+    min-width: 16rem;
+    padding: 0.75rem 0;
+    border-radius: 0.75rem;
+    border: none;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+.account-dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+    padding: 0.55rem 1rem;
+}
+
+.account-dropdown-menu .dropdown-item i {
+    font-size: 1.1rem;
+    opacity: 0.85;
+}
+
+.account-email-item {
+    font-weight: 600;
+    color: var(--bs-emphasis-color);
+    white-space: normal;
+    line-height: 1.4;
+}
+
+.account-dropdown-menu .dropdown-divider {
+    margin: 0.5rem 1rem;
+    opacity: 0.2;
+}
+
+.account-dropdown-menu .dropdown-item.text-danger i {
+    opacity: 1;
+}
+
+[data-bs-theme="dark"] .account-dropdown-menu {
+    box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.4);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 991.98px) {
+    .navbar-nav {
+        padding-top: 1rem;
+    }
+
+    .nav-link {
+        padding: 0.75rem 1rem !important;
+        margin: 0.25rem 0;
+    }
+
+    .navbar-nav:last-child {
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        margin-top: 1rem;
+    }
+
+    .account-dropdown {
+        width: 100%;
+    }
+
+    .account-dropdown .dropdown-menu {
+        position: static;
+        float: none;
+        transform: none !important;
+        width: 100%;
+        margin-top: 0.75rem;
+        box-shadow: none;
+        border: 1px solid var(--bs-border-color-translucent);
+        background-color: var(--bs-body-bg);
+    }
+
+    .account-dropdown .dropdown-item {
+        border-radius: 0.5rem;
+    }
+}
+
+/* Smooth animations */
+.navbar-collapse {
+    transition: all 0.3s ease;
+}
+
+.navbar-nav .nav-item {
+    margin: 0 0.25rem;
+}

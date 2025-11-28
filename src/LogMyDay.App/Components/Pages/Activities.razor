@@ -1,0 +1,985 @@
+﻿@page "/activities"
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using LogMyDay.App.Components.Shared
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject ILogger<Activities> Logger
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+
+<div class="mx-auto max-w-screen-2xl px-4 py-6 space-y-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
+        </div>
+        <div class="flex items-center">
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
+                <Icon Name="plus" Class="h-4 w-4" />
+                Add Activity
+            </button>
+        </div>
+    </div>
+
+    @if (displayType != "daily" && pagedResult != null)
+    {
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="text-sm font-medium text-gray-700 dark:text-slate-300">
+                    Page @GetCurrentPageNumber() of @totalPages
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto">
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PrevPage" disabled="@(GetCurrentPageNumber() == 1)" aria-label="Previous page">Previous</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)" aria-label="Next page">Next</button>
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                        <Icon Name="filter" Class="h-5 w-5" />
+                        <span class="sr-only">Filters</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
+                        <Icon Name="chevron-up" Class="h-5 w-5" />
+                        <span class="sr-only">Sort ascending</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
+                        <Icon Name="chevron-down" Class="h-5 w-5" />
+                        <span class="sr-only">Sort descending</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (pagedResult == null)
+    {
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            Loading activities…
+        </div>
+    }
+    else if (displayType == "daily")
+    {
+        <div class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-1 flex-wrap items-center justify-center gap-2 sm:justify-start">
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousMonth" title="Previous Month" disabled="@IsPreviousMonthDisabled()" aria-label="Previous month">&laquo;</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="PreviousDay" title="Previous Day" aria-label="Previous day">&lsaquo;</button>
+                    <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="w-40 sm:w-48" Stretch="false" Placeholder="Select date" />
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextDay" title="Next Day" aria-label="Next day">&rsaquo;</button>
+                    <button type="button" class="@GetNavButtonClasses()" @onclick="NextMonth" title="Next Month" disabled="@IsNextMonthDisabled()" aria-label="Next month">&raquo;</button>
+                    <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
+                </div>
+                <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                        <Icon Name="filter" Class="h-5 w-5" />
+                        <span class="sr-only">Filters</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
+                        <Icon Name="chevron-up" Class="h-5 w-5" />
+                        <span class="sr-only">Sort ascending</span>
+                    </button>
+                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
+                        <Icon Name="chevron-down" Class="h-5 w-5" />
+                        <span class="sr-only">Sort descending</span>
+                    </button>
+                </div>
+            </div>
+
+            @if (!pagedResult.Items.Any())
+            {
+                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    No activities found for @FormatDate(selectedDate).
+                </div>
+            }
+            else
+            {
+                <div class="hidden md:block">
+                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                            <thead class="bg-gray-50 dark:bg-slate-800">
+                                <tr>
+                                    <th scope="col" class="w-10 px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                                @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
+                                {
+                                    <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                        <td class="px-1 py-3">
+                                            <div class="flex items-center gap-1">
+                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                                    <Icon Name="pencil" Class="w-4 h-4" />
+                                                </button>
+                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                                    <Icon Name="trash" Class="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm font-medium">
+                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                @activity.PrimaryTagName
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="space-y-3 md:hidden">
+                    @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
+                    {
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                        <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                            @activity.PrimaryTagName
+                                        </span>
+                                    </h3>
+                                    @{ var displayValue = GetActivityDisplayValue(activity);
+                                        if (!string.IsNullOrWhiteSpace(displayValue))
+                                        {
+                                            <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                        }
+                                    }
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                            <Icon Name="pencil" Class="w-4 h-4" />
+                                        </button>
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                            <Icon Name="trash" Class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <dl class="mt-4 grid grid-cols-1 gap-4 text-sm">
+                                <div>
+                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Date</dt>
+                                    <dd class="tabular-nums text-gray-900 dark:text-slate-200">@GetActivityDateDisplay(activity)</dd>
+                                </div>
+                            </dl>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (!pagedResult.Items.Any())
+    {
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            No activities found for the selected criteria.
+        </div>
+    }
+    else
+    {
+        <div class="space-y-8">
+            @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
+            {
+                <section class="space-y-3">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-slate-100">@FormatDate(group.Key)</h2>
+
+                    <div class="hidden md:block">
+                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                                <thead class="bg-gray-50 dark:bg-slate-800">
+                                    <tr>
+                                        <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                                    @foreach (var activity in group)
+                                    {
+                                        <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                            <td class="px-4 py-3">
+                                                <div class="flex items-center gap-2">
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                                        <Icon Name="pencil" Class="w-4 h-4" />
+                                                    </button>
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                                        <Icon Name="trash" Class="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm font-medium">
+                                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                    @activity.PrimaryTagName
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 md:hidden">
+                        @foreach (var activity in group)
+                        {
+                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
+                                            <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
+                                                @activity.PrimaryTagName
+                                            </span>
+                                        </h3>
+                                        @{ var displayValue = GetActivityDisplayValue(activity);
+                                            if (!string.IsNullOrWhiteSpace(displayValue))
+                                            {
+                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                            }
+                                        }
+                                    </div>
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                        <Icon Name="trash" Class="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <dl class="mt-4 grid grid-cols-1 gap-4 text-sm">
+                                    <div>
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Date</dt>
+                                        <dd class="tabular-nums text-gray-900 dark:text-slate-200">@GetActivityDateDisplay(activity)</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    }
+</div>
+
+<!-- Filter Modal (Tailwind) -->
+@if (showFilterModal && isInitialized)
+{
+    <div class="fixed inset-0 bg-gray-900/70 flex items-center justify-center z-50 p-4" @onclick="CloseFilterModal">
+        <div class="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden" @onclick:stopPropagation="true">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Filters</h3>
+                <button type="button" @onclick="CloseFilterModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                    <Icon Name="close" Class="w-5 h-5" />
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Display Type -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Display Type:</label>
+                        <select value="@displayType" @onchange="OnDisplayTypeChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+
+                    <!-- Description Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Description Filter:</label>
+                        <input value="@descriptionFilter" @onchange="OnFilterChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            placeholder="Search description..." />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-slate-700">
+                <button type="button" @onclick="CloseFilterModal" class="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-900 dark:text-slate-100 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Activity Modal -->
+@if (showActivityModal && isInitialized && tags != null && newActivity != null)
+{
+    <AddActivityModal
+        Activity="newActivity"
+        AvailableTags="tags"
+        OptionLists="optionLists"
+        OptionListLookup="optionListLookup"
+        DisplayCulture="displayCulture"
+        DisplayTimeZone="displayTimeZone"
+        ErrorMessage="@errorMessage"
+    IsEditMode="isEditMode"
+    ActivityId="editingActivityId"
+    OnActivityCreated="OnActivityCreated"
+    OnActivityUpdated="OnActivityUpdated"
+    OnCanceled="CloseActivityModal"
+        OnError="OnError"
+        ModalId="addActivityModal"
+    PreselectedDate="@GetPreselectedDate()" />
+}
+
+@code {
+    private PagedResult<ActivityResponse>? pagedResult;
+    private IList<TagResponse>? tags;
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+    private ActivityRequest newActivity = new();
+    private string? errorMessage;
+    
+    // Modal state
+    private bool showFilterModal = false;
+    private bool showActivityModal = false;
+    private bool isEditMode = false;
+    private int? editingActivityId;
+
+    // User preferences and localization
+    private UserPreferencesSnapshot? userPreferences;
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private EffectivePreferences? effectivePreferences;
+
+    // Display and filtering
+    private string displayType = "daily";
+    private string? descriptionFilter;
+    private DateTime selectedDate = DateTime.Today;
+    private DateTime calendarMonth = DateTime.Today;
+    private int pageNumber = 1;
+    private int weekPageNumber = 1;
+    private int monthPageNumber = 1;
+    private int weeksPerPage = 12;
+    private int monthsPerPage = 12;
+    private int totalPages = 1;
+    private string orderBy = "desc";
+    private bool isInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Home");
+
+        userPreferences = await UserPreferencesService.GetAsync();
+        displayCulture = userPreferences.Culture;
+        displayTimeZone = userPreferences.TimeZone;
+        effectivePreferences = userPreferences.Preferences;
+
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
+        calendarMonth = new DateTime(today.Year, today.Month, 1);
+
+        // Initialize new activity with current date/time
+        newActivity = new ActivityRequest
+        {
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+
+        await LoadData();
+        
+        isInitialized = true;
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            // Always refresh tags and option lists to ensure we have latest data
+            tags = await ActivityApi.GetTags();
+            optionLists = await ActivityApi.GetTagOptionListsAsync();
+            
+            if (optionLists is not null)
+            {
+                optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+
+            DateTime? startDate = null;
+            DateTime? endDate = null;
+
+            // Set date range based on display type and selected date/period
+            switch (displayType)
+            {
+                case "daily":
+                    startDate = selectedDate.Date;
+                    endDate = selectedDate.Date.AddDays(1).AddTicks(-1);
+                    // For daily, get all activities for the day (no pagination)
+                    pagedResult = await ActivityApi.GetActivities(1, 1000, orderBy, null, startDate, endDate, descriptionFilter);
+                    totalPages = 1;
+                    break;
+
+                case "weekly":
+                    var weekStart = GetStartOfWeek(selectedDate);
+                    var weekEnd = weekStart.AddDays(7).AddTicks(-1);
+                    pagedResult = await ActivityApi.GetActivitiesByWeeks(weekPageNumber, weeksPerPage, orderBy, null, weekStart, weekEnd,
+                    descriptionFilter);
+                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / weeksPerPage);
+                    break;
+
+                case "monthly":
+                    var monthStart = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+                    var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
+                    pagedResult = await ActivityApi.GetActivitiesByMonths(monthPageNumber, monthsPerPage, orderBy, null, monthStart,
+                    monthEnd, descriptionFilter);
+                    totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / monthsPerPage);
+                    break;
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading data");
+        }
+    }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+    {
+        var timezone = displayTimeZone ?? TimeZoneInfo.Local;
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timezone);
+    }
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+
+    private DateTime ConvertToDisplayZone(DateTime dateTime)
+    {
+        var timezone = displayTimeZone ?? TimeZoneInfo.Local;
+
+        return dateTime.Kind switch
+        {
+            DateTimeKind.Utc => TimeZoneInfo.ConvertTimeFromUtc(dateTime, timezone),
+            DateTimeKind.Local => timezone.Equals(TimeZoneInfo.Local)
+                ? dateTime
+                : TimeZoneInfo.ConvertTime(dateTime, timezone),
+            _ => dateTime
+        };
+    }
+
+    private string FormatDate(DateTime date)
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var pattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+        var localized = ConvertToDisplayZone(date);
+
+        return localized.ToString(pattern, culture);
+    }
+
+    private string FormatTime(DateTime dateTime)
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var pattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var localized = ConvertToDisplayZone(dateTime);
+
+        return localized.ToString(pattern, culture);
+    }
+
+    private string GetActivityDateDisplay(ActivityResponse activity)
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var timePattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var datePattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+
+        var startLocal = ConvertToDisplayZone(activity.DateStarted);
+        var startTime = startLocal.ToString(timePattern, culture);
+
+        if (!activity.DateFinished.HasValue)
+        {
+            return startTime;
+        }
+
+        var endLocal = ConvertToDisplayZone(activity.DateFinished.Value);
+        var endTime = endLocal.ToString(timePattern, culture);
+
+        if (startLocal.Date == endLocal.Date)
+        {
+            return $"{startTime} – {endTime}";
+        }
+
+        var startDateTime = $"{startLocal.ToString(datePattern, culture)} {startTime}";
+        var endDateTime = $"{endLocal.ToString(datePattern, culture)} {endTime}";
+
+        return $"{startDateTime} – {endDateTime}";
+    }
+
+    private string GetOrderButtonClasses(string order)
+    {
+        var isActive = string.Equals(orderBy, order, System.StringComparison.OrdinalIgnoreCase);
+        var baseClasses = "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
+        var activeClasses = "border-sky-600 bg-sky-50 text-sky-700 dark:border-sky-400 dark:bg-slate-700/60 dark:text-sky-100";
+
+        return isActive ? $"{baseClasses} {activeClasses}" : baseClasses;
+    }
+
+    private string GetNavButtonClasses(bool emphasize = false)
+    {
+        var baseClasses = "inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
+
+        if (emphasize)
+        {
+            return $"{baseClasses} border-sky-600 bg-sky-600 text-white hover:bg-sky-700 hover:border-sky-700 dark:bg-sky-500 dark:border-sky-500 dark:hover:bg-sky-600 dark:hover:border-sky-600";
+        }
+
+        return $"{baseClasses} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
+    }
+
+    private string GetActivityDisplayValue(ActivityResponse activity)
+    {
+        var rawValue = activity.PrimaryTagValue ?? activity.Description ?? string.Empty;
+        var tag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
+        var valueForDisplay = rawValue;
+
+        if (tag?.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, rawValue, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                valueForDisplay = option.DisplayName ?? option.Value;
+            }
+        }
+        else if (tag?.TypeId == 1 && long.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+        {
+            valueForDisplay = intValue.ToString(displayCulture);
+        }
+        else if (tag?.TypeId == 6 && decimal.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+        {
+            valueForDisplay = decimalValue.ToString("0.#############################", displayCulture);
+        }
+
+        if (tag is not null && !string.IsNullOrWhiteSpace(tag.UnitSymbol) && !string.IsNullOrWhiteSpace(valueForDisplay))
+        {
+            valueForDisplay = $"{valueForDisplay} {tag.UnitSymbol}";
+        }
+
+        return valueForDisplay;
+    }
+
+    private async Task OnDisplayTypeChanged(ChangeEventArgs e)
+    {
+        displayType = e.Value?.ToString() ?? "daily";
+
+        // Reset pagination counters
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        // Reset to today/this week/this month
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
+        calendarMonth = new DateTime(today.Year, today.Month, 1);
+
+        await LoadData();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        descriptionFilter = e.Value?.ToString();
+
+        // Reset pagination when filter changes
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        await LoadData();
+    }
+
+    private string GetCurrentPeriodDisplay()
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var longPattern = effectivePreferences?.LongDatePattern ?? culture.DateTimeFormat.LongDatePattern;
+        var shortPattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+
+        var weekStart = GetStartOfWeek(selectedDate);
+        var weekEnd = weekStart.AddDays(6);
+
+        return displayType switch
+        {
+            "daily" => selectedDate.ToString(longPattern, culture),
+            "weekly" => string.Format(culture, "{0} – {1}", FormatDate(weekStart), FormatDate(weekEnd)),
+            "monthly" => selectedDate.ToString("Y", culture),
+            _ => selectedDate.ToString(longPattern, culture)
+        };
+    }
+
+    private string GetTodayButtonText()
+    {
+        return displayType switch
+        {
+            "daily" => "Today",
+            "weekly" => "This Week",
+            "monthly" => "This Month",
+            _ => "Today"
+        };
+    }
+
+    private async Task OnDatePickerValueChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            selectedDate = newDate.Value;
+            await LoadData();
+        }
+    }
+
+    private async Task PreviousCalendarPeriod()
+    {
+        selectedDate = displayType switch
+        {
+            "daily" => selectedDate.AddDays(-1),
+            "weekly" => selectedDate.AddDays(-7),
+            "monthly" => selectedDate.AddMonths(-1),
+            _ => selectedDate.AddDays(-1)
+        };
+
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task NextCalendarPeriod()
+    {
+        selectedDate = displayType switch
+        {
+            "daily" => selectedDate.AddDays(1),
+            "weekly" => selectedDate.AddDays(7),
+            "monthly" => selectedDate.AddMonths(1),
+            _ => selectedDate.AddDays(1)
+        };
+
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task GoToToday()
+    {
+        var today = GetTodayInDisplayZone();
+        selectedDate = today;
+        calendarMonth = new DateTime(today.Year, today.Month, 1);
+
+        // Reset pagination
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+
+        await LoadData();
+    }
+
+    private async Task SelectDate(DateTime date)
+    {
+        selectedDate = date;
+        await LoadData();
+    }
+
+    private string[] GetDayNames()
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var startOfWeek = effectivePreferences?.StartOfWeek ?? culture.DateTimeFormat.FirstDayOfWeek;
+        var names = new string[7];
+
+        for (var i = 0; i < 7; i++)
+        {
+            var day = (DayOfWeek)(((int)startOfWeek + i) % 7);
+            names[i] = culture.DateTimeFormat.GetAbbreviatedDayName(day);
+        }
+
+        return names;
+    }
+
+    private List<DateTime> GetCalendarDates()
+    {
+        var firstDayOfMonth = calendarMonth;
+        var startOfWeek = GetStartOfWeek(firstDayOfMonth);
+        var dates = new List<DateTime>();
+
+        for (int i = 0; i < 42; i++) // 6 weeks * 7 days
+        {
+            dates.Add(startOfWeek.AddDays(i));
+        }
+
+        return dates;
+    }
+
+    private string GetDayClass(DateTime date)
+    {
+        var classes = new List<string>();
+
+        if (date.Month != calendarMonth.Month)
+            classes.Add("other-month");
+
+        if (date.Date == selectedDate.Date)
+            classes.Add("selected");
+
+        if (date.Date == GetTodayInDisplayZone())
+            classes.Add("today");
+
+        return string.Join(" ", classes);
+    }
+
+    private DateTime GetStartOfWeek(DateTime date)
+    {
+        var culture = displayCulture ?? CultureInfo.CurrentCulture;
+        var start = effectivePreferences?.StartOfWeek ?? culture.DateTimeFormat.FirstDayOfWeek;
+        int diff = (7 + ((int)date.DayOfWeek - (int)start)) % 7;
+        return date.AddDays(-diff).Date;
+    }
+
+    private int GetCurrentPageNumber()
+    {
+        return displayType switch
+        {
+            "weekly" => weekPageNumber,
+            "monthly" => monthPageNumber,
+            _ => pageNumber
+        };
+    }
+
+    private async Task DeleteActivity(int id)
+    {
+        try
+        {
+            await ActivityApi.Delete(id);
+            await LoadData();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting activity with ID {ActivityId}", id);
+        }
+    }
+
+    private async Task PrevPage()
+    {
+        switch (displayType)
+        {
+            case "weekly":
+                if (weekPageNumber > 1)
+                {
+                    weekPageNumber--;
+                    await LoadData();
+                }
+                break;
+            case "monthly":
+                if (monthPageNumber > 1)
+                {
+                    monthPageNumber--;
+                    await LoadData();
+                }
+                break;
+            default:
+                if (pageNumber > 1)
+                {
+                    pageNumber--;
+                    await LoadData();
+                }
+                break;
+        }
+    }
+
+    private async Task NextPage()
+    {
+        switch (displayType)
+        {
+            case "weekly":
+                if (weekPageNumber < totalPages)
+                {
+                    weekPageNumber++;
+                    await LoadData();
+                }
+                break;
+            case "monthly":
+                if (monthPageNumber < totalPages)
+                {
+                    monthPageNumber++;
+                    await LoadData();
+                }
+                break;
+            default:
+                if (pageNumber < totalPages)
+                {
+                    pageNumber++;
+                    await LoadData();
+                }
+                break;
+        }
+    }
+
+    private async Task ChangeOrder(string order)
+    {
+        orderBy = order;
+        pageNumber = 1;
+        weekPageNumber = 1;
+        monthPageNumber = 1;
+        await LoadData();
+    }
+
+    // Additional navigation methods for daily view
+    private async Task PreviousWeek()
+    {
+        selectedDate = selectedDate.AddDays(-7);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task NextWeek()
+    {
+        selectedDate = selectedDate.AddDays(7);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task PreviousDay()
+    {
+        selectedDate = selectedDate.AddDays(-1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task NextDay()
+    {
+        selectedDate = selectedDate.AddDays(1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task PreviousMonth()
+    {
+        selectedDate = selectedDate.AddMonths(-1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private async Task NextMonth()
+    {
+        selectedDate = selectedDate.AddMonths(1);
+        calendarMonth = new DateTime(selectedDate.Year, selectedDate.Month, 1);
+        await LoadData();
+    }
+
+    private bool IsPreviousMonthDisabled()
+    {
+        // Disable if going back would take us before a reasonable historical limit
+        // For example, disable if it would go before 5 years ago
+        var limitDate = GetTodayInDisplayZone().AddYears(-5);
+        return selectedDate.AddMonths(-1) < limitDate;
+    }
+
+    private bool IsNextMonthDisabled()
+    {
+        // Disable if going forward would take us beyond next month
+        var nextMonth = GetTodayInDisplayZone().AddMonths(1);
+        return selectedDate.AddMonths(1) > nextMonth;
+    }
+
+    // Add Activity Modal Event Handlers
+    private async Task OnActivityCreated(ActivityRequest activity)
+    {
+        showActivityModal = false;
+        isEditMode = false;
+        editingActivityId = null;
+
+        await LoadData();
+
+        newActivity = new ActivityRequest
+        {
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        errorMessage = null;
+    }
+
+    private async Task OnActivityUpdated()
+    {
+        showActivityModal = false;
+        isEditMode = false;
+        editingActivityId = null;
+
+        await LoadData();
+
+        newActivity = new ActivityRequest
+        {
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        errorMessage = null;
+    }
+
+    private async Task OnError(string error)
+    {
+        errorMessage = error;
+        await Task.CompletedTask;
+    }
+
+    // Get the preselected date for the AddActivityModal based on display mode and selected date
+    private DateTime? GetPreselectedDate()
+    {
+        if (isEditMode)
+        {
+            return null;
+        }
+
+        return displayType == "daily" ? selectedDate : null;
+    }
+    
+    // Modal control methods
+    private void OpenFilterModal()
+    {
+        showFilterModal = true;
+    }
+    
+    private void CloseFilterModal()
+    {
+        showFilterModal = false;
+    }
+    
+    private void OpenAddActivityModal()
+    {
+        isEditMode = false;
+        editingActivityId = null;
+        newActivity = new ActivityRequest
+        {
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        showActivityModal = true;
+        errorMessage = null;
+    }
+
+    private void OpenEditActivityModal(ActivityResponse activity)
+    {
+        isEditMode = true;
+        editingActivityId = activity.Id;
+
+        newActivity = new ActivityRequest
+        {
+            PrimaryTagId = activity.PrimaryTagId,
+            Description = activity.Description,
+            DateStarted = ConvertToDisplayZone(activity.DateStarted),
+            DateFinished = activity.DateFinished.HasValue
+                ? ConvertToDisplayZone(activity.DateFinished.Value)
+                : null
+        };
+
+        showActivityModal = true;
+        errorMessage = null;
+    }
+
+    private void CloseActivityModal()
+    {
+        showActivityModal = false;
+        isEditMode = false;
+        editingActivityId = null;
+        errorMessage = null;
+    }
+}
