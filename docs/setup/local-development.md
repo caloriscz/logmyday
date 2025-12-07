@@ -162,25 +162,56 @@ dotnet run --project src/LogMyDay.Api/LogMyDay.Api.csproj
 
 Set the Blazor Server app to point at the API base address via `appsettings.Development.json` when you split them.
 
-## Build with Cake
+## Build and Deploy with Cake
 
-The project uses [Cake (C# Make)](https://cakebuild.net/) for a reliable, cross-platform build process. The build script is located at `build/build.cake`.
+LogMyDay uses [Cake (C# Make)](https://cakebuild.net/) for automated builds and deployments. The build script is located at `build/build.cake`.
 
-To run the default build (Clean + Restore + Build + Test + Publish):
+### Configure Deployment Credentials
 
-```powershell
-./build/build.ps1
-```
-
-### Common Build Targets
-
-You can specify different targets using the `-Target` parameter:
-
-- **Default**: Runs the full pipeline (Clean -> Restore -> Build -> Test -> Publish -> Package).
-- **CI**: Runs Clean, Restore, Build, and Test (ideal for Continuous Integration).
-- **FastDeploy**: Skips tests and runs Publish and Package (use only for rapid iteration).
+Before running deployment tasks, create a local environment file with your deployment credentials:
 
 ```powershell
-# Example: Run only the CI steps
-./build/build.ps1 -Target CI
+cd build
+Copy-Item local.env.example local.env
 ```
+
+Edit `build/local.env` with your actual values:
+
+```
+LMD_SERVER=your-server-address.com
+LMD_PORT=8172
+LMD_SITE=your-site-name
+LMD_LOGIN=your-deployment-username
+LMD_PASSWORD=your-deployment-password
+```
+
+> ⚠️ **Security**: The `local.env` file is gitignored. Never commit credentials to version control.
+
+### Common Build Tasks
+
+```powershell
+# Build only (no deployment)
+dotnet cake build/build.cake --target=Build
+
+# Build and run tests
+dotnet cake build/build.cake --target=Test
+
+# Full deployment (Clean, Build, Test, Publish, Package, Deploy)
+dotnet cake build/build.cake
+
+# Fast deployment (runs tests, skips packaging)
+dotnet cake build/build.cake --target=FastDeploy
+
+# Unsafe deployment (skips tests - use with caution)
+dotnet cake build/build.cake --target=DeployUnsafe
+```
+
+### CI/CD Environments
+
+For GitHub Actions or other CI/CD pipelines, configure the deployment variables as repository secrets instead of using `local.env`:
+
+- `LMD_SERVER`
+- `LMD_PORT`
+- `LMD_SITE`
+- `LMD_LOGIN`
+- `LMD_PASSWORD`
