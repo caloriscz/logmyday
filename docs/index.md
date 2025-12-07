@@ -8,7 +8,9 @@ nav_order: 1
 
 **Version:** {{ site.project_version }}
 
-![LogMyDay Application Screenshot](assets/images/app-screenshot.png)
+<div style="text-align: center; margin: 2rem 0;">
+  <img src="assets/images/app-screenshot.png" alt="LogMyDay Application Screenshot" style="max-width: 300px; width: 100%; border-radius: 50%;" />
+</div>
 
 LogMyDay is your personal activity journal. Capture workouts, study sessions, habits, or anything else you want to track, then review the trends from a calendar-driven dashboard or a mobile quick-entry companion.
 
