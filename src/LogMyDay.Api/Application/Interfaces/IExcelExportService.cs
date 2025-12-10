@@ -14,9 +14,9 @@ public interface IExcelExportService
     /// <summary>
     /// Gets available tags for Excel export selection
     /// </summary>
-    /// <param name="userId">Optional user ID to filter tags</param>
+    /// <param name="userId">User ID to filter tags</param>
     /// <returns>List of available tags</returns>
-    Task<List<TagResponse>> GetAvailableTags(Guid? userId = null);
+    Task<List<TagResponse>> GetAvailableTags(Guid userId);
 
     /// <summary>
     /// Gets preview data for Excel export without generating the file

@@ -34,10 +34,10 @@ public class ExportService : IExcelExportService
                 return result;
             }
 
-            // Get tags with their names
+            // Get tags with their names - enforce user-specific filtering
             var selectedTags = await _context.Tags
                 .Where(t => request.TagIds.Contains(t.Id))
-                .Where(t => request.UserId == null || t.UserId == request.UserId)
+                .Where(t => t.UserId == request.UserId)
                 .Select(t => new { t.Id, t.TagName })
                 .OrderBy(t => t.TagName)
                 .ToListAsync();
@@ -65,7 +65,7 @@ public class ExportService : IExcelExportService
                 .Include(a => a.Tag)
                 .Where(a => request.TagIds.Contains(a.TagId))
                 .Where(a => a.DateStarted.Date >= startDate.Date && a.DateStarted.Date <= endDate.Date)
-                .Where(a => request.UserId == null || a.UserId == request.UserId);
+                .Where(a => a.UserId == request.UserId);
 
             var activities = await activitiesQuery
                 .Select(a => new
@@ -303,16 +303,10 @@ public class ExportService : IExcelExportService
         }
     }
 
-    public async Task<List<TagResponse>> GetAvailableTags(Guid? userId = null)
+    public async Task<List<TagResponse>> GetAvailableTags(Guid userId)
     {
-        var query = _context.Tags.AsQueryable();
-
-        if (userId.HasValue)
-        {
-            query = query.Where(t => t.UserId == userId);
-        }
-
-        return await query
+        return await _context.Tags
+            .Where(t => t.UserId == userId)
             .Select(t => new TagResponse
             {
                 Id = t.Id,
@@ -344,7 +338,7 @@ public class ExportService : IExcelExportService
 
             var selectedTags = await _context.Tags
                 .Where(t => request.TagIds.Contains(t.Id))
-                .Where(t => request.UserId == null || t.UserId == request.UserId)
+                .Where(t => t.UserId == request.UserId)
                 .Select(t => new { t.Id, t.TagName })
                 .ToListAsync();
 
@@ -352,7 +346,7 @@ public class ExportService : IExcelExportService
                 .Include(a => a.Tag)
                 .Where(a => request.TagIds.Contains(a.TagId))
                 .Where(a => a.DateStarted.Date >= startDate.Date && a.DateStarted.Date <= endDate.Date)
-                .Where(a => request.UserId == null || a.UserId == request.UserId);
+                .Where(a => a.UserId == request.UserId);
 
             var activities = await activitiesQuery
                 .Select(a => new { a.Tag.TagName, Date = a.DateStarted.Date })

@@ -5,14 +5,16 @@ using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class ExcelExportController : ControllerBase
+public class ExcelExportController : BaseApiController
 {
     private readonly IExcelExportService _excelExportService;
     private readonly ILogger<ExcelExportController> _logger;
 
-    public ExcelExportController(IExcelExportService excelExportService, ILogger<ExcelExportController> logger)
+    public ExcelExportController(
+        IExcelExportService excelExportService, 
+        ILogger<ExcelExportController> logger,
+        IAuthService authService) : base(authService)
     {
         _excelExportService = excelExportService ?? throw new ArgumentNullException(nameof(excelExportService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -28,7 +30,10 @@ public class ExcelExportController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Excel export request received for {TagCount} tags", request.TagIds.Count);
+            var userId = GetCurrentUserId();
+            request.UserId = userId;
+            
+            _logger.LogInformation("Excel export request received for {TagCount} tags, User: {UserId}", request.TagIds.Count, userId);
 
             var result = await _excelExportService.GenerateExcelReport(request);
 
@@ -57,16 +62,16 @@ public class ExcelExportController : ControllerBase
     }
 
     /// <summary>
-    /// Get available tags for Excel export
+    /// Get available tags for Excel export (current user only)
     /// </summary>
-    /// <param name="userId">Optional user ID to filter tags</param>
-    /// <returns>List of available tags</returns>
+    /// <returns>List of available tags for the authenticated user</returns>
     [HttpGet("tags")]
-    public async Task<IActionResult> GetAvailableTags([FromQuery] Guid? userId = null)
+    public async Task<IActionResult> GetAvailableTags()
     {
         try
         {
-            _logger.LogInformation("Get available tags request for user: {UserId}", userId?.ToString() ?? "All users");
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("Get available tags request for user: {UserId}", userId);
 
             var tags = await _excelExportService.GetAvailableTags(userId);
 
@@ -90,7 +95,10 @@ public class ExcelExportController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Export preview request for {TagCount} tags", request.TagIds.Count);
+            var userId = GetCurrentUserId();
+            request.UserId = userId;
+            
+            _logger.LogInformation("Export preview request for {TagCount} tags, User: {UserId}", request.TagIds.Count, userId);
 
             var statistics = await _excelExportService.GetExportPreview(request);
 
