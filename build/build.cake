@@ -1,5 +1,3 @@
-#tool nuget:?package=Microsoft.Web.Xdt&version=3.1.0
-
 using System;
 using System.IO;
 
