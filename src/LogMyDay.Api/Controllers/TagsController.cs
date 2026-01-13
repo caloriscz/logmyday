@@ -113,16 +113,4 @@ public class TagsController : BaseApiController
         
         return NoContent();
     }
-
-    /// <summary>
-    /// Get all input types
-    /// </summary>
-    /// <returns></returns>
-    [HttpGet("inputtypes")]
-    public async Task<ActionResult<List<InputTypeDto>>> GetInputTypes()
-    {
-        var inputTypes = await _context.Set<InputType>().Select(x => new InputTypeDto { Id = x.Id, Name = x.Name }).ToListAsync();
-        
-        return Ok(inputTypes);
-    }
 }

@@ -1,0 +1,283 @@
+@page "/statistics"
+@using LogMyDay.Shared.Interfaces
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@inject IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+@inject IJSRuntime JS
+
+<PageTitle>@_pageTitle</PageTitle>
+
+<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-slate-100">📊 Statistics</h2>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Analyze numeric tag data with comprehensive statistics.</p>
+    </div>
+
+    <!-- Tag Selection Card -->
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div class="flex-1">
+                <label for="tagSelect" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Select numeric tag</label>
+                <select id="tagSelect" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId" @bind:after="OnTagChanged">
+                    <option value="">-- Select a tag --</option>
+                    @foreach (var tag in numericTags)
+                    {
+                        var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
+                            ? inputTypeNames[tag.InputTypeId.Value] 
+                            : "Unknown";
+                        <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+                    }
+                </select>
+            </div>
+            <button class="btn btn-primary flex items-center gap-2 whitespace-nowrap" @onclick="LoadStatistics" disabled="@(!CanLoadData)">
+                <Icon Name="chart-bar" Class="w-4 h-4" />
+                Load Statistics
+            </button>
+        </div>
+    </div>
+
+    @if (dataLoaded && statistics != null)
+    {
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- Minimum Value Card -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="p-5">
+                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
+                        <Icon Name="arrow-down" Class="w-5 h-5 me-2" />
+                        Minimum Value
+                    </h5>
+                    <p class="mb-2 text-4xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MinimumValue)</p>
+                    @if (statistics.MinimumValueDate.HasValue)
+                    {
+                        <small class="text-sm text-gray-500 dark:text-slate-400">@statistics.MinimumValueDate.Value.ToString("MMM d, yyyy")</small>
+                    }
+                </div>
+            </div>
+
+            <!-- Maximum Value Card -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="p-5">
+                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
+                        <Icon Name="arrow-up" Class="w-5 h-5 me-2" />
+                        Maximum Value
+                    </h5>
+                    <p class="mb-2 text-4xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MaximumValue)</p>
+                    @if (statistics.MaximumValueDate.HasValue)
+                    {
+                        <small class="text-sm text-gray-500 dark:text-slate-400">@statistics.MaximumValueDate.Value.ToString("MMM d, yyyy")</small>
+                    }
+                </div>
+            </div>
+
+            <!-- Average by Day of Week Card -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="p-5">
+                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
+                        <Icon Name="calendar" Class="w-5 h-5 me-2" />
+                        Average by Day
+                    </h5>
+                    <div class="space-y-2">
+                        @foreach (var dayAvg in statistics.AverageByDayOfWeek.OrderBy(kvp => (int)kvp.Key))
+                        {
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-600 dark:text-slate-400">@dayAvg.Key.ToString().Substring(0, 3)</span>
+                                <span class="font-semibold text-gray-900 dark:text-slate-100">@FormatValue(dayAvg.Value)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (!dataLoaded)
+    {
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+            <div class="flex items-start gap-3">
+                <Icon Name="information-circle" Class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    Select a numeric tag and click "Load Statistics" to view data analysis.
+                </p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string _pageTitle = "Statistics";
+    private List<TagResponse> numericTags = new();
+    private Dictionary<int, string> inputTypeNames = new();
+    private int? selectedTagId;
+    private bool dataLoaded = false;
+    private TagStatistics? statistics;
+
+    private bool CanLoadData => selectedTagId.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Statistics");
+        // Don't load data here - wait for OnAfterRenderAsync when HttpContext is available
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadNumericTags();
+            await LoadPreferences();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadNumericTags()
+    {
+        try
+        {
+            // Load all input types to get their names
+            var inputTypes = await ActivityApi.GetInputTypesAsync();
+            inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
+            
+            // Find the IDs for Integer and Decimal input types
+            var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
+            var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
+            
+            // Load tags and filter by numeric input types
+            var allTags = await ActivityApi.GetTags();
+            numericTags = allTags
+                .Where(t => t.InputTypeId.HasValue && 
+                           (t.InputTypeId == integerTypeId || t.InputTypeId == decimalTypeId))
+                .OrderBy(t => t.Title)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading tags: {ex.Message}");
+        }
+    }
+
+    private async Task LoadPreferences()
+    {
+        try
+        {
+            var prefs = await UserPreferencesService.GetAsync();
+            var savedTagIdStr = await JS.InvokeAsync<string>("localStorage.getItem", "statistics_selectedTag");
+            
+            if (!string.IsNullOrEmpty(savedTagIdStr) && int.TryParse(savedTagIdStr, out var savedTagId) && 
+                numericTags.Any(t => t.Id == savedTagId))
+            {
+                selectedTagId = savedTagId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading preferences: {ex.Message}");
+        }
+    }
+
+    private async Task OnTagChanged()
+    {
+        try
+        {
+            if (selectedTagId.HasValue)
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", "statistics_selectedTag", selectedTagId.Value.ToString());
+            }
+            dataLoaded = false;
+            statistics = null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving tag preference: {ex.Message}");
+        }
+    }
+
+    private async Task LoadStatistics()
+    {
+        if (!selectedTagId.HasValue)
+            return;
+
+        try
+        {
+            // Get all activities for the selected tag (using pagination)
+            var result = await ActivityApi.GetActivities(
+                pageNumber: 1,
+                pageSize: 10000,
+                orderBy: "desc",
+                tagId: selectedTagId.Value
+            );
+            
+            var activities = result.Items.ToList();
+            
+            if (!activities.Any())
+            {
+                statistics = null;
+                dataLoaded = true;
+                return;
+            }
+
+            var numericValues = activities
+                .Where(a => !string.IsNullOrEmpty(a.Description) && decimal.TryParse(a.Description, out _))
+                .Select(a => new 
+                { 
+                    Value = decimal.Parse(a.Description),
+                    Date = a.DateStarted,
+                    DayOfWeek = a.DateStarted.DayOfWeek
+                })
+                .ToList();
+
+            if (!numericValues.Any())
+            {
+                statistics = null;
+                dataLoaded = true;
+                return;
+            }
+
+            var prefs = await UserPreferencesService.GetAsync();
+            
+            statistics = new TagStatistics
+            {
+                MinimumValue = numericValues.Min(v => v.Value),
+                MaximumValue = numericValues.Max(v => v.Value),
+                MinimumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Min(x => x.Value))?.Date,
+                MaximumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Max(x => x.Value))?.Date,
+                AverageByDayOfWeek = numericValues
+                    .GroupBy(v => v.DayOfWeek)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Average(v => v.Value)
+                    )
+            };
+
+            dataLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading statistics: {ex.Message}");
+        }
+    }
+
+    private string FormatValue(decimal value)
+    {
+        if (selectedTagId.HasValue)
+        {
+            var selectedTag = numericTags.FirstOrDefault(t => t.Id == selectedTagId.Value);
+            if (selectedTag?.InputTypeId.HasValue == true && 
+                inputTypeNames.ContainsKey(selectedTag.InputTypeId.Value) &&
+                inputTypeNames[selectedTag.InputTypeId.Value] == "Decimal")
+            {
+                return value.ToString("F2");
+            }
+        }
+        return value.ToString("F0");
+    }
+
+    private class TagStatistics
+    {
+        public decimal MinimumValue { get; set; }
+        public decimal MaximumValue { get; set; }
+        public DateTime? MinimumValueDate { get; set; }
+        public DateTime? MaximumValueDate { get; set; }
+        public Dictionary<DayOfWeek, decimal> AverageByDayOfWeek { get; set; } = new();
+    }
+}

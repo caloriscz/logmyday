@@ -52,7 +52,7 @@
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
-                        <InputSelect @bind-Value="newTag.TypeId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
+                        <InputSelect @bind-Value="newTag.TypeId" @bind-Value:after="OnInputTypeChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
                             @foreach (var type in inputTypes)
                             {
                                 <option value="@type.Id">@type.Name</option>
@@ -65,10 +65,13 @@
                             <InputCheckbox @bind-Value="newTag.IsRequired" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Required
                         </label>
-                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                            <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
-                            Repeatable
-                        </label>
+                        @if (!IsRepeatableLockedForCurrentType)
+                        {
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                                <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                                Repeatable
+                            </label>
+                        }
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
                             <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Range
@@ -90,18 +93,27 @@
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
                             <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
                         </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
-                            <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
-                            <InputNumber @bind-Value="newTag.MaxValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
-                            <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
-                        </div>
+                        @if (!IsMinimumLockedForCurrentType)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
+                                <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                            </div>
+                        }
+                        @if (!IsMaximumLockedForCurrentType)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
+                                <InputNumber @bind-Value="newTag.MaxValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                            </div>
+                        }
+                        @if (!IsStepLockedForCurrentType)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
+                                <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                            </div>
+                        }
                     </div>
 
                     <div class="space-y-2">
@@ -310,6 +322,7 @@
         if (!inputTypes.Any(it => it.Id == newTag.TypeId))
         {
             newTag.TypeId = GetDefaultInputTypeId();
+            OnInputTypeChanged(); // Trigger the change handler to set initial values
         }
     }
 
@@ -319,5 +332,82 @@
             .FirstOrDefault(it => string.Equals(it.Name, "Integer", StringComparison.OrdinalIgnoreCase));
 
         return integerType?.Id ?? inputTypes[0].Id;
+    }
+
+    private bool IsRangeLockedForCurrentType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsRangeEditable;
+        }
+    }
+
+    private bool IsStepLockedForCurrentType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsStepEditable;
+        }
+    }
+
+    private bool IsMinimumLockedForCurrentType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsMinimumEditable;
+        }
+    }
+
+    private bool IsMaximumLockedForCurrentType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsMaximumEditable;
+        }
+    }
+
+    private bool IsRepeatableLockedForCurrentType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsRepeatableEditable;
+        }
+    }
+
+    private void OnInputTypeChanged()
+    {
+        var selectedType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+        if (selectedType != null && !selectedType.IsRangeEditable)
+        {
+            // Auto-populate constraints for locked types
+            var constraints = LogMyDay.Domain.Helpers.InputTypeDefaults.GetConstraintsForType(newTag.TypeId);
+            newTag.MinValue = constraints.MinValue;
+            newTag.MaxValue = constraints.MaxValue;
+            newTag.Step = constraints.Step;
+        }
+        else
+        {
+            // Clear values when switching to editable type
+            newTag.MinValue = null;
+            newTag.MaxValue = null;
+            newTag.Step = null;
+        }
+        
+        // Auto-set IsRepeatable = false for locked types, true for editable types
+        if (selectedType != null && !selectedType.IsRepeatableEditable)
+        {
+            newTag.IsRepeatable = false;
+        }
+        else
+        {
+            newTag.IsRepeatable = true;
+        }
+
+        StateHasChanged();
     }
 }

@@ -1,0 +1,89 @@
+@page "/insights"
+@using LogMyDay.App.Services
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+
+<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Insights</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Explore your data through different views and perspectives.</p>
+    </div>
+
+    <!-- Insights Cards Grid -->
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- Calendar Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToCalendar()">
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Calendar</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Review how often a tag appears across each month and year.</p>
+            </div>
+        </div>
+
+        <!-- Linear Calendar Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToLinearCalendar()">
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Linear Calendar</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Year-as-rows calendar view with week-aligned layout.</p>
+            </div>
+        </div>
+
+        <!-- Journal Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToJournal()">
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-amber-400 to-orange-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Journal</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">View daily text entries and summaries grouped by date.</p>
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToStatistics()">
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-rose-400 to-pink-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Statistics</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Analyze numeric tag data with min, max, and daily averages.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Insights");
+    }
+
+    private void NavigateToCalendar()
+    {
+        Navigation.NavigateTo("/calendar");
+    }
+
+    private void NavigateToLinearCalendar()
+    {
+        Navigation.NavigateTo("/calendar-linear");
+    }
+
+    private void NavigateToJournal()
+    {
+        Navigation.NavigateTo("/insights/journal");
+    }
+
+    private void NavigateToStatistics()
+    {
+        Navigation.NavigateTo("/statistics");
+    }
+}

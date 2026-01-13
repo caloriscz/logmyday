@@ -534,7 +534,11 @@
     {
         try
         {
-            availableTags = await ExcelExportService.GetAvailableTags();
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            if (currentUser?.Id != null)
+            {
+                availableTags = await ExcelExportService.GetAvailableTags(currentUser.Id);
+            }
         }
         catch (Exception ex)
         {

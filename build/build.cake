@@ -176,8 +176,41 @@ Task("Test")
     Information("========================================");
 });
 
+Task("BuildTailwind")
+    .Does(() =>
+{
+    Information("🎨 Building Tailwind CSS...");
+    var uiPath = MakeAbsolute(Directory("../src/ui")).FullPath;
+    
+    // Run npm commands via PowerShell
+    Information("Installing npm dependencies...");
+    var npmInstallExitCode = StartProcess("powershell", new ProcessSettings {
+        Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"cd '{uiPath}'; npm install\"",
+        WorkingDirectory = uiPath
+    });
+    
+    if (npmInstallExitCode != 0)
+    {
+        throw new Exception("npm install failed");
+    }
+    
+    Information("Building Tailwind CSS...");
+    var npmBuildExitCode = StartProcess("powershell", new ProcessSettings {
+        Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"cd '{uiPath}'; npm run build\"",
+        WorkingDirectory = uiPath
+    });
+    
+    if (npmBuildExitCode != 0)
+    {
+        throw new Exception("npm run build failed");
+    }
+    
+    Information("✅ Tailwind CSS built successfully");
+});
+
 Task("Publish")
     .IsDependentOn("Test")
+    .IsDependentOn("BuildTailwind")
     .Does(() =>
 {
     Information("📦 Publishing application...");

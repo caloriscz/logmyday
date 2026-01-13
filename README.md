@@ -2,6 +2,9 @@
 
 LogMyDay helps you capture the story of your day. Use it to record habits, wellness routines, chores, workouts, and the small highlights that make every day different. A web dashboard and Android companion app stay in sync so you can log entries wherever you are.
 
+> [!WARNING]
+> LogMyDay is a personal / experimental project and is not production-ready. Features and behavior may change, and occasional bugs or inconsistencies can occur. Use at your own discretion.
+
 ## What You Can Track
 
 - Daily routines, workouts, chores, study blocks, or any recurring activity you want to monitor

@@ -1,0 +1,560 @@
+@page "/insights/journal"
+@using System.Globalization
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject ILogger<Journal> Logger
+@inject IUserPreferencesService UserPreferencesService
+
+<PageTitle>Journal - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <!-- Header -->
+    <div class="bg-gradient-to-br from-amber-400 to-orange-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 shadow-lg dark:shadow-slate-900/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button @onclick="NavigateBack" 
+                            class="p-2 hover:bg-white/10 dark:hover:bg-slate-800/60 rounded-lg transition-colors">
+                        <Icon Name="arrow-left" Class="w-6 h-6 text-white" />
+                    </button>
+                    <div>
+                        <h1 class="text-2xl md:text-3xl font-bold text-white">Journal</h1>
+                        <p class="text-white/80 text-sm mt-1">Daily text entries and summaries</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Controls -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 p-4 mb-6">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Year Filter -->
+                <div class="flex-1 min-w-[200px]">
+                    <label class="form-label">Year</label>
+                    <select @bind="selectedYear" 
+                            @bind:after="OnFilterChanged"
+                            class="form-select w-full">
+                        @if (availableYears != null)
+                        {
+                            @foreach (var year in availableYears.OrderByDescending(y => y))
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <!-- Sort Order -->
+                <div class="flex-1 min-w-[200px]">
+                    <label class="form-label">Sort Order</label>
+                    <select @bind="sortOrder" 
+                            @bind:after="OnFilterChanged"
+                            class="form-select w-full">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
+
+                <!-- Tag Filter (String input types only) -->
+                <div class="flex-1 min-w-[200px]">
+                    <label class="form-label">Tag Filter</label>
+                    <select @bind="selectedTagId" 
+                            @bind:after="OnFilterChanged"
+                            class="form-select w-full">
+                        <option value="">Select tag (or All tags)</option>
+                        @if (stringTags != null)
+                        {
+                            @foreach (var tag in stringTags)
+                            {
+                                <option value="@tag.Id">@tag.Title</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Load Button -->
+            <div class="mt-4 flex justify-center">
+                <button @onclick="LoadData" 
+                        class="btn btn-primary"
+                        disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner border-t-white w-4 h-4 mr-2"></span>
+                    }
+                    else
+                    {
+                        <Icon Name="document-text" Class="w-4 h-4 mr-2" />
+                    }
+                    @(dataLoaded ? "Reload Journal Entries" : "Load Journal Entries")
+                </button>
+            </div>
+        </div>
+
+        @if (errorMessage != null)
+        {
+            <div class="alert alert-danger">
+                <p class="font-semibold">Error loading journal entries</p>
+                <p class="text-sm mt-1">@errorMessage</p>
+            </div>
+        }
+        else if (!dataLoaded)
+        {
+            <div class="text-center py-12">
+                <Icon Name="document-text" Class="w-16 h-16 text-gray-400 dark:text-slate-600 mx-auto mb-4" />
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Ready to view journal entries</h3>
+                <p class="text-gray-600 dark:text-slate-400">Click "Load Journal Entries" to view your text-based activities.</p>
+            </div>
+        }
+        else if (groupedActivities == null || !groupedActivities.Any())
+        {
+            <div class="text-center py-12">
+                <Icon Name="document-text" Class="w-16 h-16 text-gray-400 dark:text-slate-600 mx-auto mb-4" />
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">No journal entries found</h3>
+                <p class="text-gray-600 dark:text-slate-400">Try adjusting your filters or start adding text-based activities.</p>
+            </div>
+        }
+        else
+        {
+            <!-- Journal Entries Grouped by Date -->
+            <div class="space-y-6">
+                @foreach (var group in groupedActivities)
+                {
+                    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 overflow-hidden">
+                        <!-- Date Header -->
+                        <div class="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-900/60 dark:to-slate-800/60 border-b border-amber-200 dark:border-slate-700 px-6 py-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <Icon Name="calendar" Class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
+                                        @group.Date.ToString("dddd, MMMM dd, yyyy")
+                                    </h2>
+                                    <span class="text-sm text-gray-500 dark:text-slate-400">
+                                        (@group.Activities.Count @(group.Activities.Count == 1 ? "entry" : "entries"))
+                                    </span>
+                                </div>
+                                <button @onclick="() => AddActivityForDate(group.Date)" 
+                                        class="btn btn-sm btn-primary">
+                                    <Icon Name="plus" Class="w-4 h-4 mr-1" />
+                                    Add Activity
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Entries for this date -->
+                        <div class="divide-y divide-gray-200 dark:divide-slate-700">
+                            @foreach (var activity in group.Activities)
+                            {
+                                <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
+                                    <div class="flex items-start gap-3">
+                                        <!-- Time Badge -->
+                                        <div class="flex-shrink-0">
+                                            <div class="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-lg text-sm font-medium">
+                                                @activity.DateStarted.ToString("HH:mm")
+                                            </div>
+                                        </div>
+
+                                        <!-- Tag Badge -->
+                                        <div class="flex-shrink-0">
+                                            <span class="inline-flex items-center gap-1 bg-primary-100 dark:bg-sky-500/20 text-primary-700 dark:text-sky-300 px-2 py-1 rounded-md text-xs font-medium">
+                                                <Icon Name="tag" Class="w-3 h-3" />
+                                                @activity.PrimaryTagName
+                                            </span>
+                                        </div>
+
+                                        <!-- Description - wraps and continues at same indent -->
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                                                @activity.Description
+                                            </div>
+                                        </div>
+
+                                        <!-- Action Buttons -->
+                                        <div class="flex-shrink-0 flex items-center gap-2">
+                                            <button @onclick="() => EditActivity(activity)" 
+                                                    class="btn btn-sm btn-secondary">
+                                                <Icon Name="pencil" Class="w-4 h-4" />
+                                            </button>
+                                            <button @onclick="() => DeleteActivity(activity)" 
+                                                    class="btn btn-sm btn-danger">
+                                                <Icon Name="trash" Class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Pagination -->
+            @if (totalPages > 1)
+            {
+                <div class="mt-8 flex items-center justify-center gap-2">
+                    <button @onclick="() => ChangePage(1)" 
+                            disabled="@(currentPage == 1)"
+                            class="btn btn-secondary btn-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Icon Name="chevron-double-left" Class="w-4 h-4" />
+                    </button>
+                    
+                    <button @onclick="() => ChangePage(currentPage - 1)" 
+                            disabled="@(currentPage == 1)"
+                            class="btn btn-secondary btn-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Icon Name="chevron-left" Class="w-4 h-4" />
+                    </button>
+
+                    <div class="flex items-center gap-2">
+                        @for (int i = Math.Max(1, currentPage - 2); i <= Math.Min(totalPages, currentPage + 2); i++)
+                        {
+                            var pageNum = i;
+                            <button @onclick="() => ChangePage(pageNum)"
+                                    class="@(pageNum == currentPage ? "btn btn-primary btn-sm" : "btn btn-secondary btn-sm")">
+                                @pageNum
+                            </button>
+                        }
+                    </div>
+
+                    <button @onclick="() => ChangePage(currentPage + 1)" 
+                            disabled="@(currentPage >= totalPages)"
+                            class="btn btn-secondary btn-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Icon Name="chevron-right" Class="w-4 h-4" />
+                    </button>
+
+                    <button @onclick="() => ChangePage(totalPages)" 
+                            disabled="@(currentPage >= totalPages)"
+                            class="btn btn-secondary btn-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <Icon Name="chevron-double-right" Class="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div class="text-center mt-4 text-sm text-gray-600 dark:text-slate-400">
+                    Page @currentPage of @totalPages (@totalItems total entries)
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@* Edit Activity Modal *@
+@if (showActivityModal && allTags != null && optionLists != null && newActivity != null)
+{
+    <AddActivityModal
+        Activity="newActivity"
+        AvailableTags="allTags"
+        OptionLists="optionLists"
+        OptionListLookup="optionListLookup"
+        DisplayCulture="displayCulture"
+        DisplayTimeZone="displayTimeZone"
+        ErrorMessage="@modalErrorMessage"
+        IsEditMode="isEditMode"
+        ActivityId="editingActivityId"
+        OnActivityCreated="OnActivityCreated"
+        OnActivityUpdated="OnActivityUpdated"
+        OnCanceled="CloseActivityModal"
+        OnError="OnModalError"
+        ModalId="journalActivityModal"
+        PreselectedDate="@preselectedDate" />
+}
+
+@code {
+    private List<int>? availableYears;
+    private List<TagResponse>? stringTags;
+    private List<TagResponse>? allTags;
+    private List<ActivityResponse>? activities;
+    private List<DateGrouping>? groupedActivities;
+    
+    private int selectedYear = DateTime.Now.Year;
+    private string sortOrder = "desc";
+    private int? selectedTagId = null;
+    
+    private int currentPage = 1;
+    private int pageSize = 50; // 50 entries per page
+    private int totalPages = 1;
+    private int totalItems = 0;
+    
+    private bool isLoading = false;
+    private bool dataLoaded = false;
+    private string? errorMessage;
+    
+    // Modal state
+    private bool showActivityModal = false;
+    private bool isEditMode = false;
+    private int? editingActivityId;
+    private ActivityRequest newActivity = new();
+    private string? modalErrorMessage;
+    private DateTime? preselectedDate;
+    
+    // Modal dependencies
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+    private CultureInfo displayCulture = CultureInfo.InvariantCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Utc;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Journal");
+        await LoadInitialData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadPreferences();
+        }
+    }
+
+    private async Task LoadInitialData()
+    {
+        try
+        {
+            errorMessage = null;
+
+            // Load user preferences for display
+            var userPreferences = await UserPreferencesService.GetAsync();
+            displayCulture = userPreferences.Culture;
+            displayTimeZone = userPreferences.TimeZone;
+
+            // Load input types first
+            var inputTypes = await ActivityApi.GetInputTypesAsync();
+            var stringInputType = inputTypes.FirstOrDefault(t => t.Name.ToLower() == "string");
+            
+            // Load all tags and filter for string input type
+            allTags = (await ActivityApi.GetTags()).ToList();
+            stringTags = stringInputType != null 
+                ? allTags.Where(t => t.InputTypeId == stringInputType.Id).ToList()
+                : new List<TagResponse>();
+
+            // Load option lists for modal
+            optionLists = await ActivityApi.GetTagOptionListsAsync();
+            optionListLookup = optionLists?.ToDictionary(ol => ol.Id) ?? new Dictionary<int, TagOptionListResponse>();
+
+            // Load available years (all activities, not filtered by input type initially)
+            availableYears = await ActivityApi.GetAvailableYears(null);
+            
+            if (availableYears.Any())
+            {
+                selectedYear = availableYears.Max(); // Default to most recent year
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load initial data: {ex.Message}";
+        }
+    }
+
+    private async Task LoadPreferences()
+    {
+        try
+        {
+            var savedYear = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "journal_selectedYear");
+            var savedSort = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "journal_sortOrder");
+            var savedTag = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "journal_selectedTagId");
+
+            if (!string.IsNullOrEmpty(savedYear) && int.TryParse(savedYear, out var year))
+            {
+                selectedYear = year;
+            }
+
+            if (!string.IsNullOrEmpty(savedSort))
+            {
+                sortOrder = savedSort;
+            }
+
+            if (!string.IsNullOrEmpty(savedTag) && int.TryParse(savedTag, out var tagId))
+            {
+                selectedTagId = tagId;
+            }
+
+            StateHasChanged();
+        }
+        catch
+        {
+            // Ignore localStorage errors
+        }
+    }
+
+    private async Task SavePreferences()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "journal_selectedYear", selectedYear.ToString());
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "journal_sortOrder", sortOrder);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "journal_selectedTagId", selectedTagId?.ToString() ?? "");
+        }
+        catch
+        {
+            // Ignore localStorage errors
+        }
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await SavePreferences();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            StateHasChanged();
+
+            // Get all activities for the selected year
+            var yearActivities = await ActivityApi.GetActivitiesByYear(selectedYear, selectedTagId);
+
+            // Filter for string input types only if no specific tag is selected
+            if (!selectedTagId.HasValue && stringTags != null)
+            {
+                var stringTagIds = stringTags.Select(t => t.Id).ToHashSet();
+                activities = yearActivities
+                    .Where(a => a.PrimaryTagId.HasValue && stringTagIds.Contains(a.PrimaryTagId.Value))
+                    .ToList();
+            }
+            else
+            {
+                activities = yearActivities;
+            }
+
+            // Sort activities
+            var sortedActivities = sortOrder == "desc" 
+                ? activities.OrderByDescending(a => a.DateStarted).ToList()
+                : activities.OrderBy(a => a.DateStarted).ToList();
+
+            // Calculate pagination
+            totalItems = sortedActivities.Count;
+            totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+            currentPage = Math.Max(1, Math.Min(currentPage, totalPages == 0 ? 1 : totalPages));
+
+            // Apply pagination
+            var paginatedActivities = sortedActivities
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            // Group by date
+            groupedActivities = paginatedActivities
+                .GroupBy(a => a.DateStarted.Date)
+                .Select(g => new DateGrouping
+                {
+                    Date = g.Key,
+                    Activities = g.OrderBy(a => a.DateStarted).ToList()
+                })
+                .ToList();
+
+            dataLoaded = true;
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load journal entries: {ex.Message}";
+            isLoading = false;
+        }
+    }
+
+    private async Task ChangePage(int newPage)
+    {
+        if (newPage < 1 || newPage > totalPages)
+            return;
+
+        currentPage = newPage;
+        await LoadData();
+    }
+
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/insights");
+    }
+
+    private void AddActivityForDate(DateTime date)
+    {
+        isEditMode = false;
+        editingActivityId = null;
+        preselectedDate = date;
+        newActivity = new ActivityRequest
+        {
+            DateStarted = ConvertToDisplayZone(date)
+        };
+        showActivityModal = true;
+        modalErrorMessage = null;
+    }
+
+    private void EditActivity(ActivityResponse activity)
+    {
+        isEditMode = true;
+        editingActivityId = activity.Id;
+        preselectedDate = null;
+
+        newActivity = new ActivityRequest
+        {
+            PrimaryTagId = activity.PrimaryTagId,
+            Description = activity.Description,
+            DateStarted = ConvertToDisplayZone(activity.DateStarted),
+            DateFinished = activity.DateFinished.HasValue
+                ? ConvertToDisplayZone(activity.DateFinished.Value)
+                : null
+        };
+
+        showActivityModal = true;
+        modalErrorMessage = null;
+    }
+
+    private async Task DeleteActivity(ActivityResponse activity)
+    {
+        try
+        {
+            await ActivityApi.Delete(activity.Id);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to delete activity: {ex.Message}";
+            Logger.LogError(ex, "Error deleting activity with ID {ActivityId}", activity.Id);
+        }
+    }
+
+    private void CloseActivityModal()
+    {
+        showActivityModal = false;
+        isEditMode = false;
+        editingActivityId = null;
+        modalErrorMessage = null;
+    }
+
+    private async Task OnActivityCreated()
+    {
+        showActivityModal = false;
+        await LoadData();
+    }
+
+    private async Task OnActivityUpdated()
+    {
+        showActivityModal = false;
+        await LoadData();
+    }
+
+    private void OnModalError(string error)
+    {
+        modalErrorMessage = error;
+    }
+
+    private DateTime ConvertToDisplayZone(DateTime utcDateTime)
+    {
+        return TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, displayTimeZone);
+    }
+
+    private class DateGrouping
+    {
+        public DateTime Date { get; set; }
+        public List<ActivityResponse> Activities { get; set; } = new();
+    }
+}

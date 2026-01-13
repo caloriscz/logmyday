@@ -1,10 +1,9 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Infrastructure.Repositories;
-using LogMyDay.Api.Infrastructure.Specifications;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Helpers;
 using LogMyDay.Shared.DTOs;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using static LogMyDay.Api.Infrastructure.Specifications.TagSpecifications;
 
@@ -27,18 +26,50 @@ public class TagService : ITagService
     {
         _logger.LogInformation("Creating tag with request: {@CreateTagRequest}", createTagRequest);
 
+        // Apply InputType constraints for locked types
+        var inputTypeId = createTagRequest.TypeId == 0 ? (int?)null : createTagRequest.TypeId;
+        double? minValue = createTagRequest.MinValue;
+        double? maxValue = createTagRequest.MaxValue;
+        double? step = createTagRequest.Step;
+        bool isRepeatable = createTagRequest.IsRepeatable;
+
+        if (inputTypeId.HasValue)
+        {
+            var inputType = await _context.InputTypes.FindAsync(inputTypeId.Value);
+            if (inputType != null)
+            {
+                // Enforce min/max/step constraints if range not editable
+                if (!inputType.IsRangeEditable || !inputType.IsMinimumEditable || !inputType.IsMaximumEditable || !inputType.IsStepEditable)
+                {
+                    var constraints = InputTypeDefaults.GetConstraintsForType(inputTypeId.Value);
+                    if (!inputType.IsMinimumEditable) minValue = constraints.MinValue;
+                    if (!inputType.IsMaximumEditable) maxValue = constraints.MaxValue;
+                    if (!inputType.IsStepEditable) step = constraints.Step;
+                    _logger.LogInformation("Applied locked constraints for InputType {InputTypeId}: Min={Min}, Max={Max}, Step={Step}",
+                        inputTypeId, minValue, maxValue, step);
+                }
+
+                // Enforce IsRepeatable constraint if not editable
+                if (!inputType.IsRepeatableEditable)
+                {
+                    isRepeatable = false;
+                    _logger.LogInformation("Applied locked IsRepeatable=false for InputType {InputTypeId}", inputTypeId);
+                }
+            }
+        }
+
         var tag = new Tag
         {
             TagName = createTagRequest.Tag,
-            InputTypeId = createTagRequest.TypeId == 0 ? null : createTagRequest.TypeId,
+            InputTypeId = inputTypeId,
             IsRequired = createTagRequest.IsRequired, // Map IsRequired
-            IsRepeatable = createTagRequest.IsRepeatable,
+            IsRepeatable = isRepeatable,
             TimeGranularity = createTagRequest.TimeGranularity,
             IsRange = createTagRequest.IsRange,
             UnitId = createTagRequest.UnitId,
-            MinValue = createTagRequest.MinValue,
-            MaxValue = createTagRequest.MaxValue,
-            Step = createTagRequest.Step,
+            MinValue = minValue,
+            MaxValue = maxValue,
+            Step = step,
             DefaultValue = createTagRequest.DefaultValue,
             OptionListId = createTagRequest.OptionListId,
             UserId = userId // Associate tag with current user
@@ -82,16 +113,48 @@ public class TagService : ITagService
             throw new KeyNotFoundException("Tag not found");
         }
 
+        // Apply InputType constraints for locked types
+        var inputTypeId = model.TypeId == 0 ? (int?)null : model.TypeId;
+        double? minValue = model.MinValue;
+        double? maxValue = model.MaxValue;
+        double? step = model.Step;
+        bool isRepeatable = model.IsRepeatable;
+
+        if (inputTypeId.HasValue)
+        {
+            var inputType = await _context.InputTypes.FindAsync(inputTypeId.Value);
+            if (inputType != null)
+            {
+                // Enforce min/max/step constraints if range not editable
+                if (!inputType.IsRangeEditable || !inputType.IsMinimumEditable || !inputType.IsMaximumEditable || !inputType.IsStepEditable)
+                {
+                    var constraints = InputTypeDefaults.GetConstraintsForType(inputTypeId.Value);
+                    if (!inputType.IsMinimumEditable) minValue = constraints.MinValue;
+                    if (!inputType.IsMaximumEditable) maxValue = constraints.MaxValue;
+                    if (!inputType.IsStepEditable) step = constraints.Step;
+                    _logger.LogInformation("Applied locked constraints for InputType {InputTypeId}: Min={Min}, Max={Max}, Step={Step}",
+                        inputTypeId, minValue, maxValue, step);
+                }
+
+                // Enforce IsRepeatable constraint if not editable
+                if (!inputType.IsRepeatableEditable)
+                {
+                    isRepeatable = false;
+                    _logger.LogInformation("Applied locked IsRepeatable=false for InputType {InputTypeId}", inputTypeId);
+                }
+            }
+        }
+
         tag.TagName = model.Tag;
-        tag.InputTypeId = model.TypeId == 0 ? null : model.TypeId;
+        tag.InputTypeId = inputTypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
-        tag.IsRepeatable = model.IsRepeatable;
+        tag.IsRepeatable = isRepeatable;
         tag.TimeGranularity = model.TimeGranularity;
         tag.IsRange = model.IsRange;
         tag.UnitId = model.UnitId;
-        tag.MinValue = model.MinValue;
-        tag.MaxValue = model.MaxValue;
-        tag.Step = model.Step;
+        tag.MinValue = minValue;
+        tag.MaxValue = maxValue;
+        tag.Step = step;
         tag.DefaultValue = model.DefaultValue;
         tag.OptionListId = model.OptionListId;
 

@@ -22,7 +22,17 @@ public class InputTypesController : ControllerBase
     public async Task<ActionResult<IEnumerable<InputTypeDto>>> GetInputTypes()
     {
         var inputTypes = await _context.InputTypes
-            .Select(x => new InputTypeDto { Id = x.Id, Name = x.Name })
+            .Select(x => new InputTypeDto 
+            { 
+                Id = x.Id, 
+                Name = x.Name,
+                Description = x.Description,
+                IsRangeEditable = x.IsRangeEditable,
+                IsMinimumEditable = x.IsMinimumEditable,
+                IsMaximumEditable = x.IsMaximumEditable,
+                IsStepEditable = x.IsStepEditable,
+                IsRepeatableEditable = x.IsRepeatableEditable
+            })
             .ToListAsync();
         
         return Ok(inputTypes);

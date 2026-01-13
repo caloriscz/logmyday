@@ -53,7 +53,7 @@
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
-                        <InputSelect @bind-Value="editTag.TypeId" class="@InputCss" disabled="@isSaving">
+                        <InputSelect @bind-Value="editTag.TypeId" @bind-Value:after="OnInputTypeChanged" class="@InputCss" disabled="@isSaving">
                             @foreach (var type in inputTypes)
                             {
                                 <option value="@type.Id">@type.Name</option>
@@ -66,10 +66,13 @@
                             <InputCheckbox @bind-Value="editTag.IsRequired" class="@CheckboxCss" disabled="@isSaving" />
                             Required
                         </label>
-                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                            <InputCheckbox @bind-Value="editTag.IsRepeatable" class="@CheckboxCss" disabled="@isSaving" />
-                            Repeatable
-                        </label>
+                        @if (!IsRepeatableLockedForCurrentType || editTag.IsRepeatable)
+                        {
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
+                                <InputCheckbox @bind-Value="editTag.IsRepeatable" class="@CheckboxCss" disabled="@(isSaving || IsRepeatableLockedForCurrentType)" />
+                                Repeatable
+                            </label>
+                        }
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
                             <InputCheckbox @bind-Value="editTag.IsRange" class="@CheckboxCss" disabled="@isSaving" />
                             Range
@@ -91,18 +94,27 @@
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
                             <InputText @bind-Value="editTag.DefaultValue" class="@InputCss" disabled="@isSaving" />
                         </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
-                            <InputNumber @bind-Value="editTag.MinValue" class="@InputCss" TValue="double?" disabled="@isSaving" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
-                            <InputNumber @bind-Value="editTag.MaxValue" class="@InputCss" TValue="double?" disabled="@isSaving" />
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
-                            <InputNumber @bind-Value="editTag.Step" class="@InputCss" TValue="double?" disabled="@isSaving" />
-                        </div>
+                        @if (!IsMinimumLockedForCurrentType || editTag.MinValue.HasValue)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
+                                <InputNumber @bind-Value="editTag.MinValue" class="@InputCss" TValue="double?" disabled="@(isSaving || IsMinimumLockedForCurrentType)" />
+                            </div>
+                        }
+                        @if (!IsMaximumLockedForCurrentType || editTag.MaxValue.HasValue)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
+                                <InputNumber @bind-Value="editTag.MaxValue" class="@InputCss" TValue="double?" disabled="@(isSaving || IsMaximumLockedForCurrentType)" />
+                            </div>
+                        }
+                        @if (!IsStepLockedForCurrentType || editTag.Step.HasValue)
+                        {
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
+                                <InputNumber @bind-Value="editTag.Step" class="@InputCss" TValue="double?" disabled="@(isSaving || IsStepLockedForCurrentType)" />
+                            </div>
+                        }
                     </div>
 
                     <div class="space-y-2">
@@ -705,6 +717,91 @@
         var integerType = inputTypes.FirstOrDefault(it => string.Equals(it.Name, "Integer", System.StringComparison.OrdinalIgnoreCase));
 
         return integerType?.Id ?? inputTypes.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private bool IsRangeLockedForCurrentType
+    {
+        get
+        {
+            if (editTag == null) return false;
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+            return currentType != null && !currentType.IsRangeEditable;
+        }
+    }
+
+    private bool IsStepLockedForCurrentType
+    {
+        get
+        {
+            if (editTag == null) return false;
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+            return currentType != null && !currentType.IsStepEditable;
+        }
+    }
+
+    private bool IsMinimumLockedForCurrentType
+    {
+        get
+        {
+            if (editTag == null) return false;
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+            return currentType != null && !currentType.IsMinimumEditable;
+        }
+    }
+
+    private bool IsMaximumLockedForCurrentType
+    {
+        get
+        {
+            if (editTag == null) return false;
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+            return currentType != null && !currentType.IsMaximumEditable;
+        }
+    }
+
+    private bool IsRepeatableLockedForCurrentType
+    {
+        get
+        {
+            if (editTag == null) return false;
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+            return currentType != null && !currentType.IsRepeatableEditable;
+        }
+    }
+
+    private void OnInputTypeChanged()
+    {
+        if (editTag == null) return;
+        
+        var selectedType = inputTypes.FirstOrDefault(it => it.Id == editTag.TypeId);
+        if (selectedType != null && !selectedType.IsRangeEditable)
+        {
+            // Auto-populate constraints for locked types
+            var constraints = LogMyDay.Domain.Helpers.InputTypeDefaults.GetConstraintsForType(editTag.TypeId);
+            editTag.MinValue = constraints.MinValue;
+            editTag.MaxValue = constraints.MaxValue;
+            editTag.Step = constraints.Step;
+        }
+        else
+        {
+            // Clear values when switching to editable type (unless they already have values)
+            if (!editTag.MinValue.HasValue) editTag.MinValue = null;
+            if (!editTag.MaxValue.HasValue) editTag.MaxValue = null;
+            if (!editTag.Step.HasValue) editTag.Step = null;
+        }
+        
+        // Auto-set IsRepeatable = false for locked types
+        if (selectedType != null && !selectedType.IsRepeatableEditable)
+        {
+            editTag.IsRepeatable = false;
+        }
+        else if (!editTag.IsRepeatable)
+        {
+            // When switching to editable type, reset to true if currently false
+            editTag.IsRepeatable = true;
+        }
+
+        StateHasChanged();
     }
 
     private sealed class NotificationViewModel
