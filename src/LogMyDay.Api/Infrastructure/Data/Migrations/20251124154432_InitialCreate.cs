@@ -12,6 +12,10 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var dateCreatedSql = ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite"
+                ? "CURRENT_TIMESTAMP"
+                : "GETUTCDATE()";
+
             migrationBuilder.CreateTable(
                 name: "LogMyDay_InputTypes",
                 columns: table => new
@@ -147,7 +151,7 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     MaxNudges = table.Column<int>(type: "int", nullable: false, defaultValue: 3),
                     NudgeInterval = table.Column<TimeSpan>(type: "time", nullable: true, defaultValue: new TimeSpan(0, 0, 15, 0, 0)),
                     IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
-                    DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
+                    DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: dateCreatedSql),
                     LastDeliveryDate = table.Column<DateOnly>(type: "date", nullable: true),
                     DeliveriesOnLastDate = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
                     LastDeliverySentAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),

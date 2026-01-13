@@ -65,12 +65,17 @@ public class LogMyDayDbContext : DbContext
                 .HasDefaultValue(3);
 
             entity.Property(n => n.IsActive).HasDefaultValue(true);
-            entity.Property(n => n.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(n => n.DateCreated)
+                .HasDefaultValueSql(Database.IsSqlite() ? "CURRENT_TIMESTAMP" : "GETUTCDATE()");
             entity.Property(n => n.NudgeInterval).HasDefaultValue(new TimeSpan(0, 15, 0));
             entity.Property(n => n.DeliveriesOnLastDate).HasDefaultValue(0);
-            entity.Property(n => n.LastDeliveryDate).HasColumnType("date");
-            entity.Property(n => n.LastDeliverySentAtUtc).HasColumnType("datetime2");
-            entity.Property(n => n.NextEligibleSendAfterUtc).HasColumnType("datetime2");
+
+            if (!Database.IsSqlite())
+            {
+                entity.Property(n => n.LastDeliveryDate).HasColumnType("date");
+                entity.Property(n => n.LastDeliverySentAtUtc).HasColumnType("datetime2");
+                entity.Property(n => n.NextEligibleSendAfterUtc).HasColumnType("datetime2");
+            }
         });
 
         modelBuilder.Entity<Quantity>(entity =>

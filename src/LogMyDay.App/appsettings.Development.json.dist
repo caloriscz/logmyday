@@ -2,6 +2,9 @@
   "ConnectionStrings": {
     "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=False"
   },
+  "Database": {
+    "Provider": "SqlServer"
+  },
   "Security": {
     "RateLimit": {
       "MaxAttemptsPerWindow": 3,

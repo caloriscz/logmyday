@@ -42,26 +42,49 @@ var refitSettings = new RefitSettings
     ContentSerializer = new SystemTextJsonContentSerializer(refitSerializerOptions)
 };
 
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
+var isSqlite = databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase);
+
 // Build connection string with Docker secrets if in Docker environment
 string connectionString;
 if (builder.Environment.EnvironmentName == "Docker")
 {
-    var dbPassword = builder.Configuration["db_password"];
-    var dbHost = builder.Configuration["DB_HOST"] ?? "host.docker.internal,1439";
-    var dbName = builder.Configuration["DB_NAME"] ?? "logmyday";
-    var dbUser = builder.Configuration["DB_USER"] ?? "sa";
-    
-    // Note: DB_HOST should include port if needed (e.g., "host.docker.internal,1439")
-    connectionString = $"Server={dbHost};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+    if (isSqlite)
+    {
+        var sqlitePath = builder.Configuration["DB_SQLITE_PATH"] ?? "Data/logmyday.db";
+        var sqliteDirectory = Path.GetDirectoryName(sqlitePath);
+        if (!string.IsNullOrWhiteSpace(sqliteDirectory))
+        {
+            Directory.CreateDirectory(sqliteDirectory);
+        }
+
+        connectionString = $"Data Source={sqlitePath}";
+    }
+    else
+    {
+        var dbPassword = builder.Configuration["db_password"];
+        var dbHost = builder.Configuration["DB_HOST"] ?? "host.docker.internal,1439";
+        var dbName = builder.Configuration["DB_NAME"] ?? "logmyday";
+        var dbUser = builder.Configuration["DB_USER"] ?? "sa";
+
+        // Note: DB_HOST should include port if needed (e.g., "host.docker.internal,1439")
+        connectionString = $"Server={dbHost};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+    }
 }
 else
 {
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 }
 
 services.AddDbContext<LogMyDayDbContext>(options =>
 {
+    if (isSqlite)
+    {
+        options.UseSqlite(connectionString);
+        return;
+    }
+
     options.UseSqlServer(connectionString);
 });
 

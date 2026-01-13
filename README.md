@@ -74,7 +74,7 @@ Follow these steps to run the LogMyDay web stack on a workstation. The commands 
 - .NET SDK 9.0 (`dotnet --list-sdks` should list 9.x)
 - Node.js 20 LTS and npm 10+
 - Android SDK + .NET MAUI workloads if you plan to build the mobile client (`dotnet workload install maui`)
-- A SQL Server instance (local or remote)
+- A SQL Server instance (local or remote) or SQLite (for local/dev file-based storage)
 
 ## Clone the repository
 
@@ -109,10 +109,13 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database Connection
 
-Edit `appsettings.Development.json` to set up the SQL Server connection string for local development.
+Choose a database provider and update the connection string. Set `Database:Provider` to either `SqlServer` or `Sqlite`.
 
 ```json
 {
+  "Database": {
+    "Provider": "SqlServer"
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost,1439;Database=logmyday;User Id=sa;Password=YOUR_DEV_PASSWORD;Encrypt=True;TrustServerCertificate=True;"
   }
@@ -126,6 +129,19 @@ Edit `appsettings.Development.json` to set up the SQL Server connection string f
 | `User Id` | SQL Server username | `sa` |
 | `Password` | SQL Server password | `MySecurePassword123!` |
 | `TrustServerCertificate` | Skip certificate validation | `True` (required for localhost dev) |
+
+SQLite example (local file-based database):
+
+```json
+{
+  "Database": {
+    "Provider": "Sqlite"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=Data/logmyday.db"
+  }
+}
+```
 
 ### 3. Configure API Base Address
 
@@ -184,6 +200,8 @@ dotnet tool install --global dotnet-ef
 dotnet ef database update --project src/LogMyDay.Api --startup-project src/LogMyDay.App
 ```
 
+> 💡 Ensure `Database:Provider` and `ConnectionStrings:DefaultConnection` match the database you want before running migrations (SQL Server or SQLite).
+
 ## Install UI dependencies
 
 The Tailwind + Vite workspace lives in `src/ui/`.
@@ -231,4 +249,3 @@ To run the default build (Clean + Restore + Build + Test + Publish):
 ```powershell
 ./build/build.ps1
 ```
-

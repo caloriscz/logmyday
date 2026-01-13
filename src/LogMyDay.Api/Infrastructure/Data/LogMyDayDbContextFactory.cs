@@ -30,6 +30,8 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
 
         var configuration = builder.Build();
         var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var databaseProvider = configuration["Database:Provider"] ?? "SqlServer";
+        var isSqlite = databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase);
 
         Console.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
         
@@ -49,7 +51,14 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<LogMyDayDbContext>();
-        optionsBuilder.UseSqlServer(connectionString);
+        if (isSqlite)
+        {
+            optionsBuilder.UseSqlite(connectionString);
+        }
+        else
+        {
+            optionsBuilder.UseSqlServer(connectionString);
+        }
 
         return new LogMyDayDbContext(optionsBuilder.Options);
     }

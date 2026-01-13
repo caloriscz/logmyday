@@ -14,10 +14,12 @@ services:
       # Non-sensitive configuration
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:9099
+      - Database__Provider=${DB_PROVIDER:-SqlServer}
       # Database configuration (using host.docker.internal to access host machine)
       - DB_HOST=host.docker.internal,1439
       - DB_NAME=logmyday
       - DB_USER=sa
+      - DB_SQLITE_PATH=${DB_SQLITE_PATH:-/app/Data/logmyday.db}
       # API base address
       - Api__BaseAddress=${API_BASE_URL:-http://localhost:9099}
       # Email SMTP configuration
@@ -38,6 +40,7 @@ services:
     volumes:
       # Persistent logs
       - logmyday-logs:/app/Logs
+      - logmyday-data:/app/Data
     networks:
       - logmyday-network
     restart: unless-stopped
@@ -56,6 +59,8 @@ secrets:
 
 volumes:
   logmyday-logs:
+    driver: local
+  logmyday-data:
     driver: local
 
 networks:
