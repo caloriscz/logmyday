@@ -42,14 +42,6 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Cache Cake tools
-        uses: actions/cache@v4
-        with:
-          path: build/tools
-          key: ${{ runner.os }}-cake-tools-${{ hashFiles('build/tools/packages.config') }}
-          restore-keys: |
-            ${{ runner.os }}-cake-tools-
-
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
@@ -57,6 +49,9 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+
+      - name: Install Cake tool
+        run: dotnet tool install --global Cake.Tool --version 4.2.0
 
       - name: Run build script
         working-directory: build
@@ -67,7 +62,7 @@ jobs:
           }
           
           Write-Host "Running build target: $target"
-          .\build.ps1 -Target $target -Verbosity Verbose
+          dotnet cake build.cake --target=$target --verbosity=Verbose
         shell: powershell
 
       - name: Upload deployment package
