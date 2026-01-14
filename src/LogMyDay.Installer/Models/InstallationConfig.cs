@@ -27,3 +27,9 @@ public class EmailConfiguration
     public string SenderEmail { get; set; } = string.Empty;
     public string SenderName { get; set; } = "LogMyDay";
 }
+
+public class InstallerConfig
+{
+    public string DefaultServerUrl { get; set; } = "https://localhost:7064";
+    public string LastUsedServerUrl { get; set; } = string.Empty;
+}

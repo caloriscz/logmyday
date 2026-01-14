@@ -113,4 +113,49 @@ public class ConfigurationService : IConfigurationService
         
         await GenerateConfigurationAsync(config);
     }
+
+    public async Task<InstallerConfig> LoadInstallerConfigAsync()
+    {
+        var configPath = GetInstallerConfigPath();
+        
+        if (!File.Exists(configPath))
+        {
+            return new InstallerConfig();
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath);
+            var config = JsonSerializer.Deserialize<InstallerConfig>(json);
+            return config ?? new InstallerConfig();
+        }
+        catch
+        {
+            return new InstallerConfig();
+        }
+    }
+
+    public async Task SaveInstallerConfigAsync(InstallerConfig config)
+    {
+        var configPath = GetInstallerConfigPath();
+        var directory = Path.GetDirectoryName(configPath);
+        
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        await File.WriteAllTextAsync(configPath, json, Encoding.UTF8);
+    }
+
+    public string GetInstallerConfigPath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(appData, "LogMyDay", "installer-config.json");
+    }
 }

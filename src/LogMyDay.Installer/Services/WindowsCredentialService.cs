@@ -9,67 +9,98 @@ public class WindowsCredentialService : ICredentialService
 
     public void SaveCredentials(string serverUrl, string username, string password)
     {
-        var targetName = GetTargetName(serverUrl);
-        
-        using var credential = new Credential
+        try
         {
-            Target = targetName,
-            Username = username,
-            Password = password,
-            Type = CredentialType.Generic,
-            PersistanceType = PersistanceType.LocalComputer
-        };
-        
-        credential.Save();
+            var targetName = GetTargetName(serverUrl);
+            
+            using var credential = new Credential
+            {
+                Target = targetName,
+                Username = username,
+                Password = password,
+                Type = CredentialType.Generic,
+                PersistanceType = PersistanceType.LocalComputer
+            };
+            
+            credential.Save();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Could not save credentials to Windows Credential Manager: {ex.Message}");
+            Console.WriteLine("Credentials will not be persisted for future use.");
+        }
     }
 
     public ServerCredential? GetCredentials(string serverUrl)
     {
-        var targetName = GetTargetName(serverUrl);
-        
-        using var credential = new Credential
+        try
         {
-            Target = targetName,
-            Type = CredentialType.Generic
-        };
-        
-        if (!credential.Load())
+            var targetName = GetTargetName(serverUrl);
+            
+            using var credential = new Credential
+            {
+                Target = targetName,
+                Type = CredentialType.Generic
+            };
+            
+            if (!credential.Load())
+            {
+                return null;
+            }
+
+            return new ServerCredential
+            {
+                ServerUrl = serverUrl,
+                Username = credential.Username,
+                Password = credential.Password
+            };
+        }
+        catch (Exception)
         {
+            // CredentialManagement library may not be compatible with current .NET version
+            // or Windows Credential Manager is not available
             return null;
         }
-
-        return new ServerCredential
-        {
-            ServerUrl = serverUrl,
-            Username = credential.Username,
-            Password = credential.Password
-        };
     }
 
     public void DeleteCredentials(string serverUrl)
     {
-        var targetName = GetTargetName(serverUrl);
-        
-        using var credential = new Credential
+        try
         {
-            Target = targetName,
-            Type = CredentialType.Generic
-        };
-        
-        credential.Delete();
+            var targetName = GetTargetName(serverUrl);
+            
+            using var credential = new Credential
+            {
+                Target = targetName,
+                Type = CredentialType.Generic
+            };
+            
+            credential.Delete();
+        }
+        catch (Exception)
+        {
+            // Silently fail if credential cannot be deleted
+        }
     }
 
     public bool HasCredentials(string serverUrl)
     {
-        var targetName = GetTargetName(serverUrl);
-        
-        using var credential = new Credential
+        try
         {
-            Target = targetName,
-            Type = CredentialType.Generic
-        };
-        
-        return credential.Exists();
+            var targetName = GetTargetName(serverUrl);
+            
+            using var credential = new Credential
+            {
+                Target = targetName,
+                Type = CredentialType.Generic
+            };
+            
+            return credential.Exists();
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static string GetTargetName(string serverUrl)

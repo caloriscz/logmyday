@@ -234,12 +234,25 @@ public class InstallerCommands
 
     [Command("backup", Description = "Backup user data")]
     public async Task<int> BackupAsync(
-        [Option('s', Description = "Server URL")] string serverUrl = "https://localhost:7064",
+        [Option('s', Description = "Server URL (uses default if not specified)")] string? serverUrl = null,
         [Option('o', Description = "Output file path")] string? outputPath = null,
         [Option('u', Description = "Username")] string? username = null,
         [Option('p', Description = "Password")] string? password = null)
     {
         Console.WriteLine("=== LogMyDay Backup ===\n");
+
+        // Load default server if not specified
+        if (string.IsNullOrEmpty(serverUrl))
+        {
+            var config = await _configurationService.LoadInstallerConfigAsync();
+            serverUrl = config.DefaultServerUrl;
+            Console.WriteLine($"Using default server: {serverUrl}");
+        }
+
+        // Save last used server
+        var installerConfig = await _configurationService.LoadInstallerConfigAsync();
+        installerConfig.LastUsedServerUrl = serverUrl;
+        await _configurationService.SaveInstallerConfigAsync(installerConfig);
 
         // Get credentials
         ServerCredential? credential = null;
@@ -322,7 +335,7 @@ public class InstallerCommands
     [Command("restore", Description = "Restore user data from backup")]
     public async Task<int> RestoreAsync(
         [Argument(Description = "Backup file path")] string backupFile,
-        [Option('s', Description = "Server URL")] string serverUrl = "https://localhost:7064",
+        [Option('s', Description = "Server URL (uses default if not specified)")] string? serverUrl = null,
         [Option('c', Description = "Clear existing data before restore")] bool clearExisting = false,
         [Option('u', Description = "Username")] string? username = null,
         [Option('p', Description = "Password")] string? password = null)
@@ -334,6 +347,19 @@ public class InstallerCommands
             Console.WriteLine($"✗ Backup file not found: {backupFile}");
             return 1;
         }
+
+        // Load default server if not specified
+        if (string.IsNullOrEmpty(serverUrl))
+        {
+            var config = await _configurationService.LoadInstallerConfigAsync();
+            serverUrl = config.DefaultServerUrl;
+            Console.WriteLine($"Using default server: {serverUrl}");
+        }
+
+        // Save last used server
+        var installerConfig = await _configurationService.LoadInstallerConfigAsync();
+        installerConfig.LastUsedServerUrl = serverUrl;
+        await _configurationService.SaveInstallerConfigAsync(installerConfig);
 
         // Get credentials
         ServerCredential? credential = null;
@@ -497,23 +523,142 @@ public class InstallerCommands
         }
     }
 
-    [Command("status", Description = "Check LogMyDay service status")]
+    [Command("status", Description = "Check LogMyDay service and configuration status")]
     public async Task<int> StatusAsync(
-        [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp")
+        [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp",
+        [Option("show-servers", Description = "Show configured servers")] bool showServers = false)
     {
         Console.WriteLine("=== LogMyDay Status ===\n");
 
+        // Show installer configuration
+        var config = await _configurationService.LoadInstallerConfigAsync();
+        Console.WriteLine("Configuration:");
+        Console.WriteLine($"  Default Server: {config.DefaultServerUrl}");
+        if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
+        {
+            Console.WriteLine($"  Last Used: {config.LastUsedServerUrl}");
+        }
+        Console.WriteLine($"  Config File: {_configurationService.GetInstallerConfigPath()}");
+        Console.WriteLine();
+
+        // Check local service installation
+        Console.WriteLine("Local Service:");
         var isInstalled = await _serviceManager.IsServiceInstalledAsync(serviceName);
         if (!isInstalled)
         {
-            Console.WriteLine($"✗ Service '{serviceName}' is not installed");
-            return 1;
+            Console.WriteLine($"  Service '{serviceName}' is not installed");
+            Console.WriteLine("  (This is OK if using remote LogMyDay server)");
+        }
+        else
+        {
+            Console.WriteLine($"  Service '{serviceName}' is installed");
+            var isRunning = await _serviceManager.IsServiceRunningAsync(serviceName);
+            Console.WriteLine($"  Status: {(isRunning ? "Running" : "Stopped")}");
         }
 
-        Console.WriteLine($"✓ Service '{serviceName}' is installed");
+        if (showServers)
+        {
+            Console.WriteLine("\n" + new string('-', 50));
+            await ServersAsync();
+        }
+        else
+        {
+            Console.WriteLine("\nTip: Use 'logmyday servers' to list configured servers");
+            Console.WriteLine("     Use 'logmyday config --server <url>' to set default server");
+        }
 
-        var isRunning = await _serviceManager.IsServiceRunningAsync(serviceName);
-        Console.WriteLine($"  Status: {(isRunning ? "Running" : "Stopped")}");
+        return 0;
+    }
+
+    [Command("servers", Description = "List configured servers")]
+    public async Task<int> ServersAsync()
+    {
+        Console.WriteLine("=== Configured Servers ===\n");
+
+        var config = await _configurationService.LoadInstallerConfigAsync();
+        Console.WriteLine($"Default Server: {config.DefaultServerUrl}");
+        
+        if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
+        {
+            Console.WriteLine($"Last Used: {config.LastUsedServerUrl}");
+        }
+
+        Console.WriteLine("\nServers with saved credentials:");
+        
+        // Try to enumerate saved credentials by checking common URLs
+        var commonUrls = new[]
+        {
+            "https://localhost:7064",
+            "http://localhost:5000",
+            config.DefaultServerUrl,
+            config.LastUsedServerUrl
+        };
+
+        var hasCredentials = false;
+        foreach (var url in commonUrls.Where(u => !string.IsNullOrEmpty(u)).Distinct())
+        {
+            if (_credentialService.HasCredentials(url))
+            {
+                var cred = _credentialService.GetCredentials(url);
+                Console.WriteLine($"  • {url} (user: {cred?.Username ?? "unknown"})");
+                hasCredentials = true;
+            }
+        }
+
+        if (!hasCredentials)
+        {
+            Console.WriteLine("  (none)");
+            Console.WriteLine("\nTip: Use 'logmyday config --server <url>' to set a default server");
+            Console.WriteLine("     Credentials are saved when you run backup/restore commands");
+        }
+
+        return 0;
+    }
+
+    [Command("config", Description = "Configure default server and settings")]
+    public async Task<int> ConfigAsync(
+        [Option('s', Description = "Set default server URL")] string? serverUrl = null,
+        [Option("show", Description = "Show current configuration")] bool show = false)
+    {
+        var config = await _configurationService.LoadInstallerConfigAsync();
+
+        if (show || string.IsNullOrEmpty(serverUrl))
+        {
+            Console.WriteLine("=== Installer Configuration ===\n");
+            Console.WriteLine($"Default Server: {config.DefaultServerUrl}");
+            Console.WriteLine($"Config File: {_configurationService.GetInstallerConfigPath()}");
+            
+            if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
+            {
+                Console.WriteLine($"Last Used: {config.LastUsedServerUrl}");
+            }
+
+            if (string.IsNullOrEmpty(serverUrl))
+            {
+                Console.WriteLine("\nUse --server to change default server URL");
+                Console.WriteLine("\nExamples:");
+                Console.WriteLine("  logmyday config --server https://localhost:7064");
+                Console.WriteLine("  logmyday config --server https://myserver.example.com");
+                return 0;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(serverUrl))
+        {
+            // Validate URL format
+            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri) || 
+                (uri.Scheme != "http" && uri.Scheme != "https"))
+            {
+                Console.WriteLine($"✗ Invalid server URL: {serverUrl}");
+                Console.WriteLine("URL must start with http:// or https://");
+                return 1;
+            }
+
+            config.DefaultServerUrl = serverUrl;
+            await _configurationService.SaveInstallerConfigAsync(config);
+            
+            Console.WriteLine($"✓ Default server set to: {serverUrl}");
+        }
 
         return 0;
     }
