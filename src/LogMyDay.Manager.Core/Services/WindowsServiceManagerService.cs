@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public class WindowsServiceManagerService : IServiceManagerService
 {

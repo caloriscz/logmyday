@@ -1,46 +1,21 @@
-# Build LogMyDay Installer as a self-contained single-file executable
+# DEPRECATED: This script has been replaced by build-manager.ps1
+# LogMyDay.Installer has been renamed to LogMyDay.Manager
+# Please use: .\build-manager.ps1
 
-param(
-    [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64",
-    [string]$OutputPath = ".\publish\installer"
-)
-
-Write-Host "Building LogMyDay Installer..." -ForegroundColor Cyan
-Write-Host "  Configuration: $Configuration"
-Write-Host "  Runtime: $Runtime"
-Write-Host "  Output: $OutputPath"
+Write-Host "=== DEPRECATED SCRIPT ===" -ForegroundColor Red
+Write-Host ""
+Write-Host "This script has been replaced. Please use:" -ForegroundColor Yellow
+Write-Host "  .\build-manager.ps1" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "LogMyDay.Installer has been refactored into:" -ForegroundColor Yellow
+Write-Host "  - LogMyDay.Manager.Core (business logic)" -ForegroundColor White
+Write-Host "  - LogMyDay.Manager.Cli (.NET global tool)" -ForegroundColor White
+Write-Host ""
+Write-Host "New installation method:" -ForegroundColor Yellow
+Write-Host "  dotnet tool install -g LogMyDay.Manager" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Running new build script..." -ForegroundColor Green
 Write-Host ""
 
-$projectPath = Join-Path $PSScriptRoot "..\src\LogMyDay.Installer\LogMyDay.Installer.csproj"
-
-# Clean previous build
-if (Test-Path $OutputPath) {
-    Write-Host "Cleaning previous build..." -ForegroundColor Yellow
-    Remove-Item -Path $OutputPath -Recurse -Force
-}
-
-# Publish as self-contained single-file
-Write-Host "Publishing installer..." -ForegroundColor Cyan
-dotnet publish $projectPath `
-    --configuration $Configuration `
-    --runtime $Runtime `
-    --self-contained true `
-    --output $OutputPath `
-    /p:PublishSingleFile=true `
-    /p:PublishTrimmed=false `
-    /p:IncludeNativeLibrariesForSelfExtract=true
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "Build successful!" -ForegroundColor Green
-    Write-Host "  Executable: $OutputPath\logmyday.exe"
-    
-    $fileInfo = Get-Item "$OutputPath\logmyday.exe"
-    $fileSizeMB = [math]::Round($fileInfo.Length / 1MB, 2)
-    Write-Host "  Size: $fileSizeMB MB"
-} else {
-    Write-Host ""
-    Write-Host "Build failed!" -ForegroundColor Red
-    exit 1
-}
+# Forward to new script
+& "$PSScriptRoot\build-manager.ps1" @PSBoundParameters

@@ -1,8 +1,8 @@
 using System.Text;
 using System.Text.Json;
-using LogMyDay.Installer.Models;
+using LogMyDay.Manager.Core.Models;
 
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public class ConfigurationService : IConfigurationService
 {
@@ -114,30 +114,30 @@ public class ConfigurationService : IConfigurationService
         await GenerateConfigurationAsync(config);
     }
 
-    public async Task<InstallerConfig> LoadInstallerConfigAsync()
+    public async Task<ManagerConfig> LoadManagerConfigAsync()
     {
-        var configPath = GetInstallerConfigPath();
+        var configPath = GetManagerConfigPath();
         
         if (!File.Exists(configPath))
         {
-            return new InstallerConfig();
+            return new ManagerConfig();
         }
 
         try
         {
             var json = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<InstallerConfig>(json);
-            return config ?? new InstallerConfig();
+            var config = JsonSerializer.Deserialize<ManagerConfig>(json);
+            return config ?? new ManagerConfig();
         }
         catch
         {
-            return new InstallerConfig();
+            return new ManagerConfig();
         }
     }
 
-    public async Task SaveInstallerConfigAsync(InstallerConfig config)
+    public async Task SaveManagerConfigAsync(ManagerConfig config)
     {
-        var configPath = GetInstallerConfigPath();
+        var configPath = GetManagerConfigPath();
         var directory = Path.GetDirectoryName(configPath);
         
         if (!string.IsNullOrEmpty(directory))
@@ -153,9 +153,9 @@ public class ConfigurationService : IConfigurationService
         await File.WriteAllTextAsync(configPath, json, Encoding.UTF8);
     }
 
-    public string GetInstallerConfigPath()
+    public string GetManagerConfigPath()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(appData, "LogMyDay", "installer-config.json");
+        return Path.Combine(appData, "LogMyDay", "manager-config.json");
     }
 }

@@ -1,6 +1,6 @@
 using Cocona;
-using LogMyDay.Installer.Models;
-using LogMyDay.Installer.Services;
+using LogMyDay.Manager.Core.Models;
+using LogMyDay.Manager.Core.Services;
 using LogMyDay.Shared;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Interfaces;
@@ -8,9 +8,9 @@ using Refit;
 using System.Net.Http.Headers;
 using System.Text;
 
-namespace LogMyDay.Installer.Commands;
+namespace LogMyDay.Manager.Cli.Commands;
 
-public class InstallerCommands
+public class ManagerCommands
 {
     private readonly ICredentialService _credentialService;
     private readonly IGitHubService _gitHubService;
@@ -20,7 +20,7 @@ public class InstallerCommands
     private readonly IInstallationService _installationService;
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public InstallerCommands(
+    public ManagerCommands(
         ICredentialService credentialService,
         IGitHubService gitHubService,
         IConfigurationService configurationService,
@@ -38,14 +38,24 @@ public class InstallerCommands
         _httpClientFactory = httpClientFactory;
     }
 
-    [Command("install", Description = "Install LogMyDay server")]
+    [PrimaryCommand]
+    public async Task<int> DefaultAsync()
+    {
+        // When run without arguments, start interactive install
+        Console.WriteLine("=== LogMyDay Manager ===\n");
+        Console.WriteLine("Starting interactive installation...\n");
+        
+        return await InstallAsync();
+    }
+
+    [Command("install", Description = "Install LogMyDay server from GitHub Release")]
     public async Task<int> InstallAsync(
         [Option('p', Description = "Installation path")] string? installPath = null,
         [Option('d', Description = "Database provider (SqlServer or SQLite)")] string? dbProvider = null,
         [Option('c', Description = "Database connection string")] string? connectionString = null,
         [Option('a', Description = "API base address")] string? apiAddress = null)
     {
-        Console.WriteLine("=== LogMyDay Installer ===\n");
+        Console.WriteLine("=== LogMyDay Installation ===\n");
 
         // Check prerequisites
         Console.WriteLine("Checking prerequisites...");
@@ -150,89 +160,83 @@ public class InstallerCommands
         return success ? 0 : 1;
     }
 
-    [Command("configure", Description = "Modify LogMyDay configuration")]
-    public async Task<int> ConfigureAsync(
+    [Command("update", Description = "Update LogMyDay to the latest version from GitHub Release")]
+    public async Task<int> UpdateAsync(
         [Option('p', Description = "Installation path")] string? installPath = null,
         [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp")
     {
-        installPath ??= @"C:\Program Files\LogMyDay";
-        var configPath = Path.Combine(installPath, "appsettings.json");
+        Console.WriteLine("=== LogMyDay Update ===\n");
 
-        if (!File.Exists(configPath))
+        installPath ??= @"C:\Program Files\LogMyDay";
+
+        if (!Directory.Exists(installPath))
         {
-            Console.WriteLine($"✗ Configuration file not found: {configPath}");
+            Console.WriteLine($"✗ Installation not found at {installPath}");
             return 1;
         }
 
-        Console.WriteLine("=== LogMyDay Configuration ===\n");
-        Console.WriteLine("Loading current configuration...\n");
-
-        var config = await _configurationService.ReadConfigurationAsync(configPath);
-
-        Console.WriteLine("What would you like to configure?");
-        Console.WriteLine("1. Database connection");
-        Console.WriteLine("2. API base address");
-        Console.WriteLine("3. Email settings");
-        Console.Write("\nChoice: ");
-        var choice = Console.ReadLine();
-
-        switch (choice)
+        try
         {
-            case "1":
-                Console.Write($"Current connection: {config.ConnectionString}\n");
-                Console.Write("New connection string: ");
-                var newConn = Console.ReadLine();
-                if (!string.IsNullOrWhiteSpace(newConn))
-                {
-                    config.ConnectionString = newConn;
-                }
-                break;
+            // Check for updates
+            Console.WriteLine("Checking for updates...");
+            var latestVersion = await _gitHubService.GetLatestVersionAsync();
+            Console.WriteLine($"Latest version: {latestVersion}");
 
-            case "2":
-                Console.Write($"Current API address: {config.ApiBaseAddress}\n");
-                Console.Write("New API address: ");
-                var newApi = Console.ReadLine();
-                if (!string.IsNullOrWhiteSpace(newApi))
-                {
-                    config.ApiBaseAddress = newApi;
-                }
-                break;
+            Console.Write("Update to latest version? [Y/n]: ");
+            if (Console.ReadLine()?.Trim().Equals("n", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return 0;
+            }
 
-            case "3":
-                config.Email ??= new EmailConfiguration();
-                Console.Write($"SMTP Server [{config.Email.SmtpServer}]: ");
-                var smtp = Console.ReadLine();
-                if (!string.IsNullOrWhiteSpace(smtp)) config.Email.SmtpServer = smtp;
-                
-                Console.Write($"SMTP Port [{config.Email.SmtpPort}]: ");
-                var portStr = Console.ReadLine();
-                if (int.TryParse(portStr, out var port)) config.Email.SmtpPort = port;
-                break;
+            // Create backup
+            Console.WriteLine("Creating backup of current installation...");
+            var backupPath = $"{installPath}.backup.{DateTime.Now:yyyyMMdd-HHmmss}";
+            CopyDirectory(installPath, backupPath);
+            Console.WriteLine($"✓ Backup created at {backupPath}");
 
-            default:
-                Console.WriteLine("Invalid choice");
-                return 1;
+            // Stop service
+            Console.WriteLine("Stopping service...");
+            await _serviceManager.StopServiceAsync(serviceName);
+
+            // Download and extract new version
+            Console.WriteLine("Downloading new version...");
+            var tempPath = Path.Combine(Path.GetTempPath(), "logmyday-update");
+            var extractedPath = await _gitHubService.DownloadLatestReleaseAsync(tempPath);
+
+            // Replace files (preserve configuration)
+            Console.WriteLine("Updating files...");
+            var configPath = Path.Combine(installPath, "appsettings.json");
+            var configBackup = File.ReadAllText(configPath);
+
+            CopyDirectory(extractedPath, installPath);
+
+            // Restore configuration
+            await File.WriteAllTextAsync(configPath, configBackup);
+
+            // Start service
+            Console.WriteLine("Starting service...");
+            await _serviceManager.StartServiceAsync(serviceName);
+
+            // Cleanup
+            if (Directory.Exists(tempPath))
+            {
+                Directory.Delete(tempPath, true);
+            }
+
+            Console.WriteLine($"\n✓ Update completed successfully!");
+            Console.WriteLine($"  Version: {latestVersion}");
+            Console.WriteLine($"  Backup: {backupPath}");
+
+            return 0;
         }
-
-        // Save configuration
-        config.InstallPath = installPath;
-        await _configurationService.GenerateConfigurationAsync(config);
-
-        Console.WriteLine("\n✓ Configuration updated");
-
-        // Restart service
-        Console.Write("Restart service now? [Y/n]: ");
-        if (!Console.ReadLine()?.Trim().Equals("n", StringComparison.OrdinalIgnoreCase) == true)
+        catch (Exception ex)
         {
-            Console.WriteLine("Restarting service...");
-            await _serviceManager.RestartServiceAsync(serviceName);
-            Console.WriteLine("✓ Service restarted");
+            Console.WriteLine($"✗ Update failed: {ex.Message}");
+            return 1;
         }
-
-        return 0;
     }
 
-    [Command("backup", Description = "Backup user data")]
+    [Command("backup", Description = "Export user data to JSON file")]
     public async Task<int> BackupAsync(
         [Option('s', Description = "Server URL (uses default if not specified)")] string? serverUrl = null,
         [Option('o', Description = "Output file path")] string? outputPath = null,
@@ -241,18 +245,18 @@ public class InstallerCommands
     {
         Console.WriteLine("=== LogMyDay Backup ===\n");
 
-        // Load default server if not specified
+        // Server URL is required for backup
         if (string.IsNullOrEmpty(serverUrl))
         {
-            var config = await _configurationService.LoadInstallerConfigAsync();
-            serverUrl = config.DefaultServerUrl;
-            Console.WriteLine($"Using default server: {serverUrl}");
+            Console.WriteLine("Error: Server URL is required");
+            Console.WriteLine();
+            Console.WriteLine("Usage:");
+            Console.WriteLine("  logmyday backup -s <server-url>");
+            Console.WriteLine();
+            Console.WriteLine("Example:");
+            Console.WriteLine("  logmyday backup -s https://logmyday.tadata.cz");
+            return 1;
         }
-
-        // Save last used server
-        var installerConfig = await _configurationService.LoadInstallerConfigAsync();
-        installerConfig.LastUsedServerUrl = serverUrl;
-        await _configurationService.SaveInstallerConfigAsync(installerConfig);
 
         // Get credentials
         ServerCredential? credential = null;
@@ -332,7 +336,7 @@ public class InstallerCommands
         }
     }
 
-    [Command("restore", Description = "Restore user data from backup")]
+    [Command("restore", Description = "Import user data from backup file")]
     public async Task<int> RestoreAsync(
         [Argument(Description = "Backup file path")] string backupFile,
         [Option('s', Description = "Server URL (uses default if not specified)")] string? serverUrl = null,
@@ -348,18 +352,18 @@ public class InstallerCommands
             return 1;
         }
 
-        // Load default server if not specified
+        // Server URL is required for restore
         if (string.IsNullOrEmpty(serverUrl))
         {
-            var config = await _configurationService.LoadInstallerConfigAsync();
-            serverUrl = config.DefaultServerUrl;
-            Console.WriteLine($"Using default server: {serverUrl}");
+            Console.WriteLine("Error: Server URL is required");
+            Console.WriteLine();
+            Console.WriteLine("Usage:");
+            Console.WriteLine("  logmyday restore <backup-file> -s <server-url>");
+            Console.WriteLine();
+            Console.WriteLine("Example:");
+            Console.WriteLine("  logmyday restore backup.json -s https://logmyday.tadata.cz");
+            return 1;
         }
-
-        // Save last used server
-        var installerConfig = await _configurationService.LoadInstallerConfigAsync();
-        installerConfig.LastUsedServerUrl = serverUrl;
-        await _configurationService.SaveInstallerConfigAsync(installerConfig);
 
         // Get credentials
         ServerCredential? credential = null;
@@ -446,99 +450,17 @@ public class InstallerCommands
         }
     }
 
-    [Command("update", Description = "Update LogMyDay to the latest version")]
-    public async Task<int> UpdateAsync(
-        [Option('p', Description = "Installation path")] string? installPath = null,
-        [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp")
-    {
-        Console.WriteLine("=== LogMyDay Update ===\n");
-
-        installPath ??= @"C:\Program Files\LogMyDay";
-
-        if (!Directory.Exists(installPath))
-        {
-            Console.WriteLine($"✗ Installation not found at {installPath}");
-            return 1;
-        }
-
-        try
-        {
-            // Check for updates
-            Console.WriteLine("Checking for updates...");
-            var latestVersion = await _gitHubService.GetLatestVersionAsync();
-            Console.WriteLine($"Latest version: {latestVersion}");
-
-            // TODO: Compare with current version
-            Console.Write("Update to latest version? [Y/n]: ");
-            if (Console.ReadLine()?.Trim().Equals("n", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                return 0;
-            }
-
-            // Create backup
-            Console.WriteLine("Creating backup of current installation...");
-            var backupPath = $"{installPath}.backup.{DateTime.Now:yyyyMMdd-HHmmss}";
-            CopyDirectory(installPath, backupPath);
-            Console.WriteLine($"✓ Backup created at {backupPath}");
-
-            // Stop service
-            Console.WriteLine("Stopping service...");
-            await _serviceManager.StopServiceAsync(serviceName);
-
-            // Download and extract new version
-            Console.WriteLine("Downloading new version...");
-            var tempPath = Path.Combine(Path.GetTempPath(), "logmyday-update");
-            var extractedPath = await _gitHubService.DownloadLatestReleaseAsync(tempPath);
-
-            // Replace files (preserve configuration)
-            Console.WriteLine("Updating files...");
-            var configPath = Path.Combine(installPath, "appsettings.json");
-            var configBackup = File.ReadAllText(configPath);
-
-            CopyDirectory(extractedPath, installPath);
-
-            // Restore configuration
-            await File.WriteAllTextAsync(configPath, configBackup);
-
-            // Start service
-            Console.WriteLine("Starting service...");
-            await _serviceManager.StartServiceAsync(serviceName);
-
-            // Cleanup
-            if (Directory.Exists(tempPath))
-            {
-                Directory.Delete(tempPath, true);
-            }
-
-            Console.WriteLine($"\n✓ Update completed successfully!");
-            Console.WriteLine($"  Version: {latestVersion}");
-            Console.WriteLine($"  Backup: {backupPath}");
-
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"✗ Update failed: {ex.Message}");
-            return 1;
-        }
-    }
-
-    [Command("status", Description = "Check LogMyDay service and configuration status")]
+    [Command("status", Description = "Check LogMyDay installation and service status")]
     public async Task<int> StatusAsync(
-        [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp",
-        [Option("show-servers", Description = "Show configured servers")] bool showServers = false)
+        [Option('s', Description = "Service name")] string serviceName = "LogMyDayApp")
     {
         Console.WriteLine("=== LogMyDay Status ===\n");
 
-        // Show installer configuration
-        var config = await _configurationService.LoadInstallerConfigAsync();
+        // Show manager configuration
+        var config = await _configurationService.LoadManagerConfigAsync();
         Console.WriteLine("Configuration:");
-        Console.WriteLine($"  Default Server: {config.DefaultServerUrl}");
-        if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
-        {
-            Console.WriteLine($"  Last Used: {config.LastUsedServerUrl}");
-        }
-        Console.WriteLine($"  Config File: {_configurationService.GetInstallerConfigPath()}");
+        Console.WriteLine($"  Config File: {_configurationService.GetManagerConfigPath()}");
+        Console.WriteLine($"  Servers: {config.Servers.Count} configured");
         Console.WriteLine();
 
         // Check local service installation
@@ -556,108 +478,30 @@ public class InstallerCommands
             Console.WriteLine($"  Status: {(isRunning ? "Running" : "Stopped")}");
         }
 
-        if (showServers)
+        Console.WriteLine("\nConfigured servers:");
+        
+        if (config.Servers.Count == 0)
         {
-            Console.WriteLine("\n" + new string('-', 50));
-            await ServersAsync();
+            Console.WriteLine("  (none)");
+            Console.WriteLine();
+            Console.WriteLine("Add a server with: logmyday server add <url> <username>");
         }
         else
         {
-            Console.WriteLine("\nTip: Use 'logmyday servers' to list configured servers");
-            Console.WriteLine("     Use 'logmyday config --server <url>' to set default server");
-        }
-
-        return 0;
-    }
-
-    [Command("servers", Description = "List configured servers")]
-    public async Task<int> ServersAsync()
-    {
-        Console.WriteLine("=== Configured Servers ===\n");
-
-        var config = await _configurationService.LoadInstallerConfigAsync();
-        Console.WriteLine($"Default Server: {config.DefaultServerUrl}");
-        
-        if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
-        {
-            Console.WriteLine($"Last Used: {config.LastUsedServerUrl}");
-        }
-
-        Console.WriteLine("\nServers with saved credentials:");
-        
-        // Try to enumerate saved credentials by checking common URLs
-        var commonUrls = new[]
-        {
-            "https://localhost:7064",
-            "http://localhost:5000",
-            config.DefaultServerUrl,
-            config.LastUsedServerUrl
-        };
-
-        var hasCredentials = false;
-        foreach (var url in commonUrls.Where(u => !string.IsNullOrEmpty(u)).Distinct())
-        {
-            if (_credentialService.HasCredentials(url))
+            Console.WriteLine();
+            foreach (var server in config.Servers)
             {
-                var cred = _credentialService.GetCredentials(url);
-                Console.WriteLine($"  • {url} (user: {cred?.Username ?? "unknown"})");
-                hasCredentials = true;
+                var hasCredentials = _credentialService.HasCredentials(server.Url);
+                Console.WriteLine($"  • {server.Url} (user: {server.Username})");
+                if (hasCredentials)
+                {
+                    Console.WriteLine("    Credentials: ✓ Saved");
+                }
+                else
+                {
+                    Console.WriteLine("    Credentials: ✗ Not saved");
+                }
             }
-        }
-
-        if (!hasCredentials)
-        {
-            Console.WriteLine("  (none)");
-            Console.WriteLine("\nTip: Use 'logmyday config --server <url>' to set a default server");
-            Console.WriteLine("     Credentials are saved when you run backup/restore commands");
-        }
-
-        return 0;
-    }
-
-    [Command("config", Description = "Configure default server and settings")]
-    public async Task<int> ConfigAsync(
-        [Option('s', Description = "Set default server URL")] string? serverUrl = null,
-        [Option("show", Description = "Show current configuration")] bool show = false)
-    {
-        var config = await _configurationService.LoadInstallerConfigAsync();
-
-        if (show || string.IsNullOrEmpty(serverUrl))
-        {
-            Console.WriteLine("=== Installer Configuration ===\n");
-            Console.WriteLine($"Default Server: {config.DefaultServerUrl}");
-            Console.WriteLine($"Config File: {_configurationService.GetInstallerConfigPath()}");
-            
-            if (!string.IsNullOrEmpty(config.LastUsedServerUrl))
-            {
-                Console.WriteLine($"Last Used: {config.LastUsedServerUrl}");
-            }
-
-            if (string.IsNullOrEmpty(serverUrl))
-            {
-                Console.WriteLine("\nUse --server to change default server URL");
-                Console.WriteLine("\nExamples:");
-                Console.WriteLine("  logmyday config --server https://localhost:7064");
-                Console.WriteLine("  logmyday config --server https://myserver.example.com");
-                return 0;
-            }
-        }
-
-        if (!string.IsNullOrEmpty(serverUrl))
-        {
-            // Validate URL format
-            if (!Uri.TryCreate(serverUrl, UriKind.Absolute, out var uri) || 
-                (uri.Scheme != "http" && uri.Scheme != "https"))
-            {
-                Console.WriteLine($"✗ Invalid server URL: {serverUrl}");
-                Console.WriteLine("URL must start with http:// or https://");
-                return 1;
-            }
-
-            config.DefaultServerUrl = serverUrl;
-            await _configurationService.SaveInstallerConfigAsync(config);
-            
-            Console.WriteLine($"✓ Default server set to: {serverUrl}");
         }
 
         return 0;

@@ -1,7 +1,7 @@
 using CredentialManagement;
-using LogMyDay.Installer.Models;
+using LogMyDay.Manager.Core.Models;
 
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public class WindowsCredentialService : ICredentialService
 {

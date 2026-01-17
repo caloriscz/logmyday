@@ -1,4 +1,4 @@
-namespace LogMyDay.Installer.Models;
+namespace LogMyDay.Manager.Core.Models;
 
 public class InstallationConfig
 {
@@ -28,8 +28,14 @@ public class EmailConfiguration
     public string SenderName { get; set; } = "LogMyDay";
 }
 
-public class InstallerConfig
+public class ManagerConfig
 {
-    public string DefaultServerUrl { get; set; } = "https://localhost:7064";
-    public string LastUsedServerUrl { get; set; } = string.Empty;
+    public List<ServerConfig> Servers { get; set; } = new();
+}
+
+public class ServerConfig
+{
+    public required string Url { get; set; }
+    public required string Username { get; set; }
+    public DateTime LastAccessedUtc { get; set; }
 }

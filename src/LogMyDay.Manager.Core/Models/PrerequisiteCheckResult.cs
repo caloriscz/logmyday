@@ -1,4 +1,4 @@
-namespace LogMyDay.Installer.Models;
+namespace LogMyDay.Manager.Core.Models;
 
 public class PrerequisiteCheckResult
 {

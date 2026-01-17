@@ -1,12 +1,11 @@
 using Cocona;
-using LogMyDay.Installer.Commands;
-using LogMyDay.Installer.Services;
+using LogMyDay.Manager.Cli.Commands;
+using LogMyDay.Manager.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Refit;
 
 var builder = CoconaApp.CreateBuilder();
 
-// Register services
+// Register core services
 builder.Services.AddSingleton<ICredentialService, WindowsCredentialService>();
 builder.Services.AddSingleton<IGitHubService, GitHubService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -17,7 +16,7 @@ builder.Services.AddSingleton<IInstallationService, InstallationService>();
 // Register HTTP client for GitHub API
 builder.Services.AddHttpClient("GitHub", client =>
 {
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("LogMyDay-Installer/1.0");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("LogMyDay-Manager/1.0");
     client.BaseAddress = new Uri("https://api.github.com");
 });
 
@@ -26,6 +25,10 @@ builder.Services.AddHttpClient("LogMyDayApi");
 
 var app = builder.Build();
 
-app.AddCommands<InstallerCommands>();
+app.AddCommands<ManagerCommands>();
+app.AddSubCommand("server", x =>
+{
+    x.AddCommands<ServerCommands>();
+});
 
 await app.RunAsync();

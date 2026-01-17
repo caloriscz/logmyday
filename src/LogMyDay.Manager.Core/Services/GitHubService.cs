@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public class GitHubService : IGitHubService
 {
@@ -57,7 +57,7 @@ public class GitHubService : IGitHubService
 
         using (var httpClient = new HttpClient())
         {
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LogMyDay-Installer/1.0");
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("LogMyDay-Manager/1.0");
             var zipBytes = await httpClient.GetByteArrayAsync(downloadUrl);
             await File.WriteAllBytesAsync(zipPath, zipBytes);
         }

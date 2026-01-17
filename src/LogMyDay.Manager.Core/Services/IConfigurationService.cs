@@ -1,13 +1,13 @@
-using LogMyDay.Installer.Models;
+using LogMyDay.Manager.Core.Models;
 
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public interface IConfigurationService
 {
     Task GenerateConfigurationAsync(InstallationConfig config);
     Task<InstallationConfig> ReadConfigurationAsync(string configPath);
     Task UpdateConfigurationAsync(string configPath, Action<InstallationConfig> updateAction);
-    Task<InstallerConfig> LoadInstallerConfigAsync();
-    Task SaveInstallerConfigAsync(InstallerConfig config);
-    string GetInstallerConfigPath();
+    Task<ManagerConfig> LoadManagerConfigAsync();
+    Task SaveManagerConfigAsync(ManagerConfig config);
+    string GetManagerConfigPath();
 }

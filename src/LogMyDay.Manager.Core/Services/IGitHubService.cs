@@ -1,4 +1,4 @@
-namespace LogMyDay.Installer.Services;
+namespace LogMyDay.Manager.Core.Services;
 
 public interface IGitHubService
 {
