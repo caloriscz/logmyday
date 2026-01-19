@@ -74,7 +74,7 @@ public class InstallationService : IInstallationService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Installation failed: {ex.Message}");
+            Console.WriteLine($"[Error] Installation failed: {ex.Message}");
             return false;
         }
     }

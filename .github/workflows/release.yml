@@ -1,0 +1,62 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.3.0)'
+        required: true
+        default: 'v0.3.0'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore src/LogMyDay.sln
+      
+      - name: Build LogMyDay.App
+        run: dotnet publish src/LogMyDay.App/LogMyDay.App.csproj -c Release -o publish/app --no-restore
+      
+      - name: Create release archive
+        run: |
+          Compress-Archive -Path publish/app/* -DestinationPath LogMyDay-${{ github.event.inputs.version }}.zip
+        shell: pwsh
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: LogMyDay ${{ github.event.inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            LogMyDay-${{ github.event.inputs.version }}.zip
+          body: |
+            ## LogMyDay Release ${{ github.event.inputs.version }}
+            
+            ### Installation
+            
+            Download the zip file and extract it to your desired location.
+            
+            ### What's Included
+            
+            - LogMyDay.App (Blazor Server application)
+            - All required dependencies
+            
+            ### Installation using Manager CLI
+            
+            ```bash
+            logmyday install
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
