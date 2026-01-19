@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using LogMyDay.Manager.Core.Models;
 
 namespace LogMyDay.Manager.Core.Services;
@@ -12,11 +12,11 @@ public class PrerequisiteChecker : IPrerequisiteChecker
         // Check .NET SDK
         if (await CheckDotNetSdkAsync())
         {
-            result.Messages.Add("✓ .NET 9.0 SDK is installed");
+            result.Messages.Add("[OK] .NET 9.0 SDK is installed");
         }
         else
         {
-            result.Errors.Add("✗ .NET 9.0 SDK is not installed");
+            result.Errors.Add("[ERROR] .NET 9.0 SDK is not installed");
             result.IsSuccess = false;
         }
 
@@ -33,7 +33,7 @@ public class PrerequisiteChecker : IPrerequisiteChecker
                 Arguments = "--version",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
             };
 
             using var process = Process.Start(startInfo);
@@ -45,7 +45,17 @@ public class PrerequisiteChecker : IPrerequisiteChecker
             var output = await process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
 
-            return output.StartsWith(requiredVersion);
+            // Parse version and check if it's >= required version
+            var versionStr = output.Trim();
+            if (Version.TryParse(versionStr, out var installedVersion)) { }
+
+            if (Version.TryParse(requiredVersion, out var requiredVer))
+            {
+                return installedVersion >= requiredVer;
+            }
+
+            // Fallback: check if starts with major version
+            return versionStr.StartsWith(requiredVersion);
         }
         catch
         {

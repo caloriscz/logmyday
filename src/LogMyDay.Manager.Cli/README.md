@@ -235,8 +235,8 @@ Initial release with core features:
 ## Support
 
 For issues, questions, or contributions, please visit:
-- GitHub: https://github.com/yourusername/logmyday
-- Documentation: https://yourusername.github.io/logmyday
+- GitHub: https://github.com/caloriscz/logmyday
+- Documentation: https://github.com/caloriscz/logmyday
 
 ## License
 

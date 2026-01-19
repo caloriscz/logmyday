@@ -1,4 +1,4 @@
-using Cocona;
+﻿using Cocona;
 using LogMyDay.Manager.Core.Models;
 using LogMyDay.Manager.Core.Services;
 using LogMyDay.Shared;
@@ -68,12 +68,12 @@ public class ManagerCommands
         
         foreach (var warning in prereqResult.Warnings)
         {
-            Console.WriteLine($"⚠ {warning}");
+            Console.WriteLine($"[WARNING] {warning}");
         }
         
         foreach (var error in prereqResult.Errors)
         {
-            Console.WriteLine($"✗ {error}");
+            Console.WriteLine($"[X] {error}");
         }
 
         if (!prereqResult.IsSuccess)
@@ -171,7 +171,7 @@ public class ManagerCommands
 
         if (!Directory.Exists(installPath))
         {
-            Console.WriteLine($"✗ Installation not found at {installPath}");
+            Console.WriteLine($"[X] Installation not found at {installPath}");
             return 1;
         }
 
@@ -192,7 +192,7 @@ public class ManagerCommands
             Console.WriteLine("Creating backup of current installation...");
             var backupPath = $"{installPath}.backup.{DateTime.Now:yyyyMMdd-HHmmss}";
             CopyDirectory(installPath, backupPath);
-            Console.WriteLine($"✓ Backup created at {backupPath}");
+            Console.WriteLine($"[OK] Backup created at {backupPath}");
 
             // Stop service
             Console.WriteLine("Stopping service...");
@@ -223,7 +223,7 @@ public class ManagerCommands
                 Directory.Delete(tempPath, true);
             }
 
-            Console.WriteLine($"\n✓ Update completed successfully!");
+            Console.WriteLine($"\n[OK] Update completed successfully!");
             Console.WriteLine($"  Version: {latestVersion}");
             Console.WriteLine($"  Backup: {backupPath}");
 
@@ -231,7 +231,7 @@ public class ManagerCommands
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Update failed: {ex.Message}");
+            Console.WriteLine($"[X] Update failed: {ex.Message}");
             return 1;
         }
     }
@@ -281,7 +281,7 @@ public class ManagerCommands
 
                 if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
                 {
-                    Console.WriteLine("✗ Credentials required");
+                    Console.WriteLine("[X] Credentials required");
                     return 1;
                 }
 
@@ -296,7 +296,7 @@ public class ManagerCommands
                 if (!Console.ReadLine()?.Trim().Equals("n", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     _credentialService.SaveCredentials(serverUrl, user, pass);
-                    Console.WriteLine("✓ Credentials saved");
+                    Console.WriteLine("[OK] Credentials saved");
                 }
             }
         }
@@ -322,7 +322,7 @@ public class ManagerCommands
             });
             await File.WriteAllTextAsync(outputPath, json);
 
-            Console.WriteLine($"✓ Backup saved to {outputPath}");
+            Console.WriteLine($"[OK] Backup saved to {outputPath}");
             Console.WriteLine($"  Created: {backup.CreatedAt}");
             Console.WriteLine($"  Activities: {backup.Activities?.Count ?? 0}");
             Console.WriteLine($"  Tags: {backup.Tags?.Count ?? 0}");
@@ -331,7 +331,7 @@ public class ManagerCommands
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Backup failed: {ex.Message}");
+            Console.WriteLine($"[X] Backup failed: {ex.Message}");
             return 1;
         }
     }
@@ -348,7 +348,7 @@ public class ManagerCommands
 
         if (!File.Exists(backupFile))
         {
-            Console.WriteLine($"✗ Backup file not found: {backupFile}");
+            Console.WriteLine($"[X] Backup file not found: {backupFile}");
             return 1;
         }
 
@@ -388,7 +388,7 @@ public class ManagerCommands
 
                 if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
                 {
-                    Console.WriteLine("✗ Credentials required");
+                    Console.WriteLine("[X] Credentials required");
                     return 1;
                 }
 
@@ -409,7 +409,7 @@ public class ManagerCommands
 
             if (backup == null)
             {
-                Console.WriteLine("✗ Invalid backup file");
+                Console.WriteLine("[X] Invalid backup file");
                 return 1;
             }
 
@@ -423,7 +423,7 @@ public class ManagerCommands
 
             if (clearExisting)
             {
-                Console.Write("⚠ This will delete all existing data. Continue? [y/N]: ");
+                Console.Write("[WARNING] This will delete all existing data. Continue? [y/N]: ");
                 if (!Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     Console.WriteLine("Restore cancelled");
@@ -437,7 +437,7 @@ public class ManagerCommands
             Console.WriteLine("Restoring backup...");
             var result = await backupApi.RestoreSecureBackupAsync(backup);
 
-            Console.WriteLine($"✓ Restore completed");
+            Console.WriteLine($"[OK] Restore completed");
             Console.WriteLine($"  Success: {result.Success}");
             Console.WriteLine($"  Message: {result.Message}");
 
@@ -445,7 +445,7 @@ public class ManagerCommands
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Restore failed: {ex.Message}");
+            Console.WriteLine($"[X] Restore failed: {ex.Message}");
             return 1;
         }
     }
@@ -492,14 +492,14 @@ public class ManagerCommands
             foreach (var server in config.Servers)
             {
                 var hasCredentials = _credentialService.HasCredentials(server.Url);
-                Console.WriteLine($"  • {server.Url} (user: {server.Username})");
+                Console.WriteLine($"  - {server.Url} (user: {server.Username})");
                 if (hasCredentials)
                 {
-                    Console.WriteLine("    Credentials: ✓ Saved");
+                    Console.WriteLine("    Credentials: [OK] Saved");
                 }
                 else
                 {
-                    Console.WriteLine("    Credentials: ✗ Not saved");
+                    Console.WriteLine("    Credentials: [X] Not saved");
                 }
             }
         }

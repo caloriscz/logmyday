@@ -14,8 +14,8 @@
     <Authors>LogMyDay Team</Authors>
     <Description>Management CLI tool for LogMyDay - install, update, backup and restore operations</Description>
     <PackageTags>logmyday;manager;cli;tool</PackageTags>
-    <PackageProjectUrl>https://github.com/yourusername/logmyday</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/yourusername/logmyday</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/caloriscz/logmyday</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/caloriscz/logmyday</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>

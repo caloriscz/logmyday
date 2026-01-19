@@ -74,7 +74,7 @@ public class ServerCommands
         try
         {
             _credentialService.SaveCredentials(url, username, password);
-            Console.WriteLine("[OK] Credentials saved to Windows Credential Manager");
+            Console.WriteLine("✓ Credentials saved to Windows Credential Manager");
         }
         catch (Exception ex)
         {
@@ -93,7 +93,7 @@ public class ServerCommands
         await _configService.SaveManagerConfigAsync(config);
 
         Console.WriteLine();
-        Console.WriteLine($"[OK] Server added successfully: {url}");
+        Console.WriteLine($"✓ Server added successfully: {url}");
         Console.WriteLine();
         Console.WriteLine("Next steps:");
         Console.WriteLine("  - Run 'logmyday status' to check installation status");
@@ -124,7 +124,7 @@ public class ServerCommands
         foreach (var server in config.Servers.OrderBy(s => s.Url))
         {
             var hasCredentials = _credentialService.HasCredentials(server.Url);
-            var credStatus = hasCredentials ? "[OK]" : "[X]";
+            var credStatus = hasCredentials ? "✓" : "✗";
             
             Console.WriteLine($"  {credStatus} {server.Url}");
             Console.WriteLine($"    Username: {server.Username}");
@@ -134,8 +134,8 @@ public class ServerCommands
         }
 
         Console.WriteLine("Legend:");
-        Console.WriteLine("  [OK] = Credentials available");
-        Console.WriteLine("  [X] = Credentials missing (you will be prompted)");
+        Console.WriteLine("  ✓ = Credentials available");
+        Console.WriteLine("  ✗ = Credentials missing (you will be prompted)");
     }
 
     [Command("remove", Description = "Remove a server configuration")]
@@ -174,7 +174,7 @@ public class ServerCommands
         try
         {
             _credentialService.DeleteCredentials(url);
-            Console.WriteLine("[OK] Credentials removed from Windows Credential Manager");
+            Console.WriteLine("✓ Credentials removed from Windows Credential Manager");
         }
         catch (Exception ex)
         {
@@ -185,7 +185,7 @@ public class ServerCommands
         config.Servers.Remove(server);
         await _configService.SaveManagerConfigAsync(config);
 
-        Console.WriteLine($"[OK] Server removed successfully: {url}");
+        Console.WriteLine($"✓ Server removed successfully: {url}");
     }
 
     [Command("test", Description = "Test connection to a server")]

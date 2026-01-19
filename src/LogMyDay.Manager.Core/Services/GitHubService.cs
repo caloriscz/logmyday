@@ -12,7 +12,7 @@ public class GitHubService : IGitHubService
         _httpClientFactory = httpClientFactory;
     }
 
-    public async Task<string> GetLatestVersionAsync(string owner = "yourusername", string repo = "logmyday")
+    public async Task<string> GetLatestVersionAsync(string owner = "caloriscz", string repo = "logmyday")
     {
         var client = _httpClientFactory.CreateClient("GitHub");
         var response = await client.GetAsync($"/repos/{owner}/{repo}/releases/latest");
@@ -25,7 +25,7 @@ public class GitHubService : IGitHubService
         return tagName ?? "unknown";
     }
 
-    public async Task<string> DownloadLatestReleaseAsync(string downloadPath, string owner = "yourusername", string repo = "logmyday")
+    public async Task<string> DownloadLatestReleaseAsync(string downloadPath, string owner = "caloriscz", string repo = "logmyday")
     {
         var client = _httpClientFactory.CreateClient("GitHub");
         var response = await client.GetAsync($"/repos/{owner}/{repo}/releases/latest");
