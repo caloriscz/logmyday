@@ -32,11 +32,14 @@ public class ActivitiesController : BaseApiController
         }
 
         return Ok(calendar);
-    }    [HttpGet]
+    }    
+    
+    [HttpGet]
     public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] string orderBy = "desc", [FromQuery] int? tagId = null, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null, [FromQuery] string? descriptionFilter = null)
     {
         var userId = GetCurrentUserId();
         var pagedResult = await _activityService.GetPaged(pageNumber, pageSize, orderBy, userId, tagId, startDate, endDate, descriptionFilter);
+        
         return Ok(pagedResult);
     }
 
