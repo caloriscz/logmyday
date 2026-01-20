@@ -41,49 +41,107 @@
     @if (dataLoaded && statistics != null)
     {
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <!-- Minimum Value Card -->
+            <!-- Min/Max/Average Card -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div class="p-5">
-                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
-                        <Icon Name="arrow-down" Class="w-5 h-5 me-2" />
-                        Minimum Value
-                    </h5>
-                    <p class="mb-2 text-4xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MinimumValue)</p>
-                    @if (statistics.MinimumValueDate.HasValue)
-                    {
-                        <small class="text-sm text-gray-500 dark:text-slate-400">@statistics.MinimumValueDate.Value.ToString("MMM d, yyyy")</small>
-                    }
+                <div class="p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Value Statistics</h5>
+                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForValues" @bind:after="OnYearChangedForValues">
+                            <option value="">All</option>
+                            @foreach (var year in availableYears)
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <Icon Name="arrow-down" Class="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                                <span class="text-xs text-gray-600 dark:text-slate-400">Minimum</span>
+                            </div>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MinimumValue)</p>
+                            @if (statistics.MinimumValueDate.HasValue)
+                            {
+                                <small class="text-xs text-gray-500 dark:text-slate-400">@statistics.MinimumValueDate.Value.ToString("MMM d, yyyy")</small>
+                            }
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <Icon Name="arrow-up" Class="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                                <span class="text-xs text-gray-600 dark:text-slate-400">Maximum</span>
+                            </div>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MaximumValue)</p>
+                            @if (statistics.MaximumValueDate.HasValue)
+                            {
+                                <small class="text-xs text-gray-500 dark:text-slate-400">@statistics.MaximumValueDate.Value.ToString("MMM d, yyyy")</small>
+                            }
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <Icon Name="chart-bar" Class="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                                <span class="text-xs text-gray-600 dark:text-slate-400">Average</span>
+                            </div>
+                            <p class="text-2xl font-bold text-gray-900 dark:text-slate-100">@FormatAverageValue(statistics.AverageValue)</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Maximum Value Card -->
+            <!-- Average by Month Card -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div class="p-5">
-                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
-                        <Icon Name="arrow-up" Class="w-5 h-5 me-2" />
-                        Maximum Value
-                    </h5>
-                    <p class="mb-2 text-4xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(statistics.MaximumValue)</p>
-                    @if (statistics.MaximumValueDate.HasValue)
-                    {
-                        <small class="text-sm text-gray-500 dark:text-slate-400">@statistics.MaximumValueDate.Value.ToString("MMM d, yyyy")</small>
-                    }
+                <div class="p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Average by Month</h5>
+                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForMonths" @bind:after="OnYearChangedForMonths">
+                            <option value="">All</option>
+                            @foreach (var year in availableYears)
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        @if (statistics.AverageByMonth.Any())
+                        {
+                            @foreach (var monthAvg in statistics.AverageByMonth.OrderBy(kvp => kvp.Key))
+                            {
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-slate-400">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(monthAvg.Key)</span>
+                                    <span class="font-semibold text-gray-900 dark:text-slate-100">@FormatAverageValue(monthAvg.Value)</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-xs text-gray-500 dark:text-slate-400">No data available</p>
+                        }
+                    </div>
                 </div>
             </div>
 
             <!-- Average by Day of Week Card -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div class="p-5">
-                    <h5 class="mb-4 flex items-center text-sm font-medium text-gray-600 dark:text-slate-400">
-                        <Icon Name="calendar" Class="w-5 h-5 me-2" />
-                        Average by Day
-                    </h5>
+                <div class="p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Average by Day</h5>
+                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForDays" @bind:after="OnYearChangedForDays">
+                            <option value="">All</option>
+                            @foreach (var year in availableYears)
+                            {
+                                <option value="@year">@year</option>
+                            }
+                        </select>
+                    </div>
                     <div class="space-y-2">
                         @foreach (var dayAvg in statistics.AverageByDayOfWeek.OrderBy(kvp => (int)kvp.Key))
                         {
                             <div class="flex items-center justify-between text-sm">
-                                <span class="text-gray-600 dark:text-slate-400">@dayAvg.Key.ToString().Substring(0, 3)</span>
-                                <span class="font-semibold text-gray-900 dark:text-slate-100">@FormatValue(dayAvg.Value)</span>
+                                <span class="text-gray-600 dark:text-slate-400">@dayAvg.Key.ToString()</span>
+                                <span class="font-semibold text-gray-900 dark:text-slate-100">@FormatAverageValue(dayAvg.Value)</span>
                             </div>
                         }
                     </div>
@@ -162,6 +220,11 @@
     private int? selectedTagId;
     private bool dataLoaded = false;
     private TagStatistics? statistics;
+    private List<DailyValue> allNumericValues = new();
+    private List<int> availableYears = new();
+    private int? selectedYearForValues;
+    private int? selectedYearForMonths;
+    private int? selectedYearForDays;
 
     private bool CanLoadData => selectedTagId.HasValue;
 
@@ -236,6 +299,10 @@
             }
             dataLoaded = false;
             statistics = null;
+            availableYears.Clear();
+            selectedYearForValues = null;
+            selectedYearForMonths = null;
+            selectedYearForDays = null;
         }
         catch (Exception ex)
         {
@@ -264,10 +331,11 @@
             {
                 statistics = null;
                 dataLoaded = true;
+                availableYears.Clear();
                 return;
             }
 
-            var numericValues = activities
+            allNumericValues = activities
                 .Where(a => !string.IsNullOrEmpty(a.Description) && decimal.TryParse(a.Description, out _))
                 .Select(a => new DailyValue
                 { 
@@ -277,29 +345,23 @@
                 })
                 .ToList();
 
-            if (!numericValues.Any())
+            if (!allNumericValues.Any())
             {
                 statistics = null;
                 dataLoaded = true;
+                availableYears.Clear();
                 return;
             }
 
-            var prefs = await UserPreferencesService.GetAsync();
-            
-            statistics = new TagStatistics
-            {
-                MinimumValue = numericValues.Min(v => v.Value),
-                MaximumValue = numericValues.Max(v => v.Value),
-                MinimumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Min(x => x.Value))?.Date,
-                MaximumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Max(x => x.Value))?.Date,
-                AverageByDayOfWeek = numericValues
-                    .GroupBy(v => v.DayOfWeek)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Average(v => v.Value)
-                    ),
-                ValueStreaks = CalculateValueStreaks(numericValues)
-            };
+            // Get available years
+            availableYears = allNumericValues
+                .Select(v => v.Date.Year)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToList();
+
+            // Calculate statistics for all data by default
+            CalculateStatistics(allNumericValues);
 
             dataLoaded = true;
         }
@@ -307,6 +369,96 @@
         {
             Console.WriteLine($"Error loading statistics: {ex.Message}");
         }
+    }
+
+    private void CalculateStatistics(List<DailyValue> numericValues)
+    {
+        statistics = new TagStatistics
+        {
+            MinimumValue = numericValues.Min(v => v.Value),
+            MaximumValue = numericValues.Max(v => v.Value),
+            AverageValue = numericValues.Average(v => v.Value),
+            MinimumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Min(x => x.Value))?.Date,
+            MaximumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Max(x => x.Value))?.Date,
+            AverageByDayOfWeek = numericValues
+                .GroupBy(v => v.DayOfWeek)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Average(v => v.Value)
+                ),
+            AverageByMonth = numericValues
+                .GroupBy(v => v.Date.Month)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Average(v => v.Value)
+                ),
+            ValueStreaks = CalculateValueStreaks(numericValues)
+        };
+    }
+
+    private async Task OnYearChangedForValues()
+    {
+        if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
+            return;
+
+        var filteredValues = selectedYearForValues.HasValue
+            ? allNumericValues.Where(v => v.Date.Year == selectedYearForValues.Value).ToList()
+            : allNumericValues;
+
+        if (filteredValues.Any() && statistics != null)
+        {
+            statistics.MinimumValue = filteredValues.Min(v => v.Value);
+            statistics.MaximumValue = filteredValues.Max(v => v.Value);
+            statistics.AverageValue = filteredValues.Average(v => v.Value);
+            statistics.MinimumValueDate = filteredValues.FirstOrDefault(v => v.Value == filteredValues.Min(x => x.Value))?.Date;
+            statistics.MaximumValueDate = filteredValues.FirstOrDefault(v => v.Value == filteredValues.Max(x => x.Value))?.Date;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task OnYearChangedForMonths()
+    {
+        if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
+            return;
+
+        var filteredValues = selectedYearForMonths.HasValue
+            ? allNumericValues.Where(v => v.Date.Year == selectedYearForMonths.Value).ToList()
+            : allNumericValues;
+
+        if (filteredValues.Any() && statistics != null)
+        {
+            statistics.AverageByMonth = filteredValues
+                .GroupBy(v => v.Date.Month)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Average(v => v.Value)
+                );
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task OnYearChangedForDays()
+    {
+        if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
+            return;
+
+        var filteredValues = selectedYearForDays.HasValue
+            ? allNumericValues.Where(v => v.Date.Year == selectedYearForDays.Value).ToList()
+            : allNumericValues;
+
+        if (filteredValues.Any() && statistics != null)
+        {
+            statistics.AverageByDayOfWeek = filteredValues
+                .GroupBy(v => v.DayOfWeek)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Average(v => v.Value)
+                );
+        }
+
+        await Task.CompletedTask;
     }
 
     private string FormatValue(decimal value)
@@ -322,6 +474,11 @@
             }
         }
         return value.ToString("F0");
+    }
+
+    private string FormatAverageValue(decimal value)
+    {
+        return value.ToString("F2");
     }
 
     private List<ValueStreak> CalculateValueStreaks(List<DailyValue> numericValues)
@@ -408,9 +565,11 @@
     {
         public decimal MinimumValue { get; set; }
         public decimal MaximumValue { get; set; }
+        public decimal AverageValue { get; set; }
         public DateTime? MinimumValueDate { get; set; }
         public DateTime? MaximumValueDate { get; set; }
         public Dictionary<DayOfWeek, decimal> AverageByDayOfWeek { get; set; } = new();
+        public Dictionary<int, decimal> AverageByMonth { get; set; } = new();
         public List<ValueStreak> ValueStreaks { get; set; } = new();
     }
 
