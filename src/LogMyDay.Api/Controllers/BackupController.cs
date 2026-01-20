@@ -27,10 +27,12 @@ public class BackupController : BaseApiController
     /// <param name="userId">Optional user ID to filter data</param>
     /// <returns>JSON backup file</returns>
     [HttpGet("export")]
-    public async Task<IActionResult> ExportData([FromQuery] Guid? userId = null)
+    public async Task<IActionResult> ExportData([FromQuery] Guid? userId_old = null)
     {
         try
         {
+            Guid? userId = GetCurrentUserId();
+
             _logger.LogInformation("Export request received for user: {UserId}", userId?.ToString() ?? "All users");
 
             var backupData = await _backupService.ExportDataAsync(userId);

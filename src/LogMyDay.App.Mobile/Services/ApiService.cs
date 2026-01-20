@@ -82,7 +82,6 @@ public class ApiService
         try
         {
             System.Diagnostics.Debug.WriteLine("=== API CONNECTION TEST ===");
-            System.Diagnostics.Debug.WriteLine($"Testing connection to: https://logmyday.tadata.cz/api/tags");
             System.Diagnostics.Debug.WriteLine($"Using credentials: admin/secret123");
             
             var tags = await _activityApi.GetTags();
@@ -138,7 +137,7 @@ public class ApiService
                 TypeId = 2, // Default to String type
                 IsRequired = false,
                 IsRepeatable = true,
-                TimeGranularity = LogMyDay.Domain.Enums.TimeGranularity.Exact,
+                TimeGranularity = Domain.Enums.TimeGranularity.Exact,
                 IsRange = false
             };
             
