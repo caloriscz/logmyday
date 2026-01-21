@@ -146,7 +146,7 @@
                             
                             @if (list.Options.Any())
                             {
-                                <div class="mt-4">
+                                <dl class="mt-4">
                                     <dt class="text-sm font-medium text-gray-600 dark:text-slate-400 mb-2">Options:</dt>
                                     <dd class="flex flex-wrap gap-2">
                                         @foreach (var option in list.Options.Take(5))
@@ -162,7 +162,7 @@
                                             </span>
                                         }
                                     </dd>
-                                </div>
+                                </dl>
                             }
 
                             <div class="mt-4 flex justify-end gap-2">
