@@ -46,7 +46,7 @@
                 <div class="p-5 space-y-4">
                     <div class="flex items-center justify-between">
                         <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Value Statistics</h5>
-                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForValues" @bind:after="OnYearChangedForValues">
+                        <select style="width: 80px;" class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForValues" @bind:after="OnYearChangedForValues">
                             <option value="">All</option>
                             @foreach (var year in availableYears)
                             {
@@ -96,7 +96,7 @@
                 <div class="p-5 space-y-4">
                     <div class="flex items-center justify-between">
                         <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Average by Month</h5>
-                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForMonths" @bind:after="OnYearChangedForMonths">
+                        <select style="width: 80px;" class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForMonths" @bind:after="OnYearChangedForMonths">
                             <option value="">All</option>
                             @foreach (var year in availableYears)
                             {
@@ -128,7 +128,7 @@
                 <div class="p-5 space-y-4">
                     <div class="flex items-center justify-between">
                         <h5 class="text-sm font-medium text-gray-600 dark:text-slate-400">Average by Day</h5>
-                        <select class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForDays" @bind:after="OnYearChangedForDays">
+                        <select style="width: 80px;" class="form-select rounded-md border-gray-300 text-xs py-1 px-2 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedYearForDays" @bind:after="OnYearChangedForDays">
                             <option value="">All</option>
                             @foreach (var year in availableYears)
                             {
