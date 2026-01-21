@@ -252,15 +252,20 @@
             var inputTypes = await ActivityApi.GetInputTypesAsync();
             inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
             
-            // Find the IDs for Integer and Decimal input types
+            // Find the IDs for numeric input types
             var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
             var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
+            var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
+            var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
             
             // Load tags and filter by numeric input types
             var allTags = await ActivityApi.GetTags();
             numericTags = allTags
                 .Where(t => t.InputTypeId.HasValue && 
-                           (t.InputTypeId == integerTypeId || t.InputTypeId == decimalTypeId))
+                           (t.InputTypeId == integerTypeId || 
+                            t.InputTypeId == decimalTypeId ||
+                            t.InputTypeId == rating5TypeId ||
+                            t.InputTypeId == rating10TypeId))
                 .OrderBy(t => t.Title)
                 .ToList();
         }
@@ -336,10 +341,10 @@
             }
 
             allNumericValues = activities
-                .Where(a => !string.IsNullOrEmpty(a.Description) && decimal.TryParse(a.Description, out _))
+                .Where(a => !string.IsNullOrEmpty(a.Description) && decimal.TryParse(a.Description, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
                 .Select(a => new DailyValue
                 { 
-                    Value = decimal.Parse(a.Description),
+                    Value = decimal.Parse(a.Description!, System.Globalization.CultureInfo.InvariantCulture),
                     Date = a.DateStarted,
                     DayOfWeek = a.DateStarted.DayOfWeek
                 })
@@ -353,14 +358,12 @@
                 return;
             }
 
-            // Get available years
             availableYears = allNumericValues
                 .Select(v => v.Date.Year)
                 .Distinct()
                 .OrderByDescending(y => y)
                 .ToList();
 
-            // Calculate statistics for all data by default
             CalculateStatistics(allNumericValues);
 
             dataLoaded = true;
@@ -373,13 +376,16 @@
 
     private void CalculateStatistics(List<DailyValue> numericValues)
     {
+        var minValue = numericValues.Min(v => v.Value);
+        var maxValue = numericValues.Max(v => v.Value);
+
         statistics = new TagStatistics
         {
-            MinimumValue = numericValues.Min(v => v.Value),
-            MaximumValue = numericValues.Max(v => v.Value),
+            MinimumValue = minValue,
+            MaximumValue = maxValue,
             AverageValue = numericValues.Average(v => v.Value),
-            MinimumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Min(x => x.Value))?.Date,
-            MaximumValueDate = numericValues.FirstOrDefault(v => v.Value == numericValues.Max(x => x.Value))?.Date,
+            MinimumValueDate = numericValues.FirstOrDefault(v => v.Value == minValue)?.Date,
+            MaximumValueDate = numericValues.FirstOrDefault(v => v.Value == maxValue)?.Date,
             AverageByDayOfWeek = numericValues
                 .GroupBy(v => v.DayOfWeek)
                 .ToDictionary(
@@ -396,7 +402,7 @@
         };
     }
 
-    private async Task OnYearChangedForValues()
+    private void OnYearChangedForValues()
     {
         if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
             return;
@@ -407,17 +413,18 @@
 
         if (filteredValues.Any() && statistics != null)
         {
-            statistics.MinimumValue = filteredValues.Min(v => v.Value);
-            statistics.MaximumValue = filteredValues.Max(v => v.Value);
-            statistics.AverageValue = filteredValues.Average(v => v.Value);
-            statistics.MinimumValueDate = filteredValues.FirstOrDefault(v => v.Value == filteredValues.Min(x => x.Value))?.Date;
-            statistics.MaximumValueDate = filteredValues.FirstOrDefault(v => v.Value == filteredValues.Max(x => x.Value))?.Date;
-        }
+            var minValue = filteredValues.Min(v => v.Value);
+            var maxValue = filteredValues.Max(v => v.Value);
 
-        await Task.CompletedTask;
+            statistics.MinimumValue = minValue;
+            statistics.MaximumValue = maxValue;
+            statistics.AverageValue = filteredValues.Average(v => v.Value);
+            statistics.MinimumValueDate = filteredValues.FirstOrDefault(v => v.Value == minValue)?.Date;
+            statistics.MaximumValueDate = filteredValues.FirstOrDefault(v => v.Value == maxValue)?.Date;
+        }
     }
 
-    private async Task OnYearChangedForMonths()
+    private void OnYearChangedForMonths()
     {
         if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
             return;
@@ -435,11 +442,9 @@
                     g => g.Average(v => v.Value)
                 );
         }
-
-        await Task.CompletedTask;
     }
 
-    private async Task OnYearChangedForDays()
+    private void OnYearChangedForDays()
     {
         if (!dataLoaded || allNumericValues == null || !allNumericValues.Any())
             return;
@@ -457,8 +462,6 @@
                     g => g.Average(v => v.Value)
                 );
         }
-
-        await Task.CompletedTask;
     }
 
     private string FormatValue(decimal value)
@@ -486,12 +489,12 @@
         // Group by date and get the most common value for each day (in case multiple activities per day)
         var dailyValues = numericValues
             .GroupBy(v => v.Date.Date)
-            .Select(g => new
+            .Select(g => 
             {
-                Date = g.Key,
-                Value = g.GroupBy(x => x.Value)
+                var mostCommon = g.GroupBy(x => x.Value)
                     .OrderByDescending(x => x.Count())
-                    .First().Key
+                    .First();
+                return new { Date = g.Key, Value = mostCommon.Key };
             })
             .OrderBy(v => v.Date)
             .ToList();
