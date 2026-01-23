@@ -294,22 +294,19 @@
             jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme-listener.js");
             await jsModule.InvokeVoidAsync("setupThemeListener", dotNetReference);
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error setting up theme listener: {ex.Message}");
+            // Theme listener setup failed - chart will use detected theme
         }
     }
 
     [JSInvokable]
     public async Task OnThemeChanged(bool isDark)
     {
-        Console.WriteLine($"OnThemeChanged called: isDark = {isDark}");
         isDarkMode = isDark;
         
         if (dataLoaded && allSeriesData != null && allSeriesData.Any() && chart != null && chartOptions != null)
         {
-            Console.WriteLine($"Updating chart theme to: {(isDark ? "dark" : "light")}");
-            
             // Update theme settings on existing options object
             chartOptions.Theme ??= new Theme();
             chartOptions.Theme.Mode = isDark ? Mode.Dark : Mode.Light;
@@ -328,10 +325,6 @@
             await chart.RenderAsync();
             
             StateHasChanged();
-        }
-        else
-        {
-            Console.WriteLine($"Chart not ready for theme update. dataLoaded={dataLoaded}, hasData={allSeriesData?.Any()}, hasChart={chart != null}");
         }
     }
     
@@ -352,46 +345,37 @@
         {
             // Check the actual dark class on html element, not localStorage
             isDarkMode = await JS.InvokeAsync<bool>("eval", "document.documentElement.classList.contains('dark')");
-            Console.WriteLine($"Theme detected from HTML class: isDarkMode = {isDarkMode}");
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error detecting theme: {ex.Message}");
             isDarkMode = false;
         }
     }
 
     private async Task LoadNumericTags()
     {
-        try
-        {
-            // Load all input types to get their names
-            var inputTypes = await ActivityApi.GetInputTypesAsync();
-            inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
-            
-            // Find the IDs for numeric input types
-            var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
-            var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
-            var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
-            var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
-            var percentageTypeId = inputTypes.FirstOrDefault(it => it.Name == "Percentage")?.Id;
-            
-            // Load tags and filter by numeric input types
-            var allTags = await ActivityApi.GetTags();
-            numericTags = allTags
-                .Where(t => t.InputTypeId.HasValue && 
-                           (t.InputTypeId == integerTypeId || 
-                            t.InputTypeId == decimalTypeId ||
-                            t.InputTypeId == rating5TypeId ||
-                            t.InputTypeId == rating10TypeId ||
-                            t.InputTypeId == percentageTypeId))
-                .OrderBy(t => t.Title)
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading tags: {ex.Message}");
-        }
+        // Load all input types to get their names
+        var inputTypes = await ActivityApi.GetInputTypesAsync();
+        inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
+        
+        // Find the IDs for numeric input types
+        var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
+        var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
+        var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
+        var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
+        var percentageTypeId = inputTypes.FirstOrDefault(it => it.Name == "Percentage")?.Id;
+        
+        // Load tags and filter by numeric input types
+        var allTags = await ActivityApi.GetTags();
+        numericTags = allTags
+            .Where(t => t.InputTypeId.HasValue && 
+                       (t.InputTypeId == integerTypeId || 
+                        t.InputTypeId == decimalTypeId ||
+                        t.InputTypeId == rating5TypeId ||
+                        t.InputTypeId == rating10TypeId ||
+                        t.InputTypeId == percentageTypeId))
+            .OrderBy(t => t.Title)
+            .ToList();
     }
 
     private async Task LoadPreferences()
@@ -445,9 +429,9 @@
                 selectedDateRange = savedDateRange;
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Error loading preferences: {ex.Message}");
+            // Preferences loading failed - use defaults
         }
     }
 
@@ -516,27 +500,20 @@
 
     private async Task OnTagChanged(int? tagId, string storageKey)
     {
-        try
+        if (tagId.HasValue)
         {
-            if (tagId.HasValue)
-            {
-                await JS.InvokeVoidAsync("localStorage.setItem", storageKey, tagId.Value.ToString());
-            }
-            else
-            {
-                await JS.InvokeVoidAsync("localStorage.removeItem", storageKey);
-            }
+            await JS.InvokeVoidAsync("localStorage.setItem", storageKey, tagId.Value.ToString());
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", storageKey);
+        }
 
-            dataLoaded = false;
-            allSeriesData = new List<SeriesData>();
-            availableYears.Clear();
-            availableMonths.Clear();
-            selectedDateRange = "all";
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error saving tag preference: {ex.Message}");
-        }
+        dataLoaded = false;
+        allSeriesData = new List<SeriesData>();
+        availableYears.Clear();
+        availableMonths.Clear();
+        selectedDateRange = "all";
     }
 
     private async Task LoadChartData()
@@ -648,9 +625,8 @@
             // Save preferences
             await JS.InvokeVoidAsync("localStorage.setItem", "charts_dateRange", selectedDateRange);
         }
-        catch (Exception ex)
+        finally
         {
-            Console.WriteLine($"Error loading chart data: {ex.Message}");
             isLoading = false;
         }
     }
@@ -1084,16 +1060,21 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (jsModule != null)
+        try
         {
-            try
+            if (jsModule != null)
             {
                 await jsModule.InvokeVoidAsync("cleanupThemeListener");
                 await jsModule.DisposeAsync();
             }
-            catch { }
         }
-        
-        dotNetReference?.Dispose();
+        catch
+        {
+            // Cleanup may fail if JS context is already disposed
+        }
+        finally
+        {
+            dotNetReference?.Dispose();
+        }
     }
 }
