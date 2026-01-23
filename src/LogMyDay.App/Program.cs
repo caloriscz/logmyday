@@ -1,4 +1,5 @@
-﻿using LogMyDay.Api.Application.Interfaces;
+﻿using ApexCharts;
+using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
@@ -209,6 +210,9 @@ services.AddRateLimiter(options =>
 });
 
 services.AddRazorComponents().AddInteractiveServerComponents();
+
+// Add ApexCharts for data visualization
+services.AddApexCharts();
 
 services.AddControllers()
     .AddJsonOptions(options =>
