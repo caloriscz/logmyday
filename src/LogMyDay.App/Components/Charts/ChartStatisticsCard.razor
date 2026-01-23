@@ -1,0 +1,42 @@
+@using LogMyDay.App.Services.Charts
+
+<div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div class="p-5">
+        <h5 class="mb-4 text-sm font-medium opacity-75">Quick Statistics</h5>
+        @if (Statistics != null && Statistics.TotalPoints > 0)
+        {
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div>
+                    <div class="text-xs text-gray-600 dark:text-slate-400">Minimum</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(Statistics.Minimum)</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-600 dark:text-slate-400">Maximum</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(Statistics.Maximum)</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-600 dark:text-slate-400">Average</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@Statistics.Average.ToString("F2")</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-600 dark:text-slate-400">Total Data Points</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@Statistics.TotalPoints</div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p class="text-sm text-gray-500 dark:text-slate-400">No data available.</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public ChartStatistics? Statistics { get; set; }
+    [Parameter] public bool UseDecimalFormat { get; set; } = false;
+
+    private string FormatValue(decimal value)
+    {
+        return UseDecimalFormat ? value.ToString("F2") : value.ToString("F0");
+    }
+}

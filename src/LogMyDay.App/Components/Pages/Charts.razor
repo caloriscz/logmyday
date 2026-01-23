@@ -1,15 +1,16 @@
 @page "/charts"
-@using LogMyDay.Shared.Interfaces
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Services
+@using LogMyDay.App.Services.Charts
+@using LogMyDay.App.Components.Charts
 @using LogMyDay.Domain.Constants
-@inject IActivityApi ActivityApi
 @inject IPageTitleService PageTitleService
-@inject IUserPreferencesService UserPreferencesService
+@inject IChartDataService ChartDataService
+@inject IChartPreferencesService PreferencesService
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<PageTitle>@_pageTitle</PageTitle>
+<PageTitle>Charts</PageTitle>
 
 <div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
     <div class="space-y-2">
@@ -20,101 +21,52 @@
     <!-- Tag Selection and Date Range Filter Card -->
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div class="space-y-4">
-            <!-- Tag Selection Row with Chart Types -->
+            <!-- Tag Selection with Chart Types -->
             <div class="flex flex-col gap-4">
-                <!-- Tag 1 -->
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div class="flex-1">
-                        <label for="tagSelect1" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Primary tag</label>
-                        <select id="tagSelect1" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId" @bind:after="OnTag1Changed">
-                            <option value="">-- Select a tag --</option>
-                            @foreach (var tag in numericTags)
-                            {
-                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                    ? inputTypeNames[tag.InputTypeId.Value] 
-                                    : "Unknown";
-                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="w-full sm:w-32">
-                        <label for="chartType1" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
-                        <select id="chartType1" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType1" @bind:after="SaveChartType1Preference">
-                            <option value="line">Line</option>
-                            <option value="bar">Bar</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- Tag 2 -->
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div class="flex-1">
-                        <label for="tagSelect2" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 2 (Optional)</label>
-                        <select id="tagSelect2" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId2" @bind:after="OnTag2Changed">
-                            <option value="">-- Select tag (Optional) --</option>
-                            @foreach (var tag in numericTags)
-                            {
-                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                    ? inputTypeNames[tag.InputTypeId.Value] 
-                                    : "Unknown";
-                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="w-full sm:w-32">
-                        <label for="chartType2" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
-                        <select id="chartType2" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType2" @bind:after="SaveChartType2Preference" disabled="@(!selectedTagId2.HasValue)">
-                            <option value="line">Line</option>
-                            <option value="bar">Bar</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- Tag 3 -->
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                    <div class="flex-1">
-                        <label for="tagSelect3" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 3 (Optional)</label>
-                        <select id="tagSelect3" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId3" @bind:after="OnTag3Changed">
-                            <option value="">-- Select tag (Optional) --</option>
-                            @foreach (var tag in numericTags)
-                            {
-                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                    ? inputTypeNames[tag.InputTypeId.Value] 
-                                    : "Unknown";
-                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="w-full sm:w-32">
-                        <label for="chartType3" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
-                        <select id="chartType3" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType3" @bind:after="SaveChartType3Preference" disabled="@(!selectedTagId3.HasValue)">
-                            <option value="line">Line</option>
-                            <option value="bar">Bar</option>
-                        </select>
-                    </div>
-                </div>
+                <ChartTagSelector 
+                    Slot="1"
+                    Label="Primary tag"
+                    IsOptional="false"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId"
+                    @bind-ChartType="selectedChartType1"
+                    OnTagChanged="OnTag1Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(1, t))" />
+
+                <ChartTagSelector 
+                    Slot="2"
+                    Label="Tag 2 (Optional)"
+                    IsOptional="true"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId2"
+                    @bind-ChartType="selectedChartType2"
+                    OnTagChanged="OnTag2Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(2, t))" />
+
+                <ChartTagSelector 
+                    Slot="3"
+                    Label="Tag 3 (Optional)"
+                    IsOptional="true"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId3"
+                    @bind-ChartType="selectedChartType3"
+                    OnTagChanged="OnTag3Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(3, t))" />
             </div>
-            
-            <!-- Filter and Options Row -->
+
+            <!-- Filter and Load Button -->
             <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div class="w-full sm:w-48">
-                    <label for="dateRangeSelect" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Date Range</label>
-                    <select id="dateRangeSelect" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedDateRange">
-                        <option value="all">All Time</option>
-                        <option value="last-month">Last Month</option>
-                        <option value="last-quarter">Last Quarter</option>
-                        <option value="last-year">Last Year</option>
-                        @foreach (var year in availableYears)
-                        {
-                            <option value="year-@year">@year</option>
-                        }
-                        @foreach (var month in availableMonths)
-                        {
-                            <option value="@month.Value">@month.Key</option>
-                        }
-                    </select>
-                </div>
-                <button class="btn btn-primary flex items-center gap-2 whitespace-nowrap" @onclick="LoadChartData" disabled="@(!CanLoadData)">
+                <ChartDateRangeSelector 
+                    @bind-SelectedDateRange="selectedDateRange"
+                    AvailableYears="availableYears"
+                    AvailableMonths="availableMonths" />
+
+                <button class="btn btn-primary flex items-center gap-2 whitespace-nowrap" 
+                        @onclick="LoadChartData" 
+                        disabled="@(!CanLoadData)">
                     <Icon Name="chart-bar" Class="w-4 h-4" />
                     Load Chart
                 </button>
@@ -131,33 +83,31 @@
             </div>
         </div>
     }
-    else if (dataLoaded && allSeriesData != null && allSeriesData.Any())
+    else if (dataLoaded && allSeriesData.Any())
     {
+        <!-- Chart Card -->
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div class="p-5">
                 <div class="mb-4 flex items-center justify-between">
                     <h5 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
                         @GetChartTitle()
                     </h5>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-600 dark:text-slate-400">
-                            @(allSeriesData.Sum(s => s.DataPoints.Count)) data point@(allSeriesData.Sum(s => s.DataPoints.Count) != 1 ? "s" : "")
-                        </span>
-                    </div>
+                    <span class="text-xs text-gray-600 dark:text-slate-400">
+                        @totalDataPoints data point@(totalDataPoints != 1 ? "s" : "")
+                    </span>
                 </div>
-                
-                @if (chartOptions != null && allSeriesData != null && allSeriesData.Any())
+
+                @if (chartOptions != null)
                 {
-                    <ApexChart TItem="ChartDataPoint" 
+                    <ApexChart TItem="ChartDataPoint"
                                Options="@chartOptions"
                                @ref="chart">
-                        
-                        @foreach (var seriesData in allSeriesData)
+                        @foreach (var series in allSeriesData)
                         {
                             <ApexPointSeries TItem="ChartDataPoint"
-                                            Items="@seriesData.DataPoints"
-                                            Name="@seriesData.TagName"
-                                            SeriesType="@seriesData.ChartType"
+                                            Items="@series.DataPoints"
+                                            Name="@series.TagName"
+                                            SeriesType="@series.ChartType"
                                             XValue="@(e => e.Date.ToString("yyyy-MM-dd"))"
                                             YValue="@(e => (decimal?)e.Value)"
                                             OrderBy="@(e => e.X)" />
@@ -167,59 +117,16 @@
             </div>
         </div>
 
-        <!-- Statistics Summary Card -->
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div class="p-5">
-                <h5 class="mb-4 text-sm font-medium opacity-75">Quick Statistics</h5>
-                @if (allSeriesData != null && allSeriesData.Any())
-                {
-                    var allPoints = allSeriesData.SelectMany(s => s.DataPoints).ToList();
-                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                        <div>
-                            <div class="text-xs text-gray-600 dark:text-slate-400">Minimum</div>
-                            <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(allPoints.Min(d => d.Value))</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-600 dark:text-slate-400">Maximum</div>
-                            <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@FormatValue(allPoints.Max(d => d.Value))</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-600 dark:text-slate-400">Average</div>
-                            <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@FormatAverageValue(allPoints.Average(d => d.Value))</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-600 dark:text-slate-400">Total Data Points</div>
-                            <div class="text-xl font-bold text-gray-900 dark:text-slate-100">@allPoints.Count</div>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
+        <!-- Statistics Card -->
+        <ChartStatisticsCard Statistics="@statistics" UseDecimalFormat="@hasDecimalType" />
 
-        @* Correlation Insights - only show when comparing multiple tags *@
-        @if (allSeriesData != null && allSeriesData.Count > 1)
+        <!-- Correlation Insights -->
+        @if (correlationInsights.Any())
         {
-            var insights = GetCorrelationInsights();
-            @if (insights.Any())
-            {
-                <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
-                    <div class="flex items-start gap-3">
-                        <Icon Name="information-circle" Class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                        <div class="text-sm text-blue-800 dark:text-blue-200">
-                            <p class="font-medium mb-2">Comparison Insights</p>
-                            <ul class="list-disc list-inside space-y-1">
-                                @foreach (var insight in insights)
-                                {
-                                    <li>@insight</li>
-                                }
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            }
+            <CorrelationInsightsPanel Insights="@correlationInsights" />
         }
     }
-    else if (dataLoaded && (allSeriesData == null || !allSeriesData.Any()))
+    else if (dataLoaded && !allSeriesData.Any())
     {
         <div class="rounded-xl border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-yellow-950">
             <div class="flex items-start gap-3">
@@ -230,7 +137,7 @@
             </div>
         </div>
     }
-    else if (!dataLoaded)
+    else
     {
         <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
             <div class="flex items-start gap-3">
@@ -244,31 +151,46 @@
 </div>
 
 @code {
-    private string _pageTitle = "Charts";
+    // Tag data
     private List<TagResponse> numericTags = new();
     private Dictionary<int, string> inputTypeNames = new();
+
+    // User selections
     private int? selectedTagId;
     private int? selectedTagId2;
     private int? selectedTagId3;
-    private string selectedChartType1 = "line";
-    private string selectedChartType2 = "line";
-    private string selectedChartType3 = "line";
-    private string selectedDateRange = "all";
-    private bool dataLoaded = false;
-    private bool isLoading = false;
-    private List<SeriesData> allSeriesData = new();
+    private string selectedChartType1 = ChartConstants.LineChart;
+    private string selectedChartType2 = ChartConstants.LineChart;
+    private string selectedChartType3 = ChartConstants.LineChart;
+    private string selectedDateRange = ChartConstants.DateRangeAll;
+
+    // Chart state
+    private bool isLoading;
+    private bool dataLoaded;
+    private bool themeDetected;
+    private bool isDarkMode;
+    private List<ChartSeriesData> allSeriesData = new();
     private List<int> availableYears = new();
     private Dictionary<string, string> availableMonths = new();
+    private ChartStatistics? statistics;
+    private List<string> correlationInsights = new();
+    private bool hasDecimalType;
+    private int totalDataPoints;
+
+    // ApexCharts
     private ApexChart<ChartDataPoint>? chart;
     private ApexChartOptions<ChartDataPoint>? chartOptions;
-    private bool isDarkMode = false;
+
+    // JS interop
     private IJSObjectReference? jsModule;
     private DotNetObjectReference<Charts>? dotNetReference;
-    private bool themeDetected = false;
+
+    // Cancellation
+    private CancellationTokenSource? loadCts;
 
     private bool CanLoadData => selectedTagId.HasValue && themeDetected;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         PageTitleService.SetTitle("Charts");
     }
@@ -277,16 +199,38 @@
     {
         if (firstRender)
         {
-            await LoadNumericTags();
-            await DetectTheme();
-            await SetupThemeChangeListener();
-            themeDetected = true;
-            await LoadPreferences();
-            StateHasChanged();
+            await LoadInitialDataAsync();
         }
     }
 
-    private async Task SetupThemeChangeListener()
+    private async Task LoadInitialDataAsync()
+    {
+        var (tags, typeNames) = await ChartDataService.GetNumericTagsAsync();
+        numericTags = tags;
+        inputTypeNames = typeNames;
+
+        isDarkMode = await PreferencesService.IsDarkModeAsync();
+        await SetupThemeListener();
+        themeDetected = true;
+
+        var prefs = await PreferencesService.LoadAsync(numericTags.Select(t => t.Id));
+        ApplyPreferences(prefs);
+
+        StateHasChanged();
+    }
+
+    private void ApplyPreferences(ChartPreferences prefs)
+    {
+        selectedTagId = prefs.Tag1Id;
+        selectedTagId2 = prefs.Tag2Id;
+        selectedTagId3 = prefs.Tag3Id;
+        selectedChartType1 = prefs.ChartType1;
+        selectedChartType2 = prefs.ChartType2;
+        selectedChartType3 = prefs.ChartType3;
+        selectedDateRange = prefs.DateRange;
+    }
+
+    private async Task SetupThemeListener()
     {
         try
         {
@@ -304,326 +248,127 @@
     public async Task OnThemeChanged(bool isDark)
     {
         isDarkMode = isDark;
-        
-        if (dataLoaded && allSeriesData != null && allSeriesData.Any() && chart != null && chartOptions != null)
+
+        if (dataLoaded && allSeriesData.Any() && chart != null && chartOptions != null)
         {
-            // Update theme settings on existing options object
-            chartOptions.Theme ??= new Theme();
-            chartOptions.Theme.Mode = isDark ? Mode.Dark : Mode.Light;
-            
-            chartOptions.Chart ??= new Chart();
-            chartOptions.Chart.Background = isDark ? "#1e293b" : "#ffffff";
-            chartOptions.Chart.ForeColor = isDark ? "#e2e8f0" : "#374151";
-            
-            chartOptions.Grid ??= new Grid();
-            chartOptions.Grid.BorderColor = isDark ? "#334155" : "#e2e8f0";
-            
-            // Update tooltip custom formatter for theme
-            UpdateTooltipFormatter();
-            
-            // Force complete chart re-render with new theme options
+            UpdateChartTheme();
             await chart.RenderAsync();
-            
             StateHasChanged();
         }
     }
-    
-    private void UpdateTooltipFormatter()
+
+    private async Task OnTag1Changed(int? tagId)
     {
-        if (chartOptions?.Tooltip == null) return;
-        
-        var hasDecimalType = allSeriesData.Any(s => 
-            inputTypeNames.ContainsKey(s.InputTypeId) && 
-            inputTypeNames[s.InputTypeId] == "Decimal");
-        
-        chartOptions.Tooltip.Custom = GetTooltipFormatterForMultiSeries(hasDecimalType, isDarkMode);
+        await PreferencesService.SaveTagAsync(1, tagId);
+        ResetChartState();
     }
 
-    private async Task DetectTheme()
+    private async Task OnTag2Changed(int? tagId)
     {
-        try
-        {
-            // Check the actual dark class on html element, not localStorage
-            isDarkMode = await JS.InvokeAsync<bool>("eval", "document.documentElement.classList.contains('dark')");
-        }
-        catch
-        {
-            isDarkMode = false;
-        }
-    }
-
-    private async Task LoadNumericTags()
-    {
-        // Load all input types to get their names
-        var inputTypes = await ActivityApi.GetInputTypesAsync();
-        inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
-        
-        // Find the IDs for numeric input types
-        var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
-        var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
-        var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
-        var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
-        var percentageTypeId = inputTypes.FirstOrDefault(it => it.Name == "Percentage")?.Id;
-        
-        // Load tags and filter by numeric input types
-        var allTags = await ActivityApi.GetTags();
-        numericTags = allTags
-            .Where(t => t.InputTypeId.HasValue && 
-                       (t.InputTypeId == integerTypeId || 
-                        t.InputTypeId == decimalTypeId ||
-                        t.InputTypeId == rating5TypeId ||
-                        t.InputTypeId == rating10TypeId ||
-                        t.InputTypeId == percentageTypeId))
-            .OrderBy(t => t.Title)
-            .ToList();
-    }
-
-    private async Task LoadPreferences()
-    {
-        try
-        {
-            var savedTagIdStr = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag");
-            var savedTagId2Str = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag2");
-            var savedTagId3Str = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag3");
-            var savedDateRange = await JS.InvokeAsync<string>("localStorage.getItem", "charts_dateRange");
-            
-            if (!string.IsNullOrEmpty(savedTagIdStr) && int.TryParse(savedTagIdStr, out var savedTagId) && 
-                numericTags.Any(t => t.Id == savedTagId))
-            {
-                selectedTagId = savedTagId;
-            }
-
-            if (!string.IsNullOrEmpty(savedTagId2Str) && int.TryParse(savedTagId2Str, out var savedTagId2) && 
-                numericTags.Any(t => t.Id == savedTagId2))
-            {
-                selectedTagId2 = savedTagId2;
-            }
-
-            if (!string.IsNullOrEmpty(savedTagId3Str) && int.TryParse(savedTagId3Str, out var savedTagId3) && 
-                numericTags.Any(t => t.Id == savedTagId3))
-            {
-                selectedTagId3 = savedTagId3;
-            }
-
-            // Load chart types for each tag
-            var savedChartType1 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType1");
-            if (!string.IsNullOrEmpty(savedChartType1) && (savedChartType1 == "line" || savedChartType1 == "bar"))
-            {
-                selectedChartType1 = savedChartType1;
-            }
-
-            var savedChartType2 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType2");
-            if (!string.IsNullOrEmpty(savedChartType2) && (savedChartType2 == "line" || savedChartType2 == "bar"))
-            {
-                selectedChartType2 = savedChartType2;
-            }
-
-            var savedChartType3 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType3");
-            if (!string.IsNullOrEmpty(savedChartType3) && (savedChartType3 == "line" || savedChartType3 == "bar"))
-            {
-                selectedChartType3 = savedChartType3;
-            }
-
-            if (!string.IsNullOrEmpty(savedDateRange))
-            {
-                selectedDateRange = savedDateRange;
-            }
-        }
-        catch
-        {
-            // Preferences loading failed - use defaults
-        }
-    }
-
-    private async Task OnTag1Changed()
-    {
-        await OnTagChanged(selectedTagId, "charts_selectedTag");
-    }
-
-    private async Task SaveChartType1Preference()
-    {
-        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType1", selectedChartType1);
-    }
-
-    private async Task SaveChartType2Preference()
-    {
-        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType2", selectedChartType2);
-    }
-
-    private async Task SaveChartType3Preference()
-    {
-        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType3", selectedChartType3);
-    }
-
-    private async Task OnTag2Changed()
-    {
-        if (await ValidateTagSelection(selectedTagId2, 2))
-        {
-            await OnTagChanged(selectedTagId2, "charts_selectedTag2");
-        }
-        else
+        if (!await ValidateTagSelection(tagId, 2))
         {
             selectedTagId2 = null;
+
+            return;
         }
+
+        await PreferencesService.SaveTagAsync(2, tagId);
+        ResetChartState();
     }
 
-    private async Task OnTag3Changed()
+    private async Task OnTag3Changed(int? tagId)
     {
-        if (await ValidateTagSelection(selectedTagId3, 3))
-        {
-            await OnTagChanged(selectedTagId3, "charts_selectedTag3");
-        }
-        else
+        if (!await ValidateTagSelection(tagId, 3))
         {
             selectedTagId3 = null;
+
+            return;
         }
+
+        await PreferencesService.SaveTagAsync(3, tagId);
+        ResetChartState();
     }
 
-    private async Task<bool> ValidateTagSelection(int? tagId, int tagSlot)
+    private async Task<bool> ValidateTagSelection(int? tagId, int slot)
     {
-        if (!tagId.HasValue) return true;
+        if (!tagId.HasValue)
+        {
+            return true;
+        }
 
-        // Check for duplicates
         var selectedTags = new[] { selectedTagId, selectedTagId2, selectedTagId3 }
-            .Where((t, i) => t.HasValue && i != tagSlot - 1)
+            .Where((t, i) => t.HasValue && i != slot - 1)
             .Select(t => t!.Value)
             .ToList();
 
         if (selectedTags.Contains(tagId.Value))
         {
-            await JS.InvokeVoidAsync("console.warn", $"Tag already selected. Please choose a different tag.");
+            await JS.InvokeVoidAsync("console.warn", "Tag already selected. Please choose a different tag.");
+
             return false;
         }
 
         return true;
     }
 
-    private async Task OnTagChanged(int? tagId, string storageKey)
+    private void ResetChartState()
     {
-        if (tagId.HasValue)
-        {
-            await JS.InvokeVoidAsync("localStorage.setItem", storageKey, tagId.Value.ToString());
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("localStorage.removeItem", storageKey);
-        }
-
         dataLoaded = false;
-        allSeriesData = new List<SeriesData>();
+        allSeriesData = new();
         availableYears.Clear();
         availableMonths.Clear();
-        selectedDateRange = "all";
+        selectedDateRange = ChartConstants.DateRangeAll;
+        correlationInsights.Clear();
     }
 
     private async Task LoadChartData()
     {
         if (!selectedTagId.HasValue)
+        {
             return;
+        }
+
+        // Cancel any previous load
+        loadCts?.Cancel();
+        loadCts = new CancellationTokenSource();
 
         try
         {
             isLoading = true;
             StateHasChanged();
 
-            var selectedTags = GetSelectedTags();
-            allSeriesData = new List<SeriesData>();
-            var allCombinedDataPoints = new List<ChartDataPoint>();
+            var selections = GetTagSelections();
+            var result = await ChartDataService.LoadSeriesDataAsync(selections, loadCts.Token);
 
-            // Chart types for each position
-            var chartTypes = new[] { selectedChartType1, selectedChartType2, selectedChartType3 };
-            var tagIndex = 0;
+            allSeriesData = result.SeriesData;
+            availableYears = result.AvailableYears;
+            availableMonths = result.AvailableMonths;
 
-            // Load data for each selected tag
-            foreach (var tag in selectedTags)
-            {
-                var result = await ActivityApi.GetActivities(
-                    pageNumber: 1,
-                    pageSize: 10000,
-                    orderBy: "asc",
-                    tagId: tag.Id
-                );
-                
-                var activities = result.Items.ToList();
-                
-                if (!activities.Any())
-                    continue;
-
-                // Parse numeric values and create chart data points
-                var dataPoints = activities
-                    .Where(a => !string.IsNullOrEmpty(a.Description) && 
-                               decimal.TryParse(a.Description, System.Globalization.NumberStyles.Float, 
-                                              System.Globalization.CultureInfo.InvariantCulture, out _))
-                    .Select(a => new ChartDataPoint
-                    { 
-                        Value = decimal.Parse(a.Description!, System.Globalization.CultureInfo.InvariantCulture),
-                        Date = a.DateStarted.Date
-                    })
-                    .OrderBy(d => d.Date)
-                    .ToList();
-
-                if (dataPoints.Any())
-                {
-                    var chartType = chartTypes[tagIndex] == "bar" ? SeriesType.Bar : SeriesType.Line;
-                    
-                    allSeriesData.Add(new SeriesData
-                    {
-                        TagName = tag.Title,
-                        TagId = tag.Id,
-                        InputTypeId = tag.InputTypeId ?? 0,
-                        ChartType = chartType,
-                        DataPoints = dataPoints
-                    });
-                    allCombinedDataPoints.AddRange(dataPoints);
-                }
-                
-                tagIndex++;
-            }
-
-            if (!allCombinedDataPoints.Any())
-            {
-                allSeriesData = new List<SeriesData>();
-                dataLoaded = true;
-                isLoading = false;
-                availableYears.Clear();
-                availableMonths.Clear();
-                return;
-            }
-
-            // Build available years and months from combined data
-            availableYears = allCombinedDataPoints
-                .Select(v => v.Date.Year)
-                .Distinct()
-                .OrderByDescending(y => y)
-                .ToList();
-
-            availableMonths = allCombinedDataPoints
-                .GroupBy(v => new { v.Date.Year, v.Date.Month })
-                .OrderByDescending(g => g.Key.Year)
-                .ThenByDescending(g => g.Key.Month)
-                .Take(12)
-                .ToDictionary(
-                    g => $"{System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(g.Key.Month)} {g.Key.Year}",
-                    g => $"month-{g.Key.Year}-{g.Key.Month}"
-                );
-
-            // Apply date range filter to each series
+            // Apply date filter
             foreach (var series in allSeriesData)
             {
-                series.DataPoints = ApplyDateRangeFilter(series.DataPoints);
+                series.DataPoints = ChartDataService.ApplyDateFilter(series.DataPoints, selectedDateRange);
             }
 
-            // Remove series with no data after filtering
             allSeriesData = allSeriesData.Where(s => s.DataPoints.Any()).ToList();
 
-            // Configure chart options based on theme
+            // Compute derived state
+            var allPoints = allSeriesData.SelectMany(s => s.DataPoints).ToList();
+            totalDataPoints = allPoints.Count;
+            statistics = ChartStatistics.FromDataPoints(allPoints);
+            hasDecimalType = allSeriesData.Any(s =>
+                inputTypeNames.TryGetValue(s.InputTypeId, out var name) &&
+                name == ChartConstants.DecimalTypeName);
+            correlationInsights = ChartDataService.GenerateCorrelationInsights(allSeriesData, inputTypeNames);
+
             ConfigureChartOptions();
 
             dataLoaded = true;
-            isLoading = false;
-
-            // Save preferences
-            await JS.InvokeVoidAsync("localStorage.setItem", "charts_dateRange", selectedDateRange);
+            await PreferencesService.SaveDateRangeAsync(selectedDateRange);
+        }
+        catch (OperationCanceledException)
+        {
+            // Load was cancelled - ignore
         }
         finally
         {
@@ -631,64 +376,34 @@
         }
     }
 
-    private List<ChartDataPoint> ApplyDateRangeFilter(List<ChartDataPoint> allData)
+    private List<TagSelection> GetTagSelections()
     {
-        if (selectedDateRange == "all")
+        var selections = new List<TagSelection>();
+        var chartTypes = new[] { selectedChartType1, selectedChartType2, selectedChartType3 };
+        var tagIds = new[] { selectedTagId, selectedTagId2, selectedTagId3 };
+
+        for (var i = 0; i < tagIds.Length; i++)
         {
-            return allData;
+            if (tagIds[i].HasValue)
+            {
+                var tag = numericTags.FirstOrDefault(t => t.Id == tagIds[i]!.Value);
+                if (tag != null)
+                {
+                    selections.Add(new TagSelection(tag.Id, tag.Title, tag.InputTypeId ?? 0, chartTypes[i]));
+                }
+            }
         }
 
-        var today = DateTime.Today;
-
-        if (selectedDateRange == "last-month")
-        {
-            return allData.Where(d => d.Date >= today.AddDays(-30) && d.Date <= today).ToList();
-        }
-
-        if (selectedDateRange == "last-quarter")
-        {
-            return allData.Where(d => d.Date >= today.AddDays(-90) && d.Date <= today).ToList();
-        }
-
-        if (selectedDateRange == "last-year")
-        {
-            return allData.Where(d => d.Date >= today.AddDays(-365) && d.Date <= today).ToList();
-        }
-
-        if (selectedDateRange.StartsWith("year-"))
-        {
-            var year = int.Parse(selectedDateRange.Replace("year-", ""));
-            return allData.Where(d => d.Date.Year == year).ToList();
-        }
-
-        if (selectedDateRange.StartsWith("month-"))
-        {
-            var parts = selectedDateRange.Replace("month-", "").Split('-');
-            var year = int.Parse(parts[0]);
-            var month = int.Parse(parts[1]);
-            return allData.Where(d => d.Date.Year == year && d.Date.Month == month).ToList();
-        }
-
-        return allData;
+        return selections;
     }
 
     private void ConfigureChartOptions()
     {
-        // Check if all selected tags have the same InputTypeId for Y-axis range forcing
-        var (yMin, yMax) = GetYAxisRange();
-
-        // Determine if we should use decimal or integer formatting
-        var hasDecimalType = allSeriesData.Any(s => 
-            inputTypeNames.ContainsKey(s.InputTypeId) && 
-            inputTypeNames[s.InputTypeId] == "Decimal");
-        
-        var valueFormatter = hasDecimalType 
+        var (yMin, yMax) = ChartDataService.GetYAxisRange(allSeriesData.Select(s => s.InputTypeId));
+        var valueFormatter = hasDecimalType
             ? @"function(value) { return value.toFixed(2); }"
             : @"function(value) { return value.toFixed(0); }";
-        
-        // Use multi-series tooltip formatter
-        var tooltipFormatter = GetTooltipFormatterForMultiSeries(hasDecimalType, isDarkMode);
-        
+
         chartOptions = new ApexChartOptions<ChartDataPoint>
         {
             Theme = new Theme
@@ -698,9 +413,9 @@
             },
             Chart = new Chart
             {
-                Background = isDarkMode ? "#1e293b" : "#ffffff",
-                ForeColor = isDarkMode ? "#e2e8f0" : "#374151",
-                Height = "550px", // Increased height for better visibility
+                Background = isDarkMode ? ChartConstants.DarkTheme.Background : ChartConstants.LightTheme.Background,
+                ForeColor = isDarkMode ? ChartConstants.DarkTheme.ForeColor : ChartConstants.LightTheme.ForeColor,
+                Height = ChartConstants.ChartHeight,
                 Toolbar = new Toolbar
                 {
                     Show = true,
@@ -715,28 +430,14 @@
                         Reset = true
                     }
                 },
-                Zoom = new Zoom
-                {
-                    Enabled = true
-                }
+                Zoom = new Zoom { Enabled = true }
             },
-            Stroke = new Stroke
-            {
-                Curve = Curve.Smooth,
-                Width = 3
-            },
-            Markers = new Markers
-            {
-                Size = 5,
-                StrokeWidth = 2
-            },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+            Markers = new Markers { Size = 5, StrokeWidth = 2 },
             Xaxis = new XAxis
             {
                 Type = XAxisType.Datetime,
-                Title = new AxisTitle
-                {
-                    Text = "Date"
-                }
+                Title = new AxisTitle { Text = "Date" }
             },
             Yaxis = new List<YAxis>
             {
@@ -744,322 +445,99 @@
                 {
                     Min = yMin,
                     Max = yMax,
-                    Title = new AxisTitle
-                    {
-                        Text = "Value"
-                    },
-                    Labels = new YAxisLabels
-                    {
-                        Formatter = valueFormatter
-                    }
+                    Title = new AxisTitle { Text = "Value" },
+                    Labels = new YAxisLabels { Formatter = valueFormatter }
                 }
             },
             Grid = new Grid
             {
-                BorderColor = isDarkMode ? "#334155" : "#e2e8f0",
+                BorderColor = isDarkMode ? ChartConstants.DarkTheme.GridBorder : ChartConstants.LightTheme.GridBorder,
                 StrokeDashArray = 3
             },
-            Legend = new Legend
-            {
-                Show = true,
-                Position = LegendPosition.Top
-            },
+            Legend = new Legend { Show = true, Position = LegendPosition.Top },
             Tooltip = new Tooltip
             {
                 Enabled = true,
-                Shared = true, // Enable shared tooltip for multi-series
-                Intersect = false, // Required for shared tooltips to work with bar/column charts
-                X = new TooltipX
-                {
-                    Format = "dd MMM yyyy"
-                },
-                Custom = tooltipFormatter
+                Shared = true,
+                Intersect = false,
+                X = new TooltipX { Format = "dd MMM yyyy" },
+                Custom = GetTooltipFormatter()
             },
-            Colors = new List<string> { "#0ea5e9", "#f59e0b", "#10b981" } // Auto-assign colors for up to 3 series
+            Colors = ChartConstants.SeriesColors.ToList()
         };
     }
-    
-    private string GetTooltipFormatterForMultiSeries(bool hasDecimalType, bool isDark)
+
+    private void UpdateChartTheme()
     {
-        if (hasDecimalType)
+        if (chartOptions == null)
         {
-            return isDark 
-                ? @"function({series, seriesIndex, dataPointIndex, w}) {
-                    var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
-                    var dateStr = date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-                    var html = '<div style=""padding: 10px; background: #1e293b; color: #f1f5f9; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"">';
-                    html += '<div style=""font-size: 12px; margin-bottom: 6px; color: #94a3b8;"">' + dateStr + '</div>';
-                    for (var i = 0; i < series.length; i++) {
-                        if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {
-                            var color = w.globals.colors[i];
-                            var seriesName = w.globals.seriesNames[i];
-                            var value = series[i][dataPointIndex].toFixed(2);
-                            html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
-                            html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
-                            html += '<span style=""font-size: 13px; font-weight: 500;"">' + seriesName + ': ' + value + '</span>';
-                            html += '</div>';
-                        }
-                    }
+            return;
+        }
+
+        chartOptions.Theme ??= new Theme();
+        chartOptions.Theme.Mode = isDarkMode ? Mode.Dark : Mode.Light;
+
+        chartOptions.Chart ??= new Chart();
+        chartOptions.Chart.Background = isDarkMode ? ChartConstants.DarkTheme.Background : ChartConstants.LightTheme.Background;
+        chartOptions.Chart.ForeColor = isDarkMode ? ChartConstants.DarkTheme.ForeColor : ChartConstants.LightTheme.ForeColor;
+
+        chartOptions.Grid ??= new Grid();
+        chartOptions.Grid.BorderColor = isDarkMode ? ChartConstants.DarkTheme.GridBorder : ChartConstants.LightTheme.GridBorder;
+
+        if (chartOptions.Tooltip != null)
+        {
+            chartOptions.Tooltip.Custom = GetTooltipFormatter();
+        }
+    }
+
+    private string GetTooltipFormatter()
+    {
+        var formatValue = hasDecimalType ? "series[i][dataPointIndex].toFixed(2)" : "Math.round(series[i][dataPointIndex])";
+
+        var bg = isDarkMode ? ChartConstants.DarkTheme.TooltipBackground : ChartConstants.LightTheme.TooltipBackground;
+        var text = isDarkMode ? ChartConstants.DarkTheme.TooltipText : ChartConstants.LightTheme.TooltipText;
+        var dateText = isDarkMode ? ChartConstants.DarkTheme.TooltipDateText : ChartConstants.LightTheme.TooltipDateText;
+        var border = isDarkMode ? "" : $"border: 1px solid {ChartConstants.LightTheme.TooltipBorder};";
+        var shadow = isDarkMode ? "0 4px 6px rgba(0,0,0,0.3)" : "0 4px 6px rgba(0,0,0,0.1)";
+
+        return $@"function({{series, seriesIndex, dataPointIndex, w}}) {{
+            var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
+            var dateStr = date.toLocaleDateString('en-US', {{ day: '2-digit', month: 'short', year: 'numeric' }});
+            var html = '<div style=""padding: 10px; background: {bg}; color: {text}; {border} border-radius: 6px; box-shadow: {shadow};"">';
+            html += '<div style=""font-size: 12px; margin-bottom: 6px; color: {dateText};"">' + dateStr + '</div>';
+            for (var i = 0; i < series.length; i++) {{
+                if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {{
+                    var color = w.globals.colors[i];
+                    var seriesName = w.globals.seriesNames[i];
+                    var value = {formatValue};
+                    html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
+                    html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
+                    html += '<span style=""font-size: 13px; font-weight: 500;"">' + seriesName + ': ' + value + '</span>';
                     html += '</div>';
-                    return html;
-                  }"
-                : @"function({series, seriesIndex, dataPointIndex, w}) {
-                    var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
-                    var dateStr = date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-                    var html = '<div style=""padding: 10px; background: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"">';
-                    html += '<div style=""font-size: 12px; margin-bottom: 6px; color: #64748b;"">' + dateStr + '</div>';
-                    for (var i = 0; i < series.length; i++) {
-                        if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {
-                            var color = w.globals.colors[i];
-                            var seriesName = w.globals.seriesNames[i];
-                            var value = series[i][dataPointIndex].toFixed(2);
-                            html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
-                            html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
-                            html += '<span style=""font-size: 13px; font-weight: 500; color: #0f172a;"">' + seriesName + ': ' + value + '</span>';
-                            html += '</div>';
-                        }
-                    }
-                    html += '</div>';
-                    return html;
-                  }";
-        }
-        else
-        {
-            return isDark
-                ? @"function({series, seriesIndex, dataPointIndex, w}) {
-                    var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
-                    var dateStr = date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-                    var html = '<div style=""padding: 10px; background: #1e293b; color: #f1f5f9; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"">';
-                    html += '<div style=""font-size: 12px; margin-bottom: 6px; color: #94a3b8;"">' + dateStr + '</div>';
-                    for (var i = 0; i < series.length; i++) {
-                        if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {
-                            var color = w.globals.colors[i];
-                            var seriesName = w.globals.seriesNames[i];
-                            var value = Math.round(series[i][dataPointIndex]);
-                            html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
-                            html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
-                            html += '<span style=""font-size: 13px; font-weight: 500;"">' + seriesName + ': ' + value + '</span>';
-                            html += '</div>';
-                        }
-                    }
-                    html += '</div>';
-                    return html;
-                  }"
-                : @"function({series, seriesIndex, dataPointIndex, w}) {
-                    var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
-                    var dateStr = date.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-                    var html = '<div style=""padding: 10px; background: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"">';
-                    html += '<div style=""font-size: 12px; margin-bottom: 6px; color: #64748b;"">' + dateStr + '</div>';
-                    for (var i = 0; i < series.length; i++) {
-                        if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {
-                            var color = w.globals.colors[i];
-                            var seriesName = w.globals.seriesNames[i];
-                            var value = Math.round(series[i][dataPointIndex]);
-                            html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
-                            html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
-                            html += '<span style=""font-size: 13px; font-weight: 500; color: #0f172a;"">' + seriesName + ': ' + value + '</span>';
-                            html += '</div>';
-                        }
-                    }
-                    html += '</div>';
-                    return html;
-                  }";
-        }
+                }}
+            }}
+            html += '</div>';
+            return html;
+        }}";
     }
 
-    private string GetSelectedTagName()
-    {
-        if (!selectedTagId.HasValue)
-            return "";
-
-        var tag = numericTags.FirstOrDefault(t => t.Id == selectedTagId.Value);
-        return tag?.Title ?? "";
-    }
-
-    private string FormatValue(decimal value)
-    {
-        if (selectedTagId.HasValue)
-        {
-            var selectedTag = numericTags.FirstOrDefault(t => t.Id == selectedTagId.Value);
-            if (selectedTag?.InputTypeId.HasValue == true && 
-                inputTypeNames.ContainsKey(selectedTag.InputTypeId.Value) &&
-                inputTypeNames[selectedTag.InputTypeId.Value] == "Decimal")
-            {
-                return value.ToString("F2");
-            }
-        }
-        return value.ToString("F0");
-    }
-
-    private string FormatAverageValue(decimal value)
-    {
-        return value.ToString("F2");
-    }
-
-    // Helper method to get all selected tags
-    private List<TagResponse> GetSelectedTags()
-    {
-        var tags = new List<TagResponse>();
-        
-        if (selectedTagId.HasValue)
-        {
-            var tag = numericTags.FirstOrDefault(t => t.Id == selectedTagId.Value);
-            if (tag != null)
-                tags.Add(tag);
-        }
-        
-        if (selectedTagId2.HasValue)
-        {
-            var tag = numericTags.FirstOrDefault(t => t.Id == selectedTagId2.Value);
-            if (tag != null)
-                tags.Add(tag);
-        }
-        
-        if (selectedTagId3.HasValue)
-        {
-            var tag = numericTags.FirstOrDefault(t => t.Id == selectedTagId3.Value);
-            if (tag != null)
-                tags.Add(tag);
-        }
-        
-        return tags;
-    }
-
-    // Helper method to determine Y-axis range based on InputTypeId
-    private (decimal? min, decimal? max) GetYAxisRange()
-    {
-        if (!allSeriesData.Any())
-            return (null, null);
-
-        // Check if all selected tags have the same InputTypeId
-        var inputTypeIds = allSeriesData.Select(s => s.InputTypeId).Distinct().ToList();
-        
-        if (inputTypeIds.Count != 1)
-            return (null, null); // Mixed types - use auto-scaling
-
-        var inputTypeId = inputTypeIds.First();
-        
-        // Force Y-axis ranges for specific types
-        if (inputTypeId == InputTypeIds.Rating1To5)
-            return (0, 5);
-        
-        if (inputTypeId == InputTypeIds.Rating1To10)
-            return (0, 10);
-        
-        if (inputTypeId == InputTypeIds.Percentage)
-            return (0, 100);
-        
-        return (null, null); // Auto-scale for other types
-    }
-
-    // Helper method to get chart title
     private string GetChartTitle()
     {
-        var selectedTags = GetSelectedTags();
-        
-        if (!selectedTags.Any())
-            return "Chart";
-        
-        if (selectedTags.Count == 1)
-            return selectedTags[0].Title;
-        
-        return string.Join(" vs ", selectedTags.Select(t => t.Title));
-    }
+        var names = allSeriesData.Select(s => s.TagName).ToList();
 
-    // Helper method to analyze data correlation and provide insights
-    private List<string> GetCorrelationInsights()
-    {
-        var insights = new List<string>();
-        if (allSeriesData.Count < 2) return insights;
-
-        // Check 1: Different input types (different scales)
-        var inputTypes = allSeriesData.Select(s => s.InputTypeId).Distinct().ToList();
-        if (inputTypes.Count > 1)
+        return names.Count switch
         {
-            var typeNames = inputTypes
-                .Where(id => inputTypeNames.ContainsKey(id))
-                .Select(id => inputTypeNames[id])
-                .ToList();
-            if (typeNames.Count > 1)
-            {
-                insights.Add($"Tags use different scales ({string.Join(", ", typeNames)}) - values may not be directly comparable.");
-            }
-        }
-
-        // Check 2: Date overlap analysis
-        var dateRanges = allSeriesData
-            .Where(s => s.DataPoints.Any())
-            .Select(s => (
-                Min: s.DataPoints.Min(d => d.Date),
-                Max: s.DataPoints.Max(d => d.Date)
-            )).ToList();
-
-        if (dateRanges.Count >= 2)
-        {
-            var overallMin = dateRanges.Max(r => r.Min);
-            var overallMax = dateRanges.Min(r => r.Max);
-
-            if (overallMin > overallMax)
-            {
-                insights.Add("Date ranges don't overlap - tags were recorded in different time periods.");
-            }
-            else
-            {
-                var totalSpan = (dateRanges.Max(r => r.Max) - dateRanges.Min(r => r.Min)).TotalDays;
-                var overlapSpan = (overallMax - overallMin).TotalDays;
-                var overlapPercent = totalSpan > 0 ? (overlapSpan / totalSpan) * 100 : 0;
-
-                if (overlapPercent < 50)
-                {
-                    insights.Add($"Limited date overlap ({overlapPercent:F0}%) - comparison may not reflect true correlation.");
-                }
-            }
-        }
-
-        // Check 3: Data density disparity
-        var pointCounts = allSeriesData.Select(s => s.DataPoints.Count).ToList();
-        var maxCount = pointCounts.Max();
-        var minCount = pointCounts.Min();
-        if (maxCount > minCount * 3 && minCount > 0)
-        {
-            var sparseTag = allSeriesData.First(s => s.DataPoints.Count == minCount).TagName;
-            insights.Add($"'{sparseTag}' has significantly fewer data points - trends may be less reliable.");
-        }
-
-        // Check 4: Value range disparity (when same input type)
-        if (inputTypes.Count == 1 && allSeriesData.All(s => s.DataPoints.Count >= 2))
-        {
-            var ranges = allSeriesData
-                .Select(s => s.DataPoints.Max(d => d.Value) - s.DataPoints.Min(d => d.Value))
-                .ToList();
-            
-            if (ranges.Min() > 0 && ranges.Max() > ranges.Min() * 5)
-            {
-                insights.Add("Value ranges vary significantly between tags - consider if comparison is meaningful.");
-            }
-        }
-
-        return insights;
-    }
-
-    // Data class for multi-series support
-    private class SeriesData
-    {
-        public string TagName { get; set; } = string.Empty;
-        public int TagId { get; set; }
-        public int InputTypeId { get; set; }
-        public SeriesType ChartType { get; set; } = SeriesType.Line;
-        public List<ChartDataPoint> DataPoints { get; set; } = new();
-    }
-
-    private class ChartDataPoint
-    {
-        public decimal Value { get; set; }
-        public DateTime Date { get; set; }
+            0 => "Chart",
+            1 => names[0],
+            _ => string.Join(" vs ", names)
+        };
     }
 
     public async ValueTask DisposeAsync()
     {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+
         try
         {
             if (jsModule != null)

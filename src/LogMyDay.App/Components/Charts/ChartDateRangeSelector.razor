@@ -1,0 +1,35 @@
+@using LogMyDay.Domain.Constants
+
+<div class="w-full sm:w-48">
+    <label for="dateRangeSelect" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Date Range</label>
+    <select id="dateRangeSelect" 
+            class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" 
+            value="@SelectedDateRange"
+            @onchange="OnDateRangeChanged">
+        <option value="@ChartConstants.DateRangeAll">All Time</option>
+        <option value="@ChartConstants.DateRangeLastMonth">Last Month</option>
+        <option value="@ChartConstants.DateRangeLastQuarter">Last Quarter</option>
+        <option value="@ChartConstants.DateRangeLastYear">Last Year</option>
+        @foreach (var year in AvailableYears)
+        {
+            <option value="@($"{ChartConstants.DateRangeYearPrefix}{year}")">@year</option>
+        }
+        @foreach (var month in AvailableMonths)
+        {
+            <option value="@month.Value">@month.Key</option>
+        }
+    </select>
+</div>
+
+@code {
+    [Parameter] public string SelectedDateRange { get; set; } = ChartConstants.DateRangeAll;
+    [Parameter] public List<int> AvailableYears { get; set; } = new();
+    [Parameter] public Dictionary<string, string> AvailableMonths { get; set; } = new();
+    [Parameter] public EventCallback<string> SelectedDateRangeChanged { get; set; }
+
+    private async Task OnDateRangeChanged(ChangeEventArgs e)
+    {
+        var newRange = e.Value?.ToString() ?? ChartConstants.DateRangeAll;
+        await SelectedDateRangeChanged.InvokeAsync(newRange);
+    }
+}
