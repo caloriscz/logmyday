@@ -20,58 +20,83 @@
     <!-- Tag Selection and Date Range Filter Card -->
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <div class="space-y-4">
-            <!-- Tag Selection Row -->
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
-                <div class="flex-1">
-                    <label for="tagSelect1" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Primary tag</label>
-                    <select id="tagSelect1" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId" @bind:after="OnTag1Changed">
-                        <option value="">-- Select a tag --</option>
-                        @foreach (var tag in numericTags)
-                        {
-                            var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                ? inputTypeNames[tag.InputTypeId.Value] 
-                                : "Unknown";
-                            <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                        }
-                    </select>
+            <!-- Tag Selection Row with Chart Types -->
+            <div class="flex flex-col gap-4">
+                <!-- Tag 1 -->
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div class="flex-1">
+                        <label for="tagSelect1" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Primary tag</label>
+                        <select id="tagSelect1" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId" @bind:after="OnTag1Changed">
+                            <option value="">-- Select a tag --</option>
+                            @foreach (var tag in numericTags)
+                            {
+                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
+                                    ? inputTypeNames[tag.InputTypeId.Value] 
+                                    : "Unknown";
+                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-32">
+                        <label for="chartType1" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
+                        <select id="chartType1" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType1" @bind:after="SaveChartType1Preference">
+                            <option value="line">Line</option>
+                            <option value="bar">Bar</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="flex-1">
-                    <label for="tagSelect2" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 2 (Optional)</label>
-                    <select id="tagSelect2" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId2" @bind:after="OnTag2Changed">
-                        <option value="">-- Select tag (Optional) --</option>
-                        @foreach (var tag in numericTags)
-                        {
-                            var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                ? inputTypeNames[tag.InputTypeId.Value] 
-                                : "Unknown";
-                            <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                        }
-                    </select>
+                
+                <!-- Tag 2 -->
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div class="flex-1">
+                        <label for="tagSelect2" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 2 (Optional)</label>
+                        <select id="tagSelect2" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId2" @bind:after="OnTag2Changed">
+                            <option value="">-- Select tag (Optional) --</option>
+                            @foreach (var tag in numericTags)
+                            {
+                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
+                                    ? inputTypeNames[tag.InputTypeId.Value] 
+                                    : "Unknown";
+                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-32">
+                        <label for="chartType2" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
+                        <select id="chartType2" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType2" @bind:after="SaveChartType2Preference" disabled="@(!selectedTagId2.HasValue)">
+                            <option value="line">Line</option>
+                            <option value="bar">Bar</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="flex-1">
-                    <label for="tagSelect3" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 3 (Optional)</label>
-                    <select id="tagSelect3" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId3" @bind:after="OnTag3Changed">
-                        <option value="">-- Select tag (Optional) --</option>
-                        @foreach (var tag in numericTags)
-                        {
-                            var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
-                                ? inputTypeNames[tag.InputTypeId.Value] 
-                                : "Unknown";
-                            <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
-                        }
-                    </select>
+                
+                <!-- Tag 3 -->
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div class="flex-1">
+                        <label for="tagSelect3" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Tag 3 (Optional)</label>
+                        <select id="tagSelect3" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedTagId3" @bind:after="OnTag3Changed">
+                            <option value="">-- Select tag (Optional) --</option>
+                            @foreach (var tag in numericTags)
+                            {
+                                var inputTypeName = tag.InputTypeId.HasValue && inputTypeNames.ContainsKey(tag.InputTypeId.Value) 
+                                    ? inputTypeNames[tag.InputTypeId.Value] 
+                                    : "Unknown";
+                                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-32">
+                        <label for="chartType3" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
+                        <select id="chartType3" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType3" @bind:after="SaveChartType3Preference" disabled="@(!selectedTagId3.HasValue)">
+                            <option value="line">Line</option>
+                            <option value="bar">Bar</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             
             <!-- Filter and Options Row -->
             <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div class="w-full sm:w-48">
-                    <label for="chartTypeSelect" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart Type</label>
-                    <select id="chartTypeSelect" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedChartType">
-                        <option value="line">Line</option>
-                        <option value="column">Column</option>
-                    </select>
-                </div>
                 <div class="w-full sm:w-48">
                     <label for="dateRangeSelect" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Date Range</label>
                     <select id="dateRangeSelect" class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" @bind="selectedDateRange">
@@ -124,7 +149,6 @@
                 @if (chartOptions != null && allSeriesData != null && allSeriesData.Any())
                 {
                     <ApexChart TItem="ChartDataPoint" 
-                               Title="@GetChartTitle()"
                                Options="@chartOptions"
                                @ref="chart">
                         
@@ -133,7 +157,7 @@
                             <ApexPointSeries TItem="ChartDataPoint"
                                             Items="@seriesData.DataPoints"
                                             Name="@seriesData.TagName"
-                                            SeriesType="@GetSeriesType()"
+                                            SeriesType="@seriesData.ChartType"
                                             XValue="@(e => e.Date.ToString("yyyy-MM-dd"))"
                                             YValue="@(e => (decimal?)e.Value)"
                                             OrderBy="@(e => e.X)" />
@@ -146,7 +170,7 @@
         <!-- Statistics Summary Card -->
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div class="p-5">
-                <h5 class="mb-4 text-sm font-medium text-gray-600 dark:text-slate-400">Quick Statistics</h5>
+                <h5 class="mb-4 text-sm font-medium opacity-75">Quick Statistics</h5>
                 @if (allSeriesData != null && allSeriesData.Any())
                 {
                     var allPoints = allSeriesData.SelectMany(s => s.DataPoints).ToList();
@@ -203,7 +227,9 @@
     private int? selectedTagId;
     private int? selectedTagId2;
     private int? selectedTagId3;
-    private string selectedChartType = "line";
+    private string selectedChartType1 = "line";
+    private string selectedChartType2 = "line";
+    private string selectedChartType3 = "line";
     private string selectedDateRange = "all";
     private bool dataLoaded = false;
     private bool isLoading = false;
@@ -352,7 +378,6 @@
             var savedTagIdStr = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag");
             var savedTagId2Str = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag2");
             var savedTagId3Str = await JS.InvokeAsync<string>("localStorage.getItem", "charts_selectedTag3");
-            var savedChartType = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType");
             var savedDateRange = await JS.InvokeAsync<string>("localStorage.getItem", "charts_dateRange");
             
             if (!string.IsNullOrEmpty(savedTagIdStr) && int.TryParse(savedTagIdStr, out var savedTagId) && 
@@ -373,9 +398,23 @@
                 selectedTagId3 = savedTagId3;
             }
 
-            if (!string.IsNullOrEmpty(savedChartType) && (savedChartType == "line" || savedChartType == "column"))
+            // Load chart types for each tag
+            var savedChartType1 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType1");
+            if (!string.IsNullOrEmpty(savedChartType1) && (savedChartType1 == "line" || savedChartType1 == "bar"))
             {
-                selectedChartType = savedChartType;
+                selectedChartType1 = savedChartType1;
+            }
+
+            var savedChartType2 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType2");
+            if (!string.IsNullOrEmpty(savedChartType2) && (savedChartType2 == "line" || savedChartType2 == "bar"))
+            {
+                selectedChartType2 = savedChartType2;
+            }
+
+            var savedChartType3 = await JS.InvokeAsync<string>("localStorage.getItem", "charts_chartType3");
+            if (!string.IsNullOrEmpty(savedChartType3) && (savedChartType3 == "line" || savedChartType3 == "bar"))
+            {
+                selectedChartType3 = savedChartType3;
             }
 
             if (!string.IsNullOrEmpty(savedDateRange))
@@ -392,6 +431,21 @@
     private async Task OnTag1Changed()
     {
         await OnTagChanged(selectedTagId, "charts_selectedTag");
+    }
+
+    private async Task SaveChartType1Preference()
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType1", selectedChartType1);
+    }
+
+    private async Task SaveChartType2Preference()
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType2", selectedChartType2);
+    }
+
+    private async Task SaveChartType3Preference()
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType3", selectedChartType3);
     }
 
     private async Task OnTag2Changed()
@@ -476,6 +530,10 @@
             allSeriesData = new List<SeriesData>();
             var allCombinedDataPoints = new List<ChartDataPoint>();
 
+            // Chart types for each position
+            var chartTypes = new[] { selectedChartType1, selectedChartType2, selectedChartType3 };
+            var tagIndex = 0;
+
             // Load data for each selected tag
             foreach (var tag in selectedTags)
             {
@@ -506,15 +564,20 @@
 
                 if (dataPoints.Any())
                 {
+                    var chartType = chartTypes[tagIndex] == "bar" ? SeriesType.Bar : SeriesType.Line;
+                    
                     allSeriesData.Add(new SeriesData
                     {
                         TagName = tag.Title,
                         TagId = tag.Id,
                         InputTypeId = tag.InputTypeId ?? 0,
+                        ChartType = chartType,
                         DataPoints = dataPoints
                     });
                     allCombinedDataPoints.AddRange(dataPoints);
                 }
+                
+                tagIndex++;
             }
 
             if (!allCombinedDataPoints.Any())
@@ -561,7 +624,6 @@
 
             // Save preferences
             await JS.InvokeVoidAsync("localStorage.setItem", "charts_dateRange", selectedDateRange);
-            await JS.InvokeVoidAsync("localStorage.setItem", "charts_chartType", selectedChartType);
         }
         catch (Exception ex)
         {
@@ -905,18 +967,13 @@
         return string.Join(" vs ", selectedTags.Select(t => t.Title));
     }
 
-    // Helper method to get SeriesType based on selectedChartType
-    private SeriesType GetSeriesType()
-    {
-        return selectedChartType == "column" ? SeriesType.Bar : SeriesType.Line;
-    }
-
     // Data class for multi-series support
     private class SeriesData
     {
         public string TagName { get; set; } = string.Empty;
         public int TagId { get; set; }
         public int InputTypeId { get; set; }
+        public SeriesType ChartType { get; set; } = SeriesType.Line;
         public List<ChartDataPoint> DataPoints { get; set; } = new();
     }
 
