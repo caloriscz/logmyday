@@ -195,6 +195,29 @@
                 }
             </div>
         </div>
+
+        @* Correlation Insights - only show when comparing multiple tags *@
+        @if (allSeriesData != null && allSeriesData.Count > 1)
+        {
+            var insights = GetCorrelationInsights();
+            @if (insights.Any())
+            {
+                <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+                    <div class="flex items-start gap-3">
+                        <Icon Name="information-circle" Class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div class="text-sm text-blue-800 dark:text-blue-200">
+                            <p class="font-medium mb-2">Comparison Insights</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                @foreach (var insight in insights)
+                                {
+                                    <li>@insight</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
     }
     else if (dataLoaded && (allSeriesData == null || !allSeriesData.Any()))
     {
@@ -965,6 +988,82 @@
             return selectedTags[0].Title;
         
         return string.Join(" vs ", selectedTags.Select(t => t.Title));
+    }
+
+    // Helper method to analyze data correlation and provide insights
+    private List<string> GetCorrelationInsights()
+    {
+        var insights = new List<string>();
+        if (allSeriesData.Count < 2) return insights;
+
+        // Check 1: Different input types (different scales)
+        var inputTypes = allSeriesData.Select(s => s.InputTypeId).Distinct().ToList();
+        if (inputTypes.Count > 1)
+        {
+            var typeNames = inputTypes
+                .Where(id => inputTypeNames.ContainsKey(id))
+                .Select(id => inputTypeNames[id])
+                .ToList();
+            if (typeNames.Count > 1)
+            {
+                insights.Add($"Tags use different scales ({string.Join(", ", typeNames)}) - values may not be directly comparable.");
+            }
+        }
+
+        // Check 2: Date overlap analysis
+        var dateRanges = allSeriesData
+            .Where(s => s.DataPoints.Any())
+            .Select(s => (
+                Min: s.DataPoints.Min(d => d.Date),
+                Max: s.DataPoints.Max(d => d.Date)
+            )).ToList();
+
+        if (dateRanges.Count >= 2)
+        {
+            var overallMin = dateRanges.Max(r => r.Min);
+            var overallMax = dateRanges.Min(r => r.Max);
+
+            if (overallMin > overallMax)
+            {
+                insights.Add("Date ranges don't overlap - tags were recorded in different time periods.");
+            }
+            else
+            {
+                var totalSpan = (dateRanges.Max(r => r.Max) - dateRanges.Min(r => r.Min)).TotalDays;
+                var overlapSpan = (overallMax - overallMin).TotalDays;
+                var overlapPercent = totalSpan > 0 ? (overlapSpan / totalSpan) * 100 : 0;
+
+                if (overlapPercent < 50)
+                {
+                    insights.Add($"Limited date overlap ({overlapPercent:F0}%) - comparison may not reflect true correlation.");
+                }
+            }
+        }
+
+        // Check 3: Data density disparity
+        var pointCounts = allSeriesData.Select(s => s.DataPoints.Count).ToList();
+        var maxCount = pointCounts.Max();
+        var minCount = pointCounts.Min();
+        if (maxCount > minCount * 3 && minCount > 0)
+        {
+            var sparseTag = allSeriesData.First(s => s.DataPoints.Count == minCount).TagName;
+            insights.Add($"'{sparseTag}' has significantly fewer data points - trends may be less reliable.");
+        }
+
+        // Check 4: Value range disparity (when same input type)
+        if (inputTypes.Count == 1 && allSeriesData.All(s => s.DataPoints.Count >= 2))
+        {
+            var ranges = allSeriesData
+                .Select(s => s.DataPoints.Max(d => d.Value) - s.DataPoints.Min(d => d.Value))
+                .ToList();
+            
+            if (ranges.Min() > 0 && ranges.Max() > ranges.Min() * 5)
+            {
+                insights.Add("Value ranges vary significantly between tags - consider if comparison is meaningful.");
+            }
+        }
+
+        return insights;
     }
 
     // Data class for multi-series support
