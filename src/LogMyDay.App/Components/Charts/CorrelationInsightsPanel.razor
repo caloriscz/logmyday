@@ -1,0 +1,18 @@
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+    <div class="flex items-start gap-3">
+        <Icon Name="information-circle" Class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+        <div class="text-sm text-blue-800 dark:text-blue-200">
+            <p class="font-medium mb-2">Comparison Insights</p>
+            <ul class="list-disc list-inside space-y-1">
+                @foreach (var insight in Insights)
+                {
+                    <li>@insight</li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<string> Insights { get; set; } = new();
+}

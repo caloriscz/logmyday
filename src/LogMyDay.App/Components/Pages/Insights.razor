@@ -58,6 +58,18 @@
                 <p class="text-sm text-gray-600 dark:text-slate-300">Analyze numeric tag data with min, max, and daily averages.</p>
             </div>
         </div>
+
+        <!-- Charts Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToCharts()">
+            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-indigo-400 to-blue-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Charts</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Interactive line charts for visualizing numeric tag trends over time.</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -85,5 +97,10 @@
     private void NavigateToStatistics()
     {
         Navigation.NavigateTo("/statistics");
+    }
+
+    private void NavigateToCharts()
+    {
+        Navigation.NavigateTo("/charts");
     }
 }

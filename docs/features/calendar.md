@@ -7,7 +7,7 @@ nav_order: 7
 
 # Calendar
 
-Calendar suite helps review history day by day, see the values together. You can switch between rich grid layouts and linear lists depending on how deeply you need to analyse the data.
+The Calendar suite helps you review your activity history day by day and see logged entries at a glance. You can switch between rich grid layouts and linear lists depending on how deeply you need to analyze the data.
 
 ## Views
 
@@ -20,6 +20,15 @@ Calendar suite helps review history day by day, see the values together. You can
 - Jump by day, week, or month using navigation arrows or keyboard shortcuts.
 - Quickly switch to another date with the culture-aware date picker; the entire dashboard follows your selection.
 - Reminders board inherits the same navigation, letting you tackle required items for any day without leaving the page.
+
+## Charts integration
+
+From the Calendar, you can navigate to the [Charts](charts.md) page to visualize trends over time. The Charts page supports:
+
+- Compare up to three tags simultaneously with independent chart types (line or bar)
+- Flexible date ranges: Last Week, Last Month, Last Quarter, or Last Year
+- Automatic Y-axis scaling for ratings and percentages
+- Correlation insights when comparing multiple tags
 
 ## On mobile
 

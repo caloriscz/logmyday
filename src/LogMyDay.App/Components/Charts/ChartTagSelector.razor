@@ -1,0 +1,66 @@
+@using LogMyDay.Shared.DTOs
+
+<div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+    <div class="flex-1">
+        <label for="@($"tagSelect{Slot}")" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">@Label</label>
+        <select id="@($"tagSelect{Slot}")" 
+                class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" 
+                value="@SelectedTagId"
+                @onchange="OnTagSelectionChanged">
+            <option value="">@(IsOptional ? "-- Select tag (Optional) --" : "-- Select a tag --")</option>
+            @foreach (var tag in Tags)
+            {
+                var inputTypeName = tag.InputTypeId.HasValue && InputTypeNames.ContainsKey(tag.InputTypeId.Value)
+                    ? InputTypeNames[tag.InputTypeId.Value]
+                    : "Unknown";
+                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+            }
+        </select>
+    </div>
+    <div class="w-full sm:w-32">
+        <label for="@($"chartType{Slot}")" class="mb-2 block text-sm font-medium text-gray-900 dark:text-slate-100">Chart</label>
+        <select id="@($"chartType{Slot}")" 
+                class="form-select w-full rounded-lg border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" 
+                value="@ChartType"
+                @onchange="OnChartTypeSelectionChanged"
+                disabled="@IsChartTypeDisabled">
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
+        </select>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Slot { get; set; } = 1;
+    [Parameter] public string Label { get; set; } = "Tag";
+    [Parameter] public bool IsOptional { get; set; } = false;
+    [Parameter] public List<TagResponse> Tags { get; set; } = new();
+    [Parameter] public Dictionary<int, string> InputTypeNames { get; set; } = new();
+    [Parameter] public int? SelectedTagId { get; set; }
+    [Parameter] public string ChartType { get; set; } = "line";
+    [Parameter] public EventCallback<int?> SelectedTagIdChanged { get; set; }
+    [Parameter] public EventCallback<string> ChartTypeChanged { get; set; }
+    [Parameter] public EventCallback<int?> OnTagChanged { get; set; }
+    [Parameter] public EventCallback<string> OnChartTypeChanged { get; set; }
+
+    private bool IsChartTypeDisabled => IsOptional && !SelectedTagId.HasValue;
+
+    private async Task OnTagSelectionChanged(ChangeEventArgs e)
+    {
+        int? newValue = null;
+        if (int.TryParse(e.Value?.ToString(), out var parsed))
+        {
+            newValue = parsed;
+        }
+
+        await SelectedTagIdChanged.InvokeAsync(newValue);
+        await OnTagChanged.InvokeAsync(newValue);
+    }
+
+    private async Task OnChartTypeSelectionChanged(ChangeEventArgs e)
+    {
+        var newType = e.Value?.ToString() ?? "line";
+        await ChartTypeChanged.InvokeAsync(newType);
+        await OnChartTypeChanged.InvokeAsync(newType);
+    }
+}

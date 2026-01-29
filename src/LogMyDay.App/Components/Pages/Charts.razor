@@ -1,0 +1,558 @@
+@page "/charts"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using LogMyDay.App.Services.Charts
+@using LogMyDay.App.Components.Charts
+@using LogMyDay.Domain.Constants
+@inject IPageTitleService PageTitleService
+@inject IChartDataService ChartDataService
+@inject IChartPreferencesService PreferencesService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Charts</PageTitle>
+
+<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Charts</h2>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Visualize numeric tag data with interactive line charts.</p>
+    </div>
+
+    <!-- Tag Selection and Date Range Filter Card -->
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="space-y-4">
+            <!-- Tag Selection with Chart Types -->
+            <div class="flex flex-col gap-4">
+                <ChartTagSelector 
+                    Slot="1"
+                    Label="Primary tag"
+                    IsOptional="false"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId"
+                    @bind-ChartType="selectedChartType1"
+                    OnTagChanged="OnTag1Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(1, t))" />
+
+                <ChartTagSelector 
+                    Slot="2"
+                    Label="Tag 2 (Optional)"
+                    IsOptional="true"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId2"
+                    @bind-ChartType="selectedChartType2"
+                    OnTagChanged="OnTag2Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(2, t))" />
+
+                <ChartTagSelector 
+                    Slot="3"
+                    Label="Tag 3 (Optional)"
+                    IsOptional="true"
+                    Tags="numericTags"
+                    InputTypeNames="inputTypeNames"
+                    @bind-SelectedTagId="selectedTagId3"
+                    @bind-ChartType="selectedChartType3"
+                    OnTagChanged="OnTag3Changed"
+                    OnChartTypeChanged="@(async (t) => await PreferencesService.SaveChartTypeAsync(3, t))" />
+            </div>
+
+            <!-- Filter and Load Button -->
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
+                <ChartDateRangeSelector 
+                    @bind-SelectedDateRange="selectedDateRange"
+                    AvailableYears="availableYears"
+                    AvailableMonths="availableMonths" />
+
+                <button class="btn btn-primary flex items-center gap-2 whitespace-nowrap" 
+                        @onclick="LoadChartData" 
+                        disabled="@(!CanLoadData)">
+                    <Icon Name="chart-bar" Class="w-4 h-4" />
+                    Load Chart
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-col items-center gap-4">
+                <div class="spinner"></div>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Loading chart data...</p>
+            </div>
+        </div>
+    }
+    else if (dataLoaded && allSeriesData.Any())
+    {
+        <!-- Chart Card -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="p-5">
+                <div class="mb-4 flex items-center justify-between">
+                    <h5 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
+                        @GetChartTitle()
+                    </h5>
+                    <span class="text-xs text-gray-600 dark:text-slate-400">
+                        @totalDataPoints data point@(totalDataPoints != 1 ? "s" : "")
+                    </span>
+                </div>
+
+                @if (chartOptions != null)
+                {
+                    <ApexChart TItem="ChartDataPoint"
+                               Options="@chartOptions"
+                               @ref="chart">
+                        @foreach (var series in allSeriesData)
+                        {
+                            <ApexPointSeries TItem="ChartDataPoint"
+                                            Items="@series.DataPoints"
+                                            Name="@series.TagName"
+                                            SeriesType="@series.ChartType"
+                                            XValue="@(e => e.Date.ToString("yyyy-MM-dd"))"
+                                            YValue="@(e => (decimal?)e.Value)"
+                                            OrderBy="@(e => e.X)" />
+                        }
+                    </ApexChart>
+                }
+            </div>
+        </div>
+
+        <!-- Statistics Card -->
+        <ChartStatisticsCard Statistics="@statistics" UseDecimalFormat="@hasDecimalType" />
+
+        <!-- Correlation Insights -->
+        @if (correlationInsights.Any())
+        {
+            <CorrelationInsightsPanel Insights="@correlationInsights" />
+        }
+    }
+    else if (dataLoaded && !allSeriesData.Any())
+    {
+        <div class="rounded-xl border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-yellow-950">
+            <div class="flex items-start gap-3">
+                <Icon Name="information-circle" Class="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                    No numeric data found for the selected tag(s) and date range.
+                </p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+            <div class="flex items-start gap-3">
+                <Icon Name="information-circle" Class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    Select a numeric tag and click "Load Chart" to visualize your data.
+                </p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // Tag data
+    private List<TagResponse> numericTags = new();
+    private Dictionary<int, string> inputTypeNames = new();
+
+    // User selections
+    private int? selectedTagId;
+    private int? selectedTagId2;
+    private int? selectedTagId3;
+    private string selectedChartType1 = ChartConstants.LineChart;
+    private string selectedChartType2 = ChartConstants.LineChart;
+    private string selectedChartType3 = ChartConstants.LineChart;
+    private string selectedDateRange = ChartConstants.DateRangeAll;
+
+    // Chart state
+    private bool isLoading;
+    private bool dataLoaded;
+    private bool themeDetected;
+    private bool isDarkMode;
+    private List<ChartSeriesData> allSeriesData = new();
+    private List<int> availableYears = new();
+    private Dictionary<string, string> availableMonths = new();
+    private ChartStatistics? statistics;
+    private List<string> correlationInsights = new();
+    private bool hasDecimalType;
+    private int totalDataPoints;
+
+    // ApexCharts
+    private ApexChart<ChartDataPoint>? chart;
+    private ApexChartOptions<ChartDataPoint>? chartOptions;
+
+    // JS interop
+    private IJSObjectReference? jsModule;
+    private DotNetObjectReference<Charts>? dotNetReference;
+
+    // Cancellation
+    private CancellationTokenSource? loadCts;
+
+    private bool CanLoadData => selectedTagId.HasValue && themeDetected;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Charts");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadInitialDataAsync();
+        }
+    }
+
+    private async Task LoadInitialDataAsync()
+    {
+        var (tags, typeNames) = await ChartDataService.GetNumericTagsAsync();
+        numericTags = tags;
+        inputTypeNames = typeNames;
+
+        isDarkMode = await PreferencesService.IsDarkModeAsync();
+        await SetupThemeListener();
+        themeDetected = true;
+
+        var prefs = await PreferencesService.LoadAsync(numericTags.Select(t => t.Id));
+        ApplyPreferences(prefs);
+
+        StateHasChanged();
+    }
+
+    private void ApplyPreferences(ChartPreferences prefs)
+    {
+        selectedTagId = prefs.Tag1Id;
+        selectedTagId2 = prefs.Tag2Id;
+        selectedTagId3 = prefs.Tag3Id;
+        selectedChartType1 = prefs.ChartType1;
+        selectedChartType2 = prefs.ChartType2;
+        selectedChartType3 = prefs.ChartType3;
+        selectedDateRange = prefs.DateRange;
+    }
+
+    private async Task SetupThemeListener()
+    {
+        try
+        {
+            dotNetReference = DotNetObjectReference.Create(this);
+            jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme-listener.js");
+            await jsModule.InvokeVoidAsync("setupThemeListener", dotNetReference);
+        }
+        catch
+        {
+            // Theme listener setup failed - chart will use detected theme
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnThemeChanged(bool isDark)
+    {
+        isDarkMode = isDark;
+
+        if (dataLoaded && allSeriesData.Any() && chart != null && chartOptions != null)
+        {
+            UpdateChartTheme();
+            await chart.RenderAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnTag1Changed(int? tagId)
+    {
+        await PreferencesService.SaveTagAsync(1, tagId);
+        ResetChartState();
+    }
+
+    private async Task OnTag2Changed(int? tagId)
+    {
+        if (!await ValidateTagSelection(tagId, 2))
+        {
+            selectedTagId2 = null;
+
+            return;
+        }
+
+        await PreferencesService.SaveTagAsync(2, tagId);
+        ResetChartState();
+    }
+
+    private async Task OnTag3Changed(int? tagId)
+    {
+        if (!await ValidateTagSelection(tagId, 3))
+        {
+            selectedTagId3 = null;
+
+            return;
+        }
+
+        await PreferencesService.SaveTagAsync(3, tagId);
+        ResetChartState();
+    }
+
+    private async Task<bool> ValidateTagSelection(int? tagId, int slot)
+    {
+        if (!tagId.HasValue)
+        {
+            return true;
+        }
+
+        var selectedTags = new[] { selectedTagId, selectedTagId2, selectedTagId3 }
+            .Where((t, i) => t.HasValue && i != slot - 1)
+            .Select(t => t!.Value)
+            .ToList();
+
+        if (selectedTags.Contains(tagId.Value))
+        {
+            await JS.InvokeVoidAsync("console.warn", "Tag already selected. Please choose a different tag.");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ResetChartState()
+    {
+        dataLoaded = false;
+        allSeriesData = new();
+        availableYears.Clear();
+        availableMonths.Clear();
+        selectedDateRange = ChartConstants.DateRangeAll;
+        correlationInsights.Clear();
+    }
+
+    private async Task LoadChartData()
+    {
+        if (!selectedTagId.HasValue)
+        {
+            return;
+        }
+
+        // Cancel any previous load
+        loadCts?.Cancel();
+        loadCts = new CancellationTokenSource();
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var selections = GetTagSelections();
+            var result = await ChartDataService.LoadSeriesDataAsync(selections, loadCts.Token);
+
+            allSeriesData = result.SeriesData;
+            availableYears = result.AvailableYears;
+            availableMonths = result.AvailableMonths;
+
+            // Apply date filter
+            foreach (var series in allSeriesData)
+            {
+                series.DataPoints = ChartDataService.ApplyDateFilter(series.DataPoints, selectedDateRange);
+            }
+
+            allSeriesData = allSeriesData.Where(s => s.DataPoints.Any()).ToList();
+
+            // Compute derived state
+            var allPoints = allSeriesData.SelectMany(s => s.DataPoints).ToList();
+            totalDataPoints = allPoints.Count;
+            statistics = ChartStatistics.FromDataPoints(allPoints);
+            hasDecimalType = allSeriesData.Any(s =>
+                inputTypeNames.TryGetValue(s.InputTypeId, out var name) &&
+                name == ChartConstants.DecimalTypeName);
+            correlationInsights = ChartDataService.GenerateCorrelationInsights(allSeriesData, inputTypeNames);
+
+            ConfigureChartOptions();
+
+            dataLoaded = true;
+            await PreferencesService.SaveDateRangeAsync(selectedDateRange);
+        }
+        catch (OperationCanceledException)
+        {
+            // Load was cancelled - ignore
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private List<TagSelection> GetTagSelections()
+    {
+        var selections = new List<TagSelection>();
+        var chartTypes = new[] { selectedChartType1, selectedChartType2, selectedChartType3 };
+        var tagIds = new[] { selectedTagId, selectedTagId2, selectedTagId3 };
+
+        for (var i = 0; i < tagIds.Length; i++)
+        {
+            if (tagIds[i].HasValue)
+            {
+                var tag = numericTags.FirstOrDefault(t => t.Id == tagIds[i]!.Value);
+                if (tag != null)
+                {
+                    selections.Add(new TagSelection(tag.Id, tag.Title, tag.InputTypeId ?? 0, chartTypes[i]));
+                }
+            }
+        }
+
+        return selections;
+    }
+
+    private void ConfigureChartOptions()
+    {
+        var (yMin, yMax) = ChartDataService.GetYAxisRange(allSeriesData.Select(s => s.InputTypeId));
+        var valueFormatter = hasDecimalType
+            ? @"function(value) { return value.toFixed(2); }"
+            : @"function(value) { return value.toFixed(0); }";
+
+        chartOptions = new ApexChartOptions<ChartDataPoint>
+        {
+            Theme = new Theme
+            {
+                Mode = isDarkMode ? Mode.Dark : Mode.Light,
+                Palette = PaletteType.Palette1
+            },
+            Chart = new Chart
+            {
+                Background = isDarkMode ? ChartConstants.DarkTheme.Background : ChartConstants.LightTheme.Background,
+                ForeColor = isDarkMode ? ChartConstants.DarkTheme.ForeColor : ChartConstants.LightTheme.ForeColor,
+                Height = ChartConstants.ChartHeight,
+                Toolbar = new Toolbar
+                {
+                    Show = true,
+                    Tools = new Tools
+                    {
+                        Download = true,
+                        Selection = true,
+                        Zoom = true,
+                        Zoomin = true,
+                        Zoomout = true,
+                        Pan = true,
+                        Reset = true
+                    }
+                },
+                Zoom = new Zoom { Enabled = true }
+            },
+            Stroke = new Stroke { Curve = Curve.Smooth, Width = 3 },
+            Markers = new Markers { Size = 5, StrokeWidth = 2 },
+            Xaxis = new XAxis
+            {
+                Type = XAxisType.Datetime,
+                Title = new AxisTitle { Text = "Date" }
+            },
+            Yaxis = new List<YAxis>
+            {
+                new YAxis
+                {
+                    Min = yMin,
+                    Max = yMax,
+                    Title = new AxisTitle { Text = "Value" },
+                    Labels = new YAxisLabels { Formatter = valueFormatter }
+                }
+            },
+            Grid = new Grid
+            {
+                BorderColor = isDarkMode ? ChartConstants.DarkTheme.GridBorder : ChartConstants.LightTheme.GridBorder,
+                StrokeDashArray = 3
+            },
+            Legend = new Legend { Show = true, Position = LegendPosition.Top },
+            Tooltip = new Tooltip
+            {
+                Enabled = true,
+                Shared = true,
+                Intersect = false,
+                X = new TooltipX { Format = "dd MMM yyyy" },
+                Custom = GetTooltipFormatter()
+            },
+            Colors = ChartConstants.SeriesColors.ToList()
+        };
+    }
+
+    private void UpdateChartTheme()
+    {
+        if (chartOptions == null)
+        {
+            return;
+        }
+
+        chartOptions.Theme ??= new Theme();
+        chartOptions.Theme.Mode = isDarkMode ? Mode.Dark : Mode.Light;
+
+        chartOptions.Chart ??= new Chart();
+        chartOptions.Chart.Background = isDarkMode ? ChartConstants.DarkTheme.Background : ChartConstants.LightTheme.Background;
+        chartOptions.Chart.ForeColor = isDarkMode ? ChartConstants.DarkTheme.ForeColor : ChartConstants.LightTheme.ForeColor;
+
+        chartOptions.Grid ??= new Grid();
+        chartOptions.Grid.BorderColor = isDarkMode ? ChartConstants.DarkTheme.GridBorder : ChartConstants.LightTheme.GridBorder;
+
+        if (chartOptions.Tooltip != null)
+        {
+            chartOptions.Tooltip.Custom = GetTooltipFormatter();
+        }
+    }
+
+    private string GetTooltipFormatter()
+    {
+        var formatValue = hasDecimalType ? "series[i][dataPointIndex].toFixed(2)" : "Math.round(series[i][dataPointIndex])";
+
+        var bg = isDarkMode ? ChartConstants.DarkTheme.TooltipBackground : ChartConstants.LightTheme.TooltipBackground;
+        var text = isDarkMode ? ChartConstants.DarkTheme.TooltipText : ChartConstants.LightTheme.TooltipText;
+        var dateText = isDarkMode ? ChartConstants.DarkTheme.TooltipDateText : ChartConstants.LightTheme.TooltipDateText;
+        var border = isDarkMode ? "" : $"border: 1px solid {ChartConstants.LightTheme.TooltipBorder};";
+        var shadow = isDarkMode ? "0 4px 6px rgba(0,0,0,0.3)" : "0 4px 6px rgba(0,0,0,0.1)";
+
+        return $@"function({{series, seriesIndex, dataPointIndex, w}}) {{
+            var date = new Date(w.globals.seriesX[seriesIndex][dataPointIndex]);
+            var dateStr = date.toLocaleDateString('en-US', {{ day: '2-digit', month: 'short', year: 'numeric' }});
+            var html = '<div style=""padding: 10px; background: {bg}; color: {text}; {border} border-radius: 6px; box-shadow: {shadow};"">';
+            html += '<div style=""font-size: 12px; margin-bottom: 6px; color: {dateText};"">' + dateStr + '</div>';
+            for (var i = 0; i < series.length; i++) {{
+                if (series[i][dataPointIndex] !== null && series[i][dataPointIndex] !== undefined) {{
+                    var color = w.globals.colors[i];
+                    var seriesName = w.globals.seriesNames[i];
+                    var value = {formatValue};
+                    html += '<div style=""display: flex; align-items: center; margin-top: 4px;"">';
+                    html += '<span style=""display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ' + color + '; margin-right: 6px;""></span>';
+                    html += '<span style=""font-size: 13px; font-weight: 500;"">' + seriesName + ': ' + value + '</span>';
+                    html += '</div>';
+                }}
+            }}
+            html += '</div>';
+            return html;
+        }}";
+    }
+
+    private string GetChartTitle()
+    {
+        var names = allSeriesData.Select(s => s.TagName).ToList();
+
+        return names.Count switch
+        {
+            0 => "Chart",
+            1 => names[0],
+            _ => string.Join(" vs ", names)
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+
+        try
+        {
+            if (jsModule != null)
+            {
+                await jsModule.InvokeVoidAsync("cleanupThemeListener");
+                await jsModule.DisposeAsync();
+            }
+        }
+        catch
+        {
+            // Cleanup may fail if JS context is already disposed
+        }
+        finally
+        {
+            dotNetReference?.Dispose();
+        }
+    }
+}

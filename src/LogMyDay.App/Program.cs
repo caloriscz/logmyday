@@ -1,4 +1,5 @@
-﻿using LogMyDay.Api.Application.Interfaces;
+﻿using ApexCharts;
+using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
@@ -9,6 +10,7 @@ using LogMyDay.App.Authentication;
 using LogMyDay.App.Components;
 using LogMyDay.Shared.Interfaces;
 using LogMyDay.App.Services;
+using LogMyDay.App.Services.Charts;
 using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
@@ -210,6 +212,9 @@ services.AddRateLimiter(options =>
 
 services.AddRazorComponents().AddInteractiveServerComponents();
 
+// Add ApexCharts for data visualization
+services.AddApexCharts();
+
 services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -234,6 +239,10 @@ services.AddScoped<IQuantityRepository, QuantityRepository>();
 // UI services
 services.AddScoped<IPageTitleService, PageTitleService>();
 services.AddScoped<IUserPreferencesService, UserPreferencesService>();
+
+// Chart services
+services.AddScoped<IChartPreferencesService, ChartPreferencesService>();
+services.AddScoped<IChartDataService, ChartDataService>();
 
 // Authentication and user services
 services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();
