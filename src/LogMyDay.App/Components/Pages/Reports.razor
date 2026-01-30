@@ -1,0 +1,857 @@
+@page "/reports"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Api.Application.Interfaces
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using LogMyDay.App.Services
+@using LogMyDay.App.Components.Shared
+@inject IExcelExportService ExcelExportService
+@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
+@inject IJSRuntime JSRuntime
+@inject ILogger<Reports> Logger
+@inject IPageTitleService PageTitleService
+
+<div class="mx-auto max-w-screen-2xl px-4 py-6 space-y-6 sm:px-6 lg:px-8">
+    <div class="space-y-2">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">
+            <Icon Name="file-text" Class="inline h-8 w-8 mr-2" />
+            Reports & Exports
+        </h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">Generate and download activity reports in various formats.</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="rounded-lg border @(isError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-green-200 bg-green-50 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-200") px-4 py-3 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-2">
+                    <Icon Name="@(isError ? "exclamation-triangle" : "check-circle")" Class="h-5 w-5 mt-0.5 flex-shrink-0" />
+                    <span class="text-sm">@statusMessage</span>
+                </div>
+                <button type="button" class="text-current hover:opacity-70 transition-opacity" @onclick="ClearStatus">
+                    <Icon Name="close" Class="h-5 w-5" />
+                    <span class="sr-only">Close</span>
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <!-- Excel Export Section -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 bg-sky-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <Icon Name="document" Class="h-5 w-5" />
+                    Excel Reports
+                </h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-700 dark:text-slate-200">
+                    Generate Excel reports with activities data for selected tags.
+                </p>
+
+                <!-- Tag Selection -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Tags:</label>
+                    @if (availableTags != null && availableTags.Any())
+                    {
+                        <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                            @foreach (var tag in availableTags)
+                            {
+                                <div class="flex items-center gap-2 py-1">
+                                    <input type="checkbox"
+                                           id="tag-@tag.Id"
+                                           @onchange="@((e) => ToggleTagSelection(tag.Id, (bool)e.Value!))"
+                                           class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
+                                    <label for="tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
+                                        @tag.Title
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-sm text-gray-500 dark:text-slate-400">Loading tags…</div>
+                    }
+                </div>
+
+                <!-- Date Range Presets -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Date Range:</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(datePreset == DateRangePreset.Custom ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetDatePreset(DateRangePreset.Custom)">
+                            Custom
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(datePreset == DateRangePreset.AllData ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetDatePreset(DateRangePreset.AllData)"
+                                disabled="@isLoadingOldestDate">
+                            All Data
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(datePreset == DateRangePreset.LastMonth ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetDatePreset(DateRangePreset.LastMonth)">
+                            Last Month
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(datePreset == DateRangePreset.LastQuarter ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetDatePreset(DateRangePreset.LastQuarter)">
+                            Last Quarter
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(datePreset == DateRangePreset.LastYear ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetDatePreset(DateRangePreset.LastYear)">
+                            Last Year
+                        </button>
+                    </div>
+                </div>
+
+                @if (datePreset == DateRangePreset.Custom)
+                {
+                    <!-- Custom Date Range -->
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
+                            <CultureAwareDatePicker Value="@excelStartDate" ValueChanged="@((DateTime? v) => excelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
+                            <CultureAwareDatePicker Value="@excelEndDate" ValueChanged="@((DateTime? v) => excelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(dateRangeDisplay))
+                {
+                    <div class="text-sm text-gray-600 dark:text-slate-400">
+                        Period: <span class="font-medium">@dateRangeDisplay</span>
+                    </div>
+                }
+
+                <!-- Freeze First Row Option -->
+                <div class="flex items-center gap-2">
+                    <input type="checkbox"
+                           id="freezeFirstRow"
+                           @bind="freezeFirstRow"
+                           class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
+                    <label for="freezeFirstRow" class="text-sm text-gray-700 dark:text-slate-200">
+                        Freeze first row (header)
+                    </label>
+                </div>
+
+                @if (selectedTagIds.Any())
+                {
+                    <div class="text-sm text-gray-600 dark:text-slate-400">
+                        Selected @selectedTagIds.Count tag(s):
+                        <span class="font-medium">@string.Join(", ", availableTags?.Where(t => selectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
+                    </div>
+                }
+
+                @if (excelPreview != null)
+                {
+                    <div class="rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-500/40 dark:bg-sky-500/20">
+                        <h3 class="text-sm font-semibold text-sky-900 dark:text-sky-100 mb-2">Preview:</h3>
+                        <dl class="grid grid-cols-2 gap-3 text-sm text-sky-800 dark:text-sky-200">
+                            <div>
+                                <dt class="font-medium">Activities</dt>
+                                <dd>@excelPreview.TotalActivities</dd>
+                            </div>
+                            <div>
+                                <dt class="font-medium">Days</dt>
+                                <dd>@excelPreview.TotalDays</dd>
+                            </div>
+                            <div class="col-span-2">
+                                <dt class="font-medium">Period</dt>
+                                <dd>@excelPreview.DateRangeStart?.ToString("dd/MM/yyyy") - @excelPreview.DateRangeEnd?.ToString("dd/MM/yyyy")</dd>
+                            </div>
+                        </dl>
+                    </div>
+                }
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                            @onclick="PreviewExcelExport"
+                            disabled="@(!selectedTagIds.Any() || isGeneratingPreview)">
+                        @if (isGeneratingPreview)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                            <span>Loading…</span>
+                        }
+                        else
+                        {
+                            <span>Preview</span>
+                        }
+                    </button>
+
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                            @onclick="GenerateExcelReport"
+                            disabled="@(!selectedTagIds.Any() || isGeneratingExcel)">
+                        @if (isGeneratingExcel)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Generating…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="document" Class="h-4 w-4" />
+                            <span>Generate</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HTML Export Section -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 bg-purple-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <Icon Name="file-text" Class="h-5 w-5" />
+                    HTML Reports
+                </h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-700 dark:text-slate-200">
+                    Generate clean HTML reports with activities grouped by day.
+                </p>
+
+                <!-- Tag Selection for HTML -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Tags:</label>
+                    @if (availableTags != null && availableTags.Any())
+                    {
+                        <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                            @foreach (var tag in availableTags)
+                            {
+                                <div class="flex items-center gap-2 py-1">
+                                    <input type="checkbox"
+                                           id="html-tag-@tag.Id"
+                                           @onchange="@((e) => ToggleHtmlTagSelection(tag.Id, (bool)e.Value!))"
+                                           class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
+                                    <label for="html-tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
+                                        @tag.Title
+                                    </label>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-sm text-gray-500 dark:text-slate-400">Loading tags\u2026</div>
+                    }
+                </div>
+
+                <!-- Date Range Presets for HTML -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Date Range:</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(htmlDatePreset == HtmlDateRangePreset.Custom && !htmlIncludeAllData ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetHtmlDatePreset(HtmlDateRangePreset.Custom)">
+                            Custom
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(htmlDatePreset == HtmlDateRangePreset.LastMonth && !htmlIncludeAllData ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetHtmlDatePreset(HtmlDateRangePreset.LastMonth)">
+                            Last Month
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(htmlDatePreset == HtmlDateRangePreset.LastQuarter && !htmlIncludeAllData ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetHtmlDatePreset(HtmlDateRangePreset.LastQuarter)">
+                            Last Quarter
+                        </button>
+                        <button type="button"
+                                class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors @(htmlDatePreset == HtmlDateRangePreset.LastYear && !htmlIncludeAllData ? "bg-primary-600 text-white border-primary-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700")"
+                                @onclick="() => SetHtmlDatePreset(HtmlDateRangePreset.LastYear)">
+                            Last Year
+                        </button>
+                    </div>
+                    @if (!htmlIncludeAllData && !string.IsNullOrEmpty(htmlDateRangeDisplay))
+                    {
+                        <div class="text-xs text-gray-600 dark:text-slate-400">@htmlDateRangeDisplay</div>
+                    }
+                </div>
+
+                <!-- All Data Checkbox -->
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="html-all-data" @bind="htmlIncludeAllData"
+                           class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
+                    <label for="html-all-data" class="text-sm text-gray-700 dark:text-slate-200">Include all available data</label>
+                </div>
+
+                <!-- Date Range for HTML -->
+                <div class="grid gap-4 sm:grid-cols-2 @(htmlIncludeAllData ? "opacity-50 pointer-events-none" : "")">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
+                        <CultureAwareDatePicker Value="@htmlStartDate" ValueChanged="@((DateTime? v) => htmlStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
+                        <CultureAwareDatePicker Value="@htmlEndDate" ValueChanged="@((DateTime? v) => htmlEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                    </div>
+                </div>
+
+                @if (selectedHtmlTagIds.Any())
+                {
+                    <div class="text-sm text-gray-600 dark:text-slate-400">
+                        Selected @selectedHtmlTagIds.Count tag(s):
+                        <span class="font-medium">@string.Join(", ", availableTags?.Where(t => selectedHtmlTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
+                    </div>
+                }
+
+                <!-- Output Format -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Output Format:</label>
+                    <select @bind="htmlFormat" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <option value="@HtmlExportFormat.List">List Format</option>
+                        <option value="@HtmlExportFormat.Table">Table Format</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                            @onclick="GenerateHtmlReport"
+                            disabled="@(!selectedHtmlTagIds.Any() || isGeneratingHtml)">
+                        @if (isGeneratingHtml)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Generating\u2026</span>
+                        }
+                        else
+                        {
+                            <Icon Name="file-text" Class="h-4 w-4" />
+                            <span>Generate</span>
+                        }
+                    </button>
+                </div>
+
+                @if (generatedYears.Any())
+                {
+                    <div class="mt-3 text-sm text-gray-600 dark:text-slate-400">
+                        <span class="font-medium">Years:</span>
+                        @foreach (var year in generatedYears.OrderBy(y => y))
+                        {
+                            <a href="#year-@year" class="ml-2 text-primary-600 dark:text-primary-400 hover:underline">@year</a>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isGeneratingExcel = false;
+    private bool isGeneratingPreview = false;
+    private bool isGeneratingHtml = false;
+    private bool isLoadingOldestDate = false;
+    private string statusMessage = "";
+    private bool isError = false;
+    private bool freezeFirstRow = true;
+
+    // Excel export properties
+    private List<TagResponse>? availableTags;
+    private List<int> selectedTagIds = new();
+    private DateTime? excelStartDate = DateTime.Today.AddMonths(-1);
+    private DateTime? excelEndDate = DateTime.Today;
+    private ExcelExportStatistics? excelPreview;
+    private DateRangePreset datePreset = DateRangePreset.Custom;
+    private string dateRangeDisplay = "";
+    private DateTime? oldestActivityDate = null;
+
+    // HTML export properties
+    private List<int> selectedHtmlTagIds = new();
+    private DateTime? htmlStartDate = DateTime.Today.AddMonths(-1);
+    private DateTime? htmlEndDate = DateTime.Today;
+    private HtmlDateRangePreset htmlDatePreset = HtmlDateRangePreset.Custom;
+    private string htmlDateRangeDisplay = "";
+    private bool htmlIncludeAllData = false;
+    private HtmlExportFormat htmlFormat = HtmlExportFormat.List;
+    private List<int> generatedYears = new();
+
+    private enum HtmlExportFormat
+    {
+        List,
+        Table
+    }
+
+    private enum HtmlDateRangePreset
+    {
+        Custom,
+        LastMonth,
+        LastQuarter,
+        LastYear
+    }
+
+    private enum DateRangePreset
+    {
+        Custom,
+        AllData,
+        LastMonth,
+        LastQuarter,
+        LastYear
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Reports & Exports");
+        await LoadAvailableTags();
+    }
+
+    private async Task LoadAvailableTags()
+    {
+        try
+        {
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+
+            if (currentUser?.Id != null)
+            {
+                availableTags = await ExcelExportService.GetAvailableTags(currentUser.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load available tags");
+        }
+    }
+
+    private void ToggleTagSelection(int tagId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!selectedTagIds.Contains(tagId))
+            {
+                selectedTagIds.Add(tagId);
+            }
+        }
+        else
+        {
+            selectedTagIds.Remove(tagId);
+        }
+
+        // Clear preview when selection changes
+        excelPreview = null;
+    }
+
+    private async Task SetDatePreset(DateRangePreset preset)
+    {
+        datePreset = preset;
+        excelPreview = null;
+        var today = DateTime.Today;
+
+        switch (preset)
+        {
+            case DateRangePreset.Custom:
+                excelStartDate = DateTime.Today.AddMonths(-1);
+                excelEndDate = DateTime.Today;
+                dateRangeDisplay = "";
+                break;
+
+            case DateRangePreset.AllData:
+                if (oldestActivityDate == null)
+                {
+                    await LoadOldestActivityDate();
+                }
+                if (oldestActivityDate.HasValue)
+                {
+                    excelStartDate = oldestActivityDate;
+                    excelEndDate = today;
+                    dateRangeDisplay = $"{oldestActivityDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy}";
+                }
+                else
+                {
+                    SetStatus("No activity data found", true);
+                    datePreset = DateRangePreset.Custom;
+                }
+                break;
+
+            case DateRangePreset.LastMonth:
+                excelStartDate = today.AddMonths(-1);
+                excelEndDate = today;
+                dateRangeDisplay = $"{excelStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Month)";
+                break;
+
+            case DateRangePreset.LastQuarter:
+                excelStartDate = today.AddMonths(-3);
+                excelEndDate = today;
+                dateRangeDisplay = $"{excelStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Quarter)";
+                break;
+
+            case DateRangePreset.LastYear:
+                excelStartDate = today.AddYears(-1);
+                excelEndDate = today;
+                dateRangeDisplay = $"{excelStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Year)";
+                break;
+        }
+    }
+
+    private async Task LoadOldestActivityDate()
+    {
+        isLoadingOldestDate = true;
+        try
+        {
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            
+            oldestActivityDate = await ExcelExportService.GetOldestActivityDate(
+                currentUser.Id, 
+                selectedTagIds.Any() ? selectedTagIds : null
+            );
+
+            if (oldestActivityDate == null)
+            {
+                SetStatus("No activity data found", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load oldest activity date");
+            oldestActivityDate = DateTime.Today.AddYears(-2); // Fallback
+        }
+        finally
+        {
+            isLoadingOldestDate = false;
+        }
+    }
+
+    private async Task PreviewExcelExport()
+    {
+        if (!selectedTagIds.Any()) return;
+
+        isGeneratingPreview = true;
+        ClearStatus();
+        try
+        {
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+
+            var request = new ExcelExportRequest
+            {
+                TagIds = selectedTagIds,
+                StartDate = excelStartDate,
+                EndDate = excelEndDate,
+                UserId = currentUser.Id
+            };
+
+            excelPreview = await ExcelExportService.GetExportPreview(request);
+
+            if (excelPreview.TotalActivities == 0)
+            {
+                SetStatus("No activities found for the selected criteria", true);
+            }
+            else
+            {
+                SetStatus($"Preview loaded: {excelPreview.TotalActivities} activities across {excelPreview.TotalDays} days", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to generate preview");
+            SetStatus($"Preview failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isGeneratingPreview = false;
+        }
+    }
+
+    private async Task GenerateExcelReport()
+    {
+        var currentUser = await AuthApi.GetCurrentUserAsync();
+
+        if (!selectedTagIds.Any()) return;
+
+        isGeneratingExcel = true;
+        ClearStatus();
+
+        try
+        {
+            var request = new ExcelExportRequest
+            {
+                TagIds = selectedTagIds,
+                StartDate = excelStartDate,
+                EndDate = excelEndDate,
+                UserId = currentUser.Id,
+                FreezeFirstRow = freezeFirstRow
+            };
+
+            var result = await ExcelExportService.GenerateExcelReport(request);
+
+            if (result.Success && result.FileContent != null)
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFile",
+                    result.FileName,
+                    Convert.ToBase64String(result.FileContent),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+                SetStatus($"Excel report generated successfully! {result.Statistics.TotalActivities} activities included.", false);
+            }
+            else
+            {
+                SetStatus($"Excel generation failed: {result.Message}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Excel generation failed");
+            SetStatus($"Excel generation failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isGeneratingExcel = false;
+        }
+    }
+
+    private void SetStatus(string message, bool error)
+    {
+        statusMessage = message;
+        isError = error;
+    }
+
+    private void ClearStatus()
+    {
+        statusMessage = "";
+        isError = false;
+    }
+
+    private void ToggleHtmlTagSelection(int tagId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!selectedHtmlTagIds.Contains(tagId))
+            {
+                selectedHtmlTagIds.Add(tagId);
+            }
+        }
+        else
+        {
+            selectedHtmlTagIds.Remove(tagId);
+        }
+    }
+
+    private async Task GenerateHtmlReport()
+    {
+        if (!selectedHtmlTagIds.Any()) return;
+
+        isGeneratingHtml = true;
+        ClearStatus();
+
+        try
+        {
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+
+            // Fetch activities for selected tags and date range
+            // Pass null dates if "Include all data" is checked
+            var activities = await ExcelExportService.GetActivitiesForExport(new ExcelExportRequest
+            {
+                TagIds = selectedHtmlTagIds,
+                StartDate = htmlIncludeAllData ? null : htmlStartDate,
+                EndDate = htmlIncludeAllData ? null : htmlEndDate,
+                UserId = currentUser.Id
+            });
+
+            if (!activities.Any())
+            {
+                SetStatus("No activities found for the selected criteria", true);
+
+                return;
+            }
+
+            // Generate HTML content
+            var html = GenerateHtmlContent(activities);
+
+            // Download HTML file
+            var htmlBytes = System.Text.Encoding.UTF8.GetBytes(html);
+            var fileName = $"LogMyDay_Report_{DateTime.Now:yyyyMMdd_HHmmss}.html";
+
+            await JSRuntime.InvokeVoidAsync("downloadFile",
+                fileName,
+                Convert.ToBase64String(htmlBytes),
+                "text/html");
+
+            SetStatus($"HTML report generated successfully! {activities.Count} activities included.", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "HTML generation failed");
+            SetStatus($"HTML generation failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isGeneratingHtml = false;
+        }
+    }
+
+    private string GenerateHtmlContent(List<ActivityExportRow> activities)
+    {
+        var sb = new System.Text.StringBuilder();
+        
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang='en'>");
+        sb.AppendLine("<head>");
+        sb.AppendLine("    <meta charset='UTF-8'>");
+        sb.AppendLine("    <meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        sb.AppendLine("    <title>LogMyDay Activity Report</title>");
+        sb.AppendLine("    <style>");
+        sb.AppendLine("        * { margin: 0; padding: 0; box-sizing: border-box; }");
+        sb.AppendLine("        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 20px; color: #333; line-height: 1.6; }");
+        sb.AppendLine("        .container { max-width: 1400px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; }");
+        sb.AppendLine("        h1 { color: #2563eb; margin-bottom: 10px; font-size: 2em; }");
+        sb.AppendLine("        .subtitle { color: #666; margin-bottom: 20px; font-size: 0.9em; }");
+        sb.AppendLine("        .year-nav { margin-bottom: 30px; text-align: center; }");
+        sb.AppendLine("        .year-nav a { color: #8b5cf6; text-decoration: none; margin: 0 8px; }");
+        sb.AppendLine("        .year-nav a:hover { text-decoration: underline; }");
+        sb.AppendLine("        .day { margin: 20px 0; padding: 15px; background: #fafafa; border-left: 4px solid #3b82f6; border-radius: 4px; }");
+        sb.AppendLine("        .day-date { font-weight: 600; color: #1e40af; margin-bottom: 10px; font-size: 1.1em; }");
+        sb.AppendLine("        .activities { margin-left: 20px; }");
+        sb.AppendLine("        .activity-item { display: block; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9em; }");
+        sb.AppendLine("        .activity-item:last-child { border-bottom: none; }");
+        sb.AppendLine("        .activity-tag { color: #3730a3; font-weight: 600; }");
+        sb.AppendLine("        .activity-desc { color: #475569; }");
+        sb.AppendLine("        .activity-separator { color: #94a3b8; margin: 0 4px; }");
+        sb.AppendLine("        .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 0.85em; }");
+        
+        // Table-specific styles
+        if (htmlFormat == HtmlExportFormat.Table)
+        {
+            sb.AppendLine("        table { width: 100%; border-collapse: collapse; margin: 20px 0; }");
+            sb.AppendLine("        th, td { padding: 10px; text-align: left; border: 1px solid #e2e8f0; }");
+            sb.AppendLine("        th { background-color: #f8fafc; font-weight: 600; }");
+            sb.AppendLine("        td { background-color: white; }");
+            sb.AppendLine("        .col-date { width: 120px; }");
+            sb.AppendLine("        .col-tag { width: 200px; }");
+            sb.AppendLine("        .col-desc { width: auto; }");
+        }
+        
+        sb.AppendLine("        .year-heading { font-size: 1.8em; font-weight: 700; color: #1e293b; margin: 40px 0 20px 0; padding-bottom: 10px; border-bottom: 3px solid #8b5cf6; }");
+        sb.AppendLine("        @media print { body { background: white; padding: 0; } .container { box-shadow: none; padding: 20px; } }");
+        sb.AppendLine("    </style>");
+        sb.AppendLine("</head>");
+        sb.AppendLine("<body>");
+        sb.AppendLine("    <div class='container'>");
+        sb.AppendLine("        <h1>LogMyDay Activity Report</h1>");
+        sb.AppendLine($"        <div class='subtitle'>Generated on {DateTime.Now:MMMM dd, yyyy 'at' HH:mm}</div>");
+
+        // Add year navigation
+        var years = activities.Select(a => a.DateStarted.Year).Distinct().OrderBy(y => y).ToList();
+        if (years.Count > 0)
+        {
+            sb.Append("        <div class='year-nav'>Years: ");
+            sb.Append(string.Join(" | ", years.Select(y => $"<a href='#year-{y}'>{y}</a>")));
+            sb.AppendLine("</div>");
+        }
+
+        // Group activities by year, then date (oldest to newest)
+        var groupedByYear = activities
+            .OrderBy(a => a.DateStarted.Date)
+            .GroupBy(a => a.DateStarted.Year);
+
+        generatedYears = groupedByYear.Select(g => g.Key).ToList();
+
+        foreach (var yearGroup in groupedByYear)
+        {
+            sb.AppendLine($"        <h2 id='year-{yearGroup.Key}' class='year-heading'>{yearGroup.Key}</h2>");
+
+            if (htmlFormat == HtmlExportFormat.List)
+            {
+                // List format: Group by date
+                var groupedByDate = yearGroup.GroupBy(a => a.DateStarted.Date);
+
+                foreach (var dateGroup in groupedByDate)
+                {
+                    sb.AppendLine("        <div class='day'>");
+                    sb.AppendLine($"            <div class='day-date'>{dateGroup.Key:dddd, MMMM dd, yyyy}</div>");
+                    sb.AppendLine("            <div class='activities'>");
+
+                    foreach (var activity in dateGroup.OrderBy(a => a.DateStarted))
+                    {
+                        sb.Append("                <div class='activity-item'>");
+                        sb.Append($"<span class='activity-tag'>{System.Net.WebUtility.HtmlEncode(activity.Tag)}</span>");
+                        
+                        if (!string.IsNullOrWhiteSpace(activity.Description))
+                        {
+                            sb.Append("<span class='activity-separator'>-</span>");
+                            sb.Append($"<span class='activity-desc'>{System.Net.WebUtility.HtmlEncode(activity.Description)}</span>");
+                        }
+                        
+                        sb.AppendLine("</div>");
+                    }
+
+                    sb.AppendLine("            </div>");
+                    sb.AppendLine("        </div>");
+                }
+            }
+            else // Table format
+            {
+                sb.AppendLine("        <table>");
+                sb.AppendLine("            <thead>");
+                sb.AppendLine("                <tr>");
+                sb.AppendLine("                    <th class='col-date'>Date</th>");
+                sb.AppendLine("                    <th class='col-tag'>Tag</th>");
+                sb.AppendLine("                    <th class='col-desc'>Description</th>");
+                sb.AppendLine("                </tr>");
+                sb.AppendLine("            </thead>");
+                sb.AppendLine("            <tbody>");
+
+                foreach (var activity in yearGroup.OrderBy(a => a.DateStarted))
+                {
+                    // Show time only for Exact (0) or Hourly (2) granularity
+                    var showTime = activity.TimeGranularity == 0 || activity.TimeGranularity == 2;
+                    var dateFormat = showTime ? "dd/MM HH:mm" : "dd/MM";
+                    
+                    sb.AppendLine("                <tr>");
+                    sb.AppendLine($"                    <td class='col-date'>{activity.DateStarted.ToString(dateFormat)}</td>");
+                    sb.AppendLine($"                    <td class='col-tag'>{System.Net.WebUtility.HtmlEncode(activity.Tag)}</td>");
+                    sb.AppendLine($"                    <td class='col-desc'>{System.Net.WebUtility.HtmlEncode(activity.Description)}</td>");
+                    sb.AppendLine("                </tr>");
+                }
+
+                sb.AppendLine("            </tbody>");
+                sb.AppendLine("        </table>");
+            }
+        }
+
+        sb.AppendLine($"        <div class='footer'>Report contains {activities.Count} activities | LogMyDay &copy; {DateTime.Now.Year}</div>");
+        sb.AppendLine("    </div>");
+        sb.AppendLine("</body>");
+        sb.AppendLine("</html>");
+
+        return sb.ToString();
+    }
+
+    private void SetHtmlDatePreset(HtmlDateRangePreset preset)
+    {
+        htmlDatePreset = preset;
+        htmlIncludeAllData = false; // Uncheck "all data" when selecting a preset
+        var today = DateTime.Today;
+
+        switch (preset)
+        {
+            case HtmlDateRangePreset.Custom:
+                htmlStartDate = DateTime.Today.AddMonths(-1);
+                htmlEndDate = DateTime.Today;
+                htmlDateRangeDisplay = "";
+                break;
+
+            case HtmlDateRangePreset.LastMonth:
+                htmlStartDate = today.AddMonths(-1);
+                htmlEndDate = today;
+                htmlDateRangeDisplay = $"{htmlStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Month)";
+                break;
+
+            case HtmlDateRangePreset.LastQuarter:
+                htmlStartDate = today.AddMonths(-3);
+                htmlEndDate = today;
+                htmlDateRangeDisplay = $"{htmlStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Quarter)";
+                break;
+
+            case HtmlDateRangePreset.LastYear:
+                htmlStartDate = today.AddYears(-1);
+                htmlEndDate = today;
+                htmlDateRangeDisplay = $"{htmlStartDate.Value:dd/MM/yyyy} - {today:dd/MM/yyyy} (Last Year)";
+                break;
+        }
+    }
+}

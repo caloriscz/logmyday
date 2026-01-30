@@ -287,7 +287,8 @@ Task("Deploy")
         $"-source:iisApp=\"{publishSource}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {
@@ -354,7 +355,8 @@ Task("FastDeploy")
         $"-source:iisApp=\"{outputPath}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {
@@ -408,7 +410,8 @@ Task("DeployUnsafe")
         $"-source:iisApp=\"{outputPath}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {

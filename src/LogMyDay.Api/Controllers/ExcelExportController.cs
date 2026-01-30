@@ -111,4 +111,40 @@ public class ExcelExportController : BaseApiController
             return StatusCode(500, new { message = "Failed to get export preview", error = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Get oldest activity date for the user (optionally filtered by tags)
+    /// </summary>
+    /// <param name="tagIds">Optional comma-separated tag IDs to filter</param>
+    /// <returns>Oldest activity date or null</returns>
+    [HttpGet("oldest-date")]
+    public async Task<IActionResult> GetOldestActivityDate([FromQuery] string? tagIds = null)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            
+            List<int>? tagIdsList = null;
+            if (!string.IsNullOrEmpty(tagIds))
+            {
+                tagIdsList = tagIds.Split(',')
+                    .Select(id => int.TryParse(id.Trim(), out var parsed) ? parsed : (int?)null)
+                    .Where(id => id.HasValue)
+                    .Select(id => id!.Value)
+                    .ToList();
+            }
+
+            _logger.LogInformation("Get oldest activity date for user: {UserId}", userId);
+
+            var oldestDate = await _excelExportService.GetOldestActivityDate(userId, tagIdsList);
+
+            return Ok(new { oldestDate });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting oldest activity date");
+
+            return StatusCode(500, new { message = "Failed to get oldest activity date", error = ex.Message });
+        }
+    }
 }

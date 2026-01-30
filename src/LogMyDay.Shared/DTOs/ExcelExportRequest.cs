@@ -7,6 +7,7 @@ public class ExcelExportRequest
     public DateTime? EndDate { get; set; }
     public Guid? UserId { get; set; }
     public ExcelFormat Format { get; set; } = ExcelFormat.Daily;
+    public bool FreezeFirstRow { get; set; } = false;
 }
 
 public enum ExcelFormat
@@ -34,4 +35,12 @@ public class ExcelExportStatistics
     public DateTime? DateRangeStart { get; set; }
     public DateTime? DateRangeEnd { get; set; }
     public Dictionary<string, int> TagActivityCounts { get; set; } = [];
+}
+
+public class ActivityExportRow
+{
+    public DateTime DateStarted { get; set; }
+    public string Tag { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int TimeGranularity { get; set; } // 0=Exact, 1=Daily, 2=Hourly
 }
