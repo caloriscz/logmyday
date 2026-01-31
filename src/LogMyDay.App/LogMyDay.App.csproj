@@ -9,6 +9,10 @@
 		<FileVersion>0.2.0.0</FileVersion>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="LogMyDay.Api.IntegrationTests" />
+	</ItemGroup>
+
 	<Target Name="CleanPrecompressedArtifacts" BeforeTargets="Build">
 		<RemoveDir Directories="$(BaseIntermediateOutputPath)\staticwebassets" />
 	</Target>

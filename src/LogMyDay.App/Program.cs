@@ -62,10 +62,14 @@ else
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 }
 
-services.AddDbContext<LogMyDayDbContext>(options =>
+// Don't register DbContext in Test environment - let test factory handle it
+if (builder.Environment.EnvironmentName != "Test")
 {
-    options.UseSqlServer(connectionString);
-});
+    services.AddDbContext<LogMyDayDbContext>(options =>
+    {
+        options.UseSqlServer(connectionString);
+    });
+}
 
 // Configure Data Protection to persist keys and survive app restarts/deployments
 // This prevents users from being logged out after every deployment or app restart
@@ -488,11 +492,17 @@ app.MapControllers();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
-// Seed the database with initial admin user
-using (var scope = app.Services.CreateScope())
+// Seed the database with initial admin user (skip in Test environment)
+if (builder.Environment.EnvironmentName != "Test")
 {
-    var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
-    await seeder.SeedAsync();
+    using (var scope = app.Services.CreateScope())
+    {
+        var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
+        await seeder.SeedAsync();
+    }
 }
 
 app.Run();
+
+// Make Program class accessible for integration tests
+public partial class Program { }
