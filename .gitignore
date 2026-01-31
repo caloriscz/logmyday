@@ -413,3 +413,6 @@ secrets/*.txt
 /src/LogMyDay.App.Mobile/appsettings.json
 /src/LogMyDay.App/appsettings.Development.json
 /src/LogMyDay.App/DataProtection-Keys
+
+# Skills folder
+.github/skills/
