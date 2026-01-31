@@ -4,10 +4,14 @@
 		<TargetFramework>net9.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<Version>0.2.0.0</Version>
-		<AssemblyVersion>0.2.0.0</AssemblyVersion>
-		<FileVersion>0.2.0.0</FileVersion>
+		<Version>0.3.0.0</Version>
+		<AssemblyVersion>0.3.0.0</AssemblyVersion>
+		<FileVersion>0.3.0.0</FileVersion>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="LogMyDay.Api.IntegrationTests" />
+	</ItemGroup>
 
 	<Target Name="CleanPrecompressedArtifacts" BeforeTargets="Build">
 		<RemoveDir Directories="$(BaseIntermediateOutputPath)\staticwebassets" />

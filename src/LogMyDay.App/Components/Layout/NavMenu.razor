@@ -32,45 +32,76 @@
                     <Icon Name="calendar" Class="w-4 h-4" />
                     <span>Activities</span>
                 </NavLink>
-                <NavLink href="tags" 
-                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                    <Icon Name="tag" Class="w-4 h-4" />
-                    <span>Tags</span>
-                </NavLink>
-                <NavLink href="units" 
-                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                    <Icon Name="chart" Class="w-4 h-4" />
-                    <span>Units</span>
-                </NavLink>
-                <NavLink href="option-lists" 
-                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                    <Icon Name="list" Class="w-4 h-4" />
-                    <span>Lists</span>
-                </NavLink>
+                
+                <!-- Tags Dropdown -->
+                <div class="relative">
+                    <button @onclick="ToggleTagsMenu" 
+                            type="button"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            aria-label="Tags menu"
+                            aria-expanded="@showTagsMenu">
+                        <Icon Name="tag" Class="w-4 h-4" />
+                        <span>Tags</span>
+                        <Icon Name="chevron-down" Class="w-4 h-4" />
+                    </button>
+                    
+                    @if (showTagsMenu)
+                    {
+                        <div class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                            <NavLink href="tags" @onclick="() => showTagsMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="tag" Class="w-4 h-4" />
+                                <span>Tags</span>
+                            </NavLink>
+                            <NavLink href="option-lists" @onclick="() => showTagsMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="list" Class="w-4 h-4" />
+                                <span>Option Lists</span>
+                            </NavLink>
+                            <NavLink href="units" @onclick="() => showTagsMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="chart" Class="w-4 h-4" />
+                                <span>Units</span>
+                            </NavLink>
+                        </div>
+                    }
+                </div>
+                
                 <NavLink href="insights" 
                          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                          ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                     <Icon Name="sparkles" Class="w-4 h-4" />
                     <span>Insights</span>
                 </NavLink>
-                <NavLink href="backup" 
-                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                    <Icon Name="database" Class="w-4 h-4" />
-                    <span>Backup</span>
-                </NavLink>
-                @if (isAdminUser)
-                {
-                    <NavLink href="users" 
-                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                        <Icon Name="user" Class="w-4 h-4" />
-                        <span>Users</span>
-                    </NavLink>
-                }
+                
+                <!-- Data Dropdown -->
+                <div class="relative">
+                    <button @onclick="ToggleDataMenu" 
+                            type="button"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            aria-label="Data menu"
+                            aria-expanded="@showDataMenu">
+                        <Icon Name="database" Class="w-4 h-4" />
+                        <span>Data</span>
+                        <Icon Name="chevron-down" Class="w-4 h-4" />
+                    </button>
+                    
+                    @if (showDataMenu)
+                    {
+                        <div class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                            <NavLink href="backup" @onclick="() => showDataMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="database" Class="w-4 h-4" />
+                                <span>Backup</span>
+                            </NavLink>
+                            <NavLink href="reports" @onclick="() => showDataMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="file-text" Class="w-4 h-4" />
+                                <span>Reports</span>
+                            </NavLink>
+                        </div>
+                    }
+                </div>
             </div>
 
             <!-- Right Section: Theme Toggle + Account Menu -->
@@ -104,6 +135,14 @@
                                 <Icon Name="user" Class="w-4 h-4" />
                                 <span>Profile</span>
                             </NavLink>
+                            @if (isAdminUser)
+                            {
+                                <NavLink href="users" @onclick="() => showUserMenu = false"
+                                         class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    <Icon Name="users" Class="w-4 h-4" />
+                                    <span>Users</span>
+                                </NavLink>
+                            }
                             <button @onclick="Logout" type="button"
                                     class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20">
                                 <Icon Name="arrow-right" Class="w-4 h-4" />
@@ -141,45 +180,53 @@
                         <Icon Name="calendar" Class="w-5 h-5" />
                         <span>Activities</span>
                     </NavLink>
+                    
+                    <!-- Tags Section -->
+                    <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-2">
+                        Tags
+                    </div>
                     <NavLink href="tags" @onclick="() => showMobileMenu = false"
-                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="tag" Class="w-5 h-5" />
                         <span>Tags</span>
                     </NavLink>
-                    <NavLink href="units" @onclick="() => showMobileMenu = false"
-                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                        <Icon Name="chart" Class="w-5 h-5" />
-                        <span>Units</span>
-                    </NavLink>
                     <NavLink href="option-lists" @onclick="() => showMobileMenu = false"
-                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="list" Class="w-5 h-5" />
                         <span>Lists</span>
                     </NavLink>
+                    <NavLink href="units" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="chart" Class="w-5 h-5" />
+                        <span>Units</span>
+                    </NavLink>
+                    
                     <NavLink href="insights" @onclick="() => showMobileMenu = false"
-                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 mt-2"
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="sparkles" Class="w-5 h-5" />
                         <span>Insights</span>
                     </NavLink>
+                    
+                    <!-- Data Section -->
+                    <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-2">
+                        Data
+                    </div>
                     <NavLink href="backup" @onclick="() => showMobileMenu = false"
-                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="database" Class="w-5 h-5" />
                         <span>Backup</span>
                     </NavLink>
-                    @if (isAdminUser)
-                    {
-                        <NavLink href="users" @onclick="() => showMobileMenu = false"
-                                 class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                 ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
-                            <Icon Name="user" Class="w-5 h-5" />
-                            <span>Users</span>
-                        </NavLink>
-                    }
+                    <NavLink href="reports" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="file-text" Class="w-5 h-5" />
+                        <span>Reports</span>
+                    </NavLink>
                 </div>
             </div>
         }
@@ -193,6 +240,8 @@
     private string? currentUserEmail;
     private bool showMobileMenu = false;
     private bool showUserMenu = false;
+    private bool showTagsMenu = false;
+    private bool showDataMenu = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -253,7 +302,9 @@
         showMobileMenu = !showMobileMenu;
         if (showMobileMenu)
         {
-            showUserMenu = false; // Close user menu when opening mobile menu
+            showUserMenu = false;
+            showTagsMenu = false;
+            showDataMenu = false;
         }
     }
 
@@ -262,7 +313,31 @@
         showUserMenu = !showUserMenu;
         if (showUserMenu)
         {
-            showMobileMenu = false; // Close mobile menu when opening user menu
+            showMobileMenu = false;
+            showTagsMenu = false;
+            showDataMenu = false;
+        }
+    }
+    
+    private void ToggleTagsMenu()
+    {
+        showTagsMenu = !showTagsMenu;
+        if (showTagsMenu)
+        {
+            showMobileMenu = false;
+            showUserMenu = false;
+            showDataMenu = false;
+        }
+    }
+    
+    private void ToggleDataMenu()
+    {
+        showDataMenu = !showDataMenu;
+        if (showDataMenu)
+        {
+            showMobileMenu = false;
+            showUserMenu = false;
+            showTagsMenu = false;
         }
     }
 

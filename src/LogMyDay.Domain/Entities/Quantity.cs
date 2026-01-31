@@ -13,6 +13,5 @@ public class Quantity
 
     public int? BaseUnitId { get; set; }
 
-    [ForeignKey(nameof(BaseUnitId))]
     public Unit? BaseUnit { get; set; }
 }

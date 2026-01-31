@@ -24,4 +24,19 @@ public interface IExcelExportService
     /// <param name="request">Export configuration</param>
     /// <returns>Preview statistics and information</returns>
     Task<ExcelExportStatistics> GetExportPreview(ExcelExportRequest request);
+
+    /// <summary>
+    /// Gets the oldest activity date across all tags for the user
+    /// </summary>
+    /// <param name="userId">User ID to filter activities</param>
+    /// <param name="tagIds">Optional tag IDs to filter activities</param>
+    /// <returns>Oldest activity date or null if no activities exist</returns>
+    Task<DateTime?> GetOldestActivityDate(Guid userId, List<int>? tagIds = null);
+
+    /// <summary>
+    /// Gets activities data for HTML export
+    /// </summary>
+    /// <param name="request">Export configuration including tag selection and date range</param>
+    /// <returns>List of activity rows for HTML export</returns>
+    Task<List<ActivityExportRow>> GetActivitiesForExport(ExcelExportRequest request);
 }

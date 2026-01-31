@@ -146,6 +146,16 @@ Task("Build")
     
     if (exitCode != 0)
         throw new Exception("dotnet build failed");
+    
+    // Build integration tests project (not included in solution filter)
+    Information("Building integration tests project...");
+    var integrationTestsPath = MakeAbsolute(File("../src/LogMyDay.Api.IntegrationTests/LogMyDay.Api.IntegrationTests.csproj")).FullPath;
+    var integrationBuildExitCode = StartProcess("dotnet", new ProcessSettings {
+        Arguments = $"build \"{integrationTestsPath}\" --configuration {configuration} --no-restore"
+    });
+    
+    if (integrationBuildExitCode != 0)
+        throw new Exception("Integration tests build failed");
         
     Information("Build completed successfully");
 });
@@ -158,21 +168,43 @@ Task("Test")
     Information("🧪 RUNNING TESTS - Deployment will be blocked if tests fail");
     Information("========================================");
     
-    var testProjectPath = MakeAbsolute(File("../src/LogMyDay.Api.Tests/LogMyDay.Api.Tests.csproj")).FullPath;
-    var exitCode = StartProcess("dotnet", new ProcessSettings {
-        Arguments = $"test \"{testProjectPath}\" --configuration {configuration} --no-build --verbosity normal"
+    // Run unit tests
+    Information("Running unit tests...");
+    var unitTestProjectPath = MakeAbsolute(File("../src/LogMyDay.Api.Tests/LogMyDay.Api.Tests.csproj")).FullPath;
+    var unitTestExitCode = StartProcess("dotnet", new ProcessSettings {
+        Arguments = $"test \"{unitTestProjectPath}\" --configuration {configuration} --no-build --verbosity normal"
     });
     
-    if (exitCode != 0)
+    if (unitTestExitCode != 0)
     {
         Error("========================================");
-        Error("❌ TESTS FAILED - DEPLOYMENT ABORTED");
+        Error("❌ UNIT TESTS FAILED - DEPLOYMENT ABORTED");
         Error("========================================");
-        throw new Exception("dotnet test failed - fix the failing tests before deploying");
+        throw new Exception("Unit tests failed - fix the failing tests before deploying");
     }
     
+    Information("✅ Unit tests passed");
+    Information("");
+    
+    // Run integration tests
+    Information("Running integration tests...");
+    var integrationTestProjectPath = MakeAbsolute(File("../src/LogMyDay.Api.IntegrationTests/LogMyDay.Api.IntegrationTests.csproj")).FullPath;
+    var integrationTestExitCode = StartProcess("dotnet", new ProcessSettings {
+        Arguments = $"test \"{integrationTestProjectPath}\" --configuration {configuration} --no-build --verbosity normal"
+    });
+    
+    if (integrationTestExitCode != 0)
+    {
+        Error("========================================");
+        Error("❌ INTEGRATION TESTS FAILED - DEPLOYMENT ABORTED");
+        Error("========================================");
+        throw new Exception("Integration tests failed - fix the failing tests before deploying");
+    }
+    
+    Information("✅ Integration tests passed");
+    Information("");
     Information("========================================");
-    Information("✅ ALL TESTS PASSED - Safe to deploy");
+    Information("✅ ALL TESTS PASSED (Unit + Integration) - Safe to deploy");
     Information("========================================");
 });
 
@@ -287,7 +319,8 @@ Task("Deploy")
         $"-source:iisApp=\"{publishSource}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {
@@ -354,7 +387,8 @@ Task("FastDeploy")
         $"-source:iisApp=\"{outputPath}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {
@@ -408,7 +442,8 @@ Task("DeployUnsafe")
         $"-source:iisApp=\"{outputPath}\" " +
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
-        $"-enableRule:AppOffline";
+        $"-enableRule:AppOffline " +
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
     
     try
     {

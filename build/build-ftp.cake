@@ -151,7 +151,9 @@ Task("UploadToFTP")
                 throw new Exception($"Failed to upload {config.OfflineFilePath} to {remoteOfflineFilePath}");
             }
 
-            var files = System.IO.Directory.GetFiles(config.PublishDirectory, "*.*", System.IO.SearchOption.AllDirectories);
+            var files = System.IO.Directory.GetFiles(config.PublishDirectory, "*.*", System.IO.SearchOption.AllDirectories)
+                .Where(f => !f.Contains("DataProtection-Keys"))
+                .ToArray();
             int totalFiles = files.Length;
             int filesLeft = totalFiles;
             LogInformation($"Total files to upload: {totalFiles}");

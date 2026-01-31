@@ -220,6 +220,12 @@ public class ExportService : IExcelExportService
                 var tableRange = worksheet.Range(1, 1, rowIndex - 1, columnIndex - 1);
                 tableRange.Style.Border.OutsideBorder = XLBorderStyleValues.Medium;
                 tableRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+            }
+
+            // Freeze first row if requested
+            if (request.FreezeFirstRow && rowIndex > 1)
+            {
+                worksheet.SheetView.FreezeRows(1);
             }// Create summary sheet
             var summarySheet = workbook.Worksheets.Add("Summary");
 
@@ -374,6 +380,67 @@ public class ExportService : IExcelExportService
         {
             _logger.LogError(ex, "Error generating export preview");
             return statistics;
+        }
+    }
+
+    public async Task<DateTime?> GetOldestActivityDate(Guid userId, List<int>? tagIds = null)
+    {
+        try
+        {
+            var query = _context.Activities
+                .Where(a => a.UserId == userId);
+
+            if (tagIds != null && tagIds.Any())
+            {
+                query = query.Where(a => tagIds.Contains(a.TagId));
+            }
+
+            var oldestDate = await query
+                .OrderBy(a => a.DateStarted)
+                .Select(a => (DateTime?)a.DateStarted)
+                .FirstOrDefaultAsync();
+
+            return oldestDate;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching oldest activity date");
+            return null;
+        }
+    }
+
+    public async Task<List<ActivityExportRow>> GetActivitiesForExport(ExcelExportRequest request)
+    {
+        try
+        {
+            var query = _context.Activities
+                .Include(a => a.Tag)
+                .Where(a => request.TagIds.Contains(a.TagId))
+                .Where(a => a.UserId == request.UserId);
+
+            // Only filter by date if both dates are provided (not null)
+            if (request.StartDate.HasValue && request.EndDate.HasValue)
+            {
+                query = query.Where(a => a.DateStarted.Date >= request.StartDate.Value.Date && a.DateStarted.Date <= request.EndDate.Value.Date);
+            }
+
+            var activities = await query
+                .OrderByDescending(a => a.DateStarted)
+                .Select(a => new ActivityExportRow
+                {
+                    DateStarted = a.DateStarted,
+                    Tag = a.Tag.TagName,
+                    Description = a.Description ?? "",
+                    TimeGranularity = (int)a.Tag.TimeGranularity
+                })
+                .ToListAsync();
+
+            return activities;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching activities for export");
+            return new List<ActivityExportRow>();
         }
     }
 }

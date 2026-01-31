@@ -412,12 +412,19 @@ document.addEventListener('keydown', window.layoutKeyboardHandler);
     {
         if (keyboardListenerAdded)
         {
-            await JSRuntime.InvokeVoidAsync("eval", @"
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("eval", @"
 if (window.layoutKeyboardHandler) {
     document.removeEventListener('keydown', window.layoutKeyboardHandler);
     delete window.layoutKeyboardHandler;
 }
 ");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already disconnected - this is expected during disposal
+            }
         }
     }
 
