@@ -113,4 +113,60 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         Assert.NotNull(activities);
         Assert.Empty(activities);
     }
+
+    [Fact]
+    public async Task GenerateExcelReport_WithNullDates_IncludesAllActivities()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
+        var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
+        
+        var testUserId = context.Users.First().Id;
+        var tagIds = context.Tags.Select(t => t.Id).ToList();
+
+        var request = new ExcelExportRequest
+        {
+            TagIds = tagIds,
+            StartDate = null,
+            EndDate = null,
+            UserId = testUserId,
+            FreezeFirstRow = true
+        };
+
+        var result = await service.GenerateExcelReport(request);
+
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+        Assert.NotNull(result.FileContent);
+        Assert.True(result.FileContent.Length > 0);
+        Assert.Equal(5, result.Statistics.TotalActivities);
+    }
+
+    [Fact]
+    public async Task GenerateExcelReport_WithDateRange_FiltersActivities()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
+        var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
+        
+        var testUserId = context.Users.First().Id;
+        var tagIds = context.Tags.Select(t => t.Id).ToList();
+
+        var request = new ExcelExportRequest
+        {
+            TagIds = tagIds,
+            StartDate = new DateTime(2025, 1, 1),
+            EndDate = new DateTime(2025, 12, 31),
+            UserId = testUserId,
+            FreezeFirstRow = false
+        };
+
+        var result = await service.GenerateExcelReport(request);
+
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+        Assert.NotNull(result.FileContent);
+        Assert.True(result.FileContent.Length > 0);
+        Assert.Equal(2, result.Statistics.TotalActivities);
+    }
 }
