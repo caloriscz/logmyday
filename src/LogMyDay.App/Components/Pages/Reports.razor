@@ -113,16 +113,19 @@
                 </div>
 
                 <!-- Custom Date Range -->
-                <div class="grid gap-4 sm:grid-cols-2 @(state.ExcelIncludeAllData ? "opacity-50 pointer-events-none" : "")">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
-                        <CultureAwareDatePicker Value="@state.ExcelStartDate" ValueChanged="@((DateTime? v) => state.ExcelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                @if (!state.ExcelIncludeAllData)
+                {
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
+                            <CultureAwareDatePicker Value="@state.ExcelStartDate" ValueChanged="@((DateTime? v) => state.ExcelStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
+                            <CultureAwareDatePicker Value="@state.ExcelEndDate" ValueChanged="@((DateTime? v) => state.ExcelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
                     </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
-                        <CultureAwareDatePicker Value="@state.ExcelEndDate" ValueChanged="@((DateTime? v) => state.ExcelEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
-                    </div>
-                </div>
+                }
 
                 <!-- Freeze First Row Option -->
                 <div class="flex items-center gap-2">
@@ -238,16 +241,19 @@
                 </div>
 
                 <!-- Date Range for HTML -->
-                <div class="grid gap-4 sm:grid-cols-2 @(state.HtmlIncludeAllData ? "opacity-50 pointer-events-none" : "")">
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
-                        <CultureAwareDatePicker Value="@state.HtmlStartDate" ValueChanged="@((DateTime? v) => state.HtmlStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                @if (!state.HtmlIncludeAllData)
+                {
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Start Date:</label>
+                            <CultureAwareDatePicker Value="@state.HtmlStartDate" ValueChanged="@((DateTime? v) => state.HtmlStartDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
+                            <CultureAwareDatePicker Value="@state.HtmlEndDate" ValueChanged="@((DateTime? v) => state.HtmlEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
+                        </div>
                     </div>
-                    <div class="space-y-2">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">End Date:</label>
-                        <CultureAwareDatePicker Value="@state.HtmlEndDate" ValueChanged="@((DateTime? v) => state.HtmlEndDate = v ?? DateTime.Today)" EnableTime="false" Stretch="true" />
-                    </div>
-                </div>
+                }
 
                 @if (state.SelectedTagIds.Any())
                 {

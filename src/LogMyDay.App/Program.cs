@@ -478,7 +478,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseRouting();
 app.UseAntiforgery();
 

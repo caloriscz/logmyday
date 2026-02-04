@@ -49,23 +49,25 @@ public class ExportService : IExcelExportService
                 return result;
             }
 
-            // Set date range
-            var startDate = request.StartDate ?? DateTime.Today.AddMonths(-1);
-            var endDate = request.EndDate ?? DateTime.Today;
-
-            if (startDate > endDate)
+            // Validate date range if provided
+            if (request.StartDate.HasValue && request.EndDate.HasValue && request.StartDate > request.EndDate)
             {
                 result.Success = false;
                 result.Message = "Start date cannot be after end date";
                 return result;
             }
 
-            // Get activities data
+            // Get activities data - start with base query
             var activitiesQuery = _context.Activities
                 .Include(a => a.Tag)
                 .Where(a => request.TagIds.Contains(a.TagId))
-                .Where(a => a.DateStarted.Date >= startDate.Date && a.DateStarted.Date <= endDate.Date)
                 .Where(a => a.UserId == request.UserId);
+
+            // Only filter by date if dates are provided (not null)
+            if (request.StartDate.HasValue && request.EndDate.HasValue)
+            {
+                activitiesQuery = activitiesQuery.Where(a => a.DateStarted.Date >= request.StartDate.Value.Date && a.DateStarted.Date <= request.EndDate.Value.Date);
+            }
 
             var activities = await activitiesQuery
                 .Select(a => new
@@ -235,7 +237,9 @@ public class ExportService : IExcelExportService
 
             summarySheet.Cell(3, 1).Value = "Report Period:";
             summarySheet.Cell(3, 1).Style.Font.Bold = true;
-            summarySheet.Cell(3, 2).Value = $"{startDate:dd/MM/yyyy} - {endDate:dd/MM/yyyy}";
+            summarySheet.Cell(3, 2).Value = request.StartDate.HasValue && request.EndDate.HasValue 
+                ? $"{request.StartDate.Value:dd/MM/yyyy} - {request.EndDate.Value:dd/MM/yyyy}"
+                : "All available data";
 
             summarySheet.Cell(4, 1).Value = "Selected Tags:";
             summarySheet.Cell(4, 1).Style.Font.Bold = true;
@@ -280,7 +284,10 @@ public class ExportService : IExcelExportService
             {
                 tagNames += $"-and-{selectedTags.Count - 2}-more";
             }
-            result.FileName = $"logmyday-overview-{tagNames}-{startDate:yyyy-MM-dd}-to-{endDate:yyyy-MM-dd}.xlsx";
+            var dateRange = request.StartDate.HasValue && request.EndDate.HasValue
+                ? $"{request.StartDate.Value:yyyy-MM-dd}-to-{request.EndDate.Value:yyyy-MM-dd}"
+                : "all-data";
+            result.FileName = $"logmyday-overview-{tagNames}-{dateRange}.xlsx";
 
             // Set statistics
             result.Statistics = new ExcelExportStatistics
@@ -288,8 +295,8 @@ public class ExportService : IExcelExportService
                 TotalDays = groupedActivities.Count,
                 TotalActivities = activities.Count,
                 SelectedTags = selectedTags.Count,
-                DateRangeStart = startDate,
-                DateRangeEnd = endDate,
+                DateRangeStart = request.StartDate ?? activities.Min(a => a.DateStarted.Date),
+                DateRangeEnd = request.EndDate ?? activities.Max(a => a.DateStarted.Date),
                 TagActivityCounts = statisticsData
             };
 
