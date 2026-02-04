@@ -2,6 +2,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.DTOs;
 using Microsoft.Extensions.DependencyInjection;
+using ClosedXML.Excel;
 
 namespace LogMyDay.Api.IntegrationTests;
 
@@ -168,5 +169,55 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         Assert.NotNull(result.FileContent);
         Assert.True(result.FileContent.Length > 0);
         Assert.Equal(2, result.Statistics.TotalActivities);
+    }
+
+    [Fact]
+    public async Task GenerateExcelReport_NumericValues_StoredAsNumbers()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
+        var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
+        
+        var testUserId = context.Users.First().Id;
+        var tagIds = context.Tags.Select(t => t.Id).ToList();
+
+        var request = new ExcelExportRequest
+        {
+            TagIds = tagIds,
+            StartDate = null,
+            EndDate = null,
+            UserId = testUserId,
+            FreezeFirstRow = true
+        };
+
+        var result = await service.GenerateExcelReport(request);
+
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+        Assert.NotNull(result.FileContent);
+
+        // Load the Excel file and verify numeric cells are stored as numbers, not text
+        using var memoryStream = new MemoryStream(result.FileContent);
+        using var workbook = new XLWorkbook(memoryStream);
+        var worksheet = workbook.Worksheet(1);
+
+        // Find cells with numeric values and verify they don't have text prefix
+        for (int row = 2; row <= worksheet.LastRowUsed().RowNumber(); row++)
+        {
+            for (int col = 2; col <= worksheet.LastColumnUsed().ColumnNumber(); col++)
+            {
+                var cell = worksheet.Cell(row, col);
+                var cellValue = cell.Value;
+
+                // If the cell contains a numeric value
+                if (cellValue.IsNumber)
+                {
+                    // Verify it's stored as a number, not as text
+                    // If it were text with apostrophe prefix, IsNumber would be false
+                    Assert.True(cell.DataType == XLDataType.Number, 
+                        $"Cell {cell.Address} contains numeric value but is stored as {cell.DataType} instead of Number");
+                }
+            }
+        }
     }
 }
