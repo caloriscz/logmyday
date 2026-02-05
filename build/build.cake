@@ -131,6 +131,16 @@ Task("Restore")
     
     if (exitCode != 0)
         throw new Exception("dotnet restore failed");
+    
+    // Restore integration tests project (not included in solution filter)
+    Information("Restoring integration tests project...");
+    var integrationTestsPath = MakeAbsolute(File("../src/LogMyDay.Api.IntegrationTests/LogMyDay.Api.IntegrationTests.csproj")).FullPath;
+    var integrationRestoreExitCode = StartProcess("dotnet", new ProcessSettings {
+        Arguments = $"restore \"{integrationTestsPath}\""
+    });
+    
+    if (integrationRestoreExitCode != 0)
+        throw new Exception("Integration tests restore failed");
         
     Information("NuGet packages restored");
 });

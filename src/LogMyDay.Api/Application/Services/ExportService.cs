@@ -153,15 +153,24 @@ public class ExportService : IExcelExportService
                             values.Add(cellValue);
                         }
 
-                        // Join multiple values with semicolon
-                        var combinedValue = string.Join("; ", values);
-                        worksheet.Cell(rowIndex, tagColumnIndex).Value = combinedValue;
-
-                        // Check if all values are numeric for right alignment
-                        bool allNumeric = values.All(v => double.TryParse(v, out _));
-                        if (allNumeric)
+                        // If single numeric value, store as number; otherwise as text
+                        if (values.Count == 1 && double.TryParse(values[0], out double numericValue))
                         {
+                            worksheet.Cell(rowIndex, tagColumnIndex).Value = numericValue;
                             worksheet.Cell(rowIndex, tagColumnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                        }
+                        else
+                        {
+                            // Join multiple values with semicolon
+                            var combinedValue = string.Join("; ", values);
+                            worksheet.Cell(rowIndex, tagColumnIndex).Value = combinedValue;
+
+                            // Check if all values are numeric for right alignment
+                            bool allNumeric = values.All(v => double.TryParse(v, out _));
+                            if (allNumeric)
+                            {
+                                worksheet.Cell(rowIndex, tagColumnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                            }
                         }
 
                         // Update statistics

@@ -1,6 +1,11 @@
 /* Import Bootstrap Icons - Remove this if not working */
 /* @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"); */
 
+/* Remove focus outline from headings - they are not interactive elements */
+h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus {
+    outline: none !important;
+}
+
 /* CSS Variables for Light/Dark Theme */
 :root {
     --bg-color: #ffffff;

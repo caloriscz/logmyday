@@ -4,7 +4,8 @@ namespace LogMyDay.App.Models;
 
 public class ReportPageState
 {
-    public List<int> SelectedTagIds { get; set; } = new();
+    public List<int> ExcelSelectedTagIds { get; set; } = new();
+    public List<int> HtmlSelectedTagIds { get; set; } = new();
 
     public DateTime? ExcelStartDate { get; set; }
     public DateTime? ExcelEndDate { get; set; }
@@ -45,18 +46,33 @@ public class ReportPageState
         IsError = false;
     }
 
-    public void ToggleTag(int tagId, bool isSelected)
+    public void ToggleExcelTag(int tagId, bool isSelected)
     {
         if (isSelected)
         {
-            if (!SelectedTagIds.Contains(tagId))
+            if (!ExcelSelectedTagIds.Contains(tagId))
             {
-                SelectedTagIds.Add(tagId);
+                ExcelSelectedTagIds.Add(tagId);
             }
         }
         else
         {
-            SelectedTagIds.Remove(tagId);
+            ExcelSelectedTagIds.Remove(tagId);
+        }
+    }
+
+    public void ToggleHtmlTag(int tagId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!HtmlSelectedTagIds.Contains(tagId))
+            {
+                HtmlSelectedTagIds.Add(tagId);
+            }
+        }
+        else
+        {
+            HtmlSelectedTagIds.Remove(tagId);
         }
     }
 
