@@ -53,19 +53,25 @@
 
                 <!-- Tag Selection -->
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Tags:</label>
+                    <label class="text-sm font-medium text-gray-700 dark:text-slate-200">
+                        Select Tags:
+                        @if (state.ExcelSelectedTagIds.Any())
+                        {
+                            <span class="font-normal text-gray-600 dark:text-slate-400">@string.Join(", ", availableTags?.Where(t => state.ExcelSelectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
+                        }
+                    </label>
                     @if (availableTags != null && availableTags.Any())
                     {
-                        <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                        <div class="max-h-72 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
                             @foreach (var tag in availableTags)
                             {
                                 <div class="flex items-center gap-2 py-1">
                                     <input type="checkbox"
-                                           id="tag-@tag.Id"
-                                           checked="@state.SelectedTagIds.Contains(tag.Id)"
-                                           @onchange="@((e) => state.ToggleTag(tag.Id, (bool)e.Value!))"
+                                           id="excel-tag-@tag.Id"
+                                           checked="@state.ExcelSelectedTagIds.Contains(tag.Id)"
+                                           @onchange="@((e) => state.ToggleExcelTag(tag.Id, (bool)e.Value!))"
                                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
-                                    <label for="tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
+                                    <label for="excel-tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
                                         @tag.Title
                                     </label>
                                 </div>
@@ -138,19 +144,11 @@
                     </label>
                 </div>
 
-                @if (state.SelectedTagIds.Any())
-                {
-                    <div class="text-sm text-gray-600 dark:text-slate-400">
-                        Selected @state.SelectedTagIds.Count tag(s):
-                        <span class="font-medium">@string.Join(", ", availableTags?.Where(t => state.SelectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
-                    </div>
-                }
-
                 <div class="flex flex-wrap gap-2">
                     <button type="button"
                             class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                             @onclick="GenerateExcelReport"
-                            disabled="@(!state.SelectedTagIds.Any() || state.IsGeneratingExcel)">
+                            disabled="@(!state.ExcelSelectedTagIds.Any() || state.IsGeneratingExcel)">
                         @if (state.IsGeneratingExcel)
                         {
                             <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -181,17 +179,23 @@
 
                 <!-- Tag Selection for HTML -->
                 <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Select Tags:</label>
+                    <label class="text-sm font-medium text-gray-700 dark:text-slate-200">
+                        Select Tags:
+                        @if (state.HtmlSelectedTagIds.Any())
+                        {
+                            <span class="font-normal text-gray-600 dark:text-slate-400">@string.Join(", ", availableTags?.Where(t => state.HtmlSelectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
+                        }
+                    </label>
                     @if (availableTags != null && availableTags.Any())
                     {
-                        <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                        <div class="max-h-72 overflow-y-auto rounded-lg border border-gray-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
                             @foreach (var tag in availableTags)
                             {
                                 <div class="flex items-center gap-2 py-1">
                                     <input type="checkbox"
                                            id="html-tag-@tag.Id"
-                                           checked="@state.SelectedTagIds.Contains(tag.Id)"
-                                           @onchange="@((e) => state.ToggleTag(tag.Id, (bool)e.Value!))"
+                                           checked="@state.HtmlSelectedTagIds.Contains(tag.Id)"
+                                           @onchange="@((e) => state.ToggleHtmlTag(tag.Id, (bool)e.Value!))"
                                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800" />
                                     <label for="html-tag-@tag.Id" class="text-sm text-gray-700 dark:text-slate-200">
                                         @tag.Title
@@ -255,14 +259,6 @@
                     </div>
                 }
 
-                @if (state.SelectedTagIds.Any())
-                {
-                    <div class="text-sm text-gray-600 dark:text-slate-400">
-                        Selected @state.SelectedTagIds.Count tag(s):
-                        <span class="font-medium">@string.Join(", ", availableTags?.Where(t => state.SelectedTagIds.Contains(t.Id)).Select(t => t.Title) ?? Array.Empty<string>())</span>
-                    </div>
-                }
-
                 <!-- Output Format -->
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-slate-200">Output Format:</label>
@@ -276,7 +272,7 @@
                     <button type="button"
                             class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                             @onclick="GenerateHtmlReport"
-                            disabled="@(!state.SelectedTagIds.Any() || state.IsGeneratingHtml)">
+                            disabled="@(!state.HtmlSelectedTagIds.Any() || state.IsGeneratingHtml)">
                         @if (state.IsGeneratingHtml)
                         {
                             <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -351,7 +347,7 @@
     }
     private async Task GenerateExcelReport()
     {
-        if (!state.SelectedTagIds.Any()) return;
+        if (!state.ExcelSelectedTagIds.Any()) return;
 
         state.IsGeneratingExcel = true;
         state.ClearStatus();
@@ -362,7 +358,7 @@
 
             var request = new ExcelExportRequest
             {
-                TagIds = state.SelectedTagIds,
+                TagIds = state.ExcelSelectedTagIds,
                 StartDate = state.ExcelIncludeAllData ? null : state.ExcelStartDate,
                 EndDate = state.ExcelIncludeAllData ? null : state.ExcelEndDate,
                 UserId = currentUser.Id,
@@ -398,7 +394,7 @@
 
     private async Task GenerateHtmlReport()
     {
-        if (!state.SelectedTagIds.Any()) return;
+        if (!state.HtmlSelectedTagIds.Any()) return;
 
         state.IsGeneratingHtml = true;
         state.ClearStatus();
@@ -409,7 +405,7 @@
 
             var activities = await ExcelExportService.GetActivitiesForExport(new ExcelExportRequest
             {
-                TagIds = state.SelectedTagIds,
+                TagIds = state.HtmlSelectedTagIds,
                 StartDate = state.HtmlIncludeAllData ? null : state.HtmlStartDate,
                 EndDate = state.HtmlIncludeAllData ? null : state.HtmlEndDate,
                 UserId = currentUser.Id
