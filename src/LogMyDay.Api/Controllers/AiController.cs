@@ -26,21 +26,30 @@ public class AiController : BaseApiController
     [HttpPost("chat")]
     public async Task<ActionResult<AiChatResponse>> Chat([FromBody] AiChatRequest request)
     {
-        var userId = GetCurrentUserId();
-
-        if (!await _aiService.IsAvailable())
+        try
         {
-            return StatusCode(503, new AiChatResponse("AI assistant is not available."));
-        }
+            var userId = GetCurrentUserId();
 
-        if (string.IsNullOrWhiteSpace(request.Message))
+            if (!await _aiService.IsAvailable())
+            {
+                return StatusCode(503, new AiChatResponse("AI assistant is not available."));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Message))
+            {
+                return BadRequest(new AiChatResponse("Message cannot be empty."));
+            }
+
+            var response = await _aiService.Chat(request, userId);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
         {
-            return BadRequest(new AiChatResponse("Message cannot be empty."));
+            _logger.LogError(ex, "Unexpected error in AI chat endpoint");
+
+            return StatusCode(503, new AiChatResponse("AI is temporarily unavailable, please try again later."));
         }
-
-        var response = await _aiService.Chat(request, userId);
-
-        return Ok(response);
     }
 
     [HttpGet("status")]

@@ -1,0 +1,279 @@
+@page "/settings"
+@using LogMyDay.Shared.DTOs.Settings
+@using LogMyDay.Shared.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@using LogMyDay.App.Services
+@inject ISettingsApi SettingsApi
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+@rendermode InteractiveServer
+
+<PageTitle>Settings - LogMyDay</PageTitle>
+
+<div class="container-fluid py-4">
+    @if (!_isAdmin)
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            Access denied. Only administrators can access this page.
+        </div>
+    }
+    else if (_loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading settings...</span>
+            </div>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            @_error
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8 col-xl-6 mx-auto">
+                <h1 class="h3 mb-4">
+                    <i class="fas fa-cog me-2"></i>
+                    Application Settings
+                </h1>
+
+                @if (_successMessage is not null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show">
+                        <i class="fas fa-check-circle me-2"></i>
+                        @_successMessage
+                        <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+                    </div>
+                }
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-robot me-2"></i>
+                            AI Assistant Configuration
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form @onsubmit="SaveSettings">
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="aiEnabled"
+                                           @bind="_settings.Enabled" />
+                                    <label class="form-check-label" for="aiEnabled">
+                                        <strong>Enable AI Assistant</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">When disabled, AI features will be hidden from all users.</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="apiKey" class="form-label">
+                                    <strong>API Key</strong>
+                                </label>
+                                <input type="password" class="form-control" id="apiKey"
+                                       @bind="_apiKeyInput"
+                                       placeholder="@_currentSettings?.ApiKeyMasked" />
+                                <small class="text-muted">
+                                    OpenAI API key. Leave blank to keep existing key.
+                                    Current: @(_currentSettings?.ApiKeyMasked ?? "Not set")
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="model" class="form-label">
+                                    <strong>Model</strong>
+                                </label>
+                                <select class="form-select" id="model" @bind="_settings.Model">
+                                    <option value="gpt-4o-mini">GPT-4o Mini (Recommended)</option>
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                                </select>
+                                <small class="text-muted">Choose the OpenAI model for AI responses.</small>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="maxTokens" class="form-label">
+                                        <strong>Max Tokens</strong>
+                                        <span class="badge bg-secondary ms-2">@_settings.MaxTokens</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="maxTokens"
+                                           min="256" max="4096" step="256"
+                                           @bind="_settings.MaxTokens" />
+                                    <small class="text-muted">Maximum length of AI responses (256-4096).</small>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="temperature" class="form-label">
+                                        <strong>Temperature</strong>
+                                        <span class="badge bg-secondary ms-2">@_settings.Temperature.ToString("F2")</span>
+                                    </label>
+                                    <input type="range" class="form-range" id="temperature"
+                                           min="0" max="2" step="0.1"
+                                           @bind="_settings.Temperature" />
+                                    <small class="text-muted">Creativity level (0.0 = focused, 2.0 = creative).</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="maxMessages" class="form-label">
+                                    <strong>Max Conversation Messages</strong>
+                                </label>
+                                <input type="number" class="form-control" id="maxMessages"
+                                       @bind="_settings.MaxConversationMessages"
+                                       min="5" max="100" />
+                                <small class="text-muted">
+                                    Number of recent messages to keep in conversation history (5-100).
+                                </small>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-secondary" @onclick="LoadSettings">
+                                    <i class="fas fa-undo me-2"></i>
+                                    Reset
+                                </button>
+                                <button type="submit" class="btn btn-primary" disabled="@_saving">
+                                    @if (_saving)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <text>Saving...</text>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-save me-2"></i>
+                                        <text>Save Settings</text>
+                                    }
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> Changes take effect immediately. All active AI assistant sessions will use the new configuration.
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _saving = false;
+    private bool _isAdmin = false;
+    private string? _error;
+    private string? _successMessage;
+    private string _apiKeyInput = string.Empty;
+
+    private AiSettingsDto? _currentSettings;
+    private SettingsFormModel _settings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Settings");
+
+        await CheckAdminAccess();
+
+        if (_isAdmin)
+        {
+            await LoadSettings();
+        }
+
+        _loading = false;
+    }
+
+    private async Task CheckAdminAccess()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        _isAdmin = user.Identity?.IsAuthenticated == true &&
+                   user.HasClaim("is_admin", "true");
+    }
+
+    private async Task LoadSettings()
+    {
+        try
+        {
+            _error = null;
+            _loading = true;
+
+            _currentSettings = await SettingsApi.GetAiSettings();
+
+            _settings = new SettingsFormModel
+            {
+                Enabled = _currentSettings.Enabled,
+                Provider = _currentSettings.Provider,
+                Model = _currentSettings.Model,
+                MaxTokens = _currentSettings.MaxTokens,
+                Temperature = _currentSettings.Temperature,
+                MaxConversationMessages = _currentSettings.MaxConversationMessages
+            };
+
+            _apiKeyInput = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load settings: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        try
+        {
+            _saving = true;
+            _error = null;
+            _successMessage = null;
+
+            var request = new UpdateAiSettingsRequest(
+                _settings.Enabled,
+                _settings.Provider,
+                _settings.Model,
+                string.IsNullOrWhiteSpace(_apiKeyInput) ? null : _apiKeyInput,
+                _settings.MaxTokens,
+                _settings.Temperature,
+                _settings.MaxConversationMessages
+            );
+
+            await SettingsApi.UpdateAiSettings(request);
+
+            _successMessage = "Settings saved successfully!";
+            _apiKeyInput = string.Empty;
+
+            // Reload to get updated masked key
+            await LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save settings: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class SettingsFormModel
+    {
+        public bool Enabled { get; set; }
+        public string Provider { get; set; } = "openai";
+        public string Model { get; set; } = "gpt-4o-mini";
+        public int MaxTokens { get; set; } = 1024;
+        public float Temperature { get; set; } = 0.7f;
+        public int MaxConversationMessages { get; set; } = 20;
+    }
+}

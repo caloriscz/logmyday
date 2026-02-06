@@ -153,6 +153,11 @@
                                     <Icon Name="users" Class="w-4 h-4" />
                                     <span>Users</span>
                                 </NavLink>
+                                <NavLink href="settings" @onclick="() => showUserMenu = false"
+                                         class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    <Icon Name="cog" Class="w-4 h-4" />
+                                    <span>Settings</span>
+                                </NavLink>
                             }
                             <button @onclick="Logout" type="button"
                                     class="w-full flex items-center gap-3 px-4 py-2 text-sm text-danger-600 dark:text-danger-400 hover:bg-danger-50 dark:hover:bg-danger-900/20">

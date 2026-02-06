@@ -252,24 +252,18 @@ services.AddScoped<ITagOptionListService, TagOptionListService>();
 services.AddScoped<INotificationService, NotificationService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExportService>();
+services.AddScoped<ISettingsService, SettingsService>();
 
-// AI services
+// AI services (new factory-based approach with runtime reconfiguration support)
 services.AddOptions<AiOptions>()
     .Bind(builder.Configuration.GetSection(AiOptions.SectionName));
 
-var aiOptions = builder.Configuration.GetSection(AiOptions.SectionName).Get<AiOptions>();
-if (aiOptions is { Enabled: true } && !string.IsNullOrWhiteSpace(aiOptions.ApiKey))
-{
-    services.AddSingleton<IChatClient>(new OpenAIClient(aiOptions.ApiKey)
-        .GetChatClient(aiOptions.Model)
-        .AsIChatClient());
-    Log.Information("AI assistant enabled with model {Model}", aiOptions.Model);
-}
-else
-{
-    Log.Information("AI assistant is disabled");
-}
+services.AddSingleton<IAiChatClientFactory, AiChatClientFactory>();
+services.AddSingleton<IRouteDiscoveryService, RouteDiscoveryService>();
+services.AddScoped<AiToolFunctions>();
 services.AddScoped<IAiAssistantService, AiAssistantService>();
+
+Log.Information("AI assistant services configured (availability determined at runtime)");
 
 // Repository layer
 services.AddScoped<IActivityRepository, ActivityRepository>();
@@ -368,6 +362,18 @@ services.AddRefitClient<ISecureBackupApi>(refitSettings)
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 services.AddRefitClient<IAiApi>(refitSettings)
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+services.AddRefitClient<ISettingsApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];
