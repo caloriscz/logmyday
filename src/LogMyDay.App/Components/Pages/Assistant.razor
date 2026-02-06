@@ -1,0 +1,268 @@
+@page "/assistant"
+@using LogMyDay.App.Services
+@using LogMyDay.Shared.DTOs.Ai
+@using LogMyDay.Shared.Interfaces
+@inject IAiApi AiApi
+@inject NavigationManager Navigation
+@inject IPageTitleService PageTitleService
+@rendermode InteractiveServer
+
+<div class="mx-auto flex h-[calc(100vh-4rem)] max-w-screen-lg flex-col px-4 py-4 sm:px-6 lg:px-8">
+
+    @if (!_isAvailable && _statusChecked)
+    {
+        <!-- AI Not Available -->
+        <div class="flex flex-1 items-center justify-center">
+            <div class="space-y-4 text-center">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800">
+                    <svg class="h-8 w-8 text-gray-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                    </svg>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-slate-100">AI Assistant Not Available</h2>
+                <p class="max-w-sm text-sm text-gray-600 dark:text-slate-400">
+                    The AI assistant is not configured on this server. Contact your administrator to enable it by providing an OpenAI API key.
+                </p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Chat Header -->
+        <div class="mb-4 space-y-1">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100">Assistant</h1>
+            <p class="text-sm text-gray-500 dark:text-slate-400">Your LogMyDay navigator — ask about features, get directions, and explore what's possible.</p>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="flex-1 space-y-4 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-900/50" @ref="_messagesContainer">
+            @if (_messages.Count == 0 && !_isLoading)
+            {
+                <!-- Welcome State -->
+                <div class="flex h-full items-center justify-center">
+                    <div class="space-y-6 text-center">
+                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/50">
+                            <svg class="h-7 w-7 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                            </svg>
+                        </div>
+                        <div class="space-y-2">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Hi! I'm your LogMyDay Assistant</h2>
+                            <p class="max-w-md text-sm text-gray-500 dark:text-slate-400">I can help you navigate features, explain how things work, and suggest where to find what you need.</p>
+                        </div>
+                        <div class="flex flex-wrap justify-center gap-2">
+                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    @onclick='() => SendQuickQuestion("What features does LogMyDay have?")'>
+                                What features are available?
+                            </button>
+                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    @onclick='() => SendQuickQuestion("How do I view my statistics?")'>
+                                How do I view statistics?
+                            </button>
+                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                    @onclick='() => SendQuickQuestion("How do tags work?")'>
+                                How do tags work?
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @foreach (var message in _messages)
+            {
+                @if (message.Role == "user")
+                {
+                    <!-- User Message -->
+                    <div class="flex justify-end">
+                        <div class="max-w-[80%] rounded-2xl rounded-br-md bg-primary-600 px-4 py-3 text-sm text-white shadow-sm">
+                            @message.Content
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Assistant Message -->
+                    <div class="flex justify-start">
+                        <div class="max-w-[80%] space-y-3">
+                            <div class="rounded-2xl rounded-bl-md bg-white px-4 py-3 text-sm text-gray-800 shadow-sm dark:bg-slate-800 dark:text-slate-200">
+                                @((MarkupString)ConvertMarkdownToHtml(message.Content))
+                            </div>
+                            @if (message.SuggestedActions is { Count: > 0 })
+                            {
+                                <div class="flex flex-wrap gap-2 pl-1">
+                                    @foreach (var action in message.SuggestedActions)
+                                    {
+                                        <button class="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition-colors hover:bg-primary-100 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/50"
+                                                @onclick="() => NavigateToAction(action)">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                                            </svg>
+                                            @action.Label
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            @if (_isLoading)
+            {
+                <!-- Typing Indicator -->
+                <div class="flex justify-start">
+                    <div class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm dark:bg-slate-800">
+                        <div class="flex items-center gap-1.5">
+                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 dark:bg-slate-500" style="animation-delay: 0ms;"></div>
+                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 dark:bg-slate-500" style="animation-delay: 150ms;"></div>
+                            <div class="h-2 w-2 animate-bounce rounded-full bg-gray-400 dark:bg-slate-500" style="animation-delay: 300ms;"></div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="flex justify-center">
+                    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        @_errorMessage
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Input Area -->
+        <div class="mt-4">
+            <form @onsubmit="SendMessage" class="flex gap-3">
+                <input type="text"
+                       @bind="_currentMessage"
+                       @bind:event="oninput"
+                       placeholder="Ask me about LogMyDay features..."
+                       disabled="@_isLoading"
+                       class="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-primary-400" />
+                <button type="submit"
+                        disabled="@(_isLoading || string.IsNullOrWhiteSpace(_currentMessage))"
+                        class="inline-flex items-center justify-center rounded-xl bg-primary-600 px-4 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary-500 dark:hover:bg-primary-600">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    }
+</div>
+
+@code {
+    private record ChatMessage(string Role, string Content, List<AiSuggestedAction>? SuggestedActions = null);
+
+    private readonly List<ChatMessage> _messages = [];
+    private string _currentMessage = string.Empty;
+    private bool _isLoading;
+    private bool _isAvailable;
+    private bool _statusChecked;
+    private string? _errorMessage;
+    private ElementReference _messagesContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Assistant");
+
+        try
+        {
+            var status = await AiApi.GetStatus();
+            _isAvailable = status.IsAvailable;
+        }
+        catch
+        {
+            _isAvailable = false;
+        }
+
+        _statusChecked = true;
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage) || _isLoading)
+        {
+            return;
+        }
+
+        var userMessage = _currentMessage.Trim();
+        _currentMessage = string.Empty;
+        _errorMessage = null;
+
+        _messages.Add(new ChatMessage("user", userMessage));
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var conversationHistory = _messages
+                .Where(m => m != _messages.Last())
+                .Select(m => new AiChatMessage(m.Role, m.Content))
+                .ToList();
+
+            var request = new AiChatRequest(userMessage, conversationHistory);
+            var response = await AiApi.Chat(request);
+
+            _messages.Add(new ChatMessage("assistant", response.Message, response.SuggestedActions));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Something went wrong. Please try again.";
+            // Remove the user message if we couldn't get a response
+            if (_messages.Count > 0 && _messages.Last().Role == "user")
+            {
+                _currentMessage = userMessage;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendQuickQuestion(string question)
+    {
+        _currentMessage = question;
+        await SendMessage();
+    }
+
+    private void NavigateToAction(AiSuggestedAction action)
+    {
+        Navigation.NavigateTo(action.Url);
+    }
+
+    private static string ConvertMarkdownToHtml(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown))
+        {
+            return string.Empty;
+        }
+
+        var html = markdown;
+
+        // Bold
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+
+        // Italic
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*(.+?)\*", "<em>$1</em>");
+
+        // Inline code
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"`(.+?)`", "<code class=\"rounded bg-gray-100 px-1 py-0.5 text-xs dark:bg-slate-700\">$1</code>");
+
+        // Line breaks
+        html = html.Replace("\n\n", "</p><p class=\"mt-2\">").Replace("\n", "<br />");
+
+        // Unordered lists
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?:^|\<br \/\>)\s*[-•]\s+(.+?)(?=\<br \/\>|$)", "<li class=\"ml-4 list-disc\">$1</li>");
+
+        if (!html.StartsWith("<"))
+        {
+            html = $"<p>{html}</p>";
+        }
+
+        return html;
+    }
+}

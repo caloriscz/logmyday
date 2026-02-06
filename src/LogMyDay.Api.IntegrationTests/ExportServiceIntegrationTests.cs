@@ -1,5 +1,4 @@
 using LogMyDay.Api.Application.Interfaces;
-using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.DTOs;
 using Microsoft.Extensions.DependencyInjection;
 using ClosedXML.Excel;

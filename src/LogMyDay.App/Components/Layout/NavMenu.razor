@@ -1,5 +1,6 @@
 @inject NavigationManager Navigation
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
+@inject LogMyDay.Shared.Interfaces.IAiApi AiApi
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @using Microsoft.AspNetCore.Components.Authorization
@@ -102,6 +103,16 @@
                         </div>
                     }
                 </div>
+
+                @if (_aiAvailable)
+                {
+                    <NavLink href="assistant" 
+                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="chat-bubble" Class="w-4 h-4" />
+                        <span>Assistant</span>
+                    </NavLink>
+                }
             </div>
 
             <!-- Right Section: Theme Toggle + Account Menu -->
@@ -227,6 +238,16 @@
                         <Icon Name="file-text" Class="w-5 h-5" />
                         <span>Reports</span>
                     </NavLink>
+
+                    @if (_aiAvailable)
+                    {
+                        <NavLink href="assistant" @onclick="() => showMobileMenu = false"
+                                 class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 mt-2"
+                                 ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                            <Icon Name="chat-bubble" Class="w-5 h-5" />
+                            <span>Assistant</span>
+                        </NavLink>
+                    }
                 </div>
             </div>
         }
@@ -242,11 +263,13 @@
     private bool showUserMenu = false;
     private bool showTagsMenu = false;
     private bool showDataMenu = false;
+    private bool _aiAvailable = false;
 
     protected override async Task OnInitializedAsync()
     {
         AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
         await RefreshUserInfoAsync();
+        await CheckAiAvailability();
     }
 
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
@@ -365,6 +388,19 @@
     }
 
     private string DisplayEmail => string.IsNullOrWhiteSpace(currentUserEmail) ? "Account" : currentUserEmail;
+
+    private async Task CheckAiAvailability()
+    {
+        try
+        {
+            var status = await AiApi.GetStatus();
+            _aiAvailable = status.IsAvailable;
+        }
+        catch
+        {
+            _aiAvailable = false;
+        }
+    }
 
     public void Dispose()
     {
