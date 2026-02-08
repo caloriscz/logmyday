@@ -1,4 +1,5 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services.Ai;
 using LogMyDay.Shared.DTOs.Ai;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -30,19 +31,24 @@ public class AiController : BaseApiController
         {
             var userId = GetCurrentUserId();
 
-            if (!await _aiService.IsAvailable())
+            var result = await _aiService.Chat(request, userId);
+
+            if (result.Success)
             {
-                return StatusCode(503, new AiChatResponse("AI assistant is not available."));
+                return Ok(new AiChatResponse(result.Message, result.SuggestedActions));
             }
 
-            if (string.IsNullOrWhiteSpace(request.Message))
+            // Map error codes to HTTP status codes
+            var statusCode = result.ErrorCode switch
             {
-                return BadRequest(new AiChatResponse("Message cannot be empty."));
-            }
+                AiErrorCode.Unavailable => 503,
+                AiErrorCode.ProviderError => 502,
+                AiErrorCode.MaxIterationsExhausted => 502,
+                AiErrorCode.InvalidRequest => 400,
+                _ => 503
+            };
 
-            var response = await _aiService.Chat(request, userId);
-
-            return Ok(response);
+            return StatusCode(statusCode, new AiChatResponse(result.Message));
         }
         catch (Exception ex)
         {

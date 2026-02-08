@@ -7,6 +7,8 @@
 @inject IPageTitleService PageTitleService
 @rendermode InteractiveServer
 
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("AI Assistant", "Chat with the AI assistant")]
+
 <div class="mx-auto flex h-[calc(100vh-4rem)] max-w-screen-lg flex-col px-4 py-4 sm:px-6 lg:px-8">
 
     @if (!_isAvailable && _statusChecked)

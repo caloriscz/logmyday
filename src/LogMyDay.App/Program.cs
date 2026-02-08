@@ -259,7 +259,12 @@ services.AddOptions<AiOptions>()
     .Bind(builder.Configuration.GetSection(AiOptions.SectionName));
 
 services.AddSingleton<IAiChatClientFactory, AiChatClientFactory>();
-services.AddSingleton<IRouteDiscoveryService, RouteDiscoveryService>();
+services.AddSingleton<IRouteDiscoveryService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<RouteDiscoveryService>>();
+    var assemblies = new[] { typeof(Program).Assembly };
+    return new RouteDiscoveryService(assemblies, logger);
+});
 services.AddScoped<AiToolFunctions>();
 services.AddScoped<IAiAssistantService, AiAssistantService>();
 

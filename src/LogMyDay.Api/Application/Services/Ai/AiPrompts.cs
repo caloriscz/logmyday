@@ -1,4 +1,5 @@
 using System.Text;
+using LogMyDay.Shared.DTOs.Ai;
 
 namespace LogMyDay.Api.Application.Services.Ai;
 

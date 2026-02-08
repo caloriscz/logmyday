@@ -37,16 +37,16 @@ public class AiAssistantService : IAiAssistantService
         return Task.FromResult(available);
     }
 
-    public async Task<AiChatResponse> Chat(AiChatRequest request, Guid userId)
+    public async Task<AiChatResult> Chat(AiChatRequest request, Guid userId)
     {
         if (!await IsAvailable())
         {
-            return new AiChatResponse("The AI assistant is not currently available. Please contact your administrator to enable it.");
+            return AiChatResult.Fail(AiErrorCode.Unavailable, "The AI assistant is not currently available. Please contact your administrator to enable it.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Message))
         {
-            return new AiChatResponse("Please enter a message to get started.");
+            return AiChatResult.Fail(AiErrorCode.InvalidRequest, "Please enter a message to get started.");
         }
 
         try
@@ -59,7 +59,7 @@ public class AiAssistantService : IAiAssistantService
             {
                 _logger.LogWarning("Chat client unavailable for user {UserId}", userId);
 
-                return new AiChatResponse("AI is temporarily unavailable, please try again later.");
+                return AiChatResult.Fail(AiErrorCode.Unavailable, "AI is temporarily unavailable, please try again later.");
             }
 
             var messages = BuildChatMessages(request, userId);
@@ -114,7 +114,7 @@ public class AiAssistantService : IAiAssistantService
                                 result.Usage.TotalTokenCount);
                         }
 
-                        return new AiChatResponse(assistantMessage, suggestedActions);
+                        return AiChatResult.Ok(assistantMessage, suggestedActions);
                     }
 
                     case ChatFinishReason.ToolCalls:
@@ -156,19 +156,19 @@ public class AiAssistantService : IAiAssistantService
                         _logger.LogWarning("Unexpected finish reason {Reason} for user {UserId}",
                             result.FinishReason, userId);
 
-                        return new AiChatResponse("I'm sorry, I couldn't generate a response. Please try again.");
+                        return AiChatResult.Fail(AiErrorCode.ProviderError, "I'm sorry, I couldn't generate a response. Please try again.");
                     }
                 }
             } while (requiresAction);
 
             // If we exhausted iterations without a Stop response
-            return new AiChatResponse("I found the information but couldn't format a complete response. Please try again.");
+            return AiChatResult.Fail(AiErrorCode.MaxIterationsExhausted, "I found the information but couldn't format a complete response. Please try again.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing AI chat request for user {UserId}", userId);
 
-            return new AiChatResponse("AI is temporarily unavailable, please try again later.");
+            return AiChatResult.Fail(AiErrorCode.ProviderError, "AI is temporarily unavailable, please try again later.");
         }
     }
 

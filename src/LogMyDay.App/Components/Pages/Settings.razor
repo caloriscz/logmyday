@@ -9,6 +9,8 @@
 @inject IPageTitleService PageTitleService
 @rendermode InteractiveServer
 
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Settings", "Configure application settings", RequiresAdmin = true)]
+
 <PageTitle>Settings - LogMyDay</PageTitle>
 
 <div class="container-fluid py-4">
