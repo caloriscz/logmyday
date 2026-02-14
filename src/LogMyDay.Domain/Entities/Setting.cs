@@ -3,7 +3,7 @@ namespace LogMyDay.Domain.Entities;
 /// <summary>
 /// Represents an application setting stored in the database.
 /// </summary>
-public sealed class AppSetting
+public sealed class Setting
 {
     /// <summary>
     /// The unique key for the setting (e.g., "AI:Enabled", "AI:Model").

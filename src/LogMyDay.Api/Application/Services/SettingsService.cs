@@ -5,6 +5,7 @@ using LogMyDay.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 
 namespace LogMyDay.Api.Application.Services;
 
@@ -13,15 +14,18 @@ public sealed class SettingsService : ISettingsService
     private readonly LogMyDayDbContext _context;
     private readonly IOptionsMonitor<AiOptions> _defaultAiOptions;
     private readonly ILogger<SettingsService> _logger;
+    private readonly ISettingProtector _protector;
 
     public SettingsService(
         LogMyDayDbContext context,
         IOptionsMonitor<AiOptions> defaultAiOptions,
-        ILogger<SettingsService> logger)
+        ILogger<SettingsService> logger,
+        ISettingProtector protector)
     {
         _context = context;
         _defaultAiOptions = defaultAiOptions;
         _logger = logger;
+        _protector = protector;
     }
 
     public async Task<AiOptions> GetAiOptionsAsync(CancellationToken cancellationToken = default)
@@ -38,12 +42,29 @@ public sealed class SettingsService : ISettingsService
             var temperature = await GetSettingAsync("AI:Temperature", cancellationToken);
             var maxMessages = await GetSettingAsync("AI:MaxConversationMessages", cancellationToken);
 
+            // Decrypt API key if it exists
+            string? decryptedApiKey = null;
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                try
+                {
+                    decryptedApiKey = _protector.Unprotect(apiKey);
+                }
+                catch (CryptographicException)
+                {
+                    // API key is not encrypted (legacy plain-text value)
+                    // Use it as-is; next save will encrypt it
+                    _logger.LogWarning("API key is stored in plain text, will be encrypted on next update");
+                    decryptedApiKey = apiKey;
+                }
+            }
+
             return new AiOptions
             {
                 Enabled = bool.TryParse(enabled, out var e) ? e : defaultOptions.Enabled,
                 Provider = provider ?? defaultOptions.Provider,
                 Model = model ?? defaultOptions.Model,
-                ApiKey = apiKey ?? defaultOptions.ApiKey,
+                ApiKey = decryptedApiKey ?? defaultOptions.ApiKey,
                 MaxTokens = int.TryParse(maxTokens, out var mt) ? mt : defaultOptions.MaxTokens,
                 Temperature = float.TryParse(temperature, out var t) ? t : defaultOptions.Temperature,
                 MaxConversationMessages = int.TryParse(maxMessages, out var mm) ? mm : defaultOptions.MaxConversationMessages
@@ -62,7 +83,13 @@ public sealed class SettingsService : ISettingsService
         await SetSettingAsync("AI:Enabled", options.Enabled.ToString(), "Enable or disable AI assistant", cancellationToken);
         await SetSettingAsync("AI:Provider", options.Provider, "AI provider (e.g., openai)", cancellationToken);
         await SetSettingAsync("AI:Model", options.Model, "AI model name", cancellationToken);
-        await SetSettingAsync("AI:ApiKey", options.ApiKey, "AI API key", cancellationToken);
+        
+        // Encrypt API key before storing
+        var encryptedApiKey = string.IsNullOrWhiteSpace(options.ApiKey) 
+            ? options.ApiKey 
+            : _protector.Protect(options.ApiKey);
+        await SetSettingAsync("AI:ApiKey", encryptedApiKey, "AI API key (encrypted)", cancellationToken);
+        
         await SetSettingAsync("AI:MaxTokens", options.MaxTokens.ToString(), "Maximum tokens per response", cancellationToken);
         await SetSettingAsync("AI:Temperature", options.Temperature.ToString("F2"), "AI temperature (creativity)", cancellationToken);
         await SetSettingAsync("AI:MaxConversationMessages", options.MaxConversationMessages.ToString(), "Max conversation history", cancellationToken);
@@ -72,7 +99,7 @@ public sealed class SettingsService : ISettingsService
 
     public async Task<string?> GetSettingAsync(string key, CancellationToken cancellationToken = default)
     {
-        var setting = await _context.AppSettings
+        var setting = await _context.Settings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
 
@@ -81,7 +108,7 @@ public sealed class SettingsService : ISettingsService
 
     public async Task SetSettingAsync(string key, string value, string? description = null, CancellationToken cancellationToken = default)
     {
-        var existing = await _context.AppSettings
+        var existing = await _context.Settings
             .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
 
         if (existing is not null)
@@ -96,7 +123,7 @@ public sealed class SettingsService : ISettingsService
         }
         else
         {
-            _context.AppSettings.Add(new AppSetting
+            _context.Settings.Add(new Setting
             {
                 Key = key,
                 Value = value,

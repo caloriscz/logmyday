@@ -12,7 +12,7 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "LogMyDay_AppSettings",
+                name: "LogMyDay_Settings",
                 columns: table => new
                 {
                     Key = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
@@ -23,12 +23,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_LogMyDay_AppSettings", x => x.Key);
+                    table.PrimaryKey("PK_LogMyDay_Settings", x => x.Key);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_LogMyDay_AppSettings_Key",
-                table: "LogMyDay_AppSettings",
+                name: "IX_LogMyDay_Settings_Key",
+                table: "LogMyDay_Settings",
                 column: "Key",
                 unique: true);
         }
@@ -37,7 +37,7 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "LogMyDay_AppSettings");
+                name: "LogMyDay_Settings");
         }
     }
 }

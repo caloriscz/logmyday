@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using LogMyDay.Api.Application.Options;
+using LogMyDay.Api.Application.Interfaces;
 using OpenAI;
 using OpenAI.Chat;
 
@@ -14,12 +14,12 @@ public interface IAiChatClientFactory
     /// <summary>
     /// Gets a configured native OpenAI ChatClient. Returns null if AI is disabled or not properly configured.
     /// </summary>
-    ChatClient? GetChatClient();
+    Task<ChatClient?> GetChatClient();
 
     /// <summary>
     /// Checks if the AI service is available and properly configured.
     /// </summary>
-    bool IsAvailable();
+    Task<bool> IsAvailable();
 }
 
 /// <summary>
@@ -27,32 +27,24 @@ public interface IAiChatClientFactory
 /// </summary>
 public sealed class AiChatClientFactory : IAiChatClientFactory
 {
-    private readonly IOptionsMonitor<AiOptions> _optionsMonitor;
+    private readonly ISettingsService _settingsService;
     private readonly ILogger<AiChatClientFactory> _logger;
     private ChatClient? _cachedClient;
     private string? _cachedConfigHash;
 
     public AiChatClientFactory(
-        IOptionsMonitor<AiOptions> optionsMonitor,
+        ISettingsService settingsService,
         ILogger<AiChatClientFactory> logger)
     {
-        _optionsMonitor = optionsMonitor;
+        _settingsService = settingsService;
         _logger = logger;
-
-        // Subscribe to configuration changes
-        _optionsMonitor.OnChange(_ =>
-        {
-            _logger.LogInformation("AI configuration changed, invalidating cached client");
-            _cachedClient = null;
-            _cachedConfigHash = null;
-        });
     }
 
-    public ChatClient? GetChatClient()
+    public async Task<ChatClient?> GetChatClient()
     {
-        var options = _optionsMonitor.CurrentValue;
+        var options = await _settingsService.GetAiOptionsAsync();
 
-        if (!IsAvailable())
+        if (!await IsAvailable())
         {
             return null;
         }
@@ -86,9 +78,9 @@ public sealed class AiChatClientFactory : IAiChatClientFactory
         }
     }
 
-    public bool IsAvailable()
+    public async Task<bool> IsAvailable()
     {
-        var options = _optionsMonitor.CurrentValue;
+        var options = await _settingsService.GetAiOptionsAsync();
 
         return options.Enabled && !string.IsNullOrWhiteSpace(options.ApiKey);
     }

@@ -19,7 +19,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
     public DbSet<TagOption> TagOptions => Set<TagOption>();
-    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<Setting> Settings => Set<Setting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,13 +37,13 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<Unit>().ToTable("LogMyDay_Units");
         modelBuilder.Entity<TagOptionList>().ToTable("LogMyDay_TagOptionLists");
         modelBuilder.Entity<TagOption>().ToTable("LogMyDay_TagOptions");
-        modelBuilder.Entity<AppSetting>().ToTable("LogMyDay_AppSettings");
+        modelBuilder.Entity<Setting>().ToTable("LogMyDay_Settings");
 
-        // Configure AppSetting entity
-        modelBuilder.Entity<AppSetting>(entity =>
+        // Configure Setting entity
+        modelBuilder.Entity<Setting>(entity =>
         {
             entity.HasKey(e => e.Key);
-            entity.HasIndex(e => e.Key).IsUnique().HasDatabaseName("IX_LogMyDay_AppSettings_Key");
+            entity.HasIndex(e => e.Key).IsUnique().HasDatabaseName("IX_LogMyDay_Settings_Key");
             entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Value).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);

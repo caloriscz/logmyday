@@ -252,6 +252,7 @@ services.AddScoped<ITagOptionListService, TagOptionListService>();
 services.AddScoped<INotificationService, NotificationService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExportService>();
+services.AddSingleton<ISettingProtector, SettingProtector>();
 services.AddScoped<ISettingsService, SettingsService>();
 
 // AI services (new factory-based approach with runtime reconfiguration support)

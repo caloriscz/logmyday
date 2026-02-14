@@ -58,7 +58,7 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Activities", (string)null);
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.AppSetting", b =>
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")
                         .HasMaxLength(200)
@@ -82,9 +82,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
                     b.HasIndex("Key")
                         .IsUnique()
-                        .HasDatabaseName("IX_LogMyDay_AppSettings_Key");
+                        .HasDatabaseName("IX_LogMyDay_Settings_Key");
 
-                    b.ToTable("LogMyDay_AppSettings", (string)null);
+                    b.ToTable("LogMyDay_Settings", (string)null);
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.InputType", b =>

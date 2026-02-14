@@ -30,11 +30,11 @@ public class AiAssistantService : IAiAssistantService
         _logger = logger;
     }
 
-    public Task<bool> IsAvailable()
+    public async Task<bool> IsAvailable()
     {
-        var available = _chatClientFactory.IsAvailable();
+        var available = await _chatClientFactory.IsAvailable();
 
-        return Task.FromResult(available);
+        return available;
     }
 
     public async Task<AiChatResult> Chat(AiChatRequest request, Guid userId)
@@ -54,7 +54,7 @@ public class AiAssistantService : IAiAssistantService
             _logger.LogInformation("AI chat request from user {UserId}, message length: {Length}",
                 userId, request.Message.Length);
 
-            var chatClient = _chatClientFactory.GetChatClient();
+            var chatClient = await _chatClientFactory.GetChatClient();
             if (chatClient is null)
             {
                 _logger.LogWarning("Chat client unavailable for user {UserId}", userId);
