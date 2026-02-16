@@ -55,32 +55,49 @@ public sealed class RouteDiscoveryService : IRouteDiscoveryService
                 var types = assembly.GetTypes()
                     .Where(t => t.IsClass && !t.IsAbstract && typeof(ComponentBase).IsAssignableFrom(t));
 
+                _logger.LogDebug("Scanning {Count} component types in assembly {Assembly}", types.Count(), assembly.GetName().Name);
+
                 foreach (var type in types)
                 {
-                    var routeAttribute = type.GetCustomAttribute<RouteAttribute>();
+                    // Use GetCustomAttributes (plural) to handle components with multiple routes
+                    var routeAttributes = type.GetCustomAttributes<RouteAttribute>();
                     var aiAttribute = type.GetCustomAttribute<AiNavigableRouteAttribute>();
 
-                    if (routeAttribute is null || aiAttribute is null)
-                        continue;
-
-                    var routePath = routeAttribute.Template;
-
-                    // Skip parameterized routes (e.g., /tags/edit/{Id:int})
-                    if (routePath.Contains('{'))
+                    if (!routeAttributes.Any())
                     {
-                        _logger.LogDebug("Skipping parameterized route: {Route}", routePath);
+                        _logger.LogDebug("Component {Type} has no RouteAttribute", type.Name);
                         continue;
                     }
 
-                    routes.Add(new NavigableRoute(
-                        routePath,
-                        aiAttribute.Label,
-                        aiAttribute.Description,
-                        aiAttribute.RequiresAdmin,
-                        aiAttribute.ClientContext
-                    ));
+                    if (aiAttribute is null)
+                    {
+                        _logger.LogDebug("Component {Type} with {Count} route(s) has no AiNavigableRouteAttribute",
+                            type.Name, routeAttributes.Count());
+                        continue;
+                    }
 
-                    _logger.LogInformation("Discovered AI-navigable route: {Path} ({Label})", routePath, aiAttribute.Label);
+                    // For components with multiple routes, add all of them
+                    foreach (var routeAttribute in routeAttributes)
+                    {
+                        var routePath = routeAttribute.Template;
+
+                        // Skip parameterized routes (e.g., /tags/edit/{Id:int})
+                        if (routePath.Contains('{'))
+                        {
+                            _logger.LogDebug("Skipping parameterized route: {Route} for {Type}", routePath, type.Name);
+                            continue;
+                        }
+
+                        routes.Add(new NavigableRoute(
+                            routePath,
+                            aiAttribute.Label,
+                            aiAttribute.Description,
+                            aiAttribute.RequiresAdmin,
+                            aiAttribute.ClientContext
+                        ));
+
+                        _logger.LogInformation("Discovered AI-navigable route: {Path} ({Label}) from {Type}", routePath, aiAttribute.Label, type.Name);
+                    }
                 }
             }
             catch (Exception ex)
