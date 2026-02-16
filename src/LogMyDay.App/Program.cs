@@ -1,6 +1,8 @@
 ﻿using ApexCharts;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Application.Services;
+using LogMyDay.Api.Application.Services.Ai;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Infrastructure.Email;
@@ -16,7 +18,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.OpenApi.Models;
+using OpenAI;
 using Refit;
 using Serilog;
 
@@ -27,6 +31,13 @@ var builder = WebApplication.CreateBuilder(args);
 if (builder.Environment.EnvironmentName == "Docker")
 {
     builder.Configuration.AddKeyPerFile(directoryPath: "/run/secrets", optional: true, reloadOnChange: false);
+
+    // Map file-based AI API key secret to configuration
+    var aiApiKey = builder.Configuration["ai_api_key"];
+    if (!string.IsNullOrWhiteSpace(aiApiKey))
+    {
+        builder.Configuration["AI:ApiKey"] = aiApiKey;
+    }
 }
 
 Log.Logger = new LoggerConfiguration()
@@ -211,6 +222,14 @@ services.AddRateLimiter(options =>
         opt.SegmentsPerWindow = 3; // 5-minute segments
     });
 
+    // AI endpoint rate limiting — more restrictive to control API costs
+    options.AddSlidingWindowLimiter("ai", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 20; // 20 AI requests per minute per IP
+        opt.SegmentsPerWindow = 4; // 15-second segments
+    });
+
     options.RejectionStatusCode = 429; // Too Many Requests
 });
 
@@ -233,6 +252,24 @@ services.AddScoped<ITagOptionListService, TagOptionListService>();
 services.AddScoped<INotificationService, NotificationService>();
 services.AddScoped<IBackupService, BackupService>();
 services.AddScoped<IExcelExportService, ExportService>();
+services.AddSingleton<ISettingProtector, SettingProtector>();
+services.AddScoped<ISettingsService, SettingsService>();
+
+// AI services (new factory-based approach with runtime reconfiguration support)
+services.AddOptions<AiOptions>()
+    .Bind(builder.Configuration.GetSection(AiOptions.SectionName));
+
+services.AddSingleton<IAiChatClientFactory, AiChatClientFactory>();
+services.AddSingleton<IRouteDiscoveryService>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<RouteDiscoveryService>>();
+    var assemblies = new[] { typeof(Program).Assembly };
+    return new RouteDiscoveryService(assemblies, logger);
+});
+services.AddScoped<AiToolFunctions>();
+services.AddScoped<IAiAssistantService, AiAssistantService>();
+
+Log.Information("AI assistant services configured (availability determined at runtime)");
 
 // Repository layer
 services.AddScoped<IActivityRepository, ActivityRepository>();
@@ -319,6 +356,30 @@ services.AddRefitClient<IAccountApi>(refitSettings)
     .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
 services.AddRefitClient<ISecureBackupApi>(refitSettings)
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+services.AddRefitClient<IAiApi>(refitSettings)
+    .ConfigureHttpClient(c =>
+    {
+        var baseAddress = builder.Configuration["Api:BaseAddress"];
+        if (string.IsNullOrEmpty(baseAddress))
+        {
+            throw new InvalidOperationException("API base address is not configured.");
+        }
+        c.BaseAddress = new Uri(baseAddress);
+    })
+    .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+services.AddRefitClient<ISettingsApi>(refitSettings)
     .ConfigureHttpClient(c =>
     {
         var baseAddress = builder.Configuration["Api:BaseAddress"];

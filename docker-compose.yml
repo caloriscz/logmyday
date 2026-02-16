@@ -32,9 +32,14 @@ services:
       - Security__RateLimit__MaxAttemptsPerWindow=${RATE_LIMIT_MAX_ATTEMPTS:-5}
       - Security__RateLimit__WindowMinutes=${RATE_LIMIT_WINDOW_MINUTES:-15}
       - Security__RateLimit__LockoutMinutes=${RATE_LIMIT_LOCKOUT_MINUTES:-30}
+      # AI assistant (optional)
+      - AI__Enabled=${AI_ENABLED:-false}
+      - AI__Provider=${AI_PROVIDER:-openai}
+      - AI__Model=${AI_MODEL:-gpt-4o-mini}
     secrets:
       - db_password
       - smtp_password
+      - ai_api_key
     volumes:
       # Persistent logs
       - logmyday-logs:/app/Logs
@@ -53,6 +58,8 @@ secrets:
     file: ./secrets/db_password.txt
   smtp_password:
     file: ./secrets/smtp_password.txt
+  ai_api_key:
+    file: ./secrets/ai_api_key.txt
 
 volumes:
   logmyday-logs:

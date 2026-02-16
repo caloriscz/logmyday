@@ -10,6 +10,8 @@
 @inject ILogger<Journal> Logger
 @inject IUserPreferencesService UserPreferencesService
 
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Journal", "Read activity journal entries")]
+
 <PageTitle>Journal - LogMyDay</PageTitle>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
