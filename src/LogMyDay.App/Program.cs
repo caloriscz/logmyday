@@ -248,6 +248,7 @@ services.AddEndpointsApiExplorer();
 
 services.AddScoped<IActivityService, ActivityService>();
 services.AddScoped<ITagService, TagService>();
+services.AddScoped<IInputTypeService, InputTypeService>();
 services.AddScoped<IUnitService, UnitService>();
 services.AddScoped<ITagOptionListService, TagOptionListService>();
 services.AddScoped<INotificationService, NotificationService>();

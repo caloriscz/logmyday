@@ -1,5 +1,4 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
-using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -14,13 +13,11 @@ public class TagsController : BaseApiController
 {
     private readonly ITagService _tagService;
     private readonly ILogger<TagsController> _logger;
-    private readonly LogMyDayDbContext _context;
 
-    public TagsController(ITagService tagsService, ILogger<TagsController> logger, LogMyDayDbContext context, IAuthService authService) : base(authService)
+    public TagsController(ITagService tagsService, ILogger<TagsController> logger, IAuthService authService) : base(authService)
     {
         _tagService = tagsService;
         _logger = logger;
-        _context = context;
     }
 
     /// <summary>
