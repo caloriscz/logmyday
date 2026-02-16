@@ -4,8 +4,8 @@ namespace LogMyDay.App.Models;
 
 public class ReportPageState
 {
-    public List<int> ExcelSelectedTagIds { get; set; } = new();
-    public List<int> HtmlSelectedTagIds { get; set; } = new();
+    public List<int> ExcelSelectedTagIds { get; set; } = [];
+    public List<int> HtmlSelectedTagIds { get; set; } = [];
 
     public DateTime? ExcelStartDate { get; set; }
     public DateTime? ExcelEndDate { get; set; }
@@ -23,7 +23,7 @@ public class ReportPageState
 
     public string StatusMessage { get; set; } = "";
     public bool IsError { get; set; }
-    public List<int> GeneratedYears { get; set; } = new();
+    public List<int> GeneratedYears { get; set; } = [];
 
     public ReportPageState()
     {

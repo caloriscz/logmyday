@@ -114,7 +114,8 @@ services.AddAuthentication(options =>
         options.ForwardDefaultSelector = context =>
         {
             // If the request has an Authorization header with "Basic", use Basic auth
-            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+            
             if (authHeader?.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase) == true)
             {
                 return "basic";
@@ -526,13 +527,13 @@ app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
     // Enforce HTTPS and prevent downgrade attacks
-    context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    context.Response.Headers.StrictTransportSecurity = "max-age=31536000; includeSubDomains";
     // Prevent clickjacking
-    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers.XFrameOptions = "DENY";
     // Prevent MIME-type sniffing
-    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers.XContentTypeOptions = "nosniff";
     // XSS protection
-    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers.XXSSProtection = "1; mode=block";
     // Referrer policy
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
 
