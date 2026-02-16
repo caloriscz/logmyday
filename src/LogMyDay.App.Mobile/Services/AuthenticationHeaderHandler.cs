@@ -19,7 +19,7 @@ public class AuthenticationHeaderHandler : DelegatingHandler
 
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
             {
-                var byteArray = Encoding.ASCII.GetBytes($"{username}:{password}");
+                var byteArray = Encoding.UTF8.GetBytes($"{username}:{password}");
                 var base64String = Convert.ToBase64String(byteArray);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64String);
                 

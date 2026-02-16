@@ -45,7 +45,7 @@ public class TagsController : BaseApiController
             _logger.LogError(ex, "Error creating tag. Tag: {Tag}, TypeId: {TypeId}, IsRepeatable: {IsRepeatable}, TimeGranularity: {TimeGranularity}, IsRange: {IsRange}", 
                 model.Tag, model.TypeId, model.IsRepeatable, model.TimeGranularity, model.IsRange);
 
-            return StatusCode(500, $"Internal server error: {ex.Message}");
+            return StatusCode(500, "An internal error occurred while creating the tag.");
         }
     }
 

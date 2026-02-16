@@ -18,7 +18,7 @@ public class DynamicAuthHandler : DelegatingHandler
         if (_ctx.Username is { } u && _ctx.Password is { } p)
         {
             var credentials = $"{u}:{p}";
-            var bytes = Encoding.ASCII.GetBytes(credentials);
+            var bytes = Encoding.UTF8.GetBytes(credentials);
             var base64 = Convert.ToBase64String(bytes);
             
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64);
