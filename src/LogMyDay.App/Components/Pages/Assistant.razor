@@ -209,7 +209,7 @@
 
             _messages.Add(new ChatMessage("assistant", response.Message, response.SuggestedActions));
         }
-        catch (Exception ex)
+        catch
         {
             _errorMessage = "Something went wrong. Please try again.";
             // Remove the user message if we couldn't get a response
@@ -244,6 +244,16 @@
         }
 
         var html = markdown;
+
+        // Markdown links (must be processed before bold/italic to avoid conflicts)
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\[(.+?)\]\((.+?)\)", match =>
+        {
+            var linkText = match.Groups[1].Value;
+            var url = match.Groups[2].Value;
+            var cssClasses = "text-primary-600 hover:text-primary-700 underline dark:text-primary-400 dark:hover:text-primary-300";
+
+            return $"<a href=\"{url}\" class=\"{cssClasses}\">{linkText}</a>";
+        });
 
         // Bold
         html = System.Text.RegularExpressions.Regex.Replace(html, @"\*\*(.+?)\*\*", "<strong>$1</strong>");

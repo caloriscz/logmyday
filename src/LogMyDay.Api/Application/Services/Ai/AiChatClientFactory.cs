@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Application.Interfaces;
 using OpenAI;
@@ -27,22 +28,24 @@ public interface IAiChatClientFactory
 /// </summary>
 public sealed class AiChatClientFactory : IAiChatClientFactory
 {
-    private readonly ISettingsService _settingsService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AiChatClientFactory> _logger;
     private ChatClient? _cachedClient;
     private string? _cachedConfigHash;
 
     public AiChatClientFactory(
-        ISettingsService settingsService,
+        IServiceProvider serviceProvider,
         ILogger<AiChatClientFactory> logger)
     {
-        _settingsService = settingsService;
+        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
     public async Task<ChatClient?> GetChatClient()
     {
-        var options = await _settingsService.GetAiOptionsAsync();
+        using var scope = _serviceProvider.CreateScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+        var options = await settingsService.GetAiOptionsAsync();
 
         if (!await IsAvailable())
         {
@@ -80,7 +83,9 @@ public sealed class AiChatClientFactory : IAiChatClientFactory
 
     public async Task<bool> IsAvailable()
     {
-        var options = await _settingsService.GetAiOptionsAsync();
+        using var scope = _serviceProvider.CreateScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+        var options = await settingsService.GetAiOptionsAsync();
 
         return options.Enabled && !string.IsNullOrWhiteSpace(options.ApiKey);
     }
