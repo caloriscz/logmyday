@@ -32,10 +32,10 @@ else
                     <i class="bi bi-bell text-2xl mb-1"></i>
                     <span class="text-xs font-medium">Reminders</span>
                 </button>
-                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsToolsSectionActive() ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                        @onclick="@(() => NavigateTo("/tools"))">
-                    <i class="bi bi-tools text-2xl mb-1"></i>
-                    <span class="text-xs font-medium">Tools</span>
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/tags") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                        @onclick="@(() => NavigateTo("/tags"))">
+                    <i class="bi bi-tags text-2xl mb-1"></i>
+                    <span class="text-xs font-medium">Tags</span>
                 </button>
                 <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/quick"))">
@@ -84,11 +84,6 @@ else
         {
             return false;
         }
-    }
-
-    private bool IsToolsSectionActive()
-    {
-        return IsActive("/tools") || IsActive("/breathing") || IsActive("/exercise");
     }
 
     private string GetCurrentPath()

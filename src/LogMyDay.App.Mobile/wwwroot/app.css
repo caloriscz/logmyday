@@ -162,38 +162,33 @@ h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus {
     --shadow: rgba(0, 0, 0, 0.3);
 }
 
-/* Force dark theme on body and common elements */
+/* Force theme on body only */
+[data-bs-theme="light"] body {
+    background-color: var(--bg-color) !important;
+    color: var(--text-color) !important;
+}
+
 [data-bs-theme="dark"] body {
     background-color: var(--bg-color) !important;
     color: var(--text-color) !important;
 }
 
-[data-bs-theme="dark"] .page-card,
-[data-bs-theme="dark"] .card {
-    background-color: var(--card-bg) !important;
-    color: var(--text-color) !important;
-    border-color: var(--border-color) !important;
+/* Comprehensive theme coverage - respect inline Tailwind classes */
+[data-bs-theme="light"] .container,
+[data-bs-theme="light"] .container-fluid,
+[data-bs-theme="light"] main,
+[data-bs-theme="light"] .row,
+[data-bs-theme="light"] .col {
+    color: var(--text-color);
 }
 
-/* Comprehensive dark theme coverage */
+/* Comprehensive dark theme coverage - respect inline Tailwind classes */
 [data-bs-theme="dark"] .container,
 [data-bs-theme="dark"] .container-fluid,
 [data-bs-theme="dark"] main,
 [data-bs-theme="dark"] .row,
 [data-bs-theme="dark"] .col {
     color: var(--text-color);
-}
-
-[data-bs-theme="dark"] h1, 
-[data-bs-theme="dark"] h2, 
-[data-bs-theme="dark"] h3, 
-[data-bs-theme="dark"] h4, 
-[data-bs-theme="dark"] h5, 
-[data-bs-theme="dark"] h6,
-[data-bs-theme="dark"] p,
-[data-bs-theme="dark"] span,
-[data-bs-theme="dark"] label {
-    color: var(--text-color) !important;
 }
 
 [data-bs-theme="dark"] .table,
@@ -753,19 +748,26 @@ main {
     }
 }
 
-/* Mobile card styling - Tailwind-based */
+/* Mobile card styling - Default styles for cards without Tailwind background classes */
 .card {
-    background-color: rgb(255 255 255); /* white */
-    border: 1px solid rgb(229 231 235); /* gray-200 */
-    border-radius: 0.5rem; /* rounded-lg */
-    padding: 1rem; /* p-4 */
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); /* shadow */
-    margin-bottom: 0.75rem; /* mb-3 */
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    margin-bottom: 0.75rem;
 }
 
-[data-bs-theme="dark"] .card {
-    background-color: rgb(31 41 55); /* gray-800 */
-    border-color: rgb(55 65 81); /* gray-700 */
+/* Light theme card defaults (when no Tailwind bg class) */
+.card:not([class*="bg-"]) {
+    background-color: rgb(255 255 255);
+    color: rgb(31 41 55);
+    border: 1px solid rgb(229 231 235);
+}
+
+/* Dark theme card defaults (override for all cards to ensure dark theme) */
+[data-bs-theme="dark"] .card:not([class*="bg-"]) {
+    background-color: rgb(31 41 55);
+    color: rgb(229 231 235);
+    border: 1px solid rgb(55 65 81);
 }
 
 .card-title {
