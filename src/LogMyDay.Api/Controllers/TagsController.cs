@@ -1,8 +1,6 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
-using LogMyDay.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
