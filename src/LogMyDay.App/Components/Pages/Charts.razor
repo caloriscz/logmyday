@@ -360,7 +360,7 @@
             statistics = ChartStatistics.FromDataPoints(allPoints);
             hasDecimalType = allSeriesData.Any(s =>
                 inputTypeNames.TryGetValue(s.InputTypeId, out var name) &&
-                name == ChartConstants.DecimalTypeName);
+                (name == ChartConstants.DecimalTypeName || name == ChartConstants.DecimalPrecision2TypeName));
             correlationInsights = ChartDataService.GenerateCorrelationInsights(allSeriesData, inputTypeNames);
 
             ConfigureChartOptions();
