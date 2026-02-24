@@ -245,6 +245,9 @@
 
         var html = markdown;
 
+        // Markdown links [text](url) - convert to clickable HTML links
+        html = System.Text.RegularExpressions.Regex.Replace(html, @"\[([^\]]+)\]\(([^\)]+)\)", "<a href=\"$2\" class=\"text-primary-400 underline hover:text-primary-300\">$1</a>");
+
         // Bold
         html = System.Text.RegularExpressions.Regex.Replace(html, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
 
