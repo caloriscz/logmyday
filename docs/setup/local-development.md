@@ -14,7 +14,7 @@ Follow these steps to run the LogMyDay web stack on a workstation. The commands 
 - .NET SDK 9.0 (`dotnet --list-sdks` should list 9.x)
 - Node.js 20 LTS and npm 10+
 - Android SDK + .NET MAUI workloads if you plan to build the mobile client (`dotnet workload install maui`)
-- A SQL Server instance (local or remote)
+- A database: **SQLite** (zero setup, default) or **SQL Server** (for multi-user production)
 
 ## Clone the repository
 
@@ -47,12 +47,38 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 > ⚠️ **Security Note**: Never commit files containing real passwords. The `.gitignore` file already excludes `appsettings.json` and `appsettings.Development.json`.
 
-### 2. Configure Database Connection
+### 2. Configure Database
 
-Edit `appsettings.Development.json` to set up the SQL Server connection string for local development.
+LogMyDay supports two database providers. Choose the one that fits your needs:
+
+#### Option A: SQLite (Recommended for Getting Started)
+
+SQLite requires no external database server. The database is stored as a single file. This is the fastest way to get started and is ideal for single-user or small-group installations.
+
+Edit `appsettings.Development.json`:
 
 ```json
 {
+  "Database": {
+    "Provider": "Sqlite",
+    "ConnectionString": "Data Source=logmyday.db"
+  }
+}
+```
+
+That's it — the application will create the database file automatically on first run.
+
+#### Option B: SQL Server (Recommended for Production / Multi-User)
+
+SQL Server is better suited for high-concurrency, multi-user production deployments.
+
+Edit `appsettings.Development.json`:
+
+```json
+{
+  "Database": {
+    "Provider": "SqlServer"
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost,1439;Database=logmyday;User Id=sa;Password=YOUR_DEV_PASSWORD;Encrypt=True;TrustServerCertificate=True;"
   }
@@ -114,7 +140,9 @@ Example for Gmail:
 
 ## Apply Database Migrations
 
-Initialize the database schema by applying the Entity Framework Core migrations. This step creates the necessary tables (like `LogMyDay_Units`) and seeds initial data.
+If you are using **SQLite**, you can skip this step — the application creates the database automatically on first run.
+
+If you are using **SQL Server**, initialize the database schema by applying the Entity Framework Core migrations:
 
 ```powershell
 # Install the EF Core tool if you haven't already

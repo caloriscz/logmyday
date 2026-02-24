@@ -49,6 +49,38 @@ The service exposes port `9099` by default. Add a reverse proxy (nginx, Traefik,
 3. **Environment variables**: Provided via `docker-compose.yml` + `.env` file.
 4. **Docker secrets**: Mounted as files under `/run/secrets/` and loaded automatically when `ASPNETCORE_ENVIRONMENT=Docker`.
 
+## Database Provider
+
+LogMyDay supports two database providers. Set the `Database__Provider` environment variable (or the `Database:Provider` key in `appsettings.Docker.json`) to choose:
+
+### SQLite (Recommended for Simple Deployments)
+
+SQLite stores the database as a single file inside the container. Ideal for single-user or small-group installations with no external database server required.
+
+```yaml
+# docker-compose.yml snippet
+environment:
+  - Database__Provider=Sqlite
+  - Database__ConnectionString=Data Source=/app/data/logmyday.db
+volumes:
+  - logmyday-data:/app/data
+```
+
+> 💡 **Tip**: Mount a persistent volume for `/app/data` so the database survives container restarts.
+
+### SQL Server (Recommended for Production / Multi-User)
+
+Use the existing SQL Server configuration with Docker secrets for the database password.
+
+```yaml
+# docker-compose.yml snippet
+environment:
+  - Database__Provider=SqlServer
+  - DB_HOST=host.docker.internal,1439
+  - DB_NAME=logmyday
+  - DB_USER=sa
+```
+
 ## Maintenance Tips
 
 - Rotate secrets and regenerate the container with `docker compose up --build`.

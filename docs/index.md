@@ -27,6 +27,7 @@ LogMyDay is your personal activity journal. Capture workouts, study sessions, ha
 - **Web Dashboard (Blazor Server)**: Offers the full activity management experience with advanced filtering, modal-based entry, and administrative tools.
 - **Mobile App (MAUI + BlazorWebView)**: Provides one-tap quick activities, notification reminders, and an interface tuned for phones and tablets.
 - **Secure API (ASP.NET Core)**: Powers both clients with HTTPS, cookie-based auth for the web app, and rate-limited endpoints.
+- **Flexible Storage**: Choose between **SQLite** (zero setup, single-file database) for personal use or **SQL Server** for multi-user production deployments.
 
 ## Start Here
 
