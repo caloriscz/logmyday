@@ -13,18 +13,55 @@ internal static class DatabaseExtensions
             return services;
         }
 
+        var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
+            ?? new DatabaseProviderOptions();
+
+        var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
+
         services.AddDbContext<LogMyDayDbContext>(options =>
         {
-            options.UseSqlServer(ResolveConnectionString(configuration, environment));
+            ConfigureProvider(options, dbOptions.Provider, connectionString);
         });
+
+        Log.Information("Database provider configured: {Provider}", dbOptions.Provider);
 
         return services;
     }
 
-    internal static string ResolveConnectionString(IConfiguration configuration, IWebHostEnvironment environment)
+    internal static void ConfigureProvider(DbContextOptionsBuilder options, DatabaseProvider provider, string connectionString)
     {
+        switch (provider)
+        {
+            case DatabaseProvider.Sqlite:
+                options.UseSqlite(connectionString);
+                break;
+
+            case DatabaseProvider.SqlServer:
+            default:
+                options.UseSqlServer(connectionString);
+                break;
+        }
+    }
+
+    internal static string ResolveConnectionString(IConfiguration configuration, IWebHostEnvironment environment, DatabaseProviderOptions? dbOptions = null)
+    {
+        // If Database:ConnectionString is explicitly set, use it
+        if (!string.IsNullOrEmpty(dbOptions?.ConnectionString))
+        {
+            return dbOptions.ConnectionString;
+        }
+
         if (environment.EnvironmentName == "Docker")
         {
+            var provider = dbOptions?.Provider ?? DatabaseProvider.SqlServer;
+
+            if (provider == DatabaseProvider.Sqlite)
+            {
+                var dbPath = configuration["DB_PATH"] ?? "/app/data/logmyday.db";
+
+                return $"Data Source={dbPath}";
+            }
+
             var dbPassword = configuration["db_password"];
             var dbHost = configuration["DB_HOST"] ?? "host.docker.internal,1439";
             var dbName = configuration["DB_NAME"] ?? "logmyday";

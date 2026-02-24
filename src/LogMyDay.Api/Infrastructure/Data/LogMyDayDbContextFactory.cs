@@ -29,27 +29,38 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
             .AddJsonFile("appsettings.Development.json", optional: true);
 
         var configuration = builder.Build();
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
 
+        var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
+            ?? new DatabaseProviderOptions();
+
+        var connectionString = !string.IsNullOrEmpty(dbOptions.ConnectionString)
+            ? dbOptions.ConnectionString
+            : configuration.GetConnectionString("DefaultConnection");
+
+        Console.WriteLine($"[LogMyDayDbContextFactory] Provider: {dbOptions.Provider}");
         Console.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
-        
-        if (!string.IsNullOrEmpty(connectionString))
-        {
-             // Mask password for logging
-             var masked = System.Text.RegularExpressions.Regex.Replace(connectionString, "Password=.*?;", "Password=***;");
-             Console.WriteLine($"[LogMyDayDbContextFactory] Using Connection String: {masked}");
-        }
 
-        // Fallback if configuration is missing (e.g. running from a location where config isn't found)
         if (string.IsNullOrEmpty(connectionString))
         {
-            Console.WriteLine("[LogMyDayDbContextFactory] ERROR: Connection string 'DefaultConnection' is null or empty.");
+            Console.WriteLine("[LogMyDayDbContextFactory] ERROR: Connection string not found.");
             Console.WriteLine("[LogMyDayDbContextFactory] Please ensure appsettings.json or appsettings.Development.json exists in LogMyDay.App and contains the connection string.");
-            throw new InvalidOperationException("Could not find connection string 'DefaultConnection'.");
+
+            throw new InvalidOperationException("Could not find a database connection string.");
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<LogMyDayDbContext>();
-        optionsBuilder.UseSqlServer(connectionString);
+
+        switch (dbOptions.Provider)
+        {
+            case DatabaseProvider.Sqlite:
+                optionsBuilder.UseSqlite(connectionString);
+                break;
+
+            case DatabaseProvider.SqlServer:
+            default:
+                optionsBuilder.UseSqlServer(connectionString);
+                break;
+        }
 
         return new LogMyDayDbContext(optionsBuilder.Options);
     }
