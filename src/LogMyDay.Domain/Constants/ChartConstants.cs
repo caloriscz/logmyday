@@ -59,4 +59,5 @@ public static class ChartConstants
 
     // Input type names for formatting decisions
     public const string DecimalTypeName = "Decimal";
+    public const string DecimalPrecision2TypeName = "Decimal, precision 2";
 }

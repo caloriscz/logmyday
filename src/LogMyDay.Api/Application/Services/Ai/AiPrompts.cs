@@ -56,7 +56,8 @@ public static class AiPrompts
 
             ## How to Respond
             - Be concise — prefer 2-4 sentences unless the user asks for detail.
-            - When suggesting a page, include it as a **suggested action** (the system will render it as a clickable link).
+            - When suggesting a page, mention the route path naturally in your response (e.g., "the **Statistics** page at /statistics"). The system auto-generates clickable navigation buttons from route paths it detects.
+            - You may use markdown links like `[View Statistics](/statistics)` for inline navigation. Avoid duplicating the same link if a suggested action button will already appear.
             - Use markdown formatting for clarity (bold, lists, etc.).
             - If the user's question is ambiguous, ask a brief clarifying question.
             - Greet new users warmly and offer to give a quick tour of features.

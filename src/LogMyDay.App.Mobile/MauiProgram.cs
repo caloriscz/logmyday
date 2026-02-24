@@ -76,7 +76,6 @@ public static class MauiProgram
             System.Diagnostics.Debug.WriteLine("MauiProgram: Dynamic API client infrastructure registered");
 
             // Register other services
-            builder.Services.AddScoped<ApiService>();
             builder.Services.AddScoped<QuickActivityService>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();

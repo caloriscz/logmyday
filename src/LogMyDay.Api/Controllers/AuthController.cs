@@ -4,6 +4,7 @@ using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
@@ -33,6 +34,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register-first")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> RegisterFirstAdmin([FromBody] RegisterFirstDto request, CancellationToken cancellationToken)
     {
         try
@@ -69,6 +71,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginDto request, CancellationToken cancellationToken)
     {
         try
@@ -107,6 +110,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login-form")]
+    [EnableRateLimiting("auth")]
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LoginForm(
         [FromForm] string email,

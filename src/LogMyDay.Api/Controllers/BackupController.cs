@@ -52,7 +52,7 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error during data export");
 
-            return StatusCode(500, new { message = "Export failed", error = ex.Message });
+            return StatusCode(500, new { message = "Export failed" });
         }
     }
 
@@ -126,16 +126,18 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error during data import");
 
-            return StatusCode(500, new { message = "Import failed", error = ex.Message });
+            return StatusCode(500, new { message = "Import failed" });
         }
     }
 
     /// <summary>
     /// Clear all data from the database
+    /// Admin-only endpoint - can clear data for specific user or all users
     /// </summary>
     /// <param name="userId">Optional user ID to clear data for specific user only</param>
     /// <returns>Number of records cleared</returns>
     [HttpDelete("clear")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> ClearData([FromQuery] Guid? userId = null)
     {
         try
@@ -155,7 +157,7 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error during data clearing");
 
-            return StatusCode(500, new { message = "Clear operation failed", error = ex.Message });
+            return StatusCode(500, new { message = "Clear operation failed" });
         }
     }
 
@@ -216,7 +218,7 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error during backup validation");
 
-            return StatusCode(500, new { message = "Validation failed", error = ex.Message });
+            return StatusCode(500, new { message = "Validation failed" });
         }
     }
 
@@ -245,7 +247,7 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error getting backup info");
 
-            return StatusCode(500, new { message = "Failed to get backup info", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to get backup info" });
         }
     }
 
@@ -275,7 +277,7 @@ public class BackupController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during secure backup export");
-            return StatusCode(500, new { message = "Failed to create secure backup", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to create secure backup" });
         }
     }
 
@@ -313,7 +315,7 @@ public class BackupController : BaseApiController
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during secure backup restore");
-            return StatusCode(500, new { message = "Failed to restore secure backup", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to restore secure backup" });
         }
     }
 
@@ -347,7 +349,7 @@ public class BackupController : BaseApiController
         {
             _logger.LogError(ex, "Error during secure user data clearing");
 
-            return StatusCode(500, new { message = "Failed to clear user data", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to clear user data" });
         }
     }
 }

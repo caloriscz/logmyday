@@ -90,9 +90,9 @@
             {
                 @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
                 {
-                    <div class="card mb-3 bg-red-600 text-white rounded-lg p-3 shadow">
+                    <div class="card mb-3 rounded-lg p-3 shadow">
                         <div class="flex justify-between items-start mb-1">
-                            <h6 class="text-base font-semibold">@activity.PrimaryTagName</h6>
+                            <h6 class="text-base font-semibold text-gray-900 dark:text-white">@activity.PrimaryTagName</h6>
                             <div class="flex items-center gap-2">
                                 <button @onclick="() => OpenEditActivityModal(activity)" type="button" title="Edit activity"
                                         class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary-500 text-white focus:outline-none focus:ring-2 focus:ring-primary-300">
@@ -107,11 +107,11 @@
 
                         @if (!string.IsNullOrEmpty(activity.Description))
                         {
-                            <p class="mb-2">@activity.Description</p>
+                            <p class="mb-2 text-gray-700 dark:text-gray-300">@activity.Description</p>
                         }
 
-                        <div class="text-sm opacity-80">
-                            <strong>Time</strong>: @GetActivityDateDisplay(activity)
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            <strong class="text-gray-900 dark:text-white">Time</strong>: @GetActivityDateDisplay(activity)
                         </div>
                     </div>
                 }
@@ -384,6 +384,7 @@
         if (value.HasValue)
         {
             selectedDate = value.Value;
+            InitializeNewActivity();
             await LoadData();
         }
     }
@@ -436,12 +437,14 @@
     private async Task PreviousDay()
     {
         selectedDate = selectedDate.AddDays(-1);
+        InitializeNewActivity();
         await LoadData();
     }
 
     private async Task NextDay()
     {
         selectedDate = selectedDate.AddDays(1);
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -466,6 +469,7 @@
             _ => selectedDate.AddDays(-1)
         };
 
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -479,6 +483,7 @@
             _ => selectedDate.AddDays(1)
         };
 
+        InitializeNewActivity();
         await LoadData();
     }
 
@@ -488,6 +493,7 @@
         pageNumber = 1;
         weekPageNumber = 1;
         monthPageNumber = 1;
+        InitializeNewActivity();
         await LoadData();
     }
 

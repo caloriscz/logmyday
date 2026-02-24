@@ -25,7 +25,7 @@ public class ChartDataService : IChartDataService
 
         var numericTypeIds = new HashSet<int?>(
             inputTypes
-                .Where(it => it.Name is "Integer" or "Decimal" or "Rating 1-5" or "Rating 1-10" or "Percentage")
+                .Where(it => it.Name is "Integer" or "Decimal" or "Decimal, precision 2" or "Rating 1-5" or "Rating 1-10" or "Percentage")
                 .Select(it => (int?)it.Id));
 
         var allTags = await _activityApi.GetTags();

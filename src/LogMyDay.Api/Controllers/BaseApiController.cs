@@ -1,15 +1,18 @@
 using LogMyDay.Api.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LogMyDay.Api.Controllers;
 
 /// <summary>
 /// Base controller for API endpoints that require user authentication and provide user context.
 /// Uses smart authentication that automatically selects between cookie and basic auth.
+/// Rate limited at 100 requests per minute per IP.
 /// </summary>
 [Authorize]
 [ApiController]
+[EnableRateLimiting("api")]
 public abstract class BaseApiController : ControllerBase
 {
     private readonly IAuthService _authService;

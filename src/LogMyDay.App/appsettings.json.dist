@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=False"
+    "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=True;TrustServerCertificate=False"
   },
   "Security": {
     "RateLimit": {

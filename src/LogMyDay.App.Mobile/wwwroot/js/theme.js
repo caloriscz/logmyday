@@ -26,18 +26,22 @@
             if (prefersDark) {
                 root.classList.add('dark');
                 body.classList.add('dark');
+                root.setAttribute('data-bs-theme', 'dark');
             } else {
                 root.classList.remove('dark');
                 body.classList.remove('dark');
+                root.setAttribute('data-bs-theme', 'light');
             }
         } else if (theme === 'dark') {
             console.log('Setting dark mode');
             root.classList.add('dark');
             body.classList.add('dark');
+            root.setAttribute('data-bs-theme', 'dark');
         } else {
             console.log('Setting light mode');
             root.classList.remove('dark');
             body.classList.remove('dark');
+            root.setAttribute('data-bs-theme', 'light');
         }
 
         // Also store in localStorage as backup

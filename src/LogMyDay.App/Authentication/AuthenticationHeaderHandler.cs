@@ -19,7 +19,7 @@ public class AuthenticationHeaderHandler : DelegatingHandler
         (string Username, string Password)? credentials = _credentialStore.Get();
         if (credentials is (var username, var password))
         {
-            var byteArray = Encoding.ASCII.GetBytes($"{username}:{password}");
+            var byteArray = Encoding.UTF8.GetBytes($"{username}:{password}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
 
             _logger.LogDebug("[AuthHandler] Injected Basic Auth for user {Username}", username);

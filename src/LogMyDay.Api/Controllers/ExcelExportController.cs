@@ -57,7 +57,7 @@ public class ExcelExportController : BaseApiController
         {
             _logger.LogError(ex, "Error during Excel export");
 
-            return StatusCode(500, new { message = "Excel export failed", error = ex.Message });
+            return StatusCode(500, new { message = "Excel export failed" });
         }
     }
 
@@ -81,7 +81,7 @@ public class ExcelExportController : BaseApiController
         {
             _logger.LogError(ex, "Error getting available tags");
 
-            return StatusCode(500, new { message = "Failed to get available tags", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to get available tags" });
         }
     }
 
@@ -108,7 +108,7 @@ public class ExcelExportController : BaseApiController
         {
             _logger.LogError(ex, "Error getting export preview");
 
-            return StatusCode(500, new { message = "Failed to get export preview", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to get export preview" });
         }
     }
 
@@ -144,7 +144,7 @@ public class ExcelExportController : BaseApiController
         {
             _logger.LogError(ex, "Error getting oldest activity date");
 
-            return StatusCode(500, new { message = "Failed to get oldest activity date", error = ex.Message });
+            return StatusCode(500, new { message = "Failed to get oldest activity date" });
         }
     }
 }

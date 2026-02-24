@@ -257,6 +257,7 @@
             // Find the IDs for numeric input types
             var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
             var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
+            var decimalP2TypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal, precision 2")?.Id;
             var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
             var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
             
@@ -266,6 +267,7 @@
                 .Where(t => t.InputTypeId.HasValue && 
                            (t.InputTypeId == integerTypeId || 
                             t.InputTypeId == decimalTypeId ||
+                            t.InputTypeId == decimalP2TypeId ||
                             t.InputTypeId == rating5TypeId ||
                             t.InputTypeId == rating10TypeId))
                 .OrderBy(t => t.Title)
@@ -473,7 +475,7 @@
             var selectedTag = numericTags.FirstOrDefault(t => t.Id == selectedTagId.Value);
             if (selectedTag?.InputTypeId.HasValue == true && 
                 inputTypeNames.ContainsKey(selectedTag.InputTypeId.Value) &&
-                inputTypeNames[selectedTag.InputTypeId.Value] == "Decimal")
+                inputTypeNames[selectedTag.InputTypeId.Value] is "Decimal" or "Decimal, precision 2")
             {
                 return value.ToString("F2");
             }

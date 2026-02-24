@@ -75,15 +75,7 @@ public class AuthenticationService : INotifyPropertyChanged
         {
             Preferences.Remove("ServerUrl");
             Preferences.Remove("Username");
-            Preferences.Remove("Password");
-            try
-            {
-                SecureStorage.Default.Remove("Password");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error removing password from secure storage: {ex.Message}");
-            }
+            // Password is never persisted - stored only in memory via ApiContext
             SetAuthenticated(false);
 
             // MainLayout will automatically handle navigation to /login when authentication state changes
