@@ -12,6 +12,26 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Charts", "Visualize tag data with interactive charts")]
 
+@*
+    Charts Component
+    
+    Interactive data visualization page for numeric tag data.
+    Allows users to:
+    - Select up to 3 numeric tags for comparison
+    - Choose different chart types (line, bar, area) for each series
+    - Filter data by date range (all time, year, month, or last N days)
+    - View statistics and correlation insights
+    - Export charts and interact with zoom/pan tools
+    
+    Features:
+    - Responsive ApexCharts integration with dark/light theme support
+    - Real-time theme switching via JavaScript interop
+    - User preference persistence for tag selections and chart types
+    - Automatic Y-axis scaling based on input types
+    - Smart tooltip formatting for decimal vs integer values
+    - Correlation analysis for multi-tag comparisons
+*@
+
 <PageTitle>Charts</PageTitle>
 
 <div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
@@ -153,50 +173,112 @@
 </div>
 
 @code {
+    #region Fields
+
     // Tag data
+    /// <summary>List of all available numeric tags for charting.</summary>
     private List<TagResponse> numericTags = new();
+    
+    /// <summary>Mapping of input type IDs to their display names.</summary>
     private Dictionary<int, string> inputTypeNames = new();
 
     // User selections
+    /// <summary>ID of the primary selected tag (required).</summary>
     private int? selectedTagId;
+    
+    /// <summary>ID of the second optional tag.</summary>
     private int? selectedTagId2;
+    
+    /// <summary>ID of the third optional tag.</summary>
     private int? selectedTagId3;
+    
+    /// <summary>Chart type for the primary tag (line, bar, or area).</summary>
     private string selectedChartType1 = ChartConstants.LineChart;
+    
+    /// <summary>Chart type for the second tag.</summary>
     private string selectedChartType2 = ChartConstants.LineChart;
+    
+    /// <summary>Chart type for the third tag.</summary>
     private string selectedChartType3 = ChartConstants.LineChart;
+    
+    /// <summary>Selected date range filter (all, year, month, or last N days).</summary>
     private string selectedDateRange = ChartConstants.DateRangeAll;
 
     // Chart state
+    /// <summary>Indicates whether chart data is currently being loaded.</summary>
     private bool isLoading;
+    
+    /// <summary>Indicates whether chart data has been successfully loaded.</summary>
     private bool dataLoaded;
+    
+    /// <summary>Indicates whether the theme detection has completed.</summary>
     private bool themeDetected;
+    
+    /// <summary>Current theme mode (true for dark, false for light).</summary>
     private bool isDarkMode;
+    
+    /// <summary>Collection of all chart series data for rendering.</summary>
     private List<ChartSeriesData> allSeriesData = new();
+    
+    /// <summary>List of years available in the data for filtering.</summary>
     private List<int> availableYears = new();
+    
+    /// <summary>Dictionary of available months (key: YYYY-MM, value: display name).</summary>
     private Dictionary<string, string> availableMonths = new();
+    
+    /// <summary>Computed statistics for the current data set.</summary>
     private ChartStatistics? statistics;
+    
+    /// <summary>List of correlation insight messages for multi-tag comparisons.</summary>
     private List<string> correlationInsights = new();
+    
+    /// <summary>Indicates whether any series uses decimal formatting.</summary>
     private bool hasDecimalType;
+    
+    /// <summary>Total number of data points across all series.</summary>
     private int totalDataPoints;
 
     // ApexCharts
+    /// <summary>Reference to the ApexChart component for programmatic control.</summary>
     private ApexChart<ChartDataPoint>? chart;
+    
+    /// <summary>Configuration options for the ApexChart.</summary>
     private ApexChartOptions<ChartDataPoint>? chartOptions;
 
     // JS interop
+    /// <summary>JavaScript module reference for theme listener.</summary>
     private IJSObjectReference? jsModule;
+    
+    /// <summary>.NET object reference for JavaScript callbacks.</summary>
     private DotNetObjectReference<Charts>? dotNetReference;
 
     // Cancellation
+    /// <summary>Cancellation token source for aborting data load operations.</summary>
     private CancellationTokenSource? loadCts;
 
+    /// <summary>Determines whether the Load Chart button should be enabled.</summary>
     private bool CanLoadData => selectedTagId.HasValue && themeDetected;
 
+    #endregion
+
+    #region Lifecycle Methods
+
+    #endregion
+
+    #region Lifecycle Methods
+
+    /// <summary>
+    /// Initializes the component and sets the page title.
+    /// </summary>
     protected override void OnInitialized()
     {
         PageTitleService.SetTitle("Charts");
     }
 
+    /// <summary>
+    /// Executes after the component has rendered. Loads initial data on first render.
+    /// </summary>
+    /// <param name="firstRender">True if this is the first render.</param>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -205,6 +287,9 @@
         }
     }
 
+    /// <summary>
+    /// Loads initial data including numeric tags, theme preferences, and saved user preferences.
+    /// </summary>
     private async Task LoadInitialDataAsync()
     {
         var (tags, typeNames) = await ChartDataService.GetNumericTagsAsync();
@@ -221,6 +306,14 @@
         StateHasChanged();
     }
 
+    #endregion
+
+    #region Preferences
+
+    /// <summary>
+    /// Applies saved user preferences to the component state.
+    /// </summary>
+    /// <param name="prefs">The chart preferences to apply.</param>
     private void ApplyPreferences(ChartPreferences prefs)
     {
         selectedTagId = prefs.Tag1Id;
@@ -232,6 +325,13 @@
         selectedDateRange = prefs.DateRange;
     }
 
+    #endregion
+
+    #region Theme Management
+
+    /// <summary>
+    /// Sets up JavaScript interop for detecting and responding to theme changes.
+    /// </summary>
     private async Task SetupThemeListener()
     {
         try
@@ -246,6 +346,11 @@
         }
     }
 
+    /// <summary>
+    /// JavaScript-invokable method called when the theme changes.
+    /// Updates the chart to reflect the new theme.
+    /// </summary>
+    /// <param name="isDark">True if dark mode is active, false otherwise.</param>
     [JSInvokable]
     public async Task OnThemeChanged(bool isDark)
     {
@@ -259,12 +364,25 @@
         }
     }
 
+    #endregion
+
+    #region Tag Selection Handlers
+
+    /// <summary>
+    /// Handles changes to the primary tag selection.
+    /// </summary>
+    /// <param name="tagId">The ID of the newly selected tag.</param>
     private async Task OnTag1Changed(int? tagId)
     {
         await PreferencesService.SaveTagAsync(1, tagId);
         ResetChartState();
     }
 
+    /// <summary>
+    /// Handles changes to the second tag selection.
+    /// Validates that the tag is not already selected.
+    /// </summary>
+    /// <param name="tagId">The ID of the newly selected tag.</param>
     private async Task OnTag2Changed(int? tagId)
     {
         if (!await ValidateTagSelection(tagId, 2))
@@ -278,6 +396,11 @@
         ResetChartState();
     }
 
+    /// <summary>
+    /// Handles changes to the third tag selection.
+    /// Validates that the tag is not already selected.
+    /// </summary>
+    /// <param name="tagId">The ID of the newly selected tag.</param>
     private async Task OnTag3Changed(int? tagId)
     {
         if (!await ValidateTagSelection(tagId, 3))
@@ -291,6 +414,12 @@
         ResetChartState();
     }
 
+    /// <summary>
+    /// Validates that a tag selection is not a duplicate of an already selected tag.
+    /// </summary>
+    /// <param name="tagId">The tag ID to validate.</param>
+    /// <param name="slot">The slot number (2 or 3) being validated.</param>
+    /// <returns>True if the selection is valid, false if it's a duplicate.</returns>
     private async Task<bool> ValidateTagSelection(int? tagId, int slot)
     {
         if (!tagId.HasValue)
@@ -313,6 +442,10 @@
         return true;
     }
 
+    /// <summary>
+    /// Resets the chart state when tag selections change.
+    /// Clears loaded data and resets filters.
+    /// </summary>
     private void ResetChartState()
     {
         dataLoaded = false;
@@ -323,6 +456,14 @@
         correlationInsights.Clear();
     }
 
+    #endregion
+
+    #region Data Loading
+
+    /// <summary>
+    /// Loads chart data for the selected tags and date range.
+    /// Computes statistics, correlations, and configures chart options.
+    /// </summary>
     private async Task LoadChartData()
     {
         if (!selectedTagId.HasValue)
@@ -378,6 +519,10 @@
         }
     }
 
+    /// <summary>
+    /// Builds a list of tag selections from the current user selections.
+    /// </summary>
+    /// <returns>List of tag selections with IDs, names, types, and chart types.</returns>
     private List<TagSelection> GetTagSelections()
     {
         var selections = new List<TagSelection>();
@@ -399,6 +544,13 @@
         return selections;
     }
 
+    #endregion
+
+    #region Chart Configuration
+
+    /// <summary>
+    /// Configures ApexChart options including theme, axes, tooltips, and interactive tools.
+    /// </summary>
     private void ConfigureChartOptions()
     {
         var (yMin, yMax) = ChartDataService.GetYAxisRange(allSeriesData.Select(s => s.InputTypeId));
@@ -469,6 +621,9 @@
         };
     }
 
+    /// <summary>
+    /// Updates the chart theme colors and styling based on the current theme mode.
+    /// </summary>
     private void UpdateChartTheme()
     {
         if (chartOptions == null)
@@ -492,6 +647,10 @@
         }
     }
 
+    /// <summary>
+    /// Generates a custom JavaScript tooltip formatter function with theme-aware styling.
+    /// </summary>
+    /// <returns>JavaScript function string for custom tooltip rendering.</returns>
     private string GetTooltipFormatter()
     {
         var formatValue = hasDecimalType ? "series[i][dataPointIndex].toFixed(2)" : "Math.round(series[i][dataPointIndex])";
@@ -523,6 +682,10 @@
         }}";
     }
 
+    /// <summary>
+    /// Generates the chart title based on the selected tag names.
+    /// </summary>
+    /// <returns>Chart title string (single tag name or "Tag1 vs Tag2 vs Tag3").</returns>
     private string GetChartTitle()
     {
         var names = allSeriesData.Select(s => s.TagName).ToList();
@@ -535,6 +698,13 @@
         };
     }
 
+    #endregion
+
+    #region Disposal
+
+    /// <summary>
+    /// Disposes resources including cancellation tokens and JavaScript interop references.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         loadCts?.Cancel();
@@ -557,4 +727,6 @@
             dotNetReference?.Dispose();
         }
     }
+
+    #endregion
 }
