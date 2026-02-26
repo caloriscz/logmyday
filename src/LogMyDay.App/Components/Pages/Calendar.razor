@@ -217,7 +217,17 @@
                     }
                 }
             </div>
-            <div class="flex items-center justify-end gap-3 pt-2">
+            <div class="flex items-center justify-between gap-3 pt-2">
+                <div class="flex items-center gap-1">
+                    <button type="button" @onclick="() => ShiftDayModal(-1)" class="inline-flex items-center gap-1 rounded px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Previous day" disabled="@isDayModalLoading">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        <span>-1d</span>
+                    </button>
+                    <button type="button" @onclick="() => ShiftDayModal(1)" class="inline-flex items-center gap-1 rounded px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Next day" disabled="@isDayModalLoading">
+                        <span>+1d</span>
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
                 <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900" @onclick="StartCreateDayActivity" disabled="@(!selectedTagId.HasValue)">
                     <Icon Name="plus" Class="h-4 w-4" />
                     Add Activity
@@ -602,6 +612,27 @@
         {
             dayModalError = $"Error loading day activities: {ex.Message}";
             dayActivities = new List<ActivityResponse>();
+        }
+    }
+
+    private async Task ShiftDayModal(int days)
+    {
+        if (selectedDayForModal is null)
+        {
+            return;
+        }
+
+        selectedDayForModal = selectedDayForModal.Value.AddDays(days);
+        isDayModalLoading = true;
+        dayModalError = null;
+
+        try
+        {
+            await LoadDayActivitiesAsync();
+        }
+        finally
+        {
+            isDayModalLoading = false;
         }
     }
 
