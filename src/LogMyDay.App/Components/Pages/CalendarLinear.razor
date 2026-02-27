@@ -144,9 +144,9 @@
                 </select>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="w-auto space-y-2">
                 <label for="weekStartPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Week starts</label>
-                <select id="weekStartPicker" class="@WeekPickerCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
+                <select id="weekStartPicker" class="@InputCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
                     <option value="1">Monday</option>
                     <option value="0">Sunday</option>
                 </select>
@@ -154,13 +154,13 @@
         </div>
 
         <div class="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <div class="flex items-center gap-2">
+            <div class="inline-flex items-center gap-1 rounded-full bg-gray-100 p-0.5 dark:bg-slate-800">
                 <button type="button" class="@GetOrderButtonClass(OrderDescending)" @onclick="@(() => ChangeOrder(OrderDescending))">Newest First</button>
                 <button type="button" class="@GetOrderButtonClass(OrderAscending)" @onclick="@(() => ChangeOrder(OrderAscending))">Oldest First</button>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
-                <button type="button" class="@NavButtonCss" @onclick="PrevYear" disabled="@(currentYear <= DateTime.Now.Year - 10)">Previous</button>
+                <button type="button" class="@NavButtonCss" @onclick="PrevYear" disabled="@(currentYear <= DateTime.Now.Year - 10)">Older</button>
                 <div class="flex flex-col items-center gap-0.5">
                     <div class="text-sm text-gray-600 dark:text-slate-300">
                         <span class="font-semibold text-gray-900 dark:text-slate-100">@currentYear</span>
@@ -185,7 +185,7 @@
                         }
                     }
                 </div>
-                <button type="button" class="@NavButtonCss" @onclick="NextYear" disabled="@(currentYear >= DateTime.Now.Year)">Next</button>
+                <button type="button" class="@NavButtonCss" @onclick="NextYear" disabled="@(currentYear >= DateTime.Now.Year)">Newer</button>
             </div>
         </div>
     </div>
@@ -410,10 +410,9 @@
 
 @code {
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-    private const string WeekPickerCss = "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
-    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
-    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200";
+    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white shadow-sm dark:bg-slate-200 dark:text-slate-900";
     private const string OrderDescending = "desc";
     private const string OrderAscending = "asc";
     private const int FixedCells = 42; // 6 weeks × 7 days
@@ -464,11 +463,21 @@
         {
             try
             {
+                var savedOrder = await JSRuntime.InvokeAsync<string?>("tagPersistence.getCalendarOrder");
+                if (!string.IsNullOrEmpty(savedOrder))
+                {
+                    orderBy = savedOrder;
+                }
+
                 var savedTagId = await JSRuntime.InvokeAsync<int?>("tagPersistence.getSelectedTag");
                 if (savedTagId.HasValue && tags.Any(t => t.Id == savedTagId.Value))
                 {
                     selectedTagId = savedTagId.Value;
                     await LoadActivitiesForTag(savedTagId.Value);
+                    StateHasChanged();
+                }
+                else if (!string.IsNullOrEmpty(savedOrder))
+                {
                     StateHasChanged();
                 }
             }
@@ -572,7 +581,7 @@
         }
     }
 
-    private void ChangeOrder(string order)
+    private async Task ChangeOrder(string order)
     {
         if (string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase))
         {
@@ -580,6 +589,7 @@
         }
 
         orderBy = order;
+        await JSRuntime.InvokeVoidAsync("tagPersistence.saveCalendarOrder", order);
     }
 
     private async Task LoadPreferencesAsync()
