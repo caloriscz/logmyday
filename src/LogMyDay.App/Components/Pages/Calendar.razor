@@ -64,7 +64,7 @@
                         {
                             <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400">
                                 <span class="h-2 w-2 rounded-full border border-current"></span>
-                                No entries &mdash; click any day to add
+                                No entries
                             </span>
                         }
                     }
@@ -291,6 +291,7 @@
     private int currentYear = DateTime.Now.Year;
     private List<int> availableYears = new();
     private string orderBy = OrderDescending;
+    private bool savedPreferencesLoaded;
 
     private bool showDayActivitiesModal;
     private bool isDayModalLoading;
@@ -317,8 +318,10 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && tags != null && tags.Any())
+        if (!savedPreferencesLoaded && tags != null && tags.Any())
         {
+            savedPreferencesLoaded = true;
+
             try
             {
                 var savedOrder = await JSRuntime.InvokeAsync<string?>("tagPersistence.getCalendarOrder");
@@ -332,17 +335,14 @@
                 {
                     selectedTagId = savedTagId.Value;
                     await LoadActivitiesForTag(savedTagId.Value);
-                    StateHasChanged();
-                }
-                else if (!string.IsNullOrEmpty(savedOrder))
-                {
-                    StateHasChanged();
                 }
             }
             catch
             {
-                // Ignore errors loading saved tag preference
+                // JS interop may fail during prerendering
             }
+
+            StateHasChanged();
         }
     }
 
@@ -430,7 +430,9 @@
 
             if (availableYears.Count > 0 && !availableYears.Contains(currentYear))
             {
-                currentYear = availableYears[0];
+                currentYear = string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase) 
+                    ? availableYears.Last() 
+                    : availableYears.First();
             }
             else if (availableYears.Count == 0)
             {
