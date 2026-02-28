@@ -14,7 +14,7 @@ public static class TagSpecifications
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
-            ApplyOrderBy(t => t.TagName);
+            ApplyOrderBy(t => t.TagName.ToLower());
         }
     }
 
@@ -61,14 +61,14 @@ public static class TagSpecifications
                 }
             }
 
-            // Apply ordering
+            // Apply ordering (case-insensitive)
             if (orderBy?.ToLower() == "asc")
             {
-                ApplyOrderBy(t => t.TagName);
+                ApplyOrderBy(t => t.TagName.ToLower());
             }
             else
             {
-                ApplyOrderByDescending(t => t.TagName);
+                ApplyOrderByDescending(t => t.TagName.ToLower());
             }
 
             // Apply pagination

@@ -1,6 +1,5 @@
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
-using LogMyDay.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace LogMyDay.Api.Infrastructure.Repositories;
@@ -39,8 +38,7 @@ public class ActivityRepository : Repository<Activity>, IActivityRepository
         var unfilledTags = await _context.Tags
              .Where(t =>
                  t.UserId == userId &&
-                 t.IsRequired &&
-                 t.TimeGranularity == TimeGranularity.Daily
+                 t.IsRequired
              )
              .Where(t => !_context.Activities.Any(a =>
                  a.UserId == userId &&
