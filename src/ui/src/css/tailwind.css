@@ -12,9 +12,23 @@
     @apply h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans antialiased;
   }
   
-  /* Focus styles for accessibility */
-  *:focus-visible {
+  /* Focus styles for interactive elements only */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex="0"]:focus-visible {
     @apply outline-none ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900;
+  }
+
+  /* Remove all focus outlines from non-interactive elements */
+  h1, h2, h3, h4, h5, h6, div, span, p, section, article, main, header, footer, nav {
+    &:focus, &:focus-visible {
+      @apply outline-none ring-0 ring-offset-0;
+      box-shadow: none !important;
+    }
   }
   
   /* Hide Bootstrap modals by default (for modals not yet converted to Tailwind) */

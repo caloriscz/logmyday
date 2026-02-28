@@ -1,9 +1,16 @@
 /* Import Bootstrap Icons - Remove this if not working */
 /* @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"); */
 
-/* Remove focus outline from headings - they are not interactive elements */
-h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus {
+/* Remove all focus styles from non-interactive elements (outline + Tailwind ring/box-shadow) */
+h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus,
+h1:focus-visible, h2:focus-visible, h3:focus-visible, h4:focus-visible, h5:focus-visible, h6:focus-visible,
+div:focus, div:focus-visible, span:focus, span:focus-visible,
+p:focus, p:focus-visible, section:focus, section:focus-visible,
+main:focus, main:focus-visible, article:focus, article:focus-visible {
     outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: none !important;
+    --tw-ring-offset-shadow: none !important;
 }
 
 /* CSS Variables for Light/Dark Theme */
@@ -323,8 +330,9 @@ a, .btn-link {
   box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
-h1:focus {
-    outline: none;
+h1:focus, h1:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .valid.modified:not([type=checkbox]) {
