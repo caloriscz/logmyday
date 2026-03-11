@@ -76,6 +76,41 @@
                     <span>Insights</span>
                 </NavLink>
                 
+                <!-- Scan Dropdown -->
+                <div class="relative" @onmouseenter="() => showScanMenu = true" @onmouseleave="() => showScanMenu = false">
+                    <button type="button"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            aria-label="Scan menu"
+                            aria-expanded="@showScanMenu">
+                        <Icon Name="qr-code" Class="w-4 h-4" />
+                        <span>Scan</span>
+                        <Icon Name="chevron-down" Class="w-4 h-4" />
+                    </button>
+                    
+                    @if (showScanMenu)
+                    {
+                        <div class="absolute left-0 top-full pt-1 z-50">
+                            <div class="w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 animate-fade-in">
+                            <NavLink href="scan" @onclick="() => showScanMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="camera" Class="w-4 h-4" />
+                                <span>Scan Code</span>
+                            </NavLink>
+                            <NavLink href="scan-mappings" @onclick="() => showScanMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="link" Class="w-4 h-4" />
+                                <span>Scan Mappings</span>
+                            </NavLink>
+                            <NavLink href="qr-generator" @onclick="() => showScanMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="qr-code" Class="w-4 h-4" />
+                                <span>QR Generator</span>
+                            </NavLink>
+                            </div>
+                        </div>
+                    }
+                </div>
+                
                 <!-- Data Dropdown -->
                 <div class="relative" @onmouseenter="() => showDataMenu = true" @onmouseleave="() => showDataMenu = false">
                     <button type="button"
@@ -230,6 +265,29 @@
                         <span>Insights</span>
                     </NavLink>
                     
+                    <!-- Scan Section -->
+                    <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-2">
+                        Scan
+                    </div>
+                    <NavLink href="scan" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="camera" Class="w-5 h-5" />
+                        <span>Scan Code</span>
+                    </NavLink>
+                    <NavLink href="scan-mappings" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="link" Class="w-5 h-5" />
+                        <span>Scan Mappings</span>
+                    </NavLink>
+                    <NavLink href="qr-generator" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="qr-code" Class="w-5 h-5" />
+                        <span>QR Generator</span>
+                    </NavLink>
+                    
                     <!-- Data Section -->
                     <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-2">
                         Data
@@ -270,6 +328,7 @@
     private bool showMobileMenu = false;
     private bool showUserMenu = false;
     private bool showTagsMenu = false;
+    private bool showScanMenu = false;
     private bool showDataMenu = false;
     private bool _aiAvailable = false;
 
@@ -335,6 +394,7 @@
         {
             showUserMenu = false;
             showTagsMenu = false;
+            showScanMenu = false;
             showDataMenu = false;
         }
     }
@@ -346,6 +406,7 @@
         {
             showMobileMenu = false;
             showTagsMenu = false;
+            showScanMenu = false;
             showDataMenu = false;
         }
     }
@@ -357,6 +418,7 @@
         {
             showMobileMenu = false;
             showUserMenu = false;
+            showScanMenu = false;
             showDataMenu = false;
         }
     }
@@ -369,6 +431,7 @@
             showMobileMenu = false;
             showUserMenu = false;
             showTagsMenu = false;
+            showScanMenu = false;
         }
     }
 
