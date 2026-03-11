@@ -1,3 +1,4 @@
+using System.Net.Http;
 using CommunityToolkit.Maui;
 using LogMyDay.App.Mobile.Services;
 using LogMyDay.Shared.Interfaces;
@@ -56,6 +57,13 @@ public static class MauiProgram
             builder.Services.Add(new ServiceDescriptor(typeof(IApiContext), typeof(ApiContext), ServiceLifetime.Singleton));
             builder.Services.AddTransient<DynamicAuthHandler>();
             builder.Services.AddHttpClient("dynamic-api")
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                    PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                    MaxConnectionsPerServer = 4,
+                    EnableMultipleHttp2Connections = true
+                })
                 .AddHttpMessageHandler<DynamicAuthHandler>();
             builder.Services.Add(new ServiceDescriptor(typeof(IApiClientProvider), typeof(ApiClientProvider), ServiceLifetime.Singleton));
             // Adapter so existing pages injecting API interfaces continue to work
@@ -77,6 +85,7 @@ public static class MauiProgram
 
             // Register other services
             builder.Services.AddScoped<QuickActivityService>();
+            builder.Services.AddSingleton<ISharedDataCache, SharedDataCache>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();
             builder.Services.Add(new ServiceDescriptor(

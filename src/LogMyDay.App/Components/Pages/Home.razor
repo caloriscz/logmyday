@@ -63,24 +63,99 @@
                             </a>
                         </div>
 
-                        <div class="mt-6 @(HasDefaultValue(tag) ? "grid gap-3 sm:grid-cols-2" : "")">
-                            <button type="button" class="@(HasDefaultValue(tag) ? "" : "w-full ") inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="@(() => PrepareModalForTag(tag.Id))">
-                                <Icon Name="plus" Class="h-4 w-4" />
-                                Add activity
-                            </button>
-                            @if (HasDefaultValue(tag))
+                        @{
+                            bool hasDefault = HasDefaultCapability(tag);
+                            bool hasStep = HasStepCapability(tag);
+                            bool showSplit = hasDefault || hasStep;
+                            bool actionBusy = IsActionInProgress(tag.Id);
+                            bool dropdownOpen = openDropdownTagId == tag.Id;
+                        }
+
+                        @if (GetExistingActivity(tag.Id) != null && hasStep)
+                        {
+                            <div class="mt-3 flex items-center gap-1.5 text-sm text-gray-500 dark:text-slate-400">
+                                <span>Current:</span>
+                                <span class="font-semibold text-gray-700 dark:text-slate-200">@FormatStepValue(GetCurrentNumericValue(tag.Id))@(tag.UnitSymbol is not null ? $"\u00a0{tag.UnitSymbol}" : "")</span>
+                            </div>
+                        }
+
+                        <div class="relative mt-5">
+                            @if (showSplit)
+                            {
+                                <div class="flex">
+                                    @if (hasDefault)
+                                    {
+                                        <button type="button"
+                                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-l-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                            @onclick="@(() => SetDefaultAsync(tag))"
+                                            disabled="@actionBusy"
+                                            title="Set default value: @GetDefaultValueLabel(tag)">
+                                            <Icon Name="check" Class="h-4 w-4" />
+                                            Set default (@TruncateLabel(GetDefaultValueLabel(tag)))
+                                            @if (actionBusy)
+                                            {
+                                                <span class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-white"></span>
+                                            }
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button"
+                                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-l-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                            @onclick="@(() => PrepareModalForTag(tag.Id))"
+                                            disabled="@actionBusy">
+                                            <Icon Name="plus" Class="h-4 w-4" />
+                                            Add manually
+                                        </button>
+                                    }
+                                    <button type="button"
+                                        class="inline-flex items-center justify-center @(hasDefault ? "border-l border-emerald-500 bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-emerald-500" : "border-l border-primary-500 bg-primary-600 hover:bg-primary-700 focus-visible:ring-primary-500") rounded-r-lg px-2.5 py-2 text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                        @onclick="@(() => ToggleDropdown(tag.Id))"
+                                        disabled="@actionBusy"
+                                        aria-haspopup="true"
+                                        aria-expanded="@dropdownOpen">
+                                        <Icon Name="chevron-down" Class="h-4 w-4" />
+                                    </button>
+                                </div>
+
+                                @if (dropdownOpen)
+                                {
+                                    <div class="fixed inset-0 z-10" @onclick="CloseDropdown"></div>
+                                    <div class="absolute right-0 z-20 mt-1 min-w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                                        @if (hasStep)
+                                        {
+                                            <button type="button"
+                                                class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                @onclick="@(async () => { CloseDropdown(); await AddStepAsync(tag); })"
+                                                disabled="@(!CanStepUp(tag))">
+                                                <Icon Name="arrow-up" Class="h-4 w-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                                <span>Add step (+@FormatStepValue(tag.Step!.Value) &rarr; <strong>@FormatStepValue(GetNextStepUpValue(tag))</strong>@(tag.UnitSymbol is not null ? $"\u00a0{tag.UnitSymbol}" : ""))</span>
+                                            </button>
+                                            <button type="button"
+                                                class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                @onclick="@(async () => { CloseDropdown(); await RemoveStepAsync(tag); })"
+                                                disabled="@(!CanStepDown(tag))">
+                                                <Icon Name="arrow-down" Class="h-4 w-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />
+                                                <span>Remove step (-@FormatStepValue(tag.Step!.Value) &rarr; <strong>@FormatStepValue(GetNextStepDownValue(tag))</strong>@(tag.UnitSymbol is not null ? $"\u00a0{tag.UnitSymbol}" : ""))</span>
+                                            </button>
+                                            <div class="my-1 border-t border-gray-200 dark:border-slate-700"></div>
+                                        }
+                                        <button type="button"
+                                            class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-700"
+                                            @onclick="@(() => { CloseDropdown(); PrepareModalForTag(tag.Id); })">
+                                            <Icon Name="pencil" Class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-slate-400" />
+                                            Add manually
+                                        </button>
+                                    </div>
+                                }
+                            }
+                            else
                             {
                                 <button type="button"
-                                        class="@GetQuickAddButtonClasses(tag)"
-                                        @onclick="@(() => QuickAddDefaultAsync(tag))"
-                                        disabled="@IsQuickAddDisabled(tag)"
-                                        title="Will add default value: @GetDefaultValueLabel(tag)">
-                                    <Icon Name="check" Class="h-4 w-4" />
-                                    Use default
-                                    @if (IsQuickAddInProgress(tag.Id))
-                                    {
-                                        <span class="h-3 w-3 animate-spin rounded-full border border-white/60 border-t-white"></span>
-                                    }
+                                    class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                                    @onclick="@(() => PrepareModalForTag(tag.Id))">
+                                    <Icon Name="plus" Class="h-4 w-4" />
+                                    Add manually
                                 </button>
                             }
                         </div>
@@ -138,7 +213,9 @@
     private ActivityRequest newActivity = new();
     private int? preselectedTagId;
     private bool showAddActivityModal = false;
-    private readonly HashSet<int> quickAddInProgress = new();
+    private Dictionary<int, ActivityResponse?> existingActivities = new();
+    private readonly HashSet<int> operationInProgress = new();
+    private int? openDropdownTagId;
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -203,6 +280,18 @@
             if (optionLists is not null)
             {
                 optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+
+            existingActivities.Clear();
+            if (unfilledRequiredTags?.Count > 0)
+            {
+                var activityFetchTasks = unfilledRequiredTags.Select(t =>
+                    ActivityApi.GetActivities(tagId: t.Id, startDate: selectedDate.Date, endDate: selectedDate.Date, pageSize: 1));
+                var activityResults = await Task.WhenAll(activityFetchTasks);
+                for (var i = 0; i < unfilledRequiredTags.Count; i++)
+                {
+                    existingActivities[unfilledRequiredTags[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                }
             }
 
             var today = GetTodayInDisplayZone();
@@ -336,25 +425,98 @@
         return $"{baseClasses} border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
     }
 
-    private bool HasDefaultValue(TagResponse tag)
+    private bool HasDefaultCapability(TagResponse tag)
         => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
 
-    private bool IsQuickAddDisabled(TagResponse tag)
-        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
+    private bool HasStepCapability(TagResponse tag)
+        => tag.Step.HasValue && !tag.IsRepeatable;
 
-    private bool IsQuickAddInProgress(int tagId)
-        => quickAddInProgress.Contains(tagId);
+    private bool IsActionInProgress(int tagId)
+        => operationInProgress.Contains(tagId);
 
-    private string GetQuickAddButtonClasses(TagResponse tag)
+    private void ToggleDropdown(int tagId)
     {
-        var baseClasses = "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 w-full";
+        openDropdownTagId = openDropdownTagId == tagId ? null : tagId;
+    }
 
-        if (IsQuickAddDisabled(tag))
+    private void CloseDropdown()
+    {
+        openDropdownTagId = null;
+    }
+
+    private ActivityResponse? GetExistingActivity(int tagId)
+        => existingActivities.TryGetValue(tagId, out var act) ? act : null;
+
+    private double GetCurrentNumericValue(int tagId)
+    {
+        var activity = GetExistingActivity(tagId);
+        if (activity?.Description is null)
         {
-            return $"{baseClasses} cursor-not-allowed bg-emerald-500/40 text-emerald-100 opacity-70";
+            return 0;
         }
 
-        return $"{baseClasses} bg-emerald-600 text-white shadow-sm transition-colors hover:bg-emerald-700";
+        return double.TryParse(activity.Description, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var val) ? val : 0;
+    }
+
+    private double GetNextStepUpValue(TagResponse tag)
+    {
+        var next = GetCurrentNumericValue(tag.Id) + tag.Step!.Value;
+
+        return tag.MaxValue.HasValue ? Math.Min(next, tag.MaxValue.Value) : next;
+    }
+
+    private double GetNextStepDownValue(TagResponse tag)
+    {
+        var next = GetCurrentNumericValue(tag.Id) - tag.Step!.Value;
+        var min = tag.MinValue ?? 0;
+
+        return Math.Max(next, min);
+    }
+
+    private bool CanStepUp(TagResponse tag)
+    {
+        if (!tag.Step.HasValue)
+        {
+            return false;
+        }
+
+        var current = GetCurrentNumericValue(tag.Id);
+
+        return !tag.MaxValue.HasValue || current < tag.MaxValue.Value;
+    }
+
+    private bool CanStepDown(TagResponse tag)
+    {
+        if (!tag.Step.HasValue)
+        {
+            return false;
+        }
+
+        var current = GetCurrentNumericValue(tag.Id);
+        var min = tag.MinValue ?? 0;
+
+        return current > min;
+    }
+
+    private string FormatStepValue(double value)
+    {
+        if (value == Math.Floor(value))
+        {
+            return ((long)value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return value.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string TruncateLabel(string? label, int maxLength = 13)
+    {
+        if (string.IsNullOrEmpty(label) || label.Length <= maxLength)
+        {
+            return label ?? string.Empty;
+        }
+
+        return label[..maxLength] + "\u2026";
     }
 
     private string? GetDefaultValueLabel(TagResponse tag)
@@ -387,7 +549,13 @@
         return null;
     }
 
-    private async Task QuickAddDefaultAsync(TagResponse tag)
+    private async Task RefetchExistingActivityAsync(int tagId)
+    {
+        var result = await ActivityApi.GetActivities(tagId: tagId, startDate: selectedDate.Date, endDate: selectedDate.Date, pageSize: 1);
+        existingActivities[tagId] = result?.Items?.FirstOrDefault();
+    }
+
+    private async Task SetDefaultAsync(TagResponse tag)
     {
         var defaultValue = ResolveDefaultValue(tag);
         if (string.IsNullOrWhiteSpace(defaultValue))
@@ -396,11 +564,12 @@
             return;
         }
 
-        if (!quickAddInProgress.Add(tag.Id))
+        if (!operationInProgress.Add(tag.Id))
         {
             return;
         }
 
+        errorMessage = null;
         var today = GetTodayInDisplayZone();
         var startDate = selectedDate.Date == today
             ? GetCurrentDateTimeInDisplayZone()
@@ -408,14 +577,23 @@
 
         try
         {
+            var existing = GetExistingActivity(tag.Id);
             var request = new ActivityRequest
             {
                 PrimaryTagId = tag.Id,
                 Description = defaultValue,
-                DateStarted = startDate
+                DateStarted = existing?.DateStarted ?? startDate
             };
 
-            await ActivityApi.CreateCalendarItem(request);
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
             await LoadRequiredTags();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
@@ -431,11 +609,135 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error adding default activity: {ex.Message}";
+            errorMessage = $"Error setting default activity: {ex.Message}";
         }
         finally
         {
-            quickAddInProgress.Remove(tag.Id);
+            operationInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddStepAsync(TagResponse tag)
+    {
+        if (!CanStepUp(tag))
+        {
+            return;
+        }
+
+        if (!operationInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        errorMessage = null;
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var newValue = GetNextStepUpValue(tag);
+            var existing = GetExistingActivity(tag.Id);
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = FormatStepValue(newValue),
+                DateStarted = existing?.DateStarted ?? startDate
+            };
+
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
+            await RefetchExistingActivityAsync(tag.Id);
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "Could not update step value.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding step: {ex.Message}";
+        }
+        finally
+        {
+            operationInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveStepAsync(TagResponse tag)
+    {
+        if (!CanStepDown(tag))
+        {
+            return;
+        }
+
+        if (!operationInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        errorMessage = null;
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var newValue = GetNextStepDownValue(tag);
+            var existing = GetExistingActivity(tag.Id);
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = FormatStepValue(newValue),
+                DateStarted = existing?.DateStarted ?? startDate
+            };
+
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
+            await RefetchExistingActivityAsync(tag.Id);
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "Could not update step value.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error removing step: {ex.Message}";
+        }
+        finally
+        {
+            operationInProgress.Remove(tag.Id);
             StateHasChanged();
         }
     }

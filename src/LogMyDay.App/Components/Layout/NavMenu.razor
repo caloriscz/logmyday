@@ -35,9 +35,8 @@
                 </NavLink>
                 
                 <!-- Tags Dropdown -->
-                <div class="relative">
-                    <button @onclick="ToggleTagsMenu" 
-                            type="button"
+                <div class="relative" @onmouseenter="() => showTagsMenu = true" @onmouseleave="() => showTagsMenu = false">
+                    <button type="button"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             aria-label="Tags menu"
                             aria-expanded="@showTagsMenu">
@@ -48,7 +47,8 @@
                     
                     @if (showTagsMenu)
                     {
-                        <div class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                        <div class="absolute left-0 top-full pt-1 z-50">
+                            <div class="w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 animate-fade-in">
                             <NavLink href="tags" @onclick="() => showTagsMenu = false"
                                      class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 <Icon Name="tag" Class="w-4 h-4" />
@@ -64,6 +64,7 @@
                                 <Icon Name="chart" Class="w-4 h-4" />
                                 <span>Units</span>
                             </NavLink>
+                            </div>
                         </div>
                     }
                 </div>
@@ -76,9 +77,8 @@
                 </NavLink>
                 
                 <!-- Data Dropdown -->
-                <div class="relative">
-                    <button @onclick="ToggleDataMenu" 
-                            type="button"
+                <div class="relative" @onmouseenter="() => showDataMenu = true" @onmouseleave="() => showDataMenu = false">
+                    <button type="button"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             aria-label="Data menu"
                             aria-expanded="@showDataMenu">
@@ -89,7 +89,8 @@
                     
                     @if (showDataMenu)
                     {
-                        <div class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                        <div class="absolute left-0 top-full pt-1 z-50">
+                            <div class="w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 animate-fade-in">
                             <NavLink href="backup" @onclick="() => showDataMenu = false"
                                      class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 <Icon Name="database" Class="w-4 h-4" />
@@ -100,6 +101,7 @@
                                 <Icon Name="file-text" Class="w-4 h-4" />
                                 <span>Reports</span>
                             </NavLink>
+                            </div>
                         </div>
                     }
                 </div>
@@ -121,9 +123,8 @@
                 <ThemeToggle />
                 
                 <!-- Account Dropdown -->
-                <div class="relative">
-                    <button @onclick="ToggleUserMenu" 
-                            type="button"
+                <div class="relative" @onmouseenter="() => showUserMenu = true" @onmouseleave="() => showUserMenu = false">
+                    <button type="button"
                             class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             title="@DisplayEmail"
                             aria-label="Account menu"
@@ -134,7 +135,8 @@
                     
                     @if (showUserMenu)
                     {
-                        <div class="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                        <div class="absolute right-0 top-full pt-1 z-50">
+                            <div class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 animate-fade-in">
                             <NavLink href="profile" @onclick="() => showUserMenu = false"
                                      class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 <Icon Name="user" Class="w-4 h-4 flex-shrink-0" />
@@ -164,6 +166,7 @@
                                 <Icon Name="arrow-right" Class="w-4 h-4" />
                                 <span>Logout</span>
                             </button>
+                            </div>
                         </div>
                     }
                 </div>

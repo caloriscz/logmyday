@@ -113,7 +113,7 @@ public class ActivityRepositoryTests
     }
 
     [Fact]
-    public async Task GetRequiredDailyTagsNotFilledAsync_IgnoresNonDailyGranularity()
+    public async Task GetRequiredDailyTagsNotFilledAsync_IncludesAllGranularities()
     {
         // Arrange
         using var context = CreateContext();
@@ -121,7 +121,7 @@ public class ActivityRepositoryTests
         var userId = Guid.NewGuid();
         var today = DateTime.Today;
 
-        // Create tags with different time granularities
+        // Create required tags with different time granularities
         var dailyTag = new Tag 
         { 
             TagName = "DailyTag", 
@@ -134,7 +134,7 @@ public class ActivityRepositoryTests
             TagName = "ExactTimeTag", 
             UserId = userId, 
             IsRequired = true, 
-            TimeGranularity = TimeGranularity.Exact // Not daily
+            TimeGranularity = TimeGranularity.Exact
         };
 
         context.Tags.AddRange(dailyTag, exactTimeTag);
@@ -143,9 +143,10 @@ public class ActivityRepositoryTests
         // Act
         var unfilledTags = await repository.GetRequiredDailyTagsNotFilledAsync(today, userId);
 
-        // Assert - Only daily tag should be returned
-        Assert.Single(unfilledTags);
-        Assert.Equal("DailyTag", unfilledTags[0].TagName);
+        // Assert - All required tags should be returned regardless of granularity
+        Assert.Equal(2, unfilledTags.Count);
+        Assert.Contains(unfilledTags, t => t.TagName == "DailyTag");
+        Assert.Contains(unfilledTags, t => t.TagName == "ExactTimeTag");
     }
 
     [Fact]

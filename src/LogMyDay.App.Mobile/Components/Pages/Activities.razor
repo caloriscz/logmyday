@@ -8,6 +8,7 @@
 @using System.Linq
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
+@inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @inject ILogger<Activities> Logger
@@ -321,6 +322,10 @@
     {
         try
         {
+            // Start cached tag/option-list fetches in parallel with the activities query
+            var tagsTask = SharedDataCache.GetTagsAsync();
+            var optionListsTask = SharedDataCache.GetOptionListsAsync();
+
             DateTime? startDate = null;
             DateTime? endDate = null;
 
@@ -352,8 +357,9 @@
                     break;
             }
 
-            tags = await ActivityApi.GetTags();
-            optionLists = await ActivityApi.GetTagOptionListsAsync();
+            // Await the parallel tag/option-list fetches
+            tags = await tagsTask;
+            optionLists = await optionListsTask;
 
             if (optionLists is not null && optionLists.Count > 0)
             {

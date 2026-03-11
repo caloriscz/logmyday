@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject ISharedDataCache SharedDataCache
 @inject IJSRuntime JSRuntime
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
@@ -194,8 +195,8 @@
 
             // Load both unfilled required tags and all tags for the modal
             var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
-            var allTagsTask = ActivityApi.GetTags();
-            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+            var allTagsTask = SharedDataCache.GetTagsAsync();
+            var optionListsTask = SharedDataCache.GetOptionListsAsync();
 
             await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
 

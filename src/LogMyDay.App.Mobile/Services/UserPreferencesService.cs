@@ -18,9 +18,12 @@ public interface IUserPreferencesService
 
 public sealed class UserPreferencesService : IUserPreferencesService
 {
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
     private readonly IApiClientProvider _apiClientProvider;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private UserPreferencesSnapshot? _cached;
+    private DateTime _cacheExpiresUtc = DateTime.MinValue;
 
     public event EventHandler? PreferencesChanged;
 
@@ -31,9 +34,21 @@ public sealed class UserPreferencesService : IUserPreferencesService
 
     public async Task<UserPreferencesSnapshot> GetAsync(CancellationToken cancellationToken = default)
     {
+        // Fast path: return cached value if not expired
+        if (_cached is not null && DateTime.UtcNow < _cacheExpiresUtc)
+        {
+            return _cached;
+        }
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            // Double-check after acquiring lock
+            if (_cached is not null && DateTime.UtcNow < _cacheExpiresUtc)
+            {
+                return _cached;
+            }
+
             var authApi = _apiClientProvider.Auth;
             var currentUser = await authApi.GetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
 
@@ -47,6 +62,8 @@ public sealed class UserPreferencesService : IUserPreferencesService
                 
                 PreferencesChanged?.Invoke(this, EventArgs.Empty);
             }
+
+            _cacheExpiresUtc = DateTime.UtcNow.Add(CacheTtl);
         }
         finally
         {
@@ -59,6 +76,7 @@ public sealed class UserPreferencesService : IUserPreferencesService
     public void InvalidateCache()
     {
         _cached = null;
+        _cacheExpiresUtc = DateTime.MinValue;
     }
 }
 

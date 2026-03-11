@@ -3,6 +3,7 @@
 @using LogMyDay.Domain.Enums
 @using LogMyDay.App.Mobile.Services
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -281,7 +282,8 @@
     {
         try
         {
-            tags = await ActivityApi.GetTags();
+            SharedDataCache.Invalidate();
+            tags = await SharedDataCache.GetTagsAsync();
             errorMessage = null;
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -300,6 +302,7 @@
         try
         {
             _ = await ActivityApi.CreateTag(newTag);
+            SharedDataCache.Invalidate();
             
             newTag = new() { Tag = "" };
             errorMessage = null;
@@ -331,6 +334,7 @@
         try
         {
             await ActivityApi.DeleteTag(id);
+            SharedDataCache.Invalidate();
             await LoadTags();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)

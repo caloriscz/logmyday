@@ -1,5 +1,4 @@
 using LogMyDay.Domain.Entities;
-using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Api.Infrastructure.Specifications;
 
@@ -172,16 +171,15 @@ public class ActivitiesForYearSpec : BaseSpecification<Activity>
 }
 
 /// <summary>
-/// Specification for required daily tags that haven't been filled for a specific date.
-/// Uses a subquery pattern for finding unfilled tags.
+/// Specification for required tags that haven't been filled for a specific date.
+/// Returns all required tags regardless of time granularity.
 /// </summary>
 public class RequiredDailyTagsNotFilledSpec : BaseSpecification<Tag>
 {
     public RequiredDailyTagsNotFilledSpec(DateTime date, Guid userId)
         : base(t => 
             t.UserId == userId &&
-            t.IsRequired &&
-            t.TimeGranularity == TimeGranularity.Daily)
+            t.IsRequired)
     {
         AddInclude(t => t.InputType);
         AddInclude(t => t.Unit);

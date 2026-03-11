@@ -126,10 +126,6 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Linear Calendar</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Year-as-rows calendar view with week-aligned layout.</p>
         </div>
-        <button type="button" class="@NavButtonCss" @onclick="NavigateToGridView">
-            <Icon Name="grid-3x3" Class="h-4 w-4 mr-1" />
-            Grid Calendar
-        </button>
     </div>
 
     <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
@@ -148,9 +144,9 @@
                 </select>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="w-auto space-y-2">
                 <label for="weekStartPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Week starts</label>
-                <select id="weekStartPicker" class="@WeekPickerCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
+                <select id="weekStartPicker" class="@InputCss" value="@((int)weekStartsOn)" @onchange="OnWeekStartChanged">
                     <option value="1">Monday</option>
                     <option value="0">Sunday</option>
                 </select>
@@ -158,18 +154,38 @@
         </div>
 
         <div class="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <div class="flex items-center gap-2">
+            <div class="inline-flex items-center gap-1 rounded-full bg-gray-100 p-0.5 dark:bg-slate-800">
                 <button type="button" class="@GetOrderButtonClass(OrderDescending)" @onclick="@(() => ChangeOrder(OrderDescending))">Newest First</button>
                 <button type="button" class="@GetOrderButtonClass(OrderAscending)" @onclick="@(() => ChangeOrder(OrderAscending))">Oldest First</button>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
-                <button type="button" class="@NavButtonCss" @onclick="PrevYear" disabled="@(!hasPreviousYear)">Previous</button>
-                <div class="text-sm text-gray-600 dark:text-slate-300">
-                    <span class="font-semibold text-gray-900 dark:text-slate-100">@currentYear</span>
-                    <span class="ml-2">(@availableYears.Count year@(availableYears.Count == 1 ? "" : "s") available)</span>
+                <button type="button" class="@NavButtonCss" @onclick="PrevYear" disabled="@(currentYear <= DateTime.Now.Year - 10)">Older</button>
+                <div class="flex flex-col items-center gap-0.5">
+                    <div class="text-sm text-gray-600 dark:text-slate-300">
+                        <span class="font-semibold text-gray-900 dark:text-slate-100">@currentYear</span>
+                        <span class="ml-2">(@availableYears.Count year@(availableYears.Count == 1 ? "" : "s") available)</span>
+                    </div>
+                    @if (selectedTagId.HasValue && activitiesByDate != null)
+                    {
+                        @if (activitiesByDate.Count > 0)
+                        {
+                            var entryCount = activitiesByDate.Values.Sum(v => v.Count);
+                            <span class="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                @entryCount @(entryCount == 1 ? "entry" : "entries")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400">
+                                <span class="h-2 w-2 rounded-full border border-current"></span>
+                                No entries
+                            </span>
+                        }
+                    }
                 </div>
-                <button type="button" class="@NavButtonCss" @onclick="NextYear" disabled="@(!hasNextYear)">Next</button>
+                <button type="button" class="@NavButtonCss" @onclick="NextYear" disabled="@(currentYear >= DateTime.Now.Year)">Newer</button>
             </div>
         </div>
     </div>
@@ -191,12 +207,6 @@
     {
         <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading calendar data...
-        </div>
-    }
-    else if (activitiesByDate.Count == 0)
-    {
-        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            No activities found for this tag in @currentYear.
         </div>
     }
     else
@@ -400,10 +410,9 @@
 
 @code {
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-    private const string WeekPickerCss = "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
-    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900";
-    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900";
+    private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200";
+    private const string OrderButtonActive = "inline-flex items-center justify-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white shadow-sm dark:bg-slate-200 dark:text-slate-900";
     private const string OrderDescending = "desc";
     private const string OrderAscending = "asc";
     private const int FixedCells = 42; // 6 weeks × 7 days
@@ -422,11 +431,10 @@
     private string? errorMessage;
     private int currentYear = DateTime.Now.Year;
     private List<int> availableYears = new();
-    private bool hasNextYear;
-    private bool hasPreviousYear;
     private DayOfWeek weekStartsOn = DayOfWeek.Sunday; // Default, will be set from culture
     private string orderBy = OrderDescending;
-    
+    private bool savedPreferencesLoaded;
+
     private bool showDayActivitiesModal;
     private bool isDayModalLoading;
     private string? dayModalError;
@@ -452,22 +460,31 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && tags != null && tags.Any())
+        if (!savedPreferencesLoaded && tags != null && tags.Any())
         {
+            savedPreferencesLoaded = true;
+
             try
             {
+                var savedOrder = await JSRuntime.InvokeAsync<string?>("tagPersistence.getCalendarOrder");
+                if (!string.IsNullOrEmpty(savedOrder))
+                {
+                    orderBy = savedOrder;
+                }
+
                 var savedTagId = await JSRuntime.InvokeAsync<int?>("tagPersistence.getSelectedTag");
                 if (savedTagId.HasValue && tags.Any(t => t.Id == savedTagId.Value))
                 {
                     selectedTagId = savedTagId.Value;
                     await LoadActivitiesForTag(savedTagId.Value);
-                    StateHasChanged();
                 }
             }
             catch
             {
-                // Ignore errors loading saved tag preference
+                // JS interop may fail during prerendering
             }
+
+            StateHasChanged();
         }
     }
 
@@ -548,39 +565,23 @@
 
     private async Task PrevYear()
     {
-        if (selectedTagId.HasValue && hasPreviousYear)
-        {
-            var currentIndex = availableYears.IndexOf(currentYear);
-            if (currentIndex > 0)
-            {
-                currentYear = availableYears[currentIndex - 1];
-                await LoadActivitiesForTag(selectedTagId.Value);
-            }
-        }
-        else
+        if (selectedTagId.HasValue && currentYear > DateTime.Now.Year - 10)
         {
             currentYear--;
+            await LoadActivitiesForYear(selectedTagId.Value);
         }
     }
 
     private async Task NextYear()
     {
-        if (selectedTagId.HasValue && hasNextYear)
-        {
-            var currentIndex = availableYears.IndexOf(currentYear);
-            if (currentIndex >= 0 && currentIndex < availableYears.Count - 1)
-            {
-                currentYear = availableYears[currentIndex + 1];
-                await LoadActivitiesForTag(selectedTagId.Value);
-            }
-        }
-        else
+        if (selectedTagId.HasValue && currentYear < DateTime.Now.Year)
         {
             currentYear++;
+            await LoadActivitiesForYear(selectedTagId.Value);
         }
     }
 
-    private void ChangeOrder(string order)
+    private async Task ChangeOrder(string order)
     {
         if (string.Equals(orderBy, order, StringComparison.OrdinalIgnoreCase))
         {
@@ -588,6 +589,7 @@
         }
 
         orderBy = order;
+        await JSRuntime.InvokeVoidAsync("tagPersistence.saveCalendarOrder", order);
     }
 
     private async Task LoadPreferencesAsync()
@@ -664,8 +666,6 @@
             await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", null);
             activitiesByDate = null;
             availableYears.Clear();
-            hasNextYear = false;
-            hasPreviousYear = false;
         }
     }
 
@@ -682,13 +682,28 @@
 
             if (availableYears.Count > 0 && !availableYears.Contains(currentYear))
             {
-                currentYear = availableYears[0];
+                currentYear = string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase) 
+                    ? availableYears.Last() 
+                    : availableYears.First();
             }
             else if (availableYears.Count == 0)
             {
                 currentYear = DateTime.Now.Year;
             }
 
+            await LoadActivitiesForYear(tagId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading activities: {ex.Message}";
+            activitiesByDate = new Dictionary<string, List<string>>();
+        }
+    }
+
+    private async Task LoadActivitiesForYear(int tagId)
+    {
+        try
+        {
             var activities = await ActivityApi.GetActivitiesByYear(currentYear, tagId);
 
             activitiesByDate = activities?
@@ -697,10 +712,6 @@
                     g => g.Key,
                     g => g.Select(a => a.Description ?? string.Empty).ToList())
                 ?? new Dictionary<string, List<string>>();
-
-            var currentIndex = availableYears.IndexOf(currentYear);
-            hasPreviousYear = currentIndex > 0;
-            hasNextYear = currentIndex >= 0 && currentIndex < availableYears.Count - 1;
 
             errorMessage = null;
         }
