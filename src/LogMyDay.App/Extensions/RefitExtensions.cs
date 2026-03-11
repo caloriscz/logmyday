@@ -45,6 +45,10 @@ internal static class RefitExtensions
             .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
             .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
+        services.AddRefitClient<IScanMappingApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
         return services;
     }
 }
