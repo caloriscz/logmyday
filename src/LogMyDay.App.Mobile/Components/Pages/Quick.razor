@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject QuickActivityService QuickActivityService
 @inject IActivityApi ActivityApi
+@inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
@@ -306,8 +307,7 @@
             return;
         }
 
-        await LoadQuickButtons();
-        await LoadTags();
+        await Task.WhenAll(LoadQuickButtons(), LoadTags());
     }
 
     public async ValueTask DisposeAsync()
@@ -342,7 +342,7 @@
     {
         try
         {
-            var tagsList = await ActivityApi.GetTags();
+            var tagsList = await SharedDataCache.GetTagsAsync();
             availableTags = tagsList.ToList();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)

@@ -81,7 +81,8 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         _logger.LogInformation("Starting notification monitoring loop");
         WriteDebug("Starting notification monitoring loop");
 
-        _ = CheckNotificationsAsync(forceRefresh: true);
+        // Delay the initial check to avoid competing with page data loading for HTTP connections
+        _ = Task.Delay(TimeSpan.FromSeconds(10)).ContinueWith(_ => CheckNotificationsAsync(forceRefresh: true));
 
         _checkTimer = new System.Timers.Timer(CheckInterval.TotalMilliseconds);
         _checkTimer.Elapsed += OnTimerElapsed;

@@ -6,6 +6,7 @@
 @using System.Linq
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject ILogger<OptionLists> Logger
 @inject IPageTitleService PageTitleService
 
@@ -235,7 +236,7 @@
 
         try
         {
-            var results = await ActivityApi.GetTagOptionListsAsync();
+            var results = await SharedDataCache.GetOptionListsAsync();
             lists.Clear();
             lists.AddRange(results.OrderBy(l => l.Name));
         }
@@ -275,6 +276,7 @@
                 await ActivityApi.CreateTagOptionList(listForm);
             }
 
+            SharedDataCache.Invalidate();
             await LoadListsAsync();
             ResetForm();
         }
@@ -396,6 +398,7 @@
         try
         {
             await ActivityApi.DeleteTagOptionList(listPendingDelete.Id);
+            SharedDataCache.Invalidate();
             await LoadListsAsync();
         }
         catch (Refit.ApiException ex)

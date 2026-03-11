@@ -3,6 +3,7 @@
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject IApiContext ApiContext
 @inject IApiClientProvider ApiProvider
+@inject ISharedDataCache SharedDataCache
 @inject ILogger<Layout.MainLayout> Logger
 @inject NotificationNavigationService NotificationNavigation
 @implements IDisposable
@@ -120,10 +121,6 @@ else
         AuthService.AuthenticationChanged += OnAuthenticationChanged;
         NotificationNavigation.NavigationRequested += OnNotificationNavigationRequested;
 
-        // Show loading screen while checking authentication
-        _isCheckingAuthentication = true;
-        StateHasChanged();
-
         await TryRestoreSessionAsync();
 
         // If authentication was restored successfully, redirect to activities BEFORE hiding loading screen
@@ -214,7 +211,8 @@ else
             {
                 try
                 {
-                    await ApiProvider.Activity.GetTags();
+                    var tags = await ApiProvider.Activity.GetTags();
+                    SharedDataCache.SeedTags(tags);
                 }
                 catch (ApiException apiEx) when (apiEx.StatusCode == HttpStatusCode.Unauthorized)
                 {
