@@ -1,0 +1,145 @@
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@inject LogMyDay.Shared.Interfaces.IScanMappingApi ScanMappingApi
+
+<div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Unknown Code</h2>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Link this code to a tag so future scans create activities automatically.</p>
+    </div>
+
+    <div class="px-5 py-4 space-y-4">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Scanned value</p>
+            <p class="mt-1 break-all font-mono text-sm text-gray-900 dark:text-white">@CodeValue</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @errorMessage
+            </div>
+        }
+
+        <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tag</label>
+            <select @bind="selectedTagId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" disabled="@isBusy">
+                <option value="0">-- Select Tag --</option>
+                @if (AvailableTags != null)
+                {
+                    @foreach (var tag in AvailableTags)
+                    {
+                        <option value="@tag.Id">@tag.Title</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Display Name</label>
+            <input type="text" @bind="displayName"
+                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                   placeholder="e.g., Magnesium 400mg" disabled="@isBusy" />
+            <p class="text-xs text-gray-500 dark:text-gray-400">Optional friendly name for this code.</p>
+        </div>
+
+        <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Default Value</label>
+            <input type="text" @bind="defaultDescription"
+                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                   placeholder="Pre-filled activity value" disabled="@isBusy" />
+            <p class="text-xs text-gray-500 dark:text-gray-400">Pre-filled as the activity description on future scans.</p>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-4 dark:border-slate-700">
+        <button type="button"
+                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700"
+                @onclick="HandleSkip" disabled="@isBusy">
+            Skip
+        </button>
+        <button type="button"
+                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 disabled:opacity-60"
+                @onclick="HandleSave" disabled="@(isBusy || selectedTagId == 0)">
+            @if (isBusy)
+            {
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                <span>Saving…</span>
+            }
+            else
+            {
+                <i class="bi bi-link-45deg text-base"></i>
+                <span>Link &amp; Create Activity</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string CodeValue { get; set; } = string.Empty;
+
+    [Parameter]
+    public CodeType CodeType { get; set; } = CodeType.QRCode;
+
+    [Parameter]
+    public IList<TagResponse>? AvailableTags { get; set; }
+
+    [Parameter]
+    public EventCallback<ScanMappingResponse> OnLinked { get; set; }
+
+    [Parameter]
+    public EventCallback OnCanceled { get; set; }
+
+    private int selectedTagId;
+    private string? displayName;
+    private string? defaultDescription;
+    private string? errorMessage;
+    private bool isBusy;
+
+    private async Task HandleSkip()
+    {
+        await OnCanceled.InvokeAsync();
+    }
+
+    private async Task HandleSave()
+    {
+        if (selectedTagId == 0)
+        {
+            errorMessage = "Please select a tag.";
+
+            return;
+        }
+
+        isBusy = true;
+        errorMessage = null;
+
+        try
+        {
+            var request = new ScanMappingRequest
+            {
+                CodeValue = CodeValue,
+                CodeType = CodeType,
+                TagId = selectedTagId,
+                DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim(),
+                DefaultDescription = string.IsNullOrWhiteSpace(defaultDescription) ? null : defaultDescription.Trim(),
+                IsActive = true
+            };
+
+            var created = await ScanMappingApi.Create(request);
+            await OnLinked.InvokeAsync(created);
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            errorMessage = "A mapping for this code already exists.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to save mapping: {ex.Message}";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

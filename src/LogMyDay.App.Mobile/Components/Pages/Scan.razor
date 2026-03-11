@@ -1,0 +1,300 @@
+@page "/scan"
+@using System.Globalization
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using LogMyDay.Shared.Scanning
+@using LogMyDay.Shared.Preferences
+@using LogMyDay.App.Mobile.Components.Shared
+@using LogMyDay.App.Mobile.Services
+@inject IScanOrchestrator ScanOrchestrator
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+@inject ISharedDataCache SharedDataCache
+@inject IJSRuntime JSRuntime
+@inject ILogger<Scan> Logger
+
+<PageTitle>Scan - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="Scan" ShowReload="false" />
+
+    <div class="px-6 py-4 space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+            Scan a barcode or QR code to log an activity instantly.
+        </p>
+
+        @switch (pageState)
+        {
+            case PageState.Scanner:
+                <BarcodeScanner OnScanned="HandleScanned" />
+                break;
+
+            case PageState.Processing:
+                <div class="flex flex-col items-center gap-3 rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+                    <span class="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary-600 dark:border-slate-600 dark:border-t-primary-400"></span>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Looking up scanned code…</p>
+                </div>
+                break;
+
+            case PageState.Error:
+                <div class="space-y-4">
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @errorMessage
+                    </div>
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700" @onclick="ResetToScanner">
+                        <i class="bi bi-camera text-base"></i>
+                        Scan Again
+                    </button>
+                </div>
+                break;
+
+            case PageState.UnknownCode:
+                @if (lastScannedValue != null && allTags != null)
+                {
+                    <LinkUnknownCodeDialog CodeValue="@lastScannedValue"
+                                           CodeType="@lastCodeType"
+                                           AvailableTags="allTags"
+                                           OnLinked="HandleLinked"
+                                           OnCanceled="ResetToScanner" />
+                }
+                break;
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-600/20 dark:text-emerald-200">
+                @successMessage
+            </div>
+        }
+    </div>
+</div>
+
+@* AddActivityModal — shown when tag is resolved *@
+@if (showActivityModal && allTags != null && newActivity != null)
+{
+    <AddActivityModal Activity="newActivity"
+                      AvailableTags="allTags"
+                      OptionLists="optionLists"
+                      OptionListLookup="optionListLookup"
+                      DisplayCulture="displayCulture"
+                      DisplayTimeZone="displayTimeZone"
+                      PreselectedTagId="preselectedTagId"
+                      PreselectedDate="DateTime.Today"
+                      OnActivityCreated="OnActivityCreated"
+                      OnCanceled="CloseActivityModal"
+                      OnError="OnActivityModalError"
+                      ModalId="scanAddActivityModal" />
+}
+
+@code {
+    private enum PageState { Scanner, Processing, Error, UnknownCode }
+
+    private PageState pageState = PageState.Scanner;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? lastScannedValue;
+    private CodeType lastCodeType;
+
+    // Activity modal state
+    private bool showActivityModal;
+    private bool shouldShowModalAfterRender;
+    private ActivityRequest? newActivity;
+    private int? preselectedTagId;
+    private IList<TagResponse>? allTags;
+    private IList<TagOptionListResponse>? optionLists;
+    private Dictionary<int, TagOptionListResponse>? optionListLookup;
+
+    // User preferences
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Scan");
+
+        try
+        {
+            var prefs = await UserPreferencesService.GetAsync();
+            displayCulture = prefs.Culture;
+            displayTimeZone = prefs.TimeZone;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load user preferences, using defaults");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadTagData();
+            StateHasChanged();
+        }
+
+        if (shouldShowModalAfterRender && showActivityModal)
+        {
+            shouldShowModalAfterRender = false;
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("showModal", "scanAddActivityModal");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to show scan activity modal");
+            }
+        }
+    }
+
+    private async Task LoadTagData()
+    {
+        try
+        {
+            var tagsTask = ActivityApi.GetTags();
+            var listsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(tagsTask, listsTask);
+
+            allTags = await tagsTask;
+            optionLists = await listsTask;
+
+            if (optionLists is not null)
+            {
+                optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load tags for scan page");
+        }
+    }
+
+    private async Task HandleScanned(BarcodeScanner.ScanEventArgs args)
+    {
+        successMessage = null;
+        lastScannedValue = args.DecodedText;
+        lastCodeType = args.FormatName.Contains("QR", StringComparison.OrdinalIgnoreCase)
+            ? CodeType.QRCode
+            : CodeType.Barcode;
+
+        pageState = PageState.Processing;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ScanOrchestrator.Process(args.DecodedText);
+
+            switch (result.Type)
+            {
+                case ScanResultType.TagFound:
+                    OpenActivityModal(result);
+                    break;
+
+                case ScanResultType.TagNotFound:
+                    pageState = PageState.Error;
+                    errorMessage = "The tag referenced by this code no longer exists. It may have been deleted.";
+                    break;
+
+                case ScanResultType.UnknownCode:
+                    pageState = PageState.UnknownCode;
+                    break;
+
+                case ScanResultType.Error:
+                    pageState = PageState.Error;
+                    errorMessage = "Something went wrong while processing the scan. Please try again.";
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error processing scan result for {Value}", args.DecodedText);
+            pageState = PageState.Error;
+            errorMessage = $"Failed to process scan: {ex.Message}";
+        }
+
+        StateHasChanged();
+    }
+
+    private void OpenActivityModal(ScanResult result)
+    {
+        preselectedTagId = result.TagId;
+        newActivity = new ActivityRequest
+        {
+            PrimaryTagId = result.TagId ?? 0,
+            Description = result.PrefilledValue ?? string.Empty,
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        showActivityModal = true;
+        shouldShowModalAfterRender = true;
+        pageState = PageState.Scanner;
+    }
+
+    private void HandleLinked(ScanMappingResponse mapping)
+    {
+        preselectedTagId = mapping.TagId;
+        newActivity = new ActivityRequest
+        {
+            PrimaryTagId = mapping.TagId,
+            Description = mapping.DefaultDescription ?? string.Empty,
+            DateStarted = GetCurrentDateTimeInDisplayZone()
+        };
+        showActivityModal = true;
+        shouldShowModalAfterRender = true;
+        pageState = PageState.Scanner;
+        StateHasChanged();
+    }
+
+    private async Task OnActivityCreated(ActivityRequest activity)
+    {
+        await HideActivityModal();
+        showActivityModal = false;
+        newActivity = null;
+        preselectedTagId = null;
+
+        var tagName = allTags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId)?.Title;
+        successMessage = $"Activity logged{(tagName != null ? $" for {tagName}" : "")}!";
+        pageState = PageState.Scanner;
+        StateHasChanged();
+
+        await Task.Delay(4000);
+        successMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task CloseActivityModal()
+    {
+        await HideActivityModal();
+        showActivityModal = false;
+        newActivity = null;
+        preselectedTagId = null;
+        pageState = PageState.Scanner;
+    }
+
+    private async Task HideActivityModal()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "scanAddActivityModal");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to hide scan activity modal");
+        }
+    }
+
+    private Task OnActivityModalError(string error)
+    {
+        return Task.CompletedTask;
+    }
+
+    private void ResetToScanner()
+    {
+        pageState = PageState.Scanner;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
+}

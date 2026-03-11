@@ -30,6 +30,7 @@ public static class MauiProgram
         {
 #if ANDROID
             handlers.AddHandler(typeof(LogMyDay.App.Mobile.Controls.CustomRefreshView), typeof(LogMyDay.App.Mobile.Platforms.Android.CustomRefreshViewHandler));
+            handlers.AddHandler<BlazorWebView, LogMyDay.App.Mobile.Platforms.Android.Handlers.CameraEnabledBlazorHandler>();
 #endif
         });
 

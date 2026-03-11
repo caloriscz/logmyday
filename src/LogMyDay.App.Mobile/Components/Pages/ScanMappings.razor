@@ -1,0 +1,420 @@
+@page "/scan-mappings"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using LogMyDay.App.Mobile.Services
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IScanMappingApi ScanMappingApi
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject IJSRuntime JSRuntime
+@inject ILogger<ScanMappings> Logger
+
+<PageTitle>Scan Mappings - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="Scan Mappings" BackUrl="/scan" ShowReload="true" OnReload="LoadData" />
+
+    <div class="px-6 py-4 space-y-4">
+        @if (isLoading)
+        {
+            <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading mappings…</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+        else if (mappings.Count == 0)
+        {
+            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-gray-800">
+                <i class="bi bi-qr-code-scan text-4xl text-gray-400 dark:text-gray-500 mb-3"></i>
+                <p class="text-gray-600 dark:text-gray-400">No scan mappings yet.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">Scan a barcode on the Scan page or add one manually.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var mapping in mappings)
+            {
+                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">@(mapping.DisplayName ?? mapping.TagName ?? "Mapping")</h3>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono dark:bg-slate-800">@TruncateCode(mapping.CodeValue)</code>
+                            </p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold @(mapping.IsActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-600/20 dark:text-emerald-300" : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-400")">
+                            @(mapping.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </div>
+
+                    <dl class="mt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <dt class="font-medium text-gray-500 dark:text-gray-400">Tag</dt>
+                            <dd class="text-gray-900 dark:text-white">@(mapping.TagName ?? $"#{mapping.TagId}")</dd>
+                        </div>
+                        <div>
+                            <dt class="font-medium text-gray-500 dark:text-gray-400">Type</dt>
+                            <dd class="text-gray-900 dark:text-white">@mapping.CodeType</dd>
+                        </div>
+                        @if (!string.IsNullOrEmpty(mapping.DefaultDescription))
+                        {
+                            <div class="col-span-2">
+                                <dt class="font-medium text-gray-500 dark:text-gray-400">Default Value</dt>
+                                <dd class="text-gray-900 dark:text-white">@mapping.DefaultDescription</dd>
+                            </div>
+                        }
+                    </dl>
+
+                    <div class="mt-3 flex justify-end gap-2">
+                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700" @onclick="() => OpenEditModal(mapping)" disabled="@isBusy">
+                            <i class="bi bi-pencil"></i>
+                            <span>Edit</span>
+                        </button>
+                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10" @onclick="() => ConfirmDelete(mapping)" disabled="@isBusy">
+                            <i class="bi bi-trash"></i>
+                            <span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
+                Total mappings: @mappings.Count
+            </p>
+        }
+    </div>
+
+    @* FAB — Add Mapping *@
+    <button class="fab" @onclick="OpenCreateModal" disabled="@isBusy" title="Add Mapping">
+        <i class="bi bi-plus-lg text-2xl"></i>
+    </button>
+</div>
+
+@* Create/Edit Modal *@
+@if (showModal)
+{
+    <div class="modal fade" id="scanMappingModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
+            <div class="modal-content bg-white dark:bg-gray-800 border-0 rounded-2xl overflow-hidden">
+                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-slate-700">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">@(isEditing ? "Edit Mapping" : "Add Mapping")</h2>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Link a barcode or QR code to a tag.</p>
+                    </div>
+                    <button type="button" class="flex items-center justify-center w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700" @onclick="CloseModal" disabled="@isBusy">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="mx-5 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @formError
+                    </div>
+                }
+
+                <div class="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Code Value</label>
+                        <input type="text" @bind="formModel.CodeValue"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                               placeholder="Barcode or QR code string" disabled="@isBusy" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Code Type</label>
+                            <select @bind="formModel.CodeType"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" disabled="@isBusy">
+                                <option value="@CodeType.Barcode">Barcode</option>
+                                <option value="@CodeType.QRCode">QR Code</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tag</label>
+                            <select @bind="formModel.TagId"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" disabled="@isBusy">
+                                <option value="0">-- Select --</option>
+                                @foreach (var tag in tags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Display Name</label>
+                        <input type="text" @bind="formModel.DisplayName"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                               placeholder="e.g., Magnesium 400mg" disabled="@isBusy" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Default Description</label>
+                        <input type="text" @bind="formModel.DefaultDescription"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                               placeholder="Pre-filled activity value" disabled="@isBusy" />
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" @bind="formModel.IsActive"
+                               class="h-4 w-4 rounded border-gray-300 text-primary-600" disabled="@isBusy" />
+                        <label class="text-sm text-gray-700 dark:text-gray-300">Active</label>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-slate-700">
+                    <button type="button" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700" @onclick="CloseModal" disabled="@isBusy">
+                        Cancel
+                    </button>
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60" @onclick="HandleSubmit" disabled="@isBusy">
+                        @if (isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-lg"></i>
+                            <span>@(isEditing ? "Save Changes" : "Create Mapping")</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (pendingDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-gray-800">
+            <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Delete mapping</h3>
+            </div>
+            <div class="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
+                Delete mapping <strong>@(pendingDelete.DisplayName ?? pendingDelete.CodeValue)</strong>? This cannot be undone.
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700" @onclick="CancelDelete" disabled="@isBusy">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60" @onclick="DeleteMapping" disabled="@isBusy">
+                    @if (isBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Deleting…</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-trash"></i>
+                        <span>Delete</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<ScanMappingResponse> mappings = new();
+    private readonly List<TagResponse> tags = new();
+    private ScanMappingRequest formModel = new() { CodeValue = string.Empty };
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingId;
+    private bool showModal;
+    private bool shouldShowModalAfterRender;
+    private ScanMappingResponse? pendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Scan Mappings");
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldShowModalAfterRender && showModal)
+        {
+            shouldShowModalAfterRender = false;
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("showModal", "scanMappingModal");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to show scan mapping modal");
+            }
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var tagResults = await ActivityApi.GetTags();
+            tags.Clear();
+            tags.AddRange(tagResults.OrderBy(t => t.Title));
+
+            var mappingResults = await ScanMappingApi.GetAll();
+            mappings.Clear();
+            mappings.AddRange(mappingResults.OrderBy(m => m.DisplayName ?? m.CodeValue));
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view scan mappings.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load scan mappings: {ex.Message}";
+            Logger.LogError(ex, "Failed to load scan mappings");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        if (isBusy) return;
+
+        isEditing = false;
+        editingId = null;
+        formModel = new ScanMappingRequest { CodeValue = string.Empty, IsActive = true };
+        formError = null;
+        showModal = true;
+        shouldShowModalAfterRender = true;
+    }
+
+    private void OpenEditModal(ScanMappingResponse mapping)
+    {
+        if (isBusy) return;
+
+        isEditing = true;
+        editingId = mapping.Id;
+        formModel = new ScanMappingRequest
+        {
+            CodeValue = mapping.CodeValue,
+            CodeType = mapping.CodeType,
+            TagId = mapping.TagId,
+            DisplayName = mapping.DisplayName,
+            DefaultDescription = mapping.DefaultDescription,
+            IsActive = mapping.IsActive
+        };
+        formError = null;
+        showModal = true;
+        shouldShowModalAfterRender = true;
+    }
+
+    private async Task CloseModal()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("hideModal", "scanMappingModal");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to hide scan mapping modal");
+        }
+
+        showModal = false;
+        formError = null;
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (formModel.TagId == 0)
+        {
+            formError = "Please select a tag.";
+
+            return;
+        }
+
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            if (isEditing && editingId.HasValue)
+            {
+                await ScanMappingApi.Update(editingId.Value, formModel);
+            }
+            else
+            {
+                await ScanMappingApi.Create(formModel);
+            }
+
+            await CloseModal();
+            await LoadData();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            formError = "A mapping with this code value already exists.";
+        }
+        catch (Exception ex)
+        {
+            formError = $"Failed to save: {ex.Message}";
+            Logger.LogError(ex, "Failed to save scan mapping");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void ConfirmDelete(ScanMappingResponse mapping)
+    {
+        if (isBusy) return;
+
+        pendingDelete = mapping;
+    }
+
+    private void CancelDelete()
+    {
+        pendingDelete = null;
+    }
+
+    private async Task DeleteMapping()
+    {
+        if (pendingDelete == null) return;
+
+        var deleteId = pendingDelete.Id;
+        isBusy = true;
+
+        try
+        {
+            await ScanMappingApi.Delete(deleteId);
+            pendingDelete = null;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete scan mapping {Id}", deleteId);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string TruncateCode(string code) =>
+        code.Length > 30 ? string.Concat(code.AsSpan(0, 27), "…") : code;
+}
