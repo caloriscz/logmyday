@@ -2,6 +2,7 @@ using System.Net.Http;
 using CommunityToolkit.Maui;
 using LogMyDay.App.Mobile.Services;
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.Shared.Scanning;
 using Microsoft.AspNetCore.Components.WebView.Maui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -71,6 +72,7 @@ public static class MauiProgram
             builder.Services.AddTransient<IAuthApi>(sp => sp.GetRequiredService<IApiClientProvider>().Auth);
             builder.Services.AddTransient<IUsersApi>(sp => sp.GetRequiredService<IApiClientProvider>().Users);
             builder.Services.AddTransient<IAccountApi>(sp => sp.GetRequiredService<IApiClientProvider>().Account);
+            builder.Services.AddTransient<IScanMappingApi>(sp => sp.GetRequiredService<IApiClientProvider>().ScanMapping);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>
@@ -85,6 +87,7 @@ public static class MauiProgram
 
             // Register other services
             builder.Services.AddScoped<QuickActivityService>();
+            builder.Services.AddScoped<IScanOrchestrator, ScanOrchestrator>();
             builder.Services.AddSingleton<ISharedDataCache, SharedDataCache>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();

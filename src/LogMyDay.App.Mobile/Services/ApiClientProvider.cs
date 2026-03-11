@@ -11,6 +11,7 @@ public interface IApiClientProvider
     IAuthApi Auth { get; }
     IUsersApi Users { get; }
     IAccountApi Account { get; }
+    IScanMappingApi ScanMapping { get; }
     void Invalidate();
 }
 
@@ -22,6 +23,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private IAuthApi? _auth;
     private IUsersApi? _users;
     private IAccountApi? _account;
+    private IScanMappingApi? _scanMapping;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -34,6 +36,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IAuthApi Auth => _auth ??= Build<IAuthApi>();
     public IUsersApi Users => _users ??= Build<IUsersApi>();
     public IAccountApi Account => _account ??= Build<IAccountApi>();
+    public IScanMappingApi ScanMapping => _scanMapping ??= Build<IScanMappingApi>();
 
     private static readonly RefitSettings SharedRefitSettings = new()
     {
@@ -58,6 +61,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _auth = null;
         _users = null;
         _account = null;
+        _scanMapping = null;
     }
 
     public void Dispose()
