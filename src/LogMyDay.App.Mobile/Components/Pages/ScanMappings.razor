@@ -12,7 +12,8 @@
 <PageTitle>Scan Mappings - LogMyDay</PageTitle>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="Scan Mappings" BackUrl="/scan" ShowReload="true" OnReload="LoadData" />
+    <TopBar Title="Scan Mappings" ShowReload="true" OnReload="LoadData" />
+    <ScanSectionNav />
 
     <div class="px-6 py-4 space-y-4">
         @if (isLoading)

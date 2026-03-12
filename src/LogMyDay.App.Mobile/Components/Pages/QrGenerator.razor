@@ -1,0 +1,246 @@
+@page "/qr-generator"
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Mobile.Services
+@using Microsoft.JSInterop
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject IJSRuntime JSRuntime
+@inject ILogger<QrGenerator> Logger
+
+<PageTitle>QR Generator - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="QR Generator" ShowReload="false" />
+    <ScanSectionNav />
+
+    <div class="px-4 py-4 space-y-4">
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+            <div class="space-y-4">
+                <div class="space-y-1.5">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tag</label>
+                    <select @bind="selectedTagId" @bind:after="OnTagChanged"
+                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                        <option value="0">-- Select Tag --</option>
+                        @if (tags != null)
+                        {
+                            @foreach (var tag in tags)
+                            {
+                                <option value="@tag.Id">@tag.Title</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Pre-filled Value
+                        <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
+                    </label>
+                    <input type="text" @bind="prefilledValue" @bind:after="OnValueChanged"
+                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                           placeholder="e.g., 400mg" />
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Pre-filled in activity description when scanned.</p>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Display Name
+                        <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
+                    </label>
+                    <input type="text" @bind="displayName" @bind:after="OnValueChanged"
+                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                           placeholder="e.g., Magnesium 400mg" />
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Human-readable label printed alongside the QR code.</p>
+                </div>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading tags…</span>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+
+        @if (selectedTagId > 0)
+        {
+            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Generated QR Code</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono break-all mb-4">@generatedUri</p>
+
+                <div class="flex justify-center rounded-lg bg-white p-4 dark:bg-white mb-4">
+                    <div id="@qrElementId"></div>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700"
+                            @onclick="DownloadQr">
+                        <i class="bi bi-download"></i>
+                        Download PNG
+                    </button>
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 dark:hover:bg-slate-700"
+                            @onclick="PrintQr">
+                        <i class="bi bi-printer"></i>
+                        Print
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private IList<TagResponse>? tags;
+    private int selectedTagId;
+    private string? prefilledValue;
+    private string? displayName;
+    private string generatedUri = string.Empty;
+    private string qrElementId = "qr-output-mobile";
+    private bool isLoading;
+    private string? loadError;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("QR Generator");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadTags();
+            StateHasChanged();
+        }
+
+        if (selectedTagId > 0 && !string.IsNullOrEmpty(generatedUri))
+        {
+            await RenderQr();
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            tags = await ActivityApi.GetTags();
+        }
+        catch (Exception ex)
+        {
+            loadError = "Failed to load tags.";
+            Logger.LogWarning(ex, "Failed to load tags for QR generator");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnTagChanged()
+    {
+        RebuildUri();
+        await RenderQr();
+    }
+
+    private async Task OnValueChanged()
+    {
+        RebuildUri();
+        await RenderQr();
+    }
+
+    private void RebuildUri()
+    {
+        if (selectedTagId <= 0)
+        {
+            generatedUri = string.Empty;
+
+            return;
+        }
+
+        var uri = $"lmd://tag/{selectedTagId}";
+        var queryParts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(prefilledValue))
+        {
+            queryParts.Add($"v={Uri.EscapeDataString(prefilledValue.Trim())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            queryParts.Add($"n={Uri.EscapeDataString(displayName.Trim())}");
+        }
+
+        if (queryParts.Count > 0)
+        {
+            uri += "?" + string.Join("&", queryParts);
+        }
+
+        generatedUri = uri;
+    }
+
+    private async Task RenderQr()
+    {
+        if (string.IsNullOrEmpty(generatedUri))
+        {
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.generate", qrElementId, generatedUri, 6);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to render QR code");
+        }
+    }
+
+    private async Task DownloadQr()
+    {
+        if (string.IsNullOrEmpty(generatedUri))
+        {
+            return;
+        }
+
+        try
+        {
+            var tagTitle = tags?.FirstOrDefault(t => t.Id == selectedTagId)?.Title ?? "qrcode";
+            var safeFileName = string.Join("_", tagTitle.Split(System.IO.Path.GetInvalidFileNameChars()));
+            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.downloadPng", generatedUri, 10, $"lmd-{safeFileName}.png");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to download QR code");
+        }
+    }
+
+    private async Task PrintQr()
+    {
+        if (string.IsNullOrEmpty(generatedUri))
+        {
+            return;
+        }
+
+        try
+        {
+            var label = displayName ?? tags?.FirstOrDefault(t => t.Id == selectedTagId)?.Title ?? "Tag";
+            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.printWithLabel", generatedUri, 10, label);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to print QR code");
+        }
+    }
+}
