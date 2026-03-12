@@ -1,0 +1,122 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div class="space-y-3">
+    <div class="relative" style="min-height: 300px;">
+        @* html5-qrcode takes full ownership of this div — no Blazor children inside it *@
+        <div id="@scannerId" class="rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black w-full"
+             style="min-height: 300px;">
+        </div>
+        @if (isStarting)
+        {
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-black pointer-events-none">
+                <span class="h-8 w-8 animate-spin rounded-full border-4 border-gray-600 border-t-primary-400"></span>
+                <span class="text-sm text-gray-300">Starting camera…</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @errorMessage
+        </div>
+        <button type="button" @onclick="StartScanning"
+                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700">
+            <i class="bi bi-camera text-base"></i>
+            <span>Retry Camera</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<ScanEventArgs> OnScanned { get; set; }
+
+    private string scannerId = $"scanner-{Guid.NewGuid():N}";
+    private DotNetObjectReference<BarcodeScanner>? dotNetRef;
+    private bool isStarting = true;
+    private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await StartScanning();
+        }
+    }
+
+    private async Task StartScanning()
+    {
+        errorMessage = null;
+        isStarting = true;
+        StateHasChanged();
+
+        try
+        {
+            var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.Camera>();
+                if (status != PermissionStatus.Granted)
+                {
+                    errorMessage = "Camera permission is required to scan barcodes. Please allow camera access in Settings.";
+                    isStarting = false;
+                    StateHasChanged();
+
+                    return;
+                }
+            }
+
+            dotNetRef?.Dispose();
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.start", scannerId, dotNetRef);
+            isStarting = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message.Contains("NotAllowedError") || ex.Message.Contains("Permission")
+                ? "Camera access was denied. Please allow camera access in your device settings and try again."
+                : $"Could not start scanner: {ex.Message}";
+            isStarting = false;
+        }
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnScanSuccess(string decodedText, string formatName)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
+        }
+        catch
+        {
+            // Ignore stop errors
+        }
+
+        dotNetRef?.Dispose();
+        dotNetRef = null;
+
+        await OnScanned.InvokeAsync(new ScanEventArgs(decodedText, formatName));
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
+        }
+        catch
+        {
+            // Ignore during dispose
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    public record ScanEventArgs(string DecodedText, string FormatName);
+}

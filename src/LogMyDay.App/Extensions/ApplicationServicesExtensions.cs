@@ -27,6 +27,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IUnitService, UnitService>();
         services.AddScoped<ITagOptionListService, TagOptionListService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IScanMappingService, ScanMappingService>();
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IExcelExportService, ExportService>();
         services.AddSingleton<ISettingProtector, SettingProtector>();

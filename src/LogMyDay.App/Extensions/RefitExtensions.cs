@@ -1,5 +1,6 @@
 using LogMyDay.App.Authentication;
 using LogMyDay.Shared.Interfaces;
+using LogMyDay.Shared.Scanning;
 using LogMyDay.Shared.Serialization;
 using Refit;
 
@@ -44,6 +45,12 @@ internal static class RefitExtensions
         services.AddRefitClient<ISettingsApi>(refitSettings)
             .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
             .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+        services.AddRefitClient<IScanMappingApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+        services.AddScoped<IScanOrchestrator, ScanOrchestrator>();
 
         return services;
     }

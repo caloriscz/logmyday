@@ -20,6 +20,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
     public DbSet<TagOption> TagOptions => Set<TagOption>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<ScanMapping> ScanMappings => Set<ScanMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagOptionList>().ToTable("LogMyDay_TagOptionLists");
         modelBuilder.Entity<TagOption>().ToTable("LogMyDay_TagOptions");
         modelBuilder.Entity<Setting>().ToTable("LogMyDay_Settings");
+        modelBuilder.Entity<ScanMapping>().ToTable("LogMyDay_ScanMappings");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -108,6 +110,25 @@ public class LogMyDayDbContext : DbContext
         {
             entity.HasOne(t => t.Unit).WithMany().HasForeignKey(t => t.UnitId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(t => t.OptionList).WithMany().HasForeignKey(t => t.OptionListId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ScanMapping>(entity =>
+        {
+            entity.HasOne(s => s.Tag)
+                .WithMany()
+                .HasForeignKey(s => s.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(s => new { s.UserId, s.CodeValue })
+                .IsUnique()
+                .HasDatabaseName("IX_LogMyDay_ScanMappings_UserId_CodeValue");
+
+            entity.HasIndex(s => s.CodeValue)
+                .HasDatabaseName("IX_LogMyDay_ScanMappings_CodeValue");
+
+            entity.Property(s => s.IsActive).HasDefaultValue(true);
+            entity.Property(s => s.CodeValue).HasMaxLength(512).IsRequired();
+            entity.Property(s => s.DisplayName).HasMaxLength(200);
         });
 
         modelBuilder.SeedData();
