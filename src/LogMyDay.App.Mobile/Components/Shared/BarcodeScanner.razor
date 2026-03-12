@@ -3,11 +3,14 @@
 @implements IAsyncDisposable
 
 <div class="space-y-3">
-    <div id="@scannerId" class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black"
-         style="min-height: 300px;">
+    <div class="relative" style="min-height: 300px;">
+        @* html5-qrcode takes full ownership of this div — no Blazor children inside it *@
+        <div id="@scannerId" class="rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black w-full"
+             style="min-height: 300px;">
+        </div>
         @if (isStarting)
         {
-            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-black pointer-events-none">
                 <span class="h-8 w-8 animate-spin rounded-full border-4 border-gray-600 border-t-primary-400"></span>
                 <span class="text-sm text-gray-300">Starting camera…</span>
             </div>
