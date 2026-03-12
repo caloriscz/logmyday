@@ -11,11 +11,13 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<Tags> Logger
 @implements IAsyncDisposable
+@inject IPageTitleService PageTitleService
 
 <PageTitle>Tags - LogMyDay</PageTitle>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Activity Tags" ShowReload="true" OnReload="LoadTags" />
+    <TagSectionNav />
     
     <div class="max-w-7xl mx-auto px-6 py-4">
         <!-- Tags List -->
@@ -50,18 +52,12 @@
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         @foreach (var tag in tags)
                         {
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td class="px-4 py-3 whitespace-nowrap">
-                                    <div class="flex gap-1">
-                                        <button @onclick="() => OpenEditModal(tag)"
-                                            class="btn-secondary text-sm" title="Edit">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button @onclick="() => DeleteTag(tag.Id)"
-                                            class="btn-danger text-sm" title="Delete">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" @onclick='() => Navigation.NavigateTo($"/tags/edit/{tag.Id}")'>
+                                <td class="px-4 py-3 whitespace-nowrap" @onclick:stopPropagation="true">
+                                    <button @onclick="() => DeleteTag(tag.Id)"
+                                        class="btn-danger text-sm" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">@tag.Title</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">@GetInputTypeName(tag.TypeId)</td>
@@ -106,19 +102,13 @@
             <div class="md:hidden space-y-3">
                 @foreach (var tag in tags)
                 {
-                    <div class="card">
+                    <div class="card cursor-pointer" @onclick='() => Navigation.NavigateTo($"/tags/edit/{tag.Id}")'>
                         <div class="flex justify-between items-start mb-2">
                             <h6 class="font-semibold text-gray-900 dark:text-white">@tag.Title</h6>
-                            <div class="flex gap-1">
-                                <button @onclick="() => OpenEditModal(tag)"
-                                    class="btn-secondary text-sm" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button @onclick="() => DeleteTag(tag.Id)"
-                                    class="btn-danger text-sm" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
+                            <button @onclick="() => DeleteTag(tag.Id)" @onclick:stopPropagation="true"
+                                class="btn-danger text-sm" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-400">
                             <div>
@@ -358,6 +348,7 @@
             return;
         }
 
+        PageTitleService.SetTitle("Tags");
         await LoadTags();
     }
 

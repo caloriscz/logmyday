@@ -1,0 +1,36 @@
+@inject NavigationManager Navigation
+
+<div class="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <button type="button"
+        class="flex-1 py-3 text-sm font-medium transition-colors @(IsActive("/tags") ? "border-b-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400" : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200")"
+        @onclick='() => Navigation.NavigateTo("/tags")'>
+        Tags
+    </button>
+    <button type="button"
+        class="flex-1 py-3 text-sm font-medium transition-colors @(IsActive("/option-lists") ? "border-b-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400" : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200")"
+        @onclick='() => Navigation.NavigateTo("/option-lists")'>
+        Option Lists
+    </button>
+    <button type="button"
+        class="flex-1 py-3 text-sm font-medium transition-colors @(IsActive("/units") ? "border-b-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400" : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200")"
+        @onclick='() => Navigation.NavigateTo("/units")'>
+        Units
+    </button>
+</div>
+
+@code {
+    private bool IsActive(string path)
+    {
+        try
+        {
+            var currentPath = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var target = path.TrimStart('/');
+            return string.Equals(currentPath, target, StringComparison.OrdinalIgnoreCase)
+                || currentPath.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}
