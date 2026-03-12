@@ -2,39 +2,28 @@
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
-<div class="space-y-4">
-    @if (!isScanning)
-    {
-        <button type="button" @onclick="StartScanning" disabled="@isStarting"
-                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-50">
-            @if (isStarting)
-            {
-                <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                <span>Starting camera…</span>
-            }
-            else
-            {
-                <i class="bi bi-camera text-base"></i>
-                <span>Start Scanner</span>
-            }
-        </button>
-    }
-    else
-    {
-        <button type="button" @onclick="StopScanning"
-                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-            <i class="bi bi-x-lg text-base"></i>
-            <span>Stop Scanner</span>
-        </button>
-    }
-
-    <div id="@scannerId" class="@(isScanning ? "rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700" : "hidden")"></div>
+<div class="space-y-3">
+    <div id="@scannerId" class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black"
+         style="min-height: 300px;">
+        @if (isStarting)
+        {
+            <div class="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                <span class="h-8 w-8 animate-spin rounded-full border-4 border-gray-600 border-t-primary-400"></span>
+                <span class="text-sm text-gray-300">Starting camera…</span>
+            </div>
+        }
+    </div>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
         <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
             @errorMessage
         </div>
+        <button type="button" @onclick="StartScanning"
+                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700">
+            <i class="bi bi-camera text-base"></i>
+            <span>Retry Camera</span>
+        </button>
     }
 </div>
 
@@ -44,9 +33,16 @@
 
     private string scannerId = $"scanner-{Guid.NewGuid():N}";
     private DotNetObjectReference<BarcodeScanner>? dotNetRef;
-    private bool isScanning;
-    private bool isStarting;
+    private bool isStarting = true;
     private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await StartScanning();
+        }
+    }
 
     private async Task StartScanning()
     {
@@ -56,7 +52,6 @@
 
         try
         {
-            // Request Android runtime camera permission before accessing the camera
             var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
             if (status != PermissionStatus.Granted)
             {
@@ -64,28 +59,31 @@
                 if (status != PermissionStatus.Granted)
                 {
                     errorMessage = "Camera permission is required to scan barcodes. Please allow camera access in Settings.";
+                    isStarting = false;
+                    StateHasChanged();
 
                     return;
                 }
             }
 
+            dotNetRef?.Dispose();
             dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("LogMyDayScanner.start", scannerId, dotNetRef);
-            isScanning = true;
+            isStarting = false;
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message.Contains("NotAllowedError") || ex.Message.Contains("Permission")
                 ? "Camera access was denied. Please allow camera access in your device settings and try again."
                 : $"Could not start scanner: {ex.Message}";
-        }
-        finally
-        {
             isStarting = false;
         }
+
+        StateHasChanged();
     }
 
-    private async Task StopScanning()
+    [JSInvokable]
+    public async Task OnScanSuccess(string decodedText, string formatName)
     {
         try
         {
@@ -96,31 +94,22 @@
             // Ignore stop errors
         }
 
-        isScanning = false;
         dotNetRef?.Dispose();
         dotNetRef = null;
-    }
 
-    [JSInvokable]
-    public async Task OnScanSuccess(string decodedText, string formatName)
-    {
-        await StopScanning();
         await OnScanned.InvokeAsync(new ScanEventArgs(decodedText, formatName));
         await InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (isScanning)
+        try
         {
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
-            }
-            catch
-            {
-                // Ignore during dispose
-            }
+            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
+        }
+        catch
+        {
+            // Ignore during dispose
         }
 
         dotNetRef?.Dispose();

@@ -5,11 +5,7 @@ window.LogMyDayScanner = {
     _scanner: null,
 
     start: function (elementId, dotnetRef) {
-        if (this._scanner) {
-            this._scanner.clear();
-        }
-
-        this._scanner = new Html5Qrcode(elementId);
+        var self = this;
 
         var config = {
             fps: 10,
@@ -27,36 +23,59 @@ window.LogMyDayScanner = {
             ]
         };
 
-        return this._scanner.start(
-            { facingMode: "environment" },
-            config,
-            function (decodedText, decodedResult) {
-                dotnetRef.invokeMethodAsync('OnScanSuccess', decodedText, decodedResult.result.format.formatName);
-            },
-            function (errorMessage) {
-                // Ignore scan errors (no code in frame)
-            }
-        ).catch(function (err) {
-            // Camera start failed — try user-facing camera
-            return window.LogMyDayScanner._scanner.start(
-                { facingMode: "user" },
+        function onScanSuccess(decodedText, decodedResult) {
+            // Guard: dotNetRef may be disposed if user navigated away
+            dotnetRef.invokeMethodAsync('OnScanSuccess', decodedText, decodedResult.result.format.formatName)
+                .catch(function () { /* component was disposed, ignore */ });
+        }
+
+        function doStart() {
+            self._scanner = new Html5Qrcode(elementId);
+
+            return self._scanner.start(
+                { facingMode: "environment" },
                 config,
-                function (decodedText, decodedResult) {
-                    dotnetRef.invokeMethodAsync('OnScanSuccess', decodedText, decodedResult.result.format.formatName);
-                },
-                function (errorMessage) { }
-            );
-        });
+                onScanSuccess,
+                function () { /* ignore per-frame scan errors */ }
+            ).catch(function () {
+                // Back camera failed — try front camera
+                return self._scanner.start(
+                    { facingMode: "user" },
+                    config,
+                    onScanSuccess,
+                    function () { }
+                );
+            });
+        }
+
+        // If a previous scanner instance exists, stop it cleanly first
+        if (self._scanner) {
+            var old = self._scanner;
+            self._scanner = null;
+
+            return old.stop()
+                .catch(function () { return Promise.resolve(); })
+                .then(function () {
+                    try { old.clear(); } catch (e) { }
+                    return doStart();
+                });
+        }
+
+        return doStart();
     },
 
     stop: function () {
-        if (this._scanner) {
-            return this._scanner.stop().then(function () {
-                window.LogMyDayScanner._scanner.clear();
-                window.LogMyDayScanner._scanner = null;
-            }).catch(function () {
-                window.LogMyDayScanner._scanner = null;
-            });
+        var self = this;
+
+        if (self._scanner) {
+            var old = self._scanner;
+            self._scanner = null;
+
+            return old.stop()
+                .then(function () {
+                    try { old.clear(); } catch (e) { }
+                })
+                .catch(function () { });
         }
 
         return Promise.resolve();
