@@ -19,10 +19,16 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Tags</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Manage the tags and metadata used across your activities.</p>
         </div>
-        <a href="/tags/new" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto">
-            <Icon Name="plus" Class="h-4 w-4" />
-            Add Tag
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="/tag-groups" class="inline-flex items-center gap-2 self-start rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:self-auto">
+                <Icon Name="folder" Class="h-4 w-4" />
+                Manage Groups
+            </a>
+            <a href="/tags/new" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto">
+                <Icon Name="plus" Class="h-4 w-4" />
+                Add Tag
+            </a>
+        </div>
     </div>
     @if (!string.IsNullOrEmpty(errorMessage))
     {
