@@ -7,6 +7,7 @@
 @using System.Linq
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
 @inject NavigationManager Navigation
 @inject ILogger<Tags> Logger
 @inject IPageTitleService PageTitleService
@@ -52,13 +53,26 @@
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Sort</label>
-                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" @bind="orderBy">
-                            <option value="asc">A-Z</option>
-                            <option value="desc">Z-A</option>
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Group</label>
+                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" @bind="filterGroupId">
+                            <option value="">All groups</option>
+                            <option value="-1">(Ungrouped)</option>
+                            @foreach (var g in groups)
+                            {
+                                <option value="@g.Id">@g.Name</option>
+                            }
                         </select>
                     </div>
-                    <div class="sm:justify-self-end">
+                    <div class="space-y-1">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Sort</label>
+                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" @bind="orderBy">
+                            <option value="group-asc">Group, Name A-Z</option>
+                            <option value="group-desc">Group Z-A, Name A-Z</option>
+                            <option value="asc">Name A-Z</option>
+                            <option value="desc">Name Z-A</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-4 sm:justify-self-end">
                         <button type="button" class="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-primary-500/40 dark:bg-primary-500/20 dark:text-primary-200 dark:hover:bg-primary-500/30 dark:focus-visible:ring-offset-slate-900" @onclick="ApplyFilter">
                             <Icon Name="filter" Class="h-4 w-4" />
                             Apply
@@ -353,12 +367,14 @@
     private int pageNumber = 1;
     private int pageSize = 20;
     private int totalPages = 1;
-    private string orderBy = "asc";
+    private string orderBy = "group-asc";
     private string? filter = null;
     private string filterType = "contains";
+    private string? filterGroupId = null;
 
     private string? errorMessage;
     private List<InputTypeDto> inputTypes = new();
+    private IList<TagGroupResponse> groups = new List<TagGroupResponse>();
 
     private int? tagIdToDelete = null;
     private bool isDeleting = false;
@@ -376,6 +392,15 @@
             Logger.LogError(ex, "Failed to load input types");
         }
 
+        try
+        {
+            groups = await TagGroupApi.GetTagGroups();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tag groups");
+        }
+
         await LoadTags();
     }
 
@@ -383,7 +408,8 @@
     {
         try
         {
-            pagedResult = await ActivityApi.GetTagsPaged(pageNumber, pageSize, orderBy, filter, filterType);
+            var groupIdParam = string.IsNullOrEmpty(filterGroupId) ? (int?)null : int.Parse(filterGroupId);
+            pagedResult = await ActivityApi.GetTagsPaged(pageNumber, pageSize, orderBy, filter, filterType, groupIdParam);
             totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / pageSize);
             errorMessage = null;
             StateHasChanged();

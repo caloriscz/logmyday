@@ -54,6 +54,8 @@ public class ScanMappingService : IScanMappingService
             .Include(s => s.Tag)
                 .ThenInclude(t => t.OptionList)
                     .ThenInclude(ol => ol!.Options)
+            .Include(s => s.Tag)
+                .ThenInclude(t => t.Group)
             .FirstOrDefaultAsync(s => s.CodeValue == codeValue && s.UserId == userId && s.IsActive);
 
         if (mapping == null)
@@ -188,7 +190,7 @@ public class ScanMappingService : IScanMappingService
         return new TagResponse
         {
             Id = tag.Id,
-            Title = tag.TagName,
+            Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
             InputTypeId = tag.InputTypeId,
             TypeId = tag.InputTypeId,
             IsRequired = tag.IsRequired,

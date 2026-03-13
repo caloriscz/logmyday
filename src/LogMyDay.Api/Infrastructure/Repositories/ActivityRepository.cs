@@ -49,6 +49,7 @@ public class ActivityRepository : Repository<Activity>, IActivityRepository
              .Include(t => t.InputType)
              .Include(t => t.Unit)
              .Include(t => t.OptionList)
+             .Include(t => t.Group)
              .ToListAsync();
 
         return unfilledTags;

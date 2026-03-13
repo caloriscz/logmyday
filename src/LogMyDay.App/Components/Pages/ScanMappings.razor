@@ -201,13 +201,12 @@
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Tag</label>
-                                <InputSelect @bind-Value="formModel.TagId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
-                                    <option value="0">-- Select Tag --</option>
-                                    @foreach (var tag in tags)
-                                    {
-                                        <option value="@tag.Id">@tag.Title</option>
-                                    }
-                                </InputSelect>
+                                <GroupedTagSelect
+                                    Tags="tags"
+                                    Value="@(formModel.TagId > 0 ? formModel.TagId : (int?)null)"
+                                    ValueChanged="(int? v) => formModel.TagId = v ?? 0"
+                                    SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    Disabled="@isBusy" />
                             </div>
                         </div>
 

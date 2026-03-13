@@ -44,7 +44,8 @@ public static class TagSpecifications
             int pageSize,
             string? orderBy = null,
             string? filter = null,
-            string? filterType = null)
+            string? filterType = null,
+            int? groupId = null)
             : base(t => t.UserId == userId)
         {
             AddInclude(t => t.Unit);
@@ -64,14 +65,36 @@ public static class TagSpecifications
                 }
             }
 
-            // Apply ordering (case-insensitive)
-            if (orderBy?.ToLower() == "asc")
+            // Apply group filter if provided
+            if (groupId.HasValue)
             {
-                ApplyOrderBy(t => t.TagName.ToLower());
+                if (groupId.Value == -1)
+                {
+                    AddCriteria(t => t.GroupId == null);
+                }
+                else
+                {
+                    AddCriteria(t => t.GroupId == groupId.Value);
+                }
             }
-            else
+
+            // Apply ordering (case-insensitive)
+            switch (orderBy?.ToLower())
             {
-                ApplyOrderByDescending(t => t.TagName.ToLower());
+                case "group-asc":
+                    ApplyOrderBy(t => t.Group!.Name ?? "");
+                    ApplyThenOrderBy(t => t.TagName.ToLower());
+                    break;
+                case "group-desc":
+                    ApplyOrderByDescending(t => t.Group!.Name ?? "");
+                    ApplyThenOrderBy(t => t.TagName.ToLower());
+                    break;
+                case "desc":
+                    ApplyOrderByDescending(t => t.TagName.ToLower());
+                    break;
+                default:
+                    ApplyOrderBy(t => t.TagName.ToLower());
+                    break;
             }
 
             // Apply pagination
@@ -87,7 +110,8 @@ public static class TagSpecifications
         public TagCountSpec(
             Guid userId,
             string? filter = null,
-            string? filterType = null)
+            string? filterType = null,
+            int? groupId = null)
             : base(t => t.UserId == userId)
         {
             // Apply filter if provided (same logic as PagedTagsSpec)
@@ -100,6 +124,19 @@ public static class TagSpecifications
                 else
                 {
                     AddCriteria(t => t.TagName.Contains(filter));
+                }
+            }
+
+            // Apply group filter if provided
+            if (groupId.HasValue)
+            {
+                if (groupId.Value == -1)
+                {
+                    AddCriteria(t => t.GroupId == null);
+                }
+                else
+                {
+                    AddCriteria(t => t.GroupId == groupId.Value);
                 }
             }
         }

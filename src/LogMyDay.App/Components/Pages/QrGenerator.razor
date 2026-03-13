@@ -20,16 +20,7 @@
         <div class="space-y-5">
             <div class="space-y-2">
                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Tag</label>
-                <select @bind="selectedTagId" @bind:after="OnTagChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                    <option value="0">-- Select Tag --</option>
-                    @if (tags != null)
-                    {
-                        @foreach (var tag in tags)
-                        {
-                            <option value="@tag.Id">@tag.Title</option>
-                        }
-                    }
-                </select>
+                <GroupedTagSelect Tags="tags" @bind-Value="selectedTagId" @bind-Value:after="OnTagChanged" SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div class="space-y-2">
@@ -52,7 +43,7 @@
         </div>
     </div>
 
-    @if (selectedTagId > 0)
+    @if (selectedTagId.HasValue)
     {
         <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div class="space-y-1">
@@ -80,7 +71,7 @@
 
 @code {
     private IList<TagResponse>? tags;
-    private int selectedTagId;
+    private int? selectedTagId;
     private string? prefilledValue;
     private string? displayName;
     private string generatedUri = string.Empty;
@@ -99,7 +90,7 @@
             StateHasChanged();
         }
 
-        if (selectedTagId > 0 && !string.IsNullOrEmpty(generatedUri))
+        if (selectedTagId.HasValue && !string.IsNullOrEmpty(generatedUri))
         {
             await RenderQr();
         }
@@ -131,7 +122,7 @@
 
     private void RebuildUri()
     {
-        if (selectedTagId <= 0)
+        if (!selectedTagId.HasValue)
         {
             generatedUri = string.Empty;
 
@@ -139,7 +130,7 @@
         }
 
         // Build lmd://tag/{id}?v={value}&n={name}
-        var uri = $"lmd://tag/{selectedTagId}";
+        var uri = $"lmd://tag/{selectedTagId.Value}";
         var queryParts = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(prefilledValue))

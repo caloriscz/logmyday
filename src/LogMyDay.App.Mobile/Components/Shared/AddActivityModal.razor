@@ -29,16 +29,7 @@
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Primary Tag:</label>
-                        <InputSelect @bind-Value="Activity.PrimaryTagId" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" @bind-Value:after="HandleTagSelectionChanged">
-                            <option value="">-- Select Tag --</option>
-                            @if (AvailableTags != null)
-                            {
-                                @foreach (var tag in AvailableTags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            }
-                        </InputSelect>
+                        <GroupedTagSelect Tags="AvailableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="HandleTagSelectionChanged" SelectClass="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                     </div>
 
                     <div class="mb-4">

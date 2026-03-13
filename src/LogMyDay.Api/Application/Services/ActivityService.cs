@@ -58,6 +58,8 @@ public class ActivityService : IActivityService
             .Activities
             .Include(ct => ct.Tag)
             .ThenInclude(t => t.InputType)
+            .Include(ct => ct.Tag)
+            .ThenInclude(t => t.Group)
             .FirstAsync(c => c.Id == activity.Id);
 
         return MapToResponse(reloadedActivity);
@@ -144,7 +146,7 @@ public class ActivityService : IActivityService
         string? descriptionFilter = null
     )
     {
-        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Where(a => a.UserId == userId).AsQueryable();
+        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Include(ct => ct.Tag).ThenInclude(t => t.Group).Where(a => a.UserId == userId).AsQueryable();
         baseQuery = ApplyActivityFilters(baseQuery, tagId, startDate, endDate, descriptionFilter);
 
         return await GetPagedByTimePeriod(
@@ -168,7 +170,7 @@ public class ActivityService : IActivityService
         string? descriptionFilter = null
     )
     {
-        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Where(a => a.UserId == userId).AsQueryable();
+        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Include(ct => ct.Tag).ThenInclude(t => t.Group).Where(a => a.UserId == userId).AsQueryable();
         baseQuery = ApplyActivityFilters(baseQuery, tagId, startDate, endDate, descriptionFilter);
 
         return await GetPagedByTimePeriod(
@@ -246,7 +248,7 @@ public class ActivityService : IActivityService
             Description = calendar.Description ?? string.Empty,
             DateFinished = calendar.DateFinished,
             PrimaryTagId = primaryTag?.TagId,
-            PrimaryTagName = primaryTag?.Tag?.TagName ?? string.Empty,
+            PrimaryTagName = primaryTag?.Tag?.Group?.Name != null ? $"{primaryTag.Tag.Group.Name}: {primaryTag.Tag.TagName}" : primaryTag?.Tag?.TagName ?? string.Empty,
             PrimaryTagValue = calendar.Description ?? string.Empty,
             ElementId = primaryTag?.Tag?.InputType?.Id,
             ElementName = primaryTag?.Tag?.InputType?.Name ?? string.Empty,
@@ -331,7 +333,7 @@ public class ActivityService : IActivityService
                 DateCreated = a.DateCreated,
                 Description = a.Description,
                 PrimaryTagId = a.TagId,
-                PrimaryTagName = a.Tag?.TagName ?? string.Empty,
+                PrimaryTagName = a.Tag?.Group?.Name != null ? $"{a.Tag.Group.Name}: {a.Tag.TagName}" : a.Tag?.TagName ?? string.Empty,
                 PrimaryTagValue = a.Description ?? string.Empty,
                 ElementId = a.Tag?.InputType?.Id,
                 ElementName = a.Tag?.InputType?.Name ?? string.Empty,
@@ -351,7 +353,7 @@ public class ActivityService : IActivityService
         return [.. unfilledTags.Select(tag => new TagResponse
         {
             Id = tag.Id,
-            Title = tag.TagName,
+            Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
             InputTypeId = tag.InputTypeId,
             TypeId = tag.InputTypeId,
             IsRequired = tag.IsRequired,

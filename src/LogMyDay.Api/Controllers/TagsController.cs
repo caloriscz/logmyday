@@ -77,10 +77,10 @@ public class TagsController : BaseApiController
     /// Lists paged, sorted, and filtered tags
     /// </summary>
     [HttpGet("paged")]
-    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] string orderBy = "asc", [FromQuery] string? filter = null, [FromQuery] string? filterType = null)
+    public async Task<IActionResult> GetPaged([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20, [FromQuery] string orderBy = "asc", [FromQuery] string? filter = null, [FromQuery] string? filterType = null, [FromQuery] int? groupId = null)
     {
         var userId = GetCurrentUserId();
-        return Ok(await _tagService.GetPaged(pageNumber, pageSize, orderBy, userId, filter, filterType));
+        return Ok(await _tagService.GetPaged(pageNumber, pageSize, orderBy, userId, filter, filterType, groupId));
     }
 
     /// <summary>

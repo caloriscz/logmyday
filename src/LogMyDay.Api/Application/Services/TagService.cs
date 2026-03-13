@@ -207,14 +207,14 @@ public class TagService : ITagService
     /// <param name="filter"></param>
     /// <param name="filterType"></param>
     /// <returns></returns>
-    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null)
+    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null, int? groupId = null)
     {
         // Get paginated items
-        var pagedSpec = new PagedTagsSpec(userId, pageNumber, pageSize, orderBy, filter, filterType);
+        var pagedSpec = new PagedTagsSpec(userId, pageNumber, pageSize, orderBy, filter, filterType, groupId);
         var items = await _tagRepository.GetAsync(pagedSpec);
 
         // Get total count
-        var countSpec = new TagCountSpec(userId, filter, filterType);
+        var countSpec = new TagCountSpec(userId, filter, filterType, groupId);
         var totalCount = await _tagRepository.CountAsync(countSpec);
 
         return new PagedResult<TagResponse>
@@ -251,7 +251,7 @@ public class TagService : ITagService
         return new TagResponse
         {
             Id = tag.Id,
-            Title = tag.TagName,
+            Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
             InputTypeId = tag.InputTypeId,
             TypeId = tag.InputTypeId,
             IsRequired = tag.IsRequired,

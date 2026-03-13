@@ -33,6 +33,11 @@ public interface ISpecification<T>
     Expression<Func<T, object>>? OrderByDescending { get; }
 
     /// <summary>
+    /// Gets the secondary order by expression (ThenBy).
+    /// </summary>
+    Expression<Func<T, object>>? ThenOrderBy { get; }
+
+    /// <summary>
     /// Gets the number of items to skip (for paging).
     /// </summary>
     int? Skip { get; }

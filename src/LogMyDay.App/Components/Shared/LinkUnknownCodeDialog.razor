@@ -29,16 +29,7 @@
             <div class="space-y-5">
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Tag</label>
-                    <select @bind="selectedTagId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
-                        <option value="0">-- Select Tag --</option>
-                        @if (AvailableTags != null)
-                        {
-                            @foreach (var tag in AvailableTags)
-                            {
-                                <option value="@tag.Id">@tag.Title</option>
-                            }
-                        }
-                    </select>
+                    <GroupedTagSelect Tags="AvailableTags" @bind-Value="selectedTagId" SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" Disabled="@isBusy" />
                 </div>
 
                 <div class="space-y-2">
@@ -59,7 +50,7 @@
             <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="HandleSkip" disabled="@isBusy">
                 Skip
             </button>
-            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" @onclick="HandleSave" disabled="@(isBusy || selectedTagId == 0)">
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" @onclick="HandleSave" disabled="@(isBusy || !selectedTagId.HasValue)">
                 @if (isBusy)
                 {
                     <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -100,7 +91,7 @@
 
     @inject LogMyDay.Shared.Interfaces.IScanMappingApi ScanMappingApi
 
-    private int selectedTagId;
+    private int? selectedTagId;
     private string? displayName;
     private string? defaultDescription;
     private string? errorMessage;
@@ -126,7 +117,7 @@
 
     private async Task HandleSave()
     {
-        if (selectedTagId == 0)
+        if (!selectedTagId.HasValue)
         {
             errorMessage = "Please select a tag.";
 
@@ -142,7 +133,7 @@
             {
                 CodeValue = CodeValue,
                 CodeType = CodeType,
-                TagId = selectedTagId,
+                TagId = selectedTagId.Value,
                 DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim(),
                 DefaultDescription = string.IsNullOrWhiteSpace(defaultDescription) ? null : defaultDescription.Trim(),
                 IsActive = true

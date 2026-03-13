@@ -23,16 +23,7 @@
 
         <div class="space-y-2">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tag</label>
-            <select @bind="selectedTagId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" disabled="@isBusy">
-                <option value="0">-- Select Tag --</option>
-                @if (AvailableTags != null)
-                {
-                    @foreach (var tag in AvailableTags)
-                    {
-                        <option value="@tag.Id">@tag.Title</option>
-                    }
-                }
-            </select>
+            <GroupedTagSelect Tags="AvailableTags" @bind-Value="selectedTagId" SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" Disabled="@isBusy" />
         </div>
 
         <div class="space-y-2">
@@ -60,7 +51,7 @@
         </button>
         <button type="button"
                 class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 disabled:opacity-60"
-                @onclick="HandleSave" disabled="@(isBusy || selectedTagId == 0)">
+                @onclick="HandleSave" disabled="@(isBusy || !selectedTagId.HasValue)">
             @if (isBusy)
             {
                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -91,7 +82,7 @@
     [Parameter]
     public EventCallback OnCanceled { get; set; }
 
-    private int selectedTagId;
+    private int? selectedTagId;
     private string? displayName;
     private string? defaultDescription;
     private string? errorMessage;
@@ -104,7 +95,7 @@
 
     private async Task HandleSave()
     {
-        if (selectedTagId == 0)
+        if (!selectedTagId.HasValue)
         {
             errorMessage = "Please select a tag.";
 
@@ -120,7 +111,7 @@
             {
                 CodeValue = CodeValue,
                 CodeType = CodeType,
-                TagId = selectedTagId,
+                TagId = selectedTagId.Value,
                 DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim(),
                 DefaultDescription = string.IsNullOrWhiteSpace(defaultDescription) ? null : defaultDescription.Trim(),
                 IsActive = true
