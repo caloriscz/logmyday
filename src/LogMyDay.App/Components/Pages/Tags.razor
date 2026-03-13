@@ -89,6 +89,7 @@
                                     <th scope="col" class="w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300"></th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Name</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Type</th>
+                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Group</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Required</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Repeatable</th>
                                     <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Granularity</th>
@@ -116,6 +117,16 @@
                                         </td>
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@tag.Title</td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetTypeName(tag.TypeId)</td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @if (!string.IsNullOrWhiteSpace(tag.GroupName))
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200 max-w-[9rem] truncate" title="@tag.GroupName">@tag.GroupName</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-gray-400 dark:text-slate-500">—</span>
+                                            }
+                                        </td>
                                         <td class="px-4 py-3 text-sm">
                                             @if (tag.IsRequired)
                                             {
@@ -148,7 +159,16 @@
                                             }
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.UnitSymbol) ? "—" : tag.UnitSymbol)</td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.DefaultValue) ? "—" : tag.DefaultValue)</td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @if (string.IsNullOrWhiteSpace(tag.DefaultValue))
+                                            {
+                                                <span>—</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="block max-w-[9rem] truncate cursor-default" title="@tag.DefaultValue">@tag.DefaultValue</span>
+                                            }
+                                        </td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             <span>@(tag.MinValue?.ToString() ?? "—")</span>/
                                             <span>@(tag.MaxValue?.ToString() ?? "—")</span>
@@ -185,6 +205,19 @@
                                 <div>
                                     <dt class="font-medium text-gray-600 dark:text-slate-400">Type</dt>
                                     <dd class="text-gray-900 dark:text-slate-200">@GetTypeName(tag.TypeId)</dd>
+                                </div>
+                                <div>
+                                    <dt class="font-medium text-gray-600 dark:text-slate-400">Group</dt>
+                                    <dd class="text-gray-900 dark:text-slate-200">
+                                        @if (!string.IsNullOrWhiteSpace(tag.GroupName))
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200 truncate max-w-full" title="@tag.GroupName">@tag.GroupName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-gray-400 dark:text-slate-500">—</span>
+                                        }
+                                    </dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-600 dark:text-slate-400">Time Granularity</dt>
@@ -235,7 +268,7 @@
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-600 dark:text-slate-400">Default</dt>
-                                    <dd class="text-gray-900 dark:text-slate-200">@(string.IsNullOrWhiteSpace(tag.DefaultValue) ? "—" : tag.DefaultValue)</dd>
+                                    <dd class="text-gray-900 dark:text-slate-200 truncate" title="@tag.DefaultValue">@(string.IsNullOrWhiteSpace(tag.DefaultValue) ? "—" : tag.DefaultValue)</dd>
                                 </div>
                                 <div>
                                     <dt class="font-medium text-gray-600 dark:text-slate-400">Min</dt>

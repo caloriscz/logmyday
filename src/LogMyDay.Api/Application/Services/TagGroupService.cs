@@ -52,6 +52,7 @@ public class TagGroupService : ITagGroupService
         };
 
         await _repository.AddAsync(group);
+        await _repository.SaveChangesAsync();
 
         return group.Id;
     }
@@ -71,6 +72,7 @@ public class TagGroupService : ITagGroupService
         group.DisplayOrder = request.DisplayOrder;
 
         await _repository.UpdateAsync(group);
+        await _repository.SaveChangesAsync();
     }
 
     public async Task Delete(int id, Guid userId)
@@ -84,6 +86,7 @@ public class TagGroupService : ITagGroupService
         }
 
         await _repository.DeleteAsync(group);
+        await _repository.SaveChangesAsync();
     }
 
     private static TagGroupResponse MapToResponse(TagGroup group) =>
