@@ -28,6 +28,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<ITagOptionListService, TagOptionListService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IScanMappingService, ScanMappingService>();
+        services.AddScoped<ITagGroupService, TagGroupService>();
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IExcelExportService, ExportService>();
         services.AddSingleton<ISettingProtector, SettingProtector>();
@@ -38,6 +39,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<ITagRepository, TagRepository>();
         services.AddScoped<IUnitRepository, UnitRepository>();
         services.AddScoped<IQuantityRepository, QuantityRepository>();
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
         // UI services
         services.AddScoped<IPageTitleService, PageTitleService>();

@@ -17,4 +17,5 @@ public class TagRequest
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public int? OptionListId { get; set; }
+    public int? GroupId { get; set; }
 }

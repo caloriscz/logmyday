@@ -47,5 +47,10 @@ public class Tag
     [ForeignKey(nameof(OptionListId))]
     public TagOptionList? OptionList { get; set; }
 
+    public int? GroupId { get; set; }
+
+    [ForeignKey(nameof(GroupId))]
+    public TagGroup? Group { get; set; }
+
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

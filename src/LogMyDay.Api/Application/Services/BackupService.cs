@@ -96,6 +96,7 @@ public class BackupService : IBackupService
                 .Include(t => t.Pattern)
                 .Include(t => t.Unit)
                 .Include(t => t.OptionList)
+                .Include(t => t.Group)
                 .AsQueryable();
 
             if (userId.HasValue)
@@ -120,7 +121,26 @@ public class BackupService : IBackupService
                     MaxValue = t.MaxValue,
                     Step = t.Step,
                     DefaultValue = t.DefaultValue,
-                    OptionListKey = t.OptionList != null ? t.OptionList.Name : null
+                    OptionListKey = t.OptionList != null ? t.OptionList.Name : null,
+                    GroupName = t.Group != null ? t.Group.Name : null
+                })
+                .ToListAsync();
+
+            // Export TagGroups with user filtering
+            var tagGroupsQuery = _context.TagGroups.AsQueryable();
+            if (userId.HasValue)
+            {
+                tagGroupsQuery = tagGroupsQuery.Where(g => g.UserId == userId);
+            }
+
+            var tagGroups = await tagGroupsQuery
+                .Select(g => new TagGroupBackup
+                {
+                    Name = g.Name,
+                    UserId = g.UserId,
+                    Description = g.Description,
+                    DisplayOrder = g.DisplayOrder,
+                    DateCreated = g.DateCreated
                 })
                 .ToListAsync();
 
@@ -177,12 +197,13 @@ public class BackupService : IBackupService
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.2",
+                    Version = "1.3",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
                     TotalTagOptionLists = tagOptionLists.Count,
                     TotalTagOptions = tagOptions.Count,
+                    TotalTagGroups = tagGroups.Count,
                     TotalTags = tags.Count,
                     TotalNotifications = notifications.Count,
                     TotalActivities = activities.Count
@@ -192,6 +213,7 @@ public class BackupService : IBackupService
                 Units = units,
                 TagOptionLists = tagOptionLists,
                 TagOptions = tagOptions,
+                TagGroups = tagGroups,
                 Tags = tags,
                 Notifications = notifications,
                 Activities = activities
@@ -237,12 +259,13 @@ public class BackupService : IBackupService
                 }
 
                 // Import in correct dependency order:
-                // InputTypes -> Patterns -> Units -> TagOptionLists -> TagOptions -> Tags -> Notifications -> Activities
+                // InputTypes -> Patterns -> Units -> TagOptionLists -> TagOptions -> TagGroups -> Tags -> Notifications -> Activities
                 await ImportInputTypesAsync(backupData.InputTypes, result);
                 await ImportPatternsAsync(backupData.Patterns, result);
                 await ImportUnitsAsync(backupData.Units, result);
                 await ImportTagOptionListsAsync(backupData.TagOptionLists, result, userId);
                 await ImportTagOptionsAsync(backupData.TagOptions, result);
+                await ImportTagGroupsAsync(backupData.TagGroups, result, userId);
                 await ImportTagsAsync(backupData.Tags, result, userId);
                 await ImportNotificationsAsync(backupData.Notifications, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
@@ -608,6 +631,37 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    private async Task ImportTagGroupsAsync(List<TagGroupBackup> tagGroups, BackupImportResult result, Guid? userId)
+    {
+        var existingGroupNames = await _context.TagGroups
+            .Where(g => userId == null || g.UserId == userId)
+            .Select(g => g.Name)
+            .ToHashSetAsync();
+
+        foreach (var group in tagGroups)
+        {
+            if (existingGroupNames.Contains(group.Name))
+            {
+                result.Statistics.TagGroupsSkipped++;
+                continue;
+            }
+
+            var entity = new TagGroup
+            {
+                Name = group.Name,
+                UserId = userId ?? group.UserId,
+                Description = group.Description,
+                DisplayOrder = group.DisplayOrder,
+                DateCreated = group.DateCreated
+            };
+
+            _context.TagGroups.Add(entity);
+            result.Statistics.TagGroupsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     private async Task ImportTagsAsync(List<TagBackup> tags, BackupImportResult result, Guid? userId)
     {
         // Get lookup dictionaries for references
@@ -623,6 +677,10 @@ public class BackupService : IBackupService
         var tagOptionListLookup = await _context.TagOptionLists
             .Where(ol => userId == null || ol.UserId == userId)
             .ToDictionaryAsync(ol => ol.Name, ol => ol.Id);
+
+        var tagGroupLookup = await _context.TagGroups
+            .Where(g => userId == null || g.UserId == userId)
+            .ToDictionaryAsync(g => g.Name, g => g.Id);
 
         var existingTagNames = await _context.Tags
             .Where(t => userId == null || t.UserId == userId)
@@ -656,6 +714,8 @@ public class BackupService : IBackupService
                 DefaultValue = tag.DefaultValue,
                 OptionListId = !string.IsNullOrEmpty(tag.OptionListKey) && tagOptionListLookup.ContainsKey(tag.OptionListKey)
                     ? tagOptionListLookup[tag.OptionListKey] : null,
+                GroupId = !string.IsNullOrEmpty(tag.GroupName) && tagGroupLookup.ContainsKey(tag.GroupName)
+                    ? tagGroupLookup[tag.GroupName] : null,
                 UserId = userId ?? tag.UserId
             };
 

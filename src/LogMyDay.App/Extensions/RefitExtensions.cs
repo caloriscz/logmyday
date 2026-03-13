@@ -50,6 +50,10 @@ internal static class RefitExtensions
             .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
             .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
+        services.AddRefitClient<ITagGroupApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = new Uri(baseAddress))
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
         services.AddScoped<IScanOrchestrator, ScanOrchestrator>();
 
         return services;

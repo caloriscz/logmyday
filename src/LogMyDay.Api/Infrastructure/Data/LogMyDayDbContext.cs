@@ -21,6 +21,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagOption> TagOptions => Set<TagOption>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<ScanMapping> ScanMappings => Set<ScanMapping>();
+    public DbSet<TagGroup> TagGroups => Set<TagGroup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagOption>().ToTable("LogMyDay_TagOptions");
         modelBuilder.Entity<Setting>().ToTable("LogMyDay_Settings");
         modelBuilder.Entity<ScanMapping>().ToTable("LogMyDay_ScanMappings");
+        modelBuilder.Entity<TagGroup>().ToTable("LogMyDay_TagGroups");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -110,6 +112,14 @@ public class LogMyDayDbContext : DbContext
         {
             entity.HasOne(t => t.Unit).WithMany().HasForeignKey(t => t.UnitId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(t => t.OptionList).WithMany().HasForeignKey(t => t.OptionListId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(t => t.Group).WithMany().HasForeignKey(t => t.GroupId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TagGroup>(entity =>
+        {
+            entity.Property(g => g.Name).HasMaxLength(100).IsRequired();
+            entity.Property(g => g.Description).HasMaxLength(500);
+            entity.HasIndex(g => g.UserId).HasDatabaseName("IX_LogMyDay_TagGroups_UserId");
         });
 
         modelBuilder.Entity<ScanMapping>(entity =>

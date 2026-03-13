@@ -21,6 +21,8 @@ public class BackupImportStatistics
     public int TagOptionListsSkipped { get; set; }
     public int TagOptionsImported { get; set; }
     public int TagOptionsSkipped { get; set; }
+    public int TagGroupsImported { get; set; }
+    public int TagGroupsSkipped { get; set; }
     public int TagsImported { get; set; }
     public int TagsSkipped { get; set; }
     public int NotificationsImported { get; set; }

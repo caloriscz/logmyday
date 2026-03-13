@@ -14,6 +14,7 @@ public static class TagSpecifications
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
+            AddInclude(t => t.Group);
             ApplyOrderBy(t => t.TagName.ToLower());
         }
     }
@@ -28,6 +29,7 @@ public static class TagSpecifications
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
+            AddInclude(t => t.Group);
         }
     }
 
@@ -47,6 +49,7 @@ public static class TagSpecifications
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
+            AddInclude(t => t.Group);
 
             // Apply filter if provided
             if (!string.IsNullOrWhiteSpace(filter))

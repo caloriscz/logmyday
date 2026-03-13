@@ -72,6 +72,7 @@ public class TagService : ITagService
             Step = step,
             DefaultValue = createTagRequest.DefaultValue,
             OptionListId = createTagRequest.OptionListId,
+            GroupId = createTagRequest.GroupId,
             UserId = userId // Associate tag with current user
         };
 
@@ -157,6 +158,7 @@ public class TagService : ITagService
         tag.Step = step;
         tag.DefaultValue = model.DefaultValue;
         tag.OptionListId = model.OptionListId;
+        tag.GroupId = model.GroupId;
 
         _context.Tags.Update(tag);
         await _context.SaveChangesAsync();
@@ -234,7 +236,9 @@ public class TagService : ITagService
                 Step = t.Step,
                 DefaultValue = t.DefaultValue,
                 OptionListId = t.OptionListId,
-                OptionListName = t.OptionList?.Name
+                OptionListName = t.OptionList?.Name,
+                GroupId = t.Group?.Id,
+                GroupName = t.Group?.Name
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -261,7 +265,9 @@ public class TagService : ITagService
             Step = tag.Step,
             DefaultValue = tag.DefaultValue,
             OptionListId = tag.OptionListId,
-            OptionListName = tag.OptionList?.Name
+            OptionListName = tag.OptionList?.Name,
+            GroupId = tag.Group?.Id,
+            GroupName = tag.Group?.Name
         };
     }
 }

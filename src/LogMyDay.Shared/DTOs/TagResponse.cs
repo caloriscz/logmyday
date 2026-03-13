@@ -20,4 +20,6 @@ public class TagResponse
     public string? DefaultValue { get; set; }
     public int? OptionListId { get; set; }
     public string? OptionListName { get; set; }
+    public int? GroupId { get; set; }
+    public string? GroupName { get; set; }
 }
