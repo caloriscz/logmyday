@@ -35,12 +35,21 @@ public class ExportService : IExcelExportService
             }
 
             // Get tags with their names - enforce user-specific filtering
-            var selectedTags = await _context.Tags
+            var rawTags = await _context.Tags
+                .Include(t => t.Group)
                 .Where(t => request.TagIds.Contains(t.Id))
                 .Where(t => t.UserId == request.UserId)
-                .Select(t => new { t.Id, t.TagName })
-                .OrderBy(t => t.TagName)
                 .ToListAsync();
+
+            var selectedTags = rawTags
+                .Select(t => new
+                {
+                    t.Id,
+                    t.TagName,
+                    DisplayName = t.Group != null ? $"{t.Group.Name}: {t.TagName}" : t.TagName
+                })
+                .OrderBy(t => t.DisplayName)
+                .ToList();
 
             if (!selectedTags.Any())
             {
@@ -96,9 +105,11 @@ public class ExportService : IExcelExportService
             worksheet.Cell(1, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center; var columnIndex = 2;
             var tagColumnMap = new Dictionary<int, int>();
 
+            var tagDisplayNames = selectedTags.ToDictionary(t => t.Id, t => t.DisplayName);
+
             foreach (var tag in selectedTags)
             {
-                worksheet.Cell(1, columnIndex).Value = tag.TagName;
+                worksheet.Cell(1, columnIndex).Value = tag.DisplayName;
                 worksheet.Cell(1, columnIndex).Style.Font.Bold = true;
                 worksheet.Cell(1, columnIndex).Style.Fill.BackgroundColor = XLColor.LightGray;
                 worksheet.Cell(1, columnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -176,11 +187,12 @@ public class ExportService : IExcelExportService
                         // Update statistics
                         foreach (var activity in activitiesForTag)
                         {
-                            if (!statisticsData.ContainsKey(activity.TagName))
+                            var displayName = tagDisplayNames.GetValueOrDefault(tagId, activity.TagName);
+                            if (!statisticsData.ContainsKey(displayName))
                             {
-                                statisticsData[activity.TagName] = 0;
+                                statisticsData[displayName] = 0;
                             }
-                            statisticsData[activity.TagName]++;
+                            statisticsData[displayName]++;
                         }
                     }
                     else
@@ -252,7 +264,7 @@ public class ExportService : IExcelExportService
 
             summarySheet.Cell(4, 1).Value = "Selected Tags:";
             summarySheet.Cell(4, 1).Style.Font.Bold = true;
-            summarySheet.Cell(4, 2).Value = string.Join(", ", selectedTags.Select(t => t.TagName));
+            summarySheet.Cell(4, 2).Value = string.Join(", ", selectedTags.Select(t => t.DisplayName));
 
             summarySheet.Cell(5, 1).Value = "Total Activities:";
             summarySheet.Cell(5, 1).Style.Font.Bold = true;
@@ -288,7 +300,7 @@ public class ExportService : IExcelExportService
             result.FileContent = stream.ToArray();
 
             // Generate filename
-            var tagNames = string.Join("-", selectedTags.Take(2).Select(t => t.TagName));
+            var tagNames = string.Join("-", selectedTags.Take(2).Select(t => t.TagName.Replace(" ", "-")));
             if (selectedTags.Count > 2)
             {
                 tagNames += $"-and-{selectedTags.Count - 2}-more";
@@ -327,12 +339,18 @@ public class ExportService : IExcelExportService
 
     public async Task<List<TagResponse>> GetAvailableTags(Guid userId)
     {
-        return await _context.Tags
+        var tags = await _context.Tags
+            .Include(t => t.Group)
             .Where(t => t.UserId == userId)
+            .ToListAsync();
+
+        return tags
             .Select(t => new TagResponse
             {
                 Id = t.Id,
-                Title = t.TagName,
+                Title = t.Group != null ? $"{t.Group.Name}: {t.TagName}" : t.TagName,
+                GroupId = t.Group?.Id,
+                GroupName = t.Group?.Name,
                 InputTypeId = t.InputTypeId,
                 TypeId = t.InputTypeId,
                 IsRequired = t.IsRequired,
@@ -340,8 +358,9 @@ public class ExportService : IExcelExportService
                 TimeGranularity = t.TimeGranularity,
                 IsRange = t.IsRange
             })
-            .OrderBy(t => t.Title)
-            .ToListAsync();
+            .OrderBy(t => t.GroupName)
+            .ThenBy(t => t.Title)
+            .ToList();
     }
 
     public async Task<ExcelExportStatistics> GetExportPreview(ExcelExportRequest request)
@@ -440,16 +459,21 @@ public class ExportService : IExcelExportService
                 query = query.Where(a => a.DateStarted.Date >= request.StartDate.Value.Date && a.DateStarted.Date <= request.EndDate.Value.Date);
             }
 
-            var activities = await query
+            var rawActivities = await query
+                .Include(a => a.Tag)
+                    .ThenInclude(t => t.Group)
                 .OrderByDescending(a => a.DateStarted)
+                .ToListAsync();
+
+            var activities = rawActivities
                 .Select(a => new ActivityExportRow
                 {
                     DateStarted = a.DateStarted,
-                    Tag = a.Tag.TagName,
+                    Tag = a.Tag.Group != null ? $"{a.Tag.Group.Name}: {a.Tag.TagName}" : a.Tag.TagName,
                     Description = a.Description ?? "",
                     TimeGranularity = (int)a.Tag.TimeGranularity
                 })
-                .ToListAsync();
+                .ToList();
 
             return activities;
         }
