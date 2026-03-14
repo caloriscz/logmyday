@@ -88,6 +88,14 @@
                                 <dt class="font-medium text-gray-600 dark:text-slate-400">Notifications</dt>
                                 <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalNotifications</dd>
                             </div>
+                            <div>
+                                <dt class="font-medium text-gray-600 dark:text-slate-400">Tag Groups</dt>
+                                <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTagGroups</dd>
+                            </div>
+                            <div>
+                                <dt class="font-medium text-gray-600 dark:text-slate-400">Scan Mappings</dt>
+                                <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalScanMappings</dd>
+                            </div>
                         </dl>
                     </div>
                 }
@@ -283,6 +291,14 @@
                                     <div class="flex justify-between">
                                         <dt class="font-medium text-gray-600 dark:text-slate-400">Activities:</dt>
                                         <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.ActivitiesImported imported, @importResult.Statistics.ActivitiesSkipped skipped</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Tag Groups:</dt>
+                                        <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TagGroupsImported imported, @importResult.Statistics.TagGroupsSkipped skipped</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Scan Mappings:</dt>
+                                        <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.ScanMappingsImported imported, @importResult.Statistics.ScanMappingsSkipped skipped</dd>
                                     </div>
                                 </dl>
                             </div>

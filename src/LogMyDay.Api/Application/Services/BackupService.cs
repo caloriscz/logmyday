@@ -192,12 +192,35 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            // Export ScanMappings with user filtering
+            var scanMappingsQuery = _context.ScanMappings
+                .Include(sm => sm.Tag)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                scanMappingsQuery = scanMappingsQuery.Where(sm => sm.UserId == userId);
+            }
+
+            var scanMappings = await scanMappingsQuery
+                .Select(sm => new ScanMappingBackup
+                {
+                    CodeValue = sm.CodeValue,
+                    CodeType = (int)sm.CodeType,
+                    TagName = sm.Tag.TagName,
+                    DisplayName = sm.DisplayName,
+                    DefaultDescription = sm.DefaultDescription,
+                    IsActive = sm.IsActive,
+                    DateCreated = sm.DateCreated
+                })
+                .ToListAsync();
+
             var backupData = new BackupData
             {
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.3",
+                    Version = "1.4",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
@@ -206,7 +229,8 @@ public class BackupService : IBackupService
                     TotalTagGroups = tagGroups.Count,
                     TotalTags = tags.Count,
                     TotalNotifications = notifications.Count,
-                    TotalActivities = activities.Count
+                    TotalActivities = activities.Count,
+                    TotalScanMappings = scanMappings.Count
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -216,7 +240,8 @@ public class BackupService : IBackupService
                 TagGroups = tagGroups,
                 Tags = tags,
                 Notifications = notifications,
-                Activities = activities
+                Activities = activities,
+                ScanMappings = scanMappings
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -269,6 +294,7 @@ public class BackupService : IBackupService
                 await ImportTagsAsync(backupData.Tags, result, userId);
                 await ImportNotificationsAsync(backupData.Notifications, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
+                await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
 
                 await transaction.CommitAsync();
                 result.Message = "Data import completed successfully";
@@ -313,7 +339,17 @@ public class BackupService : IBackupService
             _context.Activities.RemoveRange(activitiesToDelete);
             recordsCleared += activitiesToDelete.Count;
 
-            // 2. Clear notifications (depends on tags)
+            // 2. Clear scan mappings (depends on tags)
+            var scanMappingsQuery = _context.ScanMappings.AsQueryable();
+            if (userId.HasValue)
+            {
+                scanMappingsQuery = scanMappingsQuery.Where(sm => sm.UserId == userId);
+            }
+            var scanMappingsToDelete = await scanMappingsQuery.ToListAsync();
+            _context.ScanMappings.RemoveRange(scanMappingsToDelete);
+            recordsCleared += scanMappingsToDelete.Count;
+
+            // 3. Clear notifications (depends on tags)
             var notificationsQuery = _context.Notifications
                 .Include(n => n.Tag)
                 .AsQueryable();
@@ -325,7 +361,7 @@ public class BackupService : IBackupService
             _context.Notifications.RemoveRange(notificationsToDelete);
             recordsCleared += notificationsToDelete.Count;
 
-            // 3. Clear tags (depends on units and option lists)
+            // 4. Clear tags (depends on units and option lists)
             var tagsQuery = _context.Tags.AsQueryable();
             if (userId.HasValue)
             {
@@ -335,7 +371,17 @@ public class BackupService : IBackupService
             _context.Tags.RemoveRange(tagsToDelete);
             recordsCleared += tagsToDelete.Count;
 
-            // 4. Clear tag options (depends on tag option lists)
+            // 5. Clear tag groups
+            var tagGroupsQuery = _context.TagGroups.AsQueryable();
+            if (userId.HasValue)
+            {
+                tagGroupsQuery = tagGroupsQuery.Where(g => g.UserId == userId);
+            }
+            var tagGroupsToDelete = await tagGroupsQuery.ToListAsync();
+            _context.TagGroups.RemoveRange(tagGroupsToDelete);
+            recordsCleared += tagGroupsToDelete.Count;
+
+            // 6. Clear tag options (depends on tag option lists)
             var tagOptionsQuery = _context.TagOptions
                 .Include(to => to.OptionList)
                 .AsQueryable();
@@ -478,6 +524,30 @@ public class BackupService : IBackupService
         if (invalidTagOptions.Any())
         {
             result.Warnings.Add($"Found {invalidTagOptions.Count} tag options referencing non-existent option lists (will be skipped)");
+        }
+
+        // Validate ScanMapping references
+        var invalidScanMappings = backupData.ScanMappings
+            .Where(sm => !string.IsNullOrEmpty(sm.TagName) && !tagNames.Contains(sm.TagName))
+            .ToList();
+
+        if (invalidScanMappings.Any())
+        {
+            result.Errors.Add($"Found {invalidScanMappings.Count} scan mappings referencing non-existent tags");
+            result.IsValid = false;
+        }
+
+        // Validate ScanMapping duplicate CodeValues
+        var duplicateCodeValues = backupData.ScanMappings
+            .GroupBy(sm => sm.CodeValue)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateCodeValues.Any())
+        {
+            result.Errors.Add($"Duplicate scan mapping code values found: {string.Join(", ", duplicateCodeValues)}");
+            result.IsValid = false;
         }
 
         return Task.FromResult(result);
@@ -807,6 +877,51 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    private async Task ImportScanMappingsAsync(List<ScanMappingBackup> scanMappings, BackupImportResult result, Guid? userId)
+    {
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        var existingCodeValues = await _context.ScanMappings
+            .Where(sm => userId == null || sm.UserId == userId)
+            .Select(sm => sm.CodeValue)
+            .ToHashSetAsync();
+
+        foreach (var mapping in scanMappings)
+        {
+            if (existingCodeValues.Contains(mapping.CodeValue))
+            {
+                result.Statistics.ScanMappingsSkipped++;
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(mapping.TagName) || !tagLookup.ContainsKey(mapping.TagName))
+            {
+                result.Warnings.Add($"Skipping scan mapping '{mapping.CodeValue}' - unknown tag '{mapping.TagName}'");
+                result.Statistics.ScanMappingsSkipped++;
+                continue;
+            }
+
+            var entity = new ScanMapping
+            {
+                CodeValue = mapping.CodeValue,
+                CodeType = (Domain.Enums.CodeType)mapping.CodeType,
+                TagId = tagLookup[mapping.TagName],
+                UserId = userId ?? Guid.Empty,
+                DisplayName = mapping.DisplayName,
+                DefaultDescription = mapping.DefaultDescription,
+                IsActive = mapping.IsActive,
+                DateCreated = mapping.DateCreated
+            };
+
+            _context.ScanMappings.Add(entity);
+            result.Statistics.ScanMappingsImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     // NEW: Secure user-scoped backup methods (v2.0)
     
     /// <summary>
@@ -853,13 +968,83 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            // Export user's tag groups
+            var userTagGroups = await _context.TagGroups
+                .Where(g => g.UserId == userId)
+                .Select(g => new SecureTagGroupBackupDto
+                {
+                    Name = g.Name,
+                    Description = g.Description,
+                    DisplayOrder = g.DisplayOrder,
+                    DateCreated = g.DateCreated
+                })
+                .ToListAsync();
+
+            // Export user's tag option lists
+            var userTagOptionLists = await _context.TagOptionLists
+                .Where(ol => ol.UserId == userId)
+                .Select(ol => new SecureTagOptionListBackupDto
+                {
+                    Name = ol.Name
+                })
+                .ToListAsync();
+
+            // Export user's tag options (via user's option lists)
+            var userTagOptions = await _context.TagOptions
+                .Include(to => to.OptionList)
+                .Where(to => to.OptionList != null && to.OptionList.UserId == userId)
+                .Select(to => new SecureTagOptionBackupDto
+                {
+                    Value = to.Value,
+                    DisplayName = to.DisplayName,
+                    TagOptionListKey = to.OptionList != null ? to.OptionList.Name : string.Empty
+                })
+                .ToListAsync();
+
+            // Export user's notifications
+            var userNotifications = await _context.Notifications
+                .Include(n => n.Tag)
+                .Where(n => n.Tag.UserId == userId)
+                .Select(n => new SecureNotificationBackupDto
+                {
+                    TagKey = n.Tag.TagName,
+                    NotificationText = n.NotificationText,
+                    NotBeforeTime = n.NotBeforeTime,
+                    NotAfterTime = n.NotAfterTime,
+                    MaxNudges = n.MaxNudges,
+                    NudgeInterval = n.NudgeInterval,
+                    IsActive = n.IsActive,
+                    DateCreated = n.DateCreated
+                })
+                .ToListAsync();
+
+            // Export user's scan mappings
+            var userScanMappings = await _context.ScanMappings
+                .Include(sm => sm.Tag)
+                .Where(sm => sm.UserId == userId)
+                .Select(sm => new SecureScanMappingBackupDto
+                {
+                    CodeValue = sm.CodeValue,
+                    CodeType = (int)sm.CodeType,
+                    TagName = sm.Tag.TagName,
+                    DisplayName = sm.DisplayName,
+                    DefaultDescription = sm.DefaultDescription,
+                    IsActive = sm.IsActive,
+                    DateCreated = sm.DateCreated
+                })
+                .ToListAsync();
+
             var secureBackup = new SecureBackupDto
             {
                 CreatedAt = DateTime.UtcNow,
-                Version = "2.0", // New secure backup format version
+                Version = "2.1",
                 Activities = userActivities,
-                Tags = userTags
-                // Note: Explicitly NO user data, credentials, or sensitive information
+                Tags = userTags,
+                TagGroups = userTagGroups,
+                TagOptionLists = userTagOptionLists,
+                TagOptions = userTagOptions,
+                Notifications = userNotifications,
+                ScanMappings = userScanMappings
             };
 
             _logger.LogInformation("Secure backup created successfully");
@@ -888,16 +1073,91 @@ public class BackupService : IBackupService
             
             try
             {
-                // Step 1: Import tags with current user ID
+                // Step 1: Import tag option lists
+                foreach (var listDto in backup.TagOptionLists)
+                {
+                    var exists = await _context.TagOptionLists
+                        .AnyAsync(ol => ol.Name == listDto.Name && ol.UserId == userId);
+
+                    if (!exists)
+                    {
+                        _context.TagOptionLists.Add(new TagOptionList
+                        {
+                            Name = listDto.Name,
+                            UserId = userId
+                        });
+                        result.Statistics.TagOptionListsImported++;
+                    }
+                    else
+                    {
+                        result.Statistics.TagOptionListsSkipped++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Step 2: Import tag options
+                var optionListLookup = await _context.TagOptionLists
+                    .Where(ol => ol.UserId == userId)
+                    .ToDictionaryAsync(ol => ol.Name, ol => ol.Id);
+
+                foreach (var optionDto in backup.TagOptions)
+                {
+                    if (!optionListLookup.TryGetValue(optionDto.TagOptionListKey, out var listId))
+                    {
+                        result.Statistics.TagOptionsSkipped++;
+                        continue;
+                    }
+
+                    _context.TagOptions.Add(new TagOption
+                    {
+                        Value = optionDto.Value,
+                        DisplayName = optionDto.DisplayName,
+                        OptionListId = listId
+                    });
+                    result.Statistics.TagOptionsImported++;
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Step 3: Import tag groups
+                foreach (var groupDto in backup.TagGroups)
+                {
+                    var exists = await _context.TagGroups
+                        .AnyAsync(g => g.Name == groupDto.Name && g.UserId == userId);
+
+                    if (!exists)
+                    {
+                        _context.TagGroups.Add(new TagGroup
+                        {
+                            Name = groupDto.Name,
+                            UserId = userId,
+                            Description = groupDto.Description,
+                            DisplayOrder = groupDto.DisplayOrder,
+                            DateCreated = groupDto.DateCreated
+                        });
+                        result.Statistics.TagGroupsImported++;
+                    }
+                    else
+                    {
+                        result.Statistics.TagGroupsSkipped++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Step 4: Import tags with current user ID
+                var tagGroupLookup = await _context.TagGroups
+                    .Where(g => g.UserId == userId)
+                    .ToDictionaryAsync(g => g.Name, g => g.Id);
+
                 foreach (var tagDto in backup.Tags)
                 {
-                    // Check if tag already exists for this user
                     var existingTag = await _context.Tags
                         .FirstOrDefaultAsync(t => t.TagName == tagDto.TagName && t.UserId == userId);
                     
                     if (existingTag == null)
                     {
-                        // Get input type if specified
                         int? inputTypeId = null;
                         if (!string.IsNullOrEmpty(tagDto.InputTypeName))
                         {
@@ -906,7 +1166,6 @@ public class BackupService : IBackupService
                             inputTypeId = inputType?.Id;
                         }
 
-                        // Get pattern if specified
                         int? patternId = null;
                         if (!string.IsNullOrEmpty(tagDto.PatternName))
                         {
@@ -915,14 +1174,12 @@ public class BackupService : IBackupService
                             patternId = pattern?.Id;
                         }
 
-                        // Parse TimeGranularity enum
                         var timeGranularity = Domain.Enums.TimeGranularity.Exact;
                         if (!string.IsNullOrEmpty(tagDto.TimeGranularity))
                         {
                             Enum.TryParse<Domain.Enums.TimeGranularity>(tagDto.TimeGranularity, out timeGranularity);
                         }
 
-                        // Create new tag - SIMPLE VERSION
                         var newTag = new Tag
                         {
                             TagName = tagDto.TagName,
@@ -932,7 +1189,7 @@ public class BackupService : IBackupService
                             IsRepeatable = tagDto.IsRepeatable,
                             IsRange = tagDto.IsRange,
                             PatternId = patternId,
-                            UserId = userId  // Simple assignment
+                            UserId = userId
                         };
                         
                         _context.Tags.Add(newTag);
@@ -944,40 +1201,104 @@ public class BackupService : IBackupService
                     }
                 }
 
-                // Save tags first
                 await _context.SaveChangesAsync();
 
-                // Step 2: Import activities with current user ID
+                // Step 5: Import notifications
+                var tagLookup = await _context.Tags
+                    .Where(t => t.UserId == userId)
+                    .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+                foreach (var notifDto in backup.Notifications)
+                {
+                    if (!tagLookup.TryGetValue(notifDto.TagKey, out var tagId))
+                    {
+                        result.Warnings.Add($"Skipping notification for unknown tag '{notifDto.TagKey}'");
+                        result.Statistics.NotificationsSkipped++;
+                        continue;
+                    }
+
+                    var existingNotif = await _context.Notifications
+                        .FirstOrDefaultAsync(n => n.TagId == tagId);
+
+                    if (existingNotif != null)
+                    {
+                        result.Statistics.NotificationsSkipped++;
+                        continue;
+                    }
+
+                    _context.Notifications.Add(new Notification
+                    {
+                        TagId = tagId,
+                        NotificationText = notifDto.NotificationText,
+                        NotBeforeTime = notifDto.NotBeforeTime,
+                        NotAfterTime = notifDto.NotAfterTime,
+                        MaxNudges = notifDto.MaxNudges,
+                        NudgeInterval = notifDto.NudgeInterval,
+                        IsActive = notifDto.IsActive,
+                        DateCreated = notifDto.DateCreated
+                    });
+                    result.Statistics.NotificationsImported++;
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Step 6: Import activities with current user ID
                 foreach (var activityDto in backup.Activities)
                 {
-                    // Find the tag by name in the current user's tags
-                    var tag = await _context.Tags
-                        .FirstOrDefaultAsync(t => t.TagName == activityDto.TagName && t.UserId == userId);
-                    
-                    if (tag != null)
-                    {
-                        // Create new activity - SIMPLE VERSION
-                        var newActivity = new Activity
-                        {
-                            Description = activityDto.Description,
-                            DateCreated = activityDto.DateCreated,
-                            DateStarted = activityDto.DateStarted,
-                            DateFinished = activityDto.DateFinished,
-                            TagId = tag.Id,
-                            UserId = userId  // Simple assignment
-                        };
-                        
-                        _context.Activities.Add(newActivity);
-                        result.Statistics.ActivitiesImported++;
-                    }
-                    else
+                    if (!tagLookup.TryGetValue(activityDto.TagName, out var tagId))
                     {
                         result.Warnings.Add($"Skipping activity with unknown tag: {activityDto.TagName}");
                         result.Statistics.ActivitiesSkipped++;
+                        continue;
                     }
+
+                    _context.Activities.Add(new Activity
+                    {
+                        Description = activityDto.Description,
+                        DateCreated = activityDto.DateCreated,
+                        DateStarted = activityDto.DateStarted,
+                        DateFinished = activityDto.DateFinished,
+                        TagId = tagId,
+                        UserId = userId
+                    });
+                    result.Statistics.ActivitiesImported++;
                 }
 
-                // Save activities
+                await _context.SaveChangesAsync();
+
+                // Step 7: Import scan mappings
+                foreach (var scanDto in backup.ScanMappings)
+                {
+                    if (!tagLookup.TryGetValue(scanDto.TagName, out var tagId))
+                    {
+                        result.Warnings.Add($"Skipping scan mapping '{scanDto.CodeValue}' - unknown tag '{scanDto.TagName}'");
+                        result.Statistics.ScanMappingsSkipped++;
+                        continue;
+                    }
+
+                    var exists = await _context.ScanMappings
+                        .AnyAsync(sm => sm.CodeValue == scanDto.CodeValue && sm.UserId == userId);
+
+                    if (exists)
+                    {
+                        result.Statistics.ScanMappingsSkipped++;
+                        continue;
+                    }
+
+                    _context.ScanMappings.Add(new ScanMapping
+                    {
+                        CodeValue = scanDto.CodeValue,
+                        CodeType = (Domain.Enums.CodeType)scanDto.CodeType,
+                        TagId = tagId,
+                        UserId = userId,
+                        DisplayName = scanDto.DisplayName,
+                        DefaultDescription = scanDto.DefaultDescription,
+                        IsActive = scanDto.IsActive,
+                        DateCreated = scanDto.DateCreated
+                    });
+                    result.Statistics.ScanMappingsImported++;
+                }
+
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 
@@ -988,6 +1309,7 @@ public class BackupService : IBackupService
             catch
             {
                 await transaction.RollbackAsync();
+
                 throw;
             }
         }
@@ -1017,23 +1339,65 @@ public class BackupService : IBackupService
             
             try
             {
-                // 🎯 ONLY clear specified user's data - NOT all users!
-                
-                // Clear user's activities first (due to foreign key constraints)
+                // Clear in reverse dependency order
+
+                // 1. Clear user's activities
                 var userActivities = await _context.Activities
                     .Where(a => a.UserId == userId)
                     .ToListAsync();
-                
+
                 _context.Activities.RemoveRange(userActivities);
                 recordsCleared += userActivities.Count;
 
-                // Clear user's tags
+                // 2. Clear user's scan mappings
+                var userScanMappings = await _context.ScanMappings
+                    .Where(sm => sm.UserId == userId)
+                    .ToListAsync();
+
+                _context.ScanMappings.RemoveRange(userScanMappings);
+                recordsCleared += userScanMappings.Count;
+
+                // 3. Clear user's notifications (via tags)
+                var userNotifications = await _context.Notifications
+                    .Include(n => n.Tag)
+                    .Where(n => n.Tag.UserId == userId)
+                    .ToListAsync();
+
+                _context.Notifications.RemoveRange(userNotifications);
+                recordsCleared += userNotifications.Count;
+
+                // 4. Clear user's tags
                 var userTags = await _context.Tags
                     .Where(t => t.UserId == userId)
                     .ToListAsync();
-                
+
                 _context.Tags.RemoveRange(userTags);
                 recordsCleared += userTags.Count;
+
+                // 5. Clear user's tag groups
+                var userTagGroups = await _context.TagGroups
+                    .Where(g => g.UserId == userId)
+                    .ToListAsync();
+
+                _context.TagGroups.RemoveRange(userTagGroups);
+                recordsCleared += userTagGroups.Count;
+
+                // 6. Clear user's tag options (via option lists)
+                var userTagOptions = await _context.TagOptions
+                    .Include(to => to.OptionList)
+                    .Where(to => to.OptionList != null && to.OptionList.UserId == userId)
+                    .ToListAsync();
+
+                _context.TagOptions.RemoveRange(userTagOptions);
+                recordsCleared += userTagOptions.Count;
+
+                // 7. Clear user's tag option lists
+                var userTagOptionLists = await _context.TagOptionLists
+                    .Where(ol => ol.UserId == userId)
+                    .ToListAsync();
+
+                _context.TagOptionLists.RemoveRange(userTagOptionLists);
+                recordsCleared += userTagOptionLists.Count;
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();

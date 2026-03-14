@@ -12,12 +12,13 @@ public class BackupData
     public List<TagBackup> Tags { get; set; } = new();
     public List<NotificationBackup> Notifications { get; set; } = new();
     public List<ActivityBackup> Activities { get; set; } = new();
+    public List<ScanMappingBackup> ScanMappings { get; set; } = new();
 }
 
 public class BackupMetadata
 {
     public DateTime ExportDate { get; set; }
-    public string Version { get; set; } = "1.3";  // schema version of the backup file format
+    public string Version { get; set; } = "1.4";  // schema version of the backup file format
     public int TotalTags { get; set; }
     public int TotalActivities { get; set; }
     public int TotalInputTypes { get; set; }
@@ -27,4 +28,5 @@ public class BackupMetadata
     public int TotalTagOptions { get; set; }
     public int TotalTagGroups { get; set; }
     public int TotalNotifications { get; set; }
+    public int TotalScanMappings { get; set; }
 }

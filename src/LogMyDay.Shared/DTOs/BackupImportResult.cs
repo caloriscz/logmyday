@@ -29,6 +29,8 @@ public class BackupImportStatistics
     public int NotificationsSkipped { get; set; }
     public int ActivitiesImported { get; set; }
     public int ActivitiesSkipped { get; set; }
+    public int ScanMappingsImported { get; set; }
+    public int ScanMappingsSkipped { get; set; }
     public int RecordsCleared { get; set; }
 }
 

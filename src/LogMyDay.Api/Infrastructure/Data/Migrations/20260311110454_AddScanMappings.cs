@@ -15,16 +15,16 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                 name: "LogMyDay_ScanMappings",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    CodeValue = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    CodeType = table.Column<int>(type: "int", nullable: false),
-                    TagId = table.Column<int>(type: "int", nullable: false),
-                    DisplayName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    DefaultDescription = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
-                    DateCreated = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    CodeValue = table.Column<string>(type: "TEXT", maxLength: 512, nullable: false),
+                    CodeType = table.Column<int>(type: "INTEGER", nullable: false),
+                    TagId = table.Column<int>(type: "INTEGER", nullable: false),
+                    DisplayName = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    DefaultDescription = table.Column<string>(type: "TEXT", nullable: true),
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false, defaultValue: true),
+                    DateCreated = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
