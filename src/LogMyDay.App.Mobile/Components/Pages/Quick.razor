@@ -125,16 +125,11 @@
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Tag:</label>
-                        <InputSelect @bind-Value="newQuickActivity.TagId" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" @bind-Value:after="OnTagSelectionChanged">
-                            <option value="0">-- Select Tag --</option>
-                            @if (availableTags != null)
-                            {
-                                foreach (var tag in availableTags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            }
-                        </InputSelect>
+                        <GroupedTagSelect
+                            Tags="availableTags"
+                            Value="@(newQuickActivity.TagId > 0 ? newQuickActivity.TagId : (int?)null)"
+                            ValueChanged="@((int? v) => { newQuickActivity.TagId = v ?? 0; OnTagSelectionChanged(); })"
+                            SelectClass="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
                     </div>
 
                     <div class="mb-4">

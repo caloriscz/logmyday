@@ -86,16 +86,7 @@ else
                         <div class="space-y-4">
                             <div>
                                 <label class="form-label">Primary Tag:</label>
-                                <InputSelect @bind-Value="newActivity.PrimaryTagId" class="form-select" @ref="primaryTagSelect" tabindex="1" @bind-Value:after="OnTagSelectionChanged" @onfocus="EnsureTagsLoaded">
-                                    <option value="">-- Select Tag --</option>
-                                    @if (tags != null)
-                                    {
-                                        foreach (var tag in tags)
-                                        {
-                                            <option value="@tag.Id">@tag.Title</option>
-                                        }
-                                    }
-                                </InputSelect>
+                                <GroupedTagSelect Tags="tags" @bind-Value="newActivity.PrimaryTagId" @bind-Value:after="OnTagSelectionChanged" OnFocus="EnsureTagsLoaded" SelectClass="form-select" />
                             </div>
 
                             <div>
@@ -237,7 +228,6 @@ else
     
     // Keyboard shortcuts
     private bool keyboardListenerAdded = false;
-    private InputSelect<int?>? primaryTagSelect;
 
     private bool IsLoginPage
     {

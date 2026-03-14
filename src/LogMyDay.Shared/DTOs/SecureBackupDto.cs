@@ -6,11 +6,14 @@ namespace LogMyDay.Shared.DTOs;
 public class SecureBackupDto
 {
     public DateTime CreatedAt { get; set; }
-    public string Version { get; set; } = "2.0";
+    public string Version { get; set; } = "2.1";
     public List<SecureActivityBackupDto> Activities { get; set; } = new();
     public List<SecureTagBackupDto> Tags { get; set; } = new();
-    
-    // Note: Explicitly NO user data, credentials, or sensitive information
+    public List<SecureTagGroupBackupDto> TagGroups { get; set; } = new();
+    public List<SecureTagOptionListBackupDto> TagOptionLists { get; set; } = new();
+    public List<SecureTagOptionBackupDto> TagOptions { get; set; } = new();
+    public List<SecureNotificationBackupDto> Notifications { get; set; } = new();
+    public List<SecureScanMappingBackupDto> ScanMappings { get; set; } = new();
 }
 
 /// <summary>
@@ -41,5 +44,48 @@ public class SecureTagBackupDto
     public string? PatternName { get; set; }
     
     // Note: UserId not included - will be assigned to current user during restore
+}
+
+public class SecureTagGroupBackupDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int? DisplayOrder { get; set; }
+    public DateTime DateCreated { get; set; }
+}
+
+public class SecureTagOptionListBackupDto
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+public class SecureTagOptionBackupDto
+{
+    public string Value { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string TagOptionListKey { get; set; } = string.Empty;
+}
+
+public class SecureNotificationBackupDto
+{
+    public string TagKey { get; set; } = string.Empty;
+    public string? NotificationText { get; set; }
+    public TimeSpan? NotBeforeTime { get; set; }
+    public TimeSpan? NotAfterTime { get; set; }
+    public int MaxNudges { get; set; }
+    public TimeSpan? NudgeInterval { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime DateCreated { get; set; }
+}
+
+public class SecureScanMappingBackupDto
+{
+    public string CodeValue { get; set; } = string.Empty;
+    public int CodeType { get; set; }
+    public string TagName { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string? DefaultDescription { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime DateCreated { get; set; }
 }
 

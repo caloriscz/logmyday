@@ -132,16 +132,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <div class="w-full max-w-sm space-y-2">
                 <label for="tagPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Select Tag</label>
-                <select id="tagPicker" class="@InputCss" value="@(selectedTagId?.ToString() ?? string.Empty)" @onchange="OnTagChangedHandler">
-                    <option value="">Select a tag...</option>
-                    @if (tags != null)
-                    {
-                        foreach (var tag in tags.OrderBy(t => t.Title))
-                        {
-                            <option value="@tag.Id">@tag.Title</option>
-                        }
-                    }
-                </select>
+                <GroupedTagSelect Tags="@(tags?.OrderBy(t => t.Title).ToList())" @bind-Value="selectedTagId" @bind-Value:after="OnTagSelectedAsync" SelectClass="@InputCss" />
             </div>
 
             <div class="w-auto space-y-2">
@@ -647,22 +638,20 @@
         }
     }
 
-    private async Task OnTagChangedHandler(ChangeEventArgs e)
+    private async Task OnTagSelectedAsync()
     {
         showDayActivitiesModal = false;
         showActivityEditor = false;
         dayModalError = null;
         activityEditorError = null;
 
-        if (int.TryParse(e.Value?.ToString(), out var tagId))
+        if (selectedTagId.HasValue)
         {
-            selectedTagId = tagId;
-            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", tagId);
-            await LoadActivitiesForTag(tagId);
+            await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", selectedTagId.Value);
+            await LoadActivitiesForTag(selectedTagId.Value);
         }
         else
         {
-            selectedTagId = null;
             await JSRuntime.InvokeVoidAsync("tagPersistence.saveSelectedTag", null);
             activitiesByDate = null;
             availableYears.Clear();

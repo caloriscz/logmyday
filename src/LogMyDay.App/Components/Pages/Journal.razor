@@ -67,18 +67,7 @@
                 <!-- Tag Filter (String input types only) -->
                 <div class="flex-1 min-w-[200px]">
                     <label class="form-label">Tag Filter</label>
-                    <select @bind="selectedTagId" 
-                            @bind:after="OnFilterChanged"
-                            class="form-select w-full">
-                        <option value="">Select tag (or All tags)</option>
-                        @if (stringTags != null)
-                        {
-                            @foreach (var tag in stringTags)
-                            {
-                                <option value="@tag.Id">@tag.Title</option>
-                            }
-                        }
-                    </select>
+                    <GroupedTagSelect Tags="stringTags" @bind-Value="selectedTagId" @bind-Value:after="OnFilterChanged" SelectClass="form-select w-full" />
                 </div>
             </div>
             

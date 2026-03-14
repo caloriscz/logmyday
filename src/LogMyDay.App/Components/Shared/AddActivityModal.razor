@@ -31,16 +31,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <label class="@LabelCss" for="@($"{modalId}PrimaryTag")">Primary Tag</label>
-                        <InputSelect id="@($"{modalId}PrimaryTag")" @bind-Value="Activity.PrimaryTagId" class="@InputCss" @bind-Value:after="() => OnTagSelectionChanged()">
-                            <option value="">-- Select Tag --</option>
-                            @if (AvailableTags != null)
-                            {
-                                @foreach (var tag in AvailableTags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            }
-                        </InputSelect>
+                        <GroupedTagSelect Tags="AvailableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="() => OnTagSelectionChanged()" SelectClass="@InputCss" />
                     </div>
 
                     <div class="space-y-2">

@@ -72,6 +72,7 @@ public class TagService : ITagService
             Step = step,
             DefaultValue = createTagRequest.DefaultValue,
             OptionListId = createTagRequest.OptionListId,
+            GroupId = createTagRequest.GroupId,
             UserId = userId // Associate tag with current user
         };
 
@@ -157,6 +158,7 @@ public class TagService : ITagService
         tag.Step = step;
         tag.DefaultValue = model.DefaultValue;
         tag.OptionListId = model.OptionListId;
+        tag.GroupId = model.GroupId;
 
         _context.Tags.Update(tag);
         await _context.SaveChangesAsync();
@@ -205,14 +207,14 @@ public class TagService : ITagService
     /// <param name="filter"></param>
     /// <param name="filterType"></param>
     /// <returns></returns>
-    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null)
+    public async Task<PagedResult<TagResponse>> GetPaged(int pageNumber, int pageSize, string orderBy, Guid userId, string? filter = null, string? filterType = null, int? groupId = null)
     {
         // Get paginated items
-        var pagedSpec = new PagedTagsSpec(userId, pageNumber, pageSize, orderBy, filter, filterType);
+        var pagedSpec = new PagedTagsSpec(userId, pageNumber, pageSize, orderBy, filter, filterType, groupId);
         var items = await _tagRepository.GetAsync(pagedSpec);
 
         // Get total count
-        var countSpec = new TagCountSpec(userId, filter, filterType);
+        var countSpec = new TagCountSpec(userId, filter, filterType, groupId);
         var totalCount = await _tagRepository.CountAsync(countSpec);
 
         return new PagedResult<TagResponse>
@@ -234,7 +236,9 @@ public class TagService : ITagService
                 Step = t.Step,
                 DefaultValue = t.DefaultValue,
                 OptionListId = t.OptionListId,
-                OptionListName = t.OptionList?.Name
+                OptionListName = t.OptionList?.Name,
+                GroupId = t.Group?.Id,
+                GroupName = t.Group?.Name
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -247,7 +251,7 @@ public class TagService : ITagService
         return new TagResponse
         {
             Id = tag.Id,
-            Title = tag.TagName,
+            Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
             InputTypeId = tag.InputTypeId,
             TypeId = tag.InputTypeId,
             IsRequired = tag.IsRequired,
@@ -261,7 +265,9 @@ public class TagService : ITagService
             Step = tag.Step,
             DefaultValue = tag.DefaultValue,
             OptionListId = tag.OptionListId,
-            OptionListName = tag.OptionList?.Name
+            OptionListName = tag.OptionList?.Name,
+            GroupId = tag.Group?.Id,
+            GroupName = tag.Group?.Name
         };
     }
 }

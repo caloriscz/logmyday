@@ -8,6 +8,7 @@
 @using System.Linq
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
 @inject NavigationManager Navigation
 @inject ILogger<TagCreate> Logger
 @inject IPageTitleService PageTitleService
@@ -50,6 +51,17 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Title</label>
                         <InputText @bind-Value="newTag.Tag" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Group (optional)</label>
+                        <InputSelect @bind-Value="newTag.GroupId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                            <option value="">(None)</option>
+                            @foreach (var group in availableGroups)
+                            {
+                                <option value="@group.Id">@group.Name</option>
+                            }
+                        </InputSelect>
                     </div>
 
                     <div class="space-y-2">
@@ -209,6 +221,7 @@
     private List<InputTypeDto> inputTypes = new();
     private List<UnitResponse> availableUnits = new();
     private List<TagOptionListResponse> availableOptionLists = new();
+    private List<TagGroupResponse> availableGroups = new();
     private string? errorMessage;
     private string? loadError;
     private bool isLoading = true;
@@ -241,6 +254,18 @@
 
     private async Task LoadSupportingData()
     {
+        try
+        {
+            availableGroups = (await TagGroupApi.GetTagGroups())
+                .OrderBy(g => g.DisplayOrder ?? int.MaxValue)
+                .ThenBy(g => g.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tag groups while creating tag");
+        }
+
         try
         {
             availableUnits = (await ActivityApi.GetUnitsAsync())

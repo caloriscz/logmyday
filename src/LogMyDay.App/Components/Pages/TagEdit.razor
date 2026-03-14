@@ -10,6 +10,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
 @inject NavigationManager Navigation
 @inject ILogger<TagEdit> Logger
 @inject IPageTitleService PageTitleService
@@ -49,6 +50,17 @@
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Title</label>
                         <InputText @bind-Value="editTag.Tag" class="@InputCss" disabled="@isSaving" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Group (optional)</label>
+                        <InputSelect @bind-Value="editTag.GroupId" class="@InputCss" TValue="int?" disabled="@isSaving">
+                            <option value="">(None)</option>
+                            @foreach (var group in availableGroups)
+                            {
+                                <option value="@group.Id">@group.Name</option>
+                            }
+                        </InputSelect>
                     </div>
 
                     <div class="space-y-2">
@@ -364,6 +376,7 @@
     private List<InputTypeDto> inputTypes = new();
     private List<UnitResponse> availableUnits = new();
     private List<TagOptionListResponse> availableOptionLists = new();
+    private List<TagGroupResponse> availableGroups = new();
     private string? tagTitle;
     private string? errorMessage;
     private bool isLoading = true;
@@ -397,7 +410,8 @@
                 MaxValue = tag.MaxValue,
                 Step = tag.Step,
                 DefaultValue = tag.DefaultValue,
-                OptionListId = tag.OptionListId
+                OptionListId = tag.OptionListId,
+                GroupId = tag.GroupId
             };
 
             EnsureValidTypeSelection();
@@ -421,6 +435,18 @@
 
     private async Task LoadSupportingData()
     {
+        try
+        {
+            availableGroups = (await TagGroupApi.GetTagGroups())
+                .OrderBy(g => g.DisplayOrder ?? int.MaxValue)
+                .ThenBy(g => g.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load tag groups");
+        }
+
         try
         {
             availableUnits = (await ActivityApi.GetUnitsAsync())

@@ -1,0 +1,384 @@
+@page "/tag-groups"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using Refit
+@inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
+@inject ILogger<TagGroups> Logger
+@inject IPageTitleService PageTitleService
+
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("TagGroups", "Manage tag groups for organizing activity tags")]
+
+<div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Tag Groups</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Organize your tags into groups for easier management.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                <Icon Name="tag" Class="h-4 w-4" />
+                Tags
+            </a>
+            <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
+                <Icon Name="plus" Class="h-4 w-4" />
+                New Group
+            </button>
+        </div>
+    </div>
+
+    <section class="space-y-4">
+        @if (isLoading)
+        {
+            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading groups…</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+        else if (groups.Count == 0)
+        {
+            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                No tag groups yet. Create your first group to start organizing tags.
+            </div>
+        }
+        else
+        {
+            <!-- Desktop Table -->
+            <div class="hidden md:block">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead class="bg-gray-50 dark:bg-slate-800">
+                            <tr>
+                                <th scope="col" class="w-24 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300"></th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Name</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Description</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Display Order</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                            @foreach (var group in groups)
+                            {
+                                <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                    <td class="px-4 py-3">
+                                        <div class="flex">
+                                            <button type="button" class="inline-flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(group)" disabled="@isBusy">
+                                                <Icon Name="pencil" Class="h-4 w-4" />
+                                            </button>
+                                            <button type="button" class="inline-flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(group)" disabled="@isBusy">
+                                                <Icon Name="trash" Class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@group.Name</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(group.Description) ? "—" : group.Description)</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(group.DisplayOrder?.ToString() ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Cards -->
+            <div class="space-y-3 md:hidden">
+                @foreach (var group in groups)
+                {
+                    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">@group.Name</h3>
+                                @if (!string.IsNullOrWhiteSpace(group.Description))
+                                {
+                                    <p class="mt-1 text-sm text-gray-600 dark:text-slate-400">@group.Description</p>
+                                }
+                            </div>
+                            @if (group.DisplayOrder.HasValue)
+                            {
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-slate-700 dark:text-slate-400">
+                                    Order: @group.DisplayOrder
+                                </span>
+                            }
+                        </div>
+
+                        <div class="mt-4 flex justify-end gap-2">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(group)" disabled="@isBusy">
+                                <Icon Name="pencil" Class="h-4 w-4" />
+                                <span>Edit</span>
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(group)" disabled="@isBusy">
+                                <Icon Name="trash" Class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                Total groups: @groups.Count
+            </div>
+        }
+    </section>
+</div>
+
+@* Create/Edit Modal *@
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isBusy) CloseModal(); }">
+        <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(isEditing ? "Edit Group" : "New Group")</h2>
+                    <p class="text-sm text-gray-600 dark:text-slate-400">Group your tags for easier management.</p>
+                </div>
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                    <Icon Name="close" Class="h-5 w-5" />
+                </button>
+            </div>
+
+            <EditForm Model="formModel" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @formError
+                    </div>
+                }
+
+                <div class="px-6 py-5">
+                    <div class="space-y-5">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Name <span class="text-rose-500">*</span></label>
+                            <InputText @bind-Value="formModel.Name" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., Health, Work, Fitness" disabled="@isBusy" />
+                            <ValidationMessage For="@(() => formModel.Name)" class="text-xs text-rose-600 dark:text-rose-400" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Description</label>
+                            <InputText @bind-Value="formModel.Description" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional description" disabled="@isBusy" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Display Order</label>
+                            <InputNumber @bind-Value="formModel.DisplayOrder" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" placeholder="Optional sort order" disabled="@isBusy" />
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Lower numbers appear first.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" disabled="@isBusy">
+                        @if (isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="check" Class="h-4 w-4" />
+                            <span>@(isEditing ? "Save Changes" : "Create Group")</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (pendingDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete group</h3>
+            </div>
+            <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                Delete group <strong>@pendingDelete.Name</strong>? Tags in this group will become ungrouped. This cannot be undone.
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="CancelDelete" disabled="@isBusy">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500" @onclick="DeleteGroup" disabled="@isBusy">
+                    @if (isBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Deleting…</span>
+                    }
+                    else
+                    {
+                        <Icon Name="trash" Class="h-4 w-4" />
+                        <span>Delete</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<TagGroupResponse> groups = new();
+    private TagGroupRequest formModel = new() { Name = string.Empty };
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingId;
+    private bool showModal;
+    private TagGroupResponse? pendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Tag Groups");
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var results = await TagGroupApi.GetTagGroups();
+            groups.Clear();
+            groups.AddRange(results.OrderBy(g => g.DisplayOrder ?? int.MaxValue).ThenBy(g => g.Name));
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view tag groups.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load tag groups: {ex.Message}";
+            Logger.LogError(ex, "Failed to load tag groups");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        if (isBusy) return;
+
+        isEditing = false;
+        editingId = null;
+        formModel = new TagGroupRequest { Name = string.Empty };
+        formError = null;
+        showModal = true;
+    }
+
+    private void OpenEditModal(TagGroupResponse group)
+    {
+        if (isBusy) return;
+
+        isEditing = true;
+        editingId = group.Id;
+        formModel = new TagGroupRequest
+        {
+            Name = group.Name,
+            Description = group.Description,
+            DisplayOrder = group.DisplayOrder
+        };
+        formError = null;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        formError = null;
+    }
+
+    private async Task HandleSubmit()
+    {
+        isBusy = true;
+        formError = null;
+
+        try
+        {
+            if (isEditing && editingId.HasValue)
+            {
+                await TagGroupApi.UpdateTagGroup(editingId.Value, formModel);
+            }
+            else
+            {
+                await TagGroupApi.CreateTagGroup(formModel);
+            }
+
+            CloseModal();
+            await LoadDataAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            formError = "A group with this name already exists.";
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            formError = "You are not authorized to perform this action.";
+        }
+        catch (Exception ex)
+        {
+            formError = $"Failed to save: {ex.Message}";
+            Logger.LogError(ex, "Failed to save tag group");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void ConfirmDelete(TagGroupResponse group)
+    {
+        if (isBusy) return;
+
+        pendingDelete = group;
+    }
+
+    private void CancelDelete()
+    {
+        pendingDelete = null;
+    }
+
+    private async Task DeleteGroup()
+    {
+        if (pendingDelete is null) return;
+
+        isBusy = true;
+
+        try
+        {
+            await TagGroupApi.DeleteTagGroup(pendingDelete.Id);
+            groups.Remove(pendingDelete);
+            pendingDelete = null;
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to delete groups.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to delete group: {ex.Message}";
+            Logger.LogError(ex, "Failed to delete tag group {GroupId}", pendingDelete?.Id);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

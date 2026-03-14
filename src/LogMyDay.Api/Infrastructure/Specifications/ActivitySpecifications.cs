@@ -12,6 +12,7 @@ public class ActivitiesForUserSpec : BaseSpecification<Activity>
     {
         AddInclude(a => a.Tag);
         AddInclude("Tag.InputType");
+        AddInclude("Tag.Group");
     }
 }
 
@@ -25,6 +26,7 @@ public class ActivityByIdAndUserSpec : BaseSpecification<Activity>
     {
         AddInclude(a => a.Tag);
         AddInclude("Tag.InputType");
+        AddInclude("Tag.Group");
     }
 }
 
@@ -86,6 +88,7 @@ public class PagedActivitiesSpec : BaseSpecification<Activity>
         // Add includes for related entities
         AddInclude(a => a.Tag);
         AddInclude("Tag.InputType");
+        AddInclude("Tag.Group");
 
         // Apply optional filters
         if (tagId.HasValue)
@@ -160,6 +163,7 @@ public class ActivitiesForYearSpec : BaseSpecification<Activity>
     {
         AddInclude(a => a.Tag);
         AddInclude("Tag.InputType");
+        AddInclude("Tag.Group");
 
         if (tagId.HasValue)
         {

@@ -21,12 +21,16 @@ public class BackupImportStatistics
     public int TagOptionListsSkipped { get; set; }
     public int TagOptionsImported { get; set; }
     public int TagOptionsSkipped { get; set; }
+    public int TagGroupsImported { get; set; }
+    public int TagGroupsSkipped { get; set; }
     public int TagsImported { get; set; }
     public int TagsSkipped { get; set; }
     public int NotificationsImported { get; set; }
     public int NotificationsSkipped { get; set; }
     public int ActivitiesImported { get; set; }
     public int ActivitiesSkipped { get; set; }
+    public int ScanMappingsImported { get; set; }
+    public int ScanMappingsSkipped { get; set; }
     public int RecordsCleared { get; set; }
 }
 

@@ -12,7 +12,8 @@
 <PageTitle>Scan Mappings - LogMyDay</PageTitle>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="Scan Mappings" BackUrl="/scan" ShowReload="true" OnReload="LoadData" />
+    <TopBar Title="Scan Mappings" ShowReload="true" OnReload="LoadData" />
+    <ScanSectionNav />
 
     <div class="px-6 py-4 space-y-4">
         @if (isLoading)
@@ -138,14 +139,12 @@
                         </div>
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tag</label>
-                            <select @bind="formModel.TagId"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white" disabled="@isBusy">
-                                <option value="0">-- Select --</option>
-                                @foreach (var tag in tags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            </select>
+                            <GroupedTagSelect
+                                Tags="tags"
+                                Value="@(formModel.TagId > 0 ? formModel.TagId : (int?)null)"
+                                ValueChanged="(int? v) => formModel.TagId = v ?? 0"
+                                SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                                Disabled="@isBusy" />
                         </div>
                     </div>
 

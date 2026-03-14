@@ -111,11 +111,13 @@ public static class SpecificationEvaluator<T> where T : class
         // Apply ordering
         if (spec.OrderBy != null)
         {
-            query = query.OrderBy(spec.OrderBy);
+            var ordered = query.OrderBy(spec.OrderBy);
+            query = spec.ThenOrderBy != null ? ordered.ThenBy(spec.ThenOrderBy) : ordered;
         }
         else if (spec.OrderByDescending != null)
         {
-            query = query.OrderByDescending(spec.OrderByDescending);
+            var ordered = query.OrderByDescending(spec.OrderByDescending);
+            query = spec.ThenOrderBy != null ? ordered.ThenBy(spec.ThenOrderBy) : ordered;
         }
 
         // Apply paging

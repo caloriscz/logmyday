@@ -21,6 +21,7 @@ public abstract class BaseSpecification<T> : ISpecification<T>
     public List<string> IncludeStrings { get; } = new();
     public Expression<Func<T, object>>? OrderBy { get; private set; }
     public Expression<Func<T, object>>? OrderByDescending { get; private set; }
+    public Expression<Func<T, object>>? ThenOrderBy { get; private set; }
     public int? Skip { get; private set; }
     public int? Take { get; private set; }
     public bool IsSplitQuery { get; private set; }
@@ -49,6 +50,11 @@ public abstract class BaseSpecification<T> : ISpecification<T>
     protected void ApplyOrderByDescending(Expression<Func<T, object>> orderByDescExpression)
     {
         OrderByDescending = orderByDescExpression;
+    }
+
+    protected void ApplyThenOrderBy(Expression<Func<T, object>> thenOrderByExpression)
+    {
+        ThenOrderBy = thenOrderByExpression;
     }
 
     protected void EnableSplitQuery()

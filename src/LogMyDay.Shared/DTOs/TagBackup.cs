@@ -19,4 +19,5 @@ public class TagBackup
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public string? OptionListKey { get; set; }
+    public string? GroupName { get; set; }
 }

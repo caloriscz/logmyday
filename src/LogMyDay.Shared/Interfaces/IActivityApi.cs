@@ -69,7 +69,8 @@ public interface IActivityApi
         int pageSize = 20,
         string orderBy = "asc",
         string? filter = null,
-        string? filterType = null);
+        string? filterType = null,
+        int? groupId = null);
 
     [Get("/api/tags")]
     Task<IList<TagResponse>> GetTags();
