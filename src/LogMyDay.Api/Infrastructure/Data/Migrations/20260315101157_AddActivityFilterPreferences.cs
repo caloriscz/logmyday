@@ -13,21 +13,18 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "ActivityDisplayType",
                 table: "LogMyDay_Users",
-                type: "TEXT",
                 nullable: false,
                 defaultValue: "daily");
 
             migrationBuilder.AddColumn<string>(
                 name: "ActivityPeriodSort",
                 table: "LogMyDay_Users",
-                type: "TEXT",
                 nullable: false,
                 defaultValue: "desc");
 
             migrationBuilder.AddColumn<string>(
                 name: "ActivitySortOrder",
                 table: "LogMyDay_Users",
-                type: "TEXT",
                 nullable: false,
                 defaultValue: "desc");
         }
