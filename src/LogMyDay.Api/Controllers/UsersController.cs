@@ -1,5 +1,6 @@
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Preferences;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -32,7 +33,18 @@ public class UsersController : ControllerBase
         {
             var users = await _userService.List(cancellationToken);
             var userDtos = users
-                .Select(u => new UserDto(u.Id, u.Email, u.DisplayName, u.IsAdmin, u.CreatedUtc, u.UpdatedUtc, u.Culture, u.TimeZone))
+                .Select(u => new UserDto(
+                    u.Id,
+                    u.Email,
+                    u.DisplayName,
+                    u.IsAdmin,
+                    u.CreatedUtc,
+                    u.UpdatedUtc,
+                    u.Culture,
+                    u.TimeZone,
+                    ActivityFilterPreferences.NormalizeDisplayType(u.ActivityDisplayType),
+                    ActivityFilterPreferences.NormalizeActivitySortOrder(u.ActivitySortOrder),
+                    ActivityFilterPreferences.NormalizePeriodSort(u.ActivityPeriodSort)))
                 .ToList();
             
             return Ok(userDtos);
@@ -93,7 +105,18 @@ public class UsersController : ControllerBase
                 actorId.Value,
                 cancellationToken);
 
-            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc, user.Culture, user.TimeZone);
+            var userDto = new UserDto(
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.IsAdmin,
+                user.CreatedUtc,
+                user.UpdatedUtc,
+                user.Culture,
+                user.TimeZone,
+                ActivityFilterPreferences.NormalizeDisplayType(user.ActivityDisplayType),
+                ActivityFilterPreferences.NormalizeActivitySortOrder(user.ActivitySortOrder),
+                ActivityFilterPreferences.NormalizePeriodSort(user.ActivityPeriodSort));
             return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, userDto);
         }
         catch (InvalidOperationException ex)
@@ -149,9 +172,23 @@ public class UsersController : ControllerBase
                 request.Culture?.Trim(),
                 request.TimeZone?.Trim(),
                 actorId.Value,
-                cancellationToken);
+                cancellationToken,
+                request.ActivityDisplayType?.Trim(),
+                request.ActivitySortOrder?.Trim(),
+                request.ActivityPeriodSort?.Trim());
 
-            var userDto = new UserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.CreatedUtc, user.UpdatedUtc, user.Culture, user.TimeZone);
+            var userDto = new UserDto(
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.IsAdmin,
+                user.CreatedUtc,
+                user.UpdatedUtc,
+                user.Culture,
+                user.TimeZone,
+                ActivityFilterPreferences.NormalizeDisplayType(user.ActivityDisplayType),
+                ActivityFilterPreferences.NormalizeActivitySortOrder(user.ActivitySortOrder),
+                ActivityFilterPreferences.NormalizePeriodSort(user.ActivityPeriodSort));
             return Ok(userDto);
         }
         catch (ArgumentException)

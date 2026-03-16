@@ -1,6 +1,7 @@
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Security;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Preferences;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -195,7 +196,16 @@ public class AuthController : ControllerBase
                 return NotFound();
             }
 
-            var userDto = new CurrentUserDto(user.Id, user.Email, user.DisplayName, user.IsAdmin, user.Culture, user.TimeZone);
+            var userDto = new CurrentUserDto(
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.IsAdmin,
+                user.Culture,
+                user.TimeZone,
+                ActivityFilterPreferences.NormalizeDisplayType(user.ActivityDisplayType),
+                ActivityFilterPreferences.NormalizeActivitySortOrder(user.ActivitySortOrder),
+                ActivityFilterPreferences.NormalizePeriodSort(user.ActivityPeriodSort));
             
             return Ok(userDto);
         }

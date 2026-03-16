@@ -112,13 +112,22 @@ public class PagedActivitiesSpec : BaseSpecification<Activity>
         }
 
         // Apply ordering
-        if (orderBy?.ToLower() == "asc")
+        switch (orderBy?.ToLower())
         {
-            ApplyOrderBy(a => a.DateStarted);
-        }
-        else
-        {
-            ApplyOrderByDescending(a => a.DateStarted);
+            case "asc":
+                ApplyOrderBy(a => a.DateStarted);
+                break;
+            case "group-asc":
+                ApplyOrderBy(a => a.Tag.Group != null ? a.Tag.Group.Name : "");
+                ApplyThenOrderBy(a => a.Tag.TagName.ToLower());
+                break;
+            case "group-desc":
+                ApplyOrderByDescending(a => a.Tag.Group != null ? a.Tag.Group.Name : "");
+                ApplyThenOrderBy(a => a.Tag.TagName.ToLower());
+                break;
+            default:
+                ApplyOrderByDescending(a => a.DateStarted);
+                break;
         }
 
         // Apply pagination

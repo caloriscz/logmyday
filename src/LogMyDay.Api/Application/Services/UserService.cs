@@ -118,7 +118,7 @@ public sealed class UserService : IUserService
         return await _context.Users.OrderBy(u => u.Email).ToListAsync(cancellationToken);
     }
 
-    public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken, string? activityDisplayType = null, string? activitySortOrder = null, string? activityPeriodSort = null)
     {
         _logger.LogInformation("🔧 UserService.Update: Starting update for user {UserId} by actor {ActorId}", id, actorId);
         
@@ -189,6 +189,21 @@ public sealed class UserService : IUserService
             }
 
             user.TimeZone = NormalizeTimeZoneOrThrow(timeZone);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activityDisplayType))
+        {
+            user.ActivityDisplayType = ActivityFilterPreferences.NormalizeDisplayType(activityDisplayType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activitySortOrder))
+        {
+            user.ActivitySortOrder = ActivityFilterPreferences.NormalizeActivitySortOrder(activitySortOrder);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activityPeriodSort))
+        {
+            user.ActivityPeriodSort = ActivityFilterPreferences.NormalizePeriodSort(activityPeriodSort);
         }
 
         user.UpdatedUtc = DateTime.UtcNow;

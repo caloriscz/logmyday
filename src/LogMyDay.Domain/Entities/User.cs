@@ -9,6 +9,9 @@ public sealed class User
     public bool IsAdmin { get; set; }
     public string Culture { get; set; } = "en-US";
     public string TimeZone { get; set; } = "Europe/Vienna";
+    public string ActivityDisplayType { get; set; } = "daily";
+    public string ActivitySortOrder { get; set; } = "desc";
+    public string ActivityPeriodSort { get; set; } = "desc";
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 }
