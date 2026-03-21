@@ -118,7 +118,7 @@ public sealed class UserService : IUserService
         return await _context.Users.OrderBy(u => u.Email).ToListAsync(cancellationToken);
     }
 
-    public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken)
+    public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken, string? activityDisplayType = null, string? activitySortOrder = null, string? activityPeriodSort = null)
     {
         _logger.LogInformation("🔧 UserService.Update: Starting update for user {UserId} by actor {ActorId}", id, actorId);
         
@@ -191,6 +191,21 @@ public sealed class UserService : IUserService
             user.TimeZone = NormalizeTimeZoneOrThrow(timeZone);
         }
 
+        if (!string.IsNullOrWhiteSpace(activityDisplayType))
+        {
+            user.ActivityDisplayType = ActivityFilterPreferences.NormalizeDisplayType(activityDisplayType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activitySortOrder))
+        {
+            user.ActivitySortOrder = ActivityFilterPreferences.NormalizeActivitySortOrder(activitySortOrder);
+        }
+
+        if (!string.IsNullOrWhiteSpace(activityPeriodSort))
+        {
+            user.ActivityPeriodSort = ActivityFilterPreferences.NormalizePeriodSort(activityPeriodSort);
+        }
+
         user.UpdatedUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -251,7 +266,7 @@ public sealed class UserService : IUserService
         _logger.LogInformation("Password reset for user {UserId} by admin {ActorId}", id, actorId);
     }
 
-    public async Task BeginForgot(string email, CancellationToken cancellationToken)
+    public async Task BeginForgot(string email, string baseUrl, CancellationToken cancellationToken)
     {
         var normalizedEmail = email.ToLowerInvariant().Trim();
         var user = await FindByEmail(normalizedEmail, cancellationToken);
@@ -279,7 +294,7 @@ public sealed class UserService : IUserService
 
         try
         {
-            await _emailSender.SendPasswordResetEmailAsync(user.Email, user.DisplayName, token, cancellationToken);
+            await _emailSender.SendPasswordResetEmailAsync(user.Email, user.DisplayName, token, baseUrl, cancellationToken);
             _logger.LogInformation("Password reset token generated and email sent for user {UserId}", user.Id);
         }
         catch

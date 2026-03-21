@@ -25,8 +25,16 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     {
         try
         {
-            // Ensure database is created
-            await _context.Database.EnsureCreatedAsync();
+            if (_context.Database.IsSqlite())
+            {
+                // Development uses SQLite and EF migrations are scaffolded against it.
+                await _context.Database.MigrateAsync();
+            }
+            else
+            {
+                // SQL Server environments are managed outside the app because the project uses dual providers.
+                await _context.Database.EnsureCreatedAsync();
+            }
 
             await EnsureDefaultUnitsAsync();
 

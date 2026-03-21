@@ -8,6 +8,7 @@
 @using LogMyDay.App.Services
 @using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.IUsersApi UsersApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @inject ILogger<Activities> Logger
@@ -46,20 +47,20 @@
                         <Icon Name="filter" Class="h-5 w-5" />
                         <span class="sr-only">Filters</span>
                     </button>
-                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
-                        <Icon Name="chevron-up" Class="h-5 w-5" />
-                        <span class="sr-only">Sort ascending</span>
-                    </button>
-                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
-                        <Icon Name="chevron-down" Class="h-5 w-5" />
-                        <span class="sr-only">Sort descending</span>
-                    </button>
                 </div>
             </div>
         </div>
     }
 
-    @if (pagedResult == null)
+    @if (loadError != null)
+    {
+        <div class="rounded-lg border border-red-300 bg-red-50 p-6 text-center text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+            <p class="font-semibold">Failed to load activities</p>
+            <p class="mt-1 text-sm">@loadError</p>
+            <button type="button" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700" @onclick="RetryLoad">Retry</button>
+        </div>
+    }
+    else if (pagedResult == null)
     {
         <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading activities…
@@ -81,14 +82,6 @@
                     <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
                         <Icon Name="filter" Class="h-5 w-5" />
                         <span class="sr-only">Filters</span>
-                    </button>
-                    <button type="button" class="@GetOrderButtonClasses("asc")" @onclick="@(() => ChangeOrder("asc"))" title="Sort ascending" aria-label="Sort ascending">
-                        <Icon Name="chevron-up" Class="h-5 w-5" />
-                        <span class="sr-only">Sort ascending</span>
-                    </button>
-                    <button type="button" class="@GetOrderButtonClasses("desc")" @onclick="@(() => ChangeOrder("desc"))" title="Sort descending" aria-label="Sort descending">
-                        <Icon Name="chevron-down" Class="h-5 w-5" />
-                        <span class="sr-only">Sort descending</span>
                     </button>
                 </div>
             </div>
@@ -190,7 +183,7 @@
     else
     {
         <div class="space-y-8">
-            @foreach (var group in pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key))
+            @foreach (var group in (periodSort == "asc" ? pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderBy(g => g.Key) : pagedResult.Items.GroupBy(a => a.DateStarted.Date).OrderByDescending(g => g.Key)))
             {
                 <section class="space-y-3">
                     <h2 class="text-lg font-bold text-gray-900 dark:text-slate-100">@FormatDate(group.Key)</h2>
@@ -303,6 +296,29 @@
                         <input value="@descriptionFilter" @onchange="OnFilterChanged" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             placeholder="Search description..." />
                     </div>
+
+                    <!-- Sort Order (within day) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Activity Sort:</label>
+                        <select value="@orderBy" @onchange="@(e => ChangeOrder(e.Value?.ToString() ?? "desc"))" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <option value="desc">Date (newest first)</option>
+                            <option value="asc">Date (oldest first)</option>
+                            <option value="group-asc">Group A-Z, then date</option>
+                            <option value="group-desc">Group Z-A, then date</option>
+                        </select>
+                    </div>
+
+                    <!-- Period Sort (day ordering within week/month) -->
+                    @if (displayType != "daily")
+                    {
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Day Order:</label>
+                            <select value="@periodSort" @onchange="@(e => ChangePeriodSort(e.Value?.ToString() ?? "desc"))" class="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <option value="desc">Newest day first</option>
+                                <option value="asc">Oldest day first</option>
+                            </select>
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -365,40 +381,66 @@
     private int pageNumber = 1;
     private int weekPageNumber = 1;
     private int monthPageNumber = 1;
-    private int weeksPerPage = 12;
-    private int monthsPerPage = 12;
+    private int weeksPerPage = 1;
+    private int monthsPerPage = 1;
     private int totalPages = 1;
     private string orderBy = "desc";
+    private string periodSort = "desc";
     private bool isInitialized = false;
+    private string? loadError;
 
     protected override async Task OnInitializedAsync()
     {
-        PageTitleService.SetTitle("Home");
-
-        userPreferences = await UserPreferencesService.GetAsync();
-        displayCulture = userPreferences.Culture;
-        displayTimeZone = userPreferences.TimeZone;
-        effectivePreferences = userPreferences.Preferences;
-
-        var today = GetTodayInDisplayZone();
-        selectedDate = today;
-        calendarMonth = new DateTime(today.Year, today.Month, 1);
-
-        // Initialize new activity with current date/time
-        newActivity = new ActivityRequest
+        try
         {
-            DateStarted = GetCurrentDateTimeInDisplayZone()
-        };
+            PageTitleService.SetTitle("Home");
 
+            userPreferences = await UserPreferencesService.GetAsync();
+            displayCulture = userPreferences.Culture;
+            displayTimeZone = userPreferences.TimeZone;
+            effectivePreferences = userPreferences.Preferences;
+
+            // Load persisted filter preferences
+            displayType = ActivityFilterPreferences.NormalizeDisplayType(userPreferences.CurrentUser.ActivityDisplayType);
+            orderBy = ActivityFilterPreferences.NormalizeActivitySortOrder(userPreferences.CurrentUser.ActivitySortOrder);
+            periodSort = ActivityFilterPreferences.NormalizePeriodSort(userPreferences.CurrentUser.ActivityPeriodSort);
+
+            var today = GetTodayInDisplayZone();
+            selectedDate = today;
+            calendarMonth = new DateTime(today.Year, today.Month, 1);
+
+            // Initialize new activity with current date/time
+            newActivity = new ActivityRequest
+            {
+                DateStarted = GetCurrentDateTimeInDisplayZone()
+            };
+
+            await LoadData();
+
+            isInitialized = true;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Activities: OnInitializedAsync failed");
+        }
+    }
+
+    private async Task RetryLoad()
+    {
+        loadError = null;
         await LoadData();
-        
-        isInitialized = true;
     }
 
     private async Task LoadData()
     {
         try
         {
+            loadError = null;
+
             // Always refresh tags and option lists to ensure we have latest data
             tags = await ActivityApi.GetTags();
             optionLists = await ActivityApi.GetTagOptionListsAsync();
@@ -410,6 +452,10 @@
 
             DateTime? startDate = null;
             DateTime? endDate = null;
+
+            displayType = ActivityFilterPreferences.NormalizeDisplayType(displayType);
+            orderBy = ActivityFilterPreferences.NormalizeActivitySortOrder(orderBy);
+            periodSort = ActivityFilterPreferences.NormalizePeriodSort(periodSort);
 
             // Set date range based on display type and selected date/period
             switch (displayType)
@@ -425,7 +471,7 @@
                 case "weekly":
                     var weekStart = GetStartOfWeek(selectedDate);
                     var weekEnd = weekStart.AddDays(7).AddTicks(-1);
-                    pagedResult = await ActivityApi.GetActivitiesByWeeks(weekPageNumber, weeksPerPage, orderBy, null, weekStart, weekEnd,
+                    pagedResult = await ActivityApi.GetActivitiesByWeeks(weekPageNumber, weeksPerPage, orderBy, null, null, null,
                     descriptionFilter);
                     totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / weeksPerPage);
                     break;
@@ -433,8 +479,8 @@
                 case "monthly":
                     var monthStart = new DateTime(selectedDate.Year, selectedDate.Month, 1);
                     var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
-                    pagedResult = await ActivityApi.GetActivitiesByMonths(monthPageNumber, monthsPerPage, orderBy, null, monthStart,
-                    monthEnd, descriptionFilter);
+                    pagedResult = await ActivityApi.GetActivitiesByMonths(monthPageNumber, monthsPerPage, orderBy, null, null, null,
+                    descriptionFilter);
                     totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / monthsPerPage);
                     break;
             }
@@ -446,6 +492,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading data");
+            loadError = ex.Message;
         }
     }
 
@@ -583,6 +630,7 @@
         selectedDate = today;
         calendarMonth = new DateTime(today.Year, today.Month, 1);
 
+        await SaveFilterPreferences();
         await LoadData();
     }
 
@@ -826,7 +874,35 @@
         pageNumber = 1;
         weekPageNumber = 1;
         monthPageNumber = 1;
+        await SaveFilterPreferences();
         await LoadData();
+    }
+
+    private async Task ChangePeriodSort(string sort)
+    {
+        periodSort = sort;
+        await SaveFilterPreferences();
+        await LoadData();
+    }
+
+    private async Task SaveFilterPreferences()
+    {
+        try
+        {
+            var userId = userPreferences?.CurrentUser.Id;
+            if (userId == null)
+            {
+                return;
+            }
+
+            var request = new UpdateUserDto(null, null, null, null, null, displayType, orderBy, periodSort);
+            await UsersApi.UpdateUserAsync(userId.Value, request);
+            UserPreferencesService.InvalidateCache();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to save filter preferences");
+        }
     }
 
     // Additional navigation methods for daily view

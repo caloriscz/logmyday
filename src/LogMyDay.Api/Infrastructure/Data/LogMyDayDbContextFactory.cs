@@ -11,9 +11,14 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
 {
     public LogMyDayDbContext CreateDbContext(string[] args)
     {
+        var environmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? "Production";
+
         // Try to find the LogMyDay.App project folder to load configuration
         var currentDir = Directory.GetCurrentDirectory();
         Console.WriteLine($"[LogMyDayDbContextFactory] Current Directory: {currentDir}");
+        Console.WriteLine($"[LogMyDayDbContextFactory] Environment: {environmentName}");
 
         var appProjectDir = FindAppProjectDirectory(currentDir);
         Console.WriteLine($"[LogMyDayDbContextFactory] App Project Directory resolved to: {appProjectDir ?? "Not Found"}");
@@ -26,7 +31,8 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
         var builder = new ConfigurationBuilder()
             .SetBasePath(appProjectDir ?? currentDir)
             .AddJsonFile("appsettings.json", optional: true)
-            .AddJsonFile("appsettings.Development.json", optional: true);
+            .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+            .AddEnvironmentVariables();
 
         var configuration = builder.Build();
 

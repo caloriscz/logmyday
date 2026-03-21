@@ -11,9 +11,6 @@
       "TrackByUsername": true
     }
   },
-  "Api": {
-    "BaseAddress": "https://localhost:7064"
-  },
   "Email": {
     "SmtpServer": "smtp.your-provider.com",
     "SmtpPort": 587,
@@ -21,8 +18,7 @@
     "UserName": "smtp-user",
     "Password": "smtp-password",
     "SenderEmail": "no-reply@your-domain.com",
-    "SenderName": "LogMyDay",
-    "PasswordResetUrl": "https://localhost:7064/reset-password"
+    "SenderName": "LogMyDay"
   },
   "Logging": {
     "LogLevel": {

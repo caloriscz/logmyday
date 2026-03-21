@@ -146,17 +146,51 @@ public class ActivityService : IActivityService
         string? descriptionFilter = null
     )
     {
-        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Include(ct => ct.Tag).ThenInclude(t => t.Group).Where(a => a.UserId == userId).AsQueryable();
-        baseQuery = ApplyActivityFilters(baseQuery, tagId, startDate, endDate, descriptionFilter);
+        var rawQuery = _context.Activities.Where(a => a.UserId == userId).AsQueryable();
+        rawQuery = ApplyActivityFilters(rawQuery, tagId, startDate, endDate, descriptionFilter);
 
-        return await GetPagedByTimePeriod(
-            baseQuery,
-            weekPageNumber,
-            weeksPerPage,
-            orderBy,
-            date => EF.Functions.DateDiffWeek(new DateTime(1900, 1, 1), date),
-            "week"
-        );
+        // Step 1: get distinct week offsets — EF-translatable, no includes needed
+        var allOffsets = await rawQuery
+            .Select(a => a.DateStarted.Year * 1000 + a.DateStarted.DayOfYear / 7)
+            .Distinct()
+            .ToListAsync();
+
+        if (allOffsets.Count == 0)
+        {
+            return CreateEmptyPagedResult(weekPageNumber, weeksPerPage);
+        }
+
+        // Always paginate newest-first so page 1 is always the most recent week.
+        // The orderBy parameter only affects sorting of activities within the period.
+        var orderedOffsets = allOffsets.OrderByDescending(o => o).ToList();
+
+        var totalPeriods = orderedOffsets.Count;
+        var pagedOffsets = orderedOffsets
+            .Skip((weekPageNumber - 1) * weeksPerPage)
+            .Take(weeksPerPage)
+            .ToList();
+
+        // Step 2: fetch activities only for the selected weeks, with all includes
+        var fullQuery = _context.Activities
+            .Include(ct => ct.Tag).ThenInclude(t => t.InputType)
+            .Include(ct => ct.Tag).ThenInclude(t => t.Group)
+            .Where(a => a.UserId == userId)
+            .AsQueryable();
+        fullQuery = ApplyActivityFilters(fullQuery, tagId, startDate, endDate, descriptionFilter);
+
+        var activities = await fullQuery
+            .Where(a => pagedOffsets.Contains(a.DateStarted.Year * 1000 + a.DateStarted.DayOfYear / 7))
+            .ToListAsync();
+
+        activities = SortActivities(activities, orderBy);
+
+        return new PagedResult<ActivityResponse>
+        {
+            Items = activities.Select(MapToResponse).ToList(),
+            TotalCount = totalPeriods,
+            PageNumber = weekPageNumber,
+            PageSize = weeksPerPage,
+        };
     }
 
     public async Task<PagedResult<ActivityResponse>> GetPagedByMonths(
@@ -170,17 +204,51 @@ public class ActivityService : IActivityService
         string? descriptionFilter = null
     )
     {
-        var baseQuery = _context.Activities.Include(ct => ct.Tag).ThenInclude(t => t.InputType).Include(ct => ct.Tag).ThenInclude(t => t.Group).Where(a => a.UserId == userId).AsQueryable();
-        baseQuery = ApplyActivityFilters(baseQuery, tagId, startDate, endDate, descriptionFilter);
+        var rawQuery = _context.Activities.Where(a => a.UserId == userId).AsQueryable();
+        rawQuery = ApplyActivityFilters(rawQuery, tagId, startDate, endDate, descriptionFilter);
 
-        return await GetPagedByTimePeriod(
-            baseQuery,
-            monthPageNumber,
-            monthsPerPage,
-            orderBy,
-            date => EF.Functions.DateDiffMonth(new DateTime(1900, 1, 1), date),
-            "month"
-        );
+        // Step 1: get distinct month offsets — EF-translatable, no includes needed
+        var allOffsets = await rawQuery
+            .Select(a => a.DateStarted.Year * 12 + a.DateStarted.Month)
+            .Distinct()
+            .ToListAsync();
+
+        if (allOffsets.Count == 0)
+        {
+            return CreateEmptyPagedResult(monthPageNumber, monthsPerPage);
+        }
+
+        // Always paginate newest-first so page 1 is always the most recent month.
+        // The orderBy parameter only affects sorting of activities within the period.
+        var orderedOffsets = allOffsets.OrderByDescending(o => o).ToList();
+
+        var totalPeriods = orderedOffsets.Count;
+        var pagedOffsets = orderedOffsets
+            .Skip((monthPageNumber - 1) * monthsPerPage)
+            .Take(monthsPerPage)
+            .ToList();
+
+        // Step 2: fetch activities only for the selected months, with all includes
+        var fullQuery = _context.Activities
+            .Include(ct => ct.Tag).ThenInclude(t => t.InputType)
+            .Include(ct => ct.Tag).ThenInclude(t => t.Group)
+            .Where(a => a.UserId == userId)
+            .AsQueryable();
+        fullQuery = ApplyActivityFilters(fullQuery, tagId, startDate, endDate, descriptionFilter);
+
+        var activities = await fullQuery
+            .Where(a => pagedOffsets.Contains(a.DateStarted.Year * 12 + a.DateStarted.Month))
+            .ToListAsync();
+
+        activities = SortActivities(activities, orderBy);
+
+        return new PagedResult<ActivityResponse>
+        {
+            Items = activities.Select(MapToResponse).ToList(),
+            TotalCount = totalPeriods,
+            PageNumber = monthPageNumber,
+            PageSize = monthsPerPage,
+        };
     }
 
     public Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId)
@@ -409,70 +477,25 @@ public class ActivityService : IActivityService
     }
 
     /// <summary>
-    /// Generic helper for paginating activities by time period (week/month).
-    /// </summary>
-    private async Task<PagedResult<ActivityResponse>> GetPagedByTimePeriod(
-        IQueryable<Activity> baseQuery,
-        int pageNumber,
-        int periodsPerPage,
-        string orderBy,
-        Func<DateTime, int?> periodOffsetCalculator,
-        string periodType)
-    {
-        // Group by time period using the provided calculator
-        var periodGroupsQuery = baseQuery
-            .GroupBy(a => periodOffsetCalculator(a.DateStarted))
-            .Select(g => new
-            {
-                PeriodOffset = g.Key,
-                Count = g.Count(),
-                MinDate = g.Min(a => a.DateStarted)
-            });
-
-        // Apply ordering at SQL level
-        var isDescending = orderBy?.ToLower() == "desc";
-        periodGroupsQuery = isDescending
-            ? periodGroupsQuery.OrderByDescending(g => g.PeriodOffset)
-            : periodGroupsQuery.OrderBy(g => g.PeriodOffset);
-
-        // Get total period count
-        var totalPeriods = await periodGroupsQuery.CountAsync();
-
-        if (totalPeriods == 0)
-        {
-            return CreateEmptyPagedResult(pageNumber, periodsPerPage);
-        }
-
-        // Get the period offsets for the current page (pagination in SQL)
-        var pagedPeriodOffsets = await periodGroupsQuery
-            .Skip((pageNumber - 1) * periodsPerPage)
-            .Take(periodsPerPage)
-            .Select(g => g.PeriodOffset)
-            .ToListAsync();
-
-        // Fetch only activities that belong to these periods
-        var activitiesInSelectedPeriods = await baseQuery.Where(a => pagedPeriodOffsets.Contains(periodOffsetCalculator(a.DateStarted))).ToListAsync();
-
-        // Order activities within the selected periods
-        activitiesInSelectedPeriods = SortActivities(activitiesInSelectedPeriods, orderBy);
-
-        return new PagedResult<ActivityResponse>
-        {
-            Items = activitiesInSelectedPeriods.Select(MapToResponse).ToList(),
-            TotalCount = totalPeriods,
-            PageNumber = pageNumber,
-            PageSize = periodsPerPage,
-        };
-    }
-
-    /// <summary>
     /// Sorts activities by DateStarted based on order direction.
     /// </summary>
     private List<Activity> SortActivities(List<Activity> activities, string? orderBy)
     {
-        return orderBy?.ToLower() == "asc"
-            ? activities.OrderBy(a => a.DateStarted).ToList()
-            : activities.OrderByDescending(a => a.DateStarted).ToList();
+        return orderBy?.ToLower() switch
+        {
+            "asc" => activities.OrderBy(a => a.DateStarted).ToList(),
+            "group-asc" => activities
+                .OrderBy(a => a.Tag?.Group?.Name ?? "")
+                .ThenBy(a => a.Tag?.TagName ?? "")
+                .ThenBy(a => a.DateStarted)
+                .ToList(),
+            "group-desc" => activities
+                .OrderByDescending(a => a.Tag?.Group?.Name ?? "")
+                .ThenByDescending(a => a.Tag?.TagName ?? "")
+                .ThenByDescending(a => a.DateStarted)
+                .ToList(),
+            _ => activities.OrderByDescending(a => a.DateStarted).ToList(),
+        };
     }
 
     /// <summary>

@@ -18,14 +18,15 @@ public class MailKitEmailSender : IEmailSender
         _logger = logger;
     }
 
-    public async Task SendPasswordResetEmailAsync(string email, string? displayName, string token, CancellationToken cancellationToken)
+    public async Task SendPasswordResetEmailAsync(string email, string? displayName, string token, string baseUrl, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseUrl);
 
         ValidateOptions();
 
-        var resetLink = BuildResetLink(token);
+        var resetLink = BuildResetLink(token, baseUrl);
         var message = CreateMessage(email, displayName, resetLink);
 
         using var client = new SmtpClient();
@@ -79,11 +80,6 @@ public class MailKitEmailSender : IEmailSender
         {
             throw new InvalidOperationException("Sender email is not configured.");
         }
-
-        if (string.IsNullOrWhiteSpace(_options.PasswordResetUrl))
-        {
-            throw new InvalidOperationException("Password reset URL is not configured.");
-        }
     }
 
     private MimeMessage CreateMessage(string email, string? displayName, string resetLink)
@@ -114,11 +110,30 @@ public class MailKitEmailSender : IEmailSender
         return message;
     }
 
-    private string BuildResetLink(string token)
+    private string BuildResetLink(string token, string baseUrl)
     {
-        var separator = _options.PasswordResetUrl.Contains('?') ? '&' : '?';
+        string resetUrl;
 
-        return $"{_options.PasswordResetUrl}{separator}token={Uri.EscapeDataString(token)}";
+        var configuredUrl = _options.PasswordResetUrl?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredUrl))
+        {
+            if (Uri.TryCreate(configuredUrl, UriKind.Absolute, out _))
+            {
+                resetUrl = configuredUrl.TrimEnd('/');
+            }
+            else
+            {
+                resetUrl = $"{baseUrl.TrimEnd('/')}/{configuredUrl.TrimStart('/')}";
+            }
+        }
+        else
+        {
+            resetUrl = $"{baseUrl.TrimEnd('/')}/reset-password";
+        }
+
+        var separator = resetUrl.Contains('?') ? '&' : '?';
+
+        return $"{resetUrl}{separator}token={Uri.EscapeDataString(token)}";
     }
 
     private static SecureSocketOptions DetermineSecureSocketOption(int port, bool useSsl)

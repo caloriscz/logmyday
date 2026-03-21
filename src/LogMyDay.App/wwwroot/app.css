@@ -847,6 +847,77 @@ main {
     }
 }
 
+/* ====================================================
+   Air Datepicker - Global Theme Overrides
+   The popup is appended to document.body by JavaScript,
+   so Blazor component-scoped CSS (with b-xxx attributes)
+   does not apply. These global rules handle theming and
+   fix the Bootstrap dark-mode override that makes all
+   input[type=range] sliders appear as solid black bars.
+   ==================================================== */
+
+/* Light theme: match app border-radius and shadow style */
+.air-datepicker {
+    border-radius: 0.75rem !important;
+    box-shadow: 0 15px 30px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Dark mode popup styling (data-bs-theme="dark" is set by app.js) */
+[data-bs-theme="dark"] .air-datepicker {
+    --adp-background-color: #1f2937; /* gray-800 */
+    --adp-color: #f9fafb;            /* gray-50 */
+    --adp-color-secondary: #9ca3af;  /* gray-400 */
+    --adp-color-other-month: #6b7280;
+    --adp-color-disabled: #4b5563;
+    --adp-border-color: #374151;     /* gray-700 */
+    --adp-border-color-inner: #374151;
+    --adp-background-color-hover: #374151;
+    --adp-background-color-active: #4b5563;
+    --adp-cell-background-color-selected: #3b82f6;
+    --adp-cell-background-color-selected-hover: #2563eb;
+    --adp-day-name-color: #f59e0b;
+    --adp-time-track-color: #4b5563;       /* visible gray track on dark bg */
+    --adp-time-track-color-hover: #6b7280;
+    border-color: rgba(148, 163, 184, 0.2) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Fix: Bootstrap dark mode overrides ALL input backgrounds to slate-800.
+   This makes input[type=range] time sliders appear as solid black bars.
+   Reset the Air Datepicker range sliders to be transparent. */
+[data-bs-theme="dark"] .air-datepicker-time--row input[type=range],
+[data-bs-theme="dark"] .air-datepicker-time--row input {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    color: inherit !important;
+    box-shadow: none !important;
+}
+
+/* Style slider thumb to be clearly visible on dark background */
+[data-bs-theme="dark"] .air-datepicker-time--row input[type=range]::-webkit-slider-thumb {
+    background: #d1d5db !important; /* gray-300 */
+    border-color: #6b7280 !important;
+}
+
+[data-bs-theme="dark"] .air-datepicker-time--row input[type=range]::-moz-range-thumb {
+    background: #d1d5db !important;
+    border-color: #6b7280 !important;
+}
+
+/* Ensure time digits are readable in dark mode */
+[data-bs-theme="dark"] .air-datepicker-time--current-hours,
+[data-bs-theme="dark"] .air-datepicker-time--current-minutes,
+[data-bs-theme="dark"] .air-datepicker-time--current-colon,
+[data-bs-theme="dark"] .air-datepicker-time--current-ampm {
+    color: #f9fafb !important;
+}
+
+/* Ensure navigation and cell text colors are correct in dark mode */
+[data-bs-theme="dark"] .air-datepicker .air-datepicker-nav--title,
+[data-bs-theme="dark"] .air-datepicker .air-datepicker-cell {
+    color: #f9fafb;
+}
+
 /* Mobile Modal Enhancements */
 @media (max-width: 992px) {
     .modal-fullscreen-lg-down .modal-body {

@@ -156,8 +156,7 @@ Example for Gmail:
     "UserName": "your-email@gmail.com",
     "Password": "your-app-password",
     "SenderEmail": "noreply@yourdomain.com",
-    "SenderName": "LogMyDay",
-    "PasswordResetUrl": "https://localhost:7064/reset-password"
+    "SenderName": "LogMyDay"
   }
 }
 ```
@@ -170,7 +169,7 @@ Example for Gmail:
 | `UserName` | SMTP authentication username |
 | `Password` | SMTP authentication password (use App Passwords for Gmail) |
 | `SenderEmail` | Email address shown as sender |
-| `PasswordResetUrl` | URL for password reset (e.g., `https://localhost:7064/reset-password`). Must match your app's base URL. |
+| `PasswordResetUrl` | *(Optional)* Override the password reset link base URL. Defaults to the incoming request's scheme and host. Useful when running behind a reverse proxy that does not forward headers. |
 
 ## Apply Database Migrations
 

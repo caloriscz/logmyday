@@ -28,7 +28,7 @@
         </button>
     }
 
-    <div id="@scannerId" class="@(isScanning ? "rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700" : "hidden")"></div>
+    <div id="@scannerId" class="@(isScanning || isStarting ? "rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-black w-full" : "hidden")" style="min-height: 300px;"></div>
 
     @if (!string.IsNullOrEmpty(errorMessage))
     {
@@ -57,11 +57,18 @@
         try
         {
             dotNetRef = DotNetObjectReference.Create(this);
-            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.start", scannerId, dotNetRef);
+
+            // Set isScanning=true before JS call so the div is visible (has dimensions)
+            // when html5-qrcode initialises the video element – prevents black camera feed
             isScanning = true;
+            StateHasChanged();
+            await Task.Yield();
+
+            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.start", scannerId, dotNetRef);
         }
         catch (Exception ex)
         {
+            isScanning = false;
             errorMessage = ex.Message.Contains("NotAllowedError") || ex.Message.Contains("Permission")
                 ? "Camera access was denied. Please allow camera access and try again."
                 : $"Could not start scanner: {ex.Message}";
