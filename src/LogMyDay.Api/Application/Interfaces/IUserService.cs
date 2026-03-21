@@ -13,6 +13,6 @@ public interface IUserService
     Task Delete(Guid id, Guid actorId, CancellationToken cancellationToken);
     Task ChangePassword(Guid id, string currentPassword, string newPassword, Guid actorId, CancellationToken cancellationToken);
     Task AdminResetPassword(Guid id, string newPassword, Guid actorId, CancellationToken cancellationToken);
-    Task BeginForgot(string email, CancellationToken cancellationToken);
+    Task BeginForgot(string email, string baseUrl, CancellationToken cancellationToken);
     Task CompleteForgot(string token, string newPassword, CancellationToken cancellationToken);
 }

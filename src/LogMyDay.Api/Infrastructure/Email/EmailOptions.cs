@@ -11,5 +11,9 @@ public class EmailOptions
     public string? Password { get; set; } = null;
     public string SenderEmail { get; set; } = string.Empty;
     public string? SenderName { get; set; } = null;
-    public string PasswordResetUrl { get; set; } = string.Empty;
+    /// <summary>
+    /// Optional override for the password reset URL base. When not set, the URL is auto-detected
+    /// from the incoming request's scheme and host.
+    /// </summary>
+    public string? PasswordResetUrl { get; set; } = null;
 }

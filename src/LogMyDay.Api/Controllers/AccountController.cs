@@ -122,7 +122,7 @@ public class AccountController : ControllerBase
                 return BadRequest("Valid email is required.");
             }
 
-            await _userService.BeginForgot(request.Email, cancellationToken);
+            await _userService.BeginForgot(request.Email, $"{Request.Scheme}://{Request.Host}", cancellationToken);
 
             var response = new ForgotResponseDto("If an account exists for the provided email, a password reset link has been sent.");
             

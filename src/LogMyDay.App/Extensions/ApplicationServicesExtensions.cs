@@ -56,14 +56,10 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
         services.AddSingleton<CredentialStore>();
 
-        // Email
+        // Email — PasswordResetUrl is now optional; when absent the reset link is built from the
+        // incoming request's scheme and host at send time (see MailKitEmailSender).
         services.AddOptions<EmailOptions>()
-            .Bind(configuration.GetSection(EmailOptions.SectionName))
-            .PostConfigure(options =>
-            {
-                options.PasswordResetUrl = ResolvePasswordResetUrl(options.PasswordResetUrl, configuration["Api:BaseAddress"]);
-                Log.Information("Password reset URL configured to {PasswordResetUrl}", options.PasswordResetUrl);
-            });
+            .Bind(configuration.GetSection(EmailOptions.SectionName));
         services.AddScoped<IEmailSender, MailKitEmailSender>();
 
         // AI services
@@ -82,41 +78,5 @@ internal static class ApplicationServicesExtensions
         Log.Information("AI assistant services configured (availability determined at runtime)");
 
         return services;
-    }
-
-    private static string ResolvePasswordResetUrl(string? configuredUrl, string? apiBaseAddress)
-    {
-        var trimmedConfigured = configuredUrl?.Trim();
-        if (!string.IsNullOrWhiteSpace(trimmedConfigured))
-        {
-            if (Uri.TryCreate(trimmedConfigured, UriKind.Absolute, out var absoluteUri))
-            {
-                return TrimTrailingSlash(absoluteUri.ToString());
-            }
-
-            if (!string.IsNullOrWhiteSpace(apiBaseAddress) && Uri.TryCreate(apiBaseAddress.Trim(), UriKind.Absolute, out var baseUri))
-            {
-                var combinedUri = new Uri(baseUri, trimmedConfigured.TrimStart('/'));
-                return TrimTrailingSlash(combinedUri.ToString());
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(apiBaseAddress) && Uri.TryCreate(apiBaseAddress.Trim(), UriKind.Absolute, out var fallbackBase))
-        {
-            var combinedUri = new Uri(fallbackBase, "reset-password");
-            return TrimTrailingSlash(combinedUri.ToString());
-        }
-
-        throw new InvalidOperationException("Email password reset URL is not configured and no API base address fallback is available.");
-    }
-
-    private static string TrimTrailingSlash(string value)
-    {
-        if (!string.IsNullOrEmpty(value) && value.EndsWith("/", StringComparison.Ordinal))
-        {
-            return value[..^1];
-        }
-
-        return value;
     }
 }
