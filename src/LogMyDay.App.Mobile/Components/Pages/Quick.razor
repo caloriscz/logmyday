@@ -15,7 +15,8 @@
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Quick Activities" ShowReload="true" OnReload="LoadQuickButtons" />
-    
+    <RemindersSectionNav />
+
     <div class="max-w-7xl mx-auto px-6 py-4">
 
         @if (isLoading)
@@ -38,15 +39,28 @@
         }
         else
         {
+            @if (quickButtons.Any(IsHiddenToday))
+            {
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                        @quickButtons.Count(IsHiddenToday) button(s) already logged today
+                    </span>
+                    <button type="button" class="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                            @onclick="@(() => showAll = !showAll)">
+                        @(showAll ? "Hide completed" : "Show all")
+                    </button>
+                </div>
+            }
+
             <!-- Quick Activity Buttons -->
             <div class="space-y-3">
-                @foreach (var button in quickButtons)
+                @foreach (var button in quickButtons.Where(b => showAll || !IsHiddenToday(b)))
                 {
-                    <div class="card @(button.IsEnabled ? "hover:shadow-lg cursor-pointer" : "opacity-60 cursor-not-allowed")"
+                    <div class="card @(button.IsEnabled && !IsHiddenToday(button) ? "hover:shadow-lg cursor-pointer" : "opacity-60 cursor-not-allowed")"
                          @onclick="@(() => UseQuickActivity(button))">
                         <div class="flex items-center justify-between">
                             <div class="flex-grow">
-                                <h5 class="font-semibold mb-1 @(button.IsEnabled ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-600")">
+                                <h5 class="font-semibold mb-1 @(button.IsEnabled && !IsHiddenToday(button) ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-600")">
                                     @button.Name
                                 </h5>
                                 <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -60,7 +74,13 @@
                                         </span>
                                     }
                                 </div>
-                                @if (!button.IsEnabled)
+                                @if (IsHiddenToday(button))
+                                {
+                                    <small class="text-green-600 dark:text-green-400">
+                                        <i class="bi bi-check-circle"></i> Already logged today
+                                    </small>
+                                }
+                                else if (!button.IsEnabled)
                                 {
                                     <small class="text-yellow-600 dark:text-yellow-400">
                                         <i class="bi bi-clock"></i> Cooling down...
@@ -68,7 +88,11 @@
                                 }
                             </div>
                             <div class="flex items-center gap-2">
-                                @if (button.IsEnabled)
+                                @if (IsHiddenToday(button))
+                                {
+                                    <i class="bi bi-check-circle text-green-500 text-2xl"></i>
+                                }
+                                else if (button.IsEnabled)
                                 {
                                     <i class="bi bi-lightning-charge text-primary-600 dark:text-primary-400 text-2xl"></i>
                                 }
@@ -292,6 +316,9 @@
     private string statusMessage = "";
     private bool isError = false;
     private string? errorMessage;
+    private bool showAll = false;
+    private HashSet<int> todayTagIds = new();
+    private string? _lastAutoFilledName;
 
     protected override async Task OnInitializedAsync()
     {
@@ -317,7 +344,8 @@
         {
             isLoading = true;
             quickButtons = await QuickActivityService.GetQuickButtonsAsync();
-            
+            await LoadTodayActivityTagIdsAsync();
+
             // Subscribe to changes
             QuickActivityService.QuickButtonsChanged -= OnQuickButtonsChanged;
             QuickActivityService.QuickButtonsChanged += OnQuickButtonsChanged;
@@ -351,6 +379,32 @@
         }
     }
 
+    private async Task LoadTodayActivityTagIdsAsync()
+    {
+        try
+        {
+            var result = await ActivityApi.GetActivities(
+                startDate: DateTime.Today,
+                endDate: DateTime.Today.AddDays(1).AddTicks(-1),
+                pageSize: 1000);
+            todayTagIds = result.Items
+                .Where(a => a.PrimaryTagId.HasValue)
+                .Select(a => a.PrimaryTagId!.Value)
+                .ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Failed to load today activities: {ex.Message}");
+        }
+    }
+
+    private bool IsHiddenToday(QuickActivityButton button)
+    {
+        var tag = availableTags.FirstOrDefault(t => t.Id == button.TagId);
+
+        return tag != null && !tag.IsRepeatable && todayTagIds.Contains(button.TagId);
+    }
+
     private void OnQuickButtonsChanged(object? sender, List<QuickActivityButton> updatedButtons)
     {
         quickButtons = updatedButtons;
@@ -364,10 +418,11 @@
             selectedTag = availableTags?.FirstOrDefault(t => t.Id == newQuickActivity.TagId);
             if (selectedTag != null)
             {
-                // Pre-fill button name with tag title if empty
-                if (string.IsNullOrEmpty(newQuickActivity.Name))
+                // Auto-fill name when user hasn't manually customised it yet
+                if (string.IsNullOrEmpty(newQuickActivity.Name) || newQuickActivity.Name == _lastAutoFilledName)
                 {
                     newQuickActivity.Name = selectedTag.Title;
+                    _lastAutoFilledName = selectedTag.Title;
                 }
             }
         }
@@ -410,6 +465,7 @@
             newQuickActivity = new();
             selectedTag = null;
             errorMessage = null;
+            _lastAutoFilledName = null;
             
             ShowSuccess($"Quick activity '{quickButton.Name}' created!");
 
@@ -434,6 +490,9 @@
         if (!button.IsEnabled)
             return;
 
+        if (IsHiddenToday(button))
+            return;
+
         try
         {
             // Create activity with predefined description value if available
@@ -452,7 +511,8 @@
             
             // Update button state (trigger cooldown)
             await QuickActivityService.UseButtonAsync(button.Id);
-            
+            todayTagIds.Add(button.TagId);
+
             ShowSuccess($"Activity '{button.Name}' logged successfully!");
         }
         catch (Exception ex)

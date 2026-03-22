@@ -61,6 +61,7 @@ public class TagService : ITagService
         var tag = new Tag
         {
             TagName = createTagRequest.Tag,
+            Description = createTagRequest.Description,
             InputTypeId = inputTypeId,
             IsRequired = createTagRequest.IsRequired, // Map IsRequired
             IsRepeatable = isRepeatable,
@@ -147,6 +148,7 @@ public class TagService : ITagService
         }
 
         tag.TagName = model.Tag;
+        tag.Description = model.Description;
         tag.InputTypeId = inputTypeId;
         tag.IsRequired = model.IsRequired; // Map IsRequired
         tag.IsRepeatable = isRepeatable;
@@ -223,6 +225,7 @@ public class TagService : ITagService
             {
                 Id = t.Id,
                 Title = t.TagName,
+                Description = t.Description,
                 TypeId = t.InputTypeId,
                 InputTypeId = t.InputTypeId,
                 IsRequired = t.IsRequired, // Map IsRequired
@@ -252,6 +255,7 @@ public class TagService : ITagService
         {
             Id = tag.Id,
             Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
+            Description = tag.Description,
             InputTypeId = tag.InputTypeId,
             TypeId = tag.InputTypeId,
             IsRequired = tag.IsRequired,

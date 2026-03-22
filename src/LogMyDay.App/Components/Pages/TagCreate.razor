@@ -54,6 +54,11 @@
                     </div>
 
                     <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Description (optional)</label>
+                        <InputTextArea @bind-Value="newTag.Description" rows="3" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" placeholder="What does this tag measure? How should values be interpreted?" />
+                    </div>
+
+                    <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Group (optional)</label>
                         <InputSelect @bind-Value="newTag.GroupId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
                             <option value="">(None)</option>

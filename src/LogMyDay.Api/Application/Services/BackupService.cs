@@ -108,6 +108,7 @@ public class BackupService : IBackupService
                 .Select(t => new TagBackup
                 {
                     TagName = t.TagName,
+                    Description = t.Description,
                     InputTypeName = t.InputType != null ? t.InputType.Name : null,
                     IsRequired = t.IsRequired,
                     TimeGranularity = t.TimeGranularity,
@@ -768,6 +769,7 @@ public class BackupService : IBackupService
             var entity = new Tag
             {
                 TagName = tag.TagName,
+                Description = tag.Description,
                 InputTypeId = !string.IsNullOrEmpty(tag.InputTypeName) && inputTypeLookup.ContainsKey(tag.InputTypeName) 
                     ? inputTypeLookup[tag.InputTypeName] : null,
                 IsRequired = tag.IsRequired,
