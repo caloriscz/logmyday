@@ -25,7 +25,7 @@
     <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div class="w-full max-w-sm space-y-2">
             <label for="tagPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Select Tag</label>
-            <GroupedTagSelect Tags="@(tags?.OrderBy(t => t.Title).ToList())" @bind-Value="selectedTagId" @bind-Value:after="OnTagSelectedAsync" SelectClass="@InputCss" />
+            <GroupedTagSelect Tags="@(tags?.OrderBy(t => t.Title).ToList())" @bind-Value="selectedTagId" @bind-Value:after="OnTagSelectedAsync" SelectClass="@InputCss" GroupPlaceholder="(All groups)" ShowAllGroupsOption="true" />
         </div>
 
         <div class="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">

@@ -67,7 +67,7 @@
                 <!-- Tag Filter (String input types only) -->
                 <div class="flex-1 min-w-[200px]">
                     <label class="form-label">Tag Filter</label>
-                    <GroupedTagSelect Tags="stringTags" @bind-Value="selectedTagId" @bind-Value:after="OnFilterChanged" SelectClass="form-select w-full" />
+                    <GroupedTagSelect Tags="stringTags" @bind-Value="selectedTagId" @bind-Value:after="OnFilterChanged" SelectClass="form-select w-full" GroupPlaceholder="(All groups)" ShowAllGroupsOption="true" />
                 </div>
             </div>
             
