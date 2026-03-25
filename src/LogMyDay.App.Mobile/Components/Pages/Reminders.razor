@@ -11,6 +11,7 @@
 @inject IUserPreferencesService UserPreferencesService
 @inject ISharedDataCache SharedDataCache
 @inject IJSRuntime JSRuntime
+@inject ISystemNotificationService SystemNotificationService
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
@@ -143,6 +144,9 @@
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "tagId")] [Parameter] public int? QueryTagId { get; set; }
+    [SupplyParameterFromQuery(Name = "date")] [Parameter] public string? QueryDate { get; set; }
+
     private List<TagResponse>? unfilledRequiredTags;
     private IList<TagResponse>? allTags;
     private IList<TagOptionListResponse>? optionLists;
@@ -169,7 +173,15 @@
         displayTimeZone = userPreferences.TimeZone;
 
         var today = GetTodayInDisplayZone();
-        selectedDate = today;
+
+        if (!string.IsNullOrWhiteSpace(QueryDate) && DateOnly.TryParse(QueryDate, out var parsedDate))
+        {
+            selectedDate = parsedDate.ToDateTime(TimeOnly.MinValue);
+        }
+        else
+        {
+            selectedDate = today;
+        }
 
         newActivity = new ActivityRequest
         {
@@ -302,6 +314,11 @@
         // Refresh the reminders list
         await LoadRequiredTags();
 
+        if (activity.PrimaryTagId.HasValue)
+        {
+            SystemNotificationService.MarkTagFulfilled(activity.PrimaryTagId.Value, DateOnly.FromDateTime(selectedDate));
+        }
+
         showAddActivityModal = false;
 
         // Reset the form but keep the date
@@ -430,6 +447,7 @@
 
             await ActivityApi.CreateCalendarItem(request);
             await LoadRequiredTags();
+            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {

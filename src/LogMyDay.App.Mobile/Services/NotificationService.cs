@@ -37,6 +37,12 @@ public class NotificationService : INotificationManagerService
         }
     }
 
+    public void CancelAlarmsForNotification(int notificationId)
+        => _platformService.CancelAlarmsForNotification(notificationId);
+
+    public void CancelAlarmsForTag(int tagId)
+        => _platformService.CancelAlarmsForTag(tagId);
+
     // Deprecated methods - use SystemNotificationService instead
     public void StartPeriodicNotifications()
     {

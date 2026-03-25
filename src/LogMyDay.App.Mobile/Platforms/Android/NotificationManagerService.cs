@@ -32,6 +32,9 @@ public class NotificationManagerService : INotificationManagerService
     int pendingIntentId = 0;
     static int _notificationCount = 0; // Track periodic notifications
 
+    // Keys: notificationId → list of (requestCode, tagId) for scheduled alarms.
+    private readonly Dictionary<int, List<(int requestCode, int tagId)>> _scheduledAlarms = new();
+
     NotificationManagerCompat? compatManager;
 
     public event EventHandler<NotificationEventArgs>? NotificationReceived;
@@ -95,6 +98,19 @@ public class NotificationManagerService : INotificationManagerService
                 long triggerTime = GetNotifyTime(notifyTime.Value);
                 AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
                 alarmManager?.Set(AlarmType.RtcWakeup, triggerTime, pendingIntent);
+
+                // Track this alarm so it can be cancelled later.
+                if (payload?.NotificationId is int nid)
+                {
+                    var requestCode = pendingIntentId - 1;
+                    var tagId = payload.TagId ?? 0;
+                    if (!_scheduledAlarms.TryGetValue(nid, out var list))
+                    {
+                        list = new List<(int, int)>();
+                        _scheduledAlarms[nid] = list;
+                    }
+                    list.Add((requestCode, tagId));
+                }
             }
         }
         else
@@ -122,6 +138,44 @@ public class NotificationManagerService : INotificationManagerService
     public void StopPeriodicNotifications()
     {
         // This will be handled by the cross-platform NotificationService
+    }
+
+    public void CancelAlarmsForNotification(int notificationId)
+    {
+        if (!_scheduledAlarms.TryGetValue(notificationId, out var alarms))
+        {
+            return;
+        }
+
+        AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
+
+        foreach (var (requestCode, _) in alarms)
+        {
+            var cancelIntent = new Intent(Platform.AppContext, typeof(AlarmHandler));
+            var flags = (Build.VERSION.SdkInt >= BuildVersionCodes.S)
+                ? PendingIntentFlags.NoCreate | PendingIntentFlags.Immutable
+                : PendingIntentFlags.NoCreate;
+            var pending = PendingIntent.GetBroadcast(Platform.AppContext, requestCode, cancelIntent, flags);
+            if (pending != null)
+            {
+                alarmManager?.Cancel(pending);
+            }
+        }
+
+        _scheduledAlarms.Remove(notificationId);
+    }
+
+    public void CancelAlarmsForTag(int tagId)
+    {
+        var idsForTag = _scheduledAlarms
+            .Where(kvp => kvp.Value.Any(a => a.tagId == tagId))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var notificationId in idsForTag)
+        {
+            CancelAlarmsForNotification(notificationId);
+        }
     }
 
     public void Show(string title, string message, NotificationPayload? payload = null)

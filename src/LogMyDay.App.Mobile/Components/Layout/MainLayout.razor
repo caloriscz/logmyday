@@ -289,6 +289,6 @@ else
             parameters.Add($"date={payload.LocalDate.Value:yyyy-MM-dd}");
         }
 
-        return parameters.Count > 0 ? "/activities?" + string.Join("&", parameters) : "/activities";
+        return parameters.Count > 0 ? "/reminders?" + string.Join("&", parameters) : "/reminders";
     }
 }

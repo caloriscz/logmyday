@@ -414,6 +414,15 @@ public class ActivityService : IActivityService
         return await _activityRepository.GetAvailableYearsAsync(userId, tagId);
     }
 
+    public async Task<bool> HasActivityForTagOnDate(int tagId, DateOnly date, Guid userId)
+    {
+        var start = date.ToDateTime(TimeOnly.MinValue);
+        var end = date.AddDays(1).ToDateTime(TimeOnly.MinValue).AddTicks(-1);
+        var spec = new DuplicateActivityCheckSpec(tagId, userId, start, end);
+
+        return await _activityRepository.AnyAsync(spec);
+    }
+
     public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId)
     {
         var unfilledTags = await _activityRepository.GetRequiredDailyTagsNotFilledAsync(date, userId);

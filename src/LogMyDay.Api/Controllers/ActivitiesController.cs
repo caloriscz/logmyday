@@ -144,4 +144,13 @@ public class ActivitiesController : BaseApiController
         
         return Ok(unfilledTags);
     }
+
+    [HttpGet("has-activity-for-tag")]
+    public async Task<IActionResult> HasActivityForTag([FromQuery] int tagId, [FromQuery] DateOnly date)
+    {
+        var userId = GetCurrentUserId();
+        var result = await _activityService.HasActivityForTagOnDate(tagId, date, userId);
+
+        return Ok(result);
+    }
 }

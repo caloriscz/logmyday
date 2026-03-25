@@ -63,6 +63,9 @@ public interface IActivityApi
     // Legacy endpoint: kept for future experiments with required-tag reminders. (in the future will be replaced by Notifications)
     Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate([Query] string dateString);
 
+    [Get("/api/activities/has-activity-for-tag")]
+    Task<bool> HasActivityForTag([Query] int tagId, [Query] DateOnly date);
+
     [Get("/api/tags/paged")]
     Task<PagedResult<TagResponse>> GetTagsPaged(
         int pageNumber = 1,
