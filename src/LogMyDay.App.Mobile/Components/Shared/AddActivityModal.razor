@@ -154,7 +154,7 @@
                         <div class="relative">
                             <div class="flex">
                                 <button type="submit" form="@($"{modalId}Form")" class="px-6 py-3 bg-primary-600 text-white rounded-l-lg hover:bg-primary-700 active:bg-primary-800 transition-colors text-base font-medium shadow-sm min-h-[48px]">
-                                    @(IsEditMode ? "Update Activity" : "Save Activity")
+                                    @(IsEditMode ? "Update" : "Save")
                                 </button>
                                 <button type="button" @onclick="ToggleSaveDropdown" @onclick:stopPropagation="true" class="px-3 py-3 border-l border-primary-700 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700 active:bg-primary-800 transition-colors min-h-[48px]" aria-label="More save options">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
