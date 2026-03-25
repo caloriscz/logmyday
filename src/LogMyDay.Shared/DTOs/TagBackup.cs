@@ -12,7 +12,6 @@ public class TagBackup
     public bool IsRepeatable { get; set; }
     public bool IsRange { get; set; }
     public string? PatternName { get; set; }
-    public Guid? UserId { get; set; }
     public string? UnitKey { get; set; }
     public string? UnitSymbol { get; set; }
     public double? MinValue { get; set; }

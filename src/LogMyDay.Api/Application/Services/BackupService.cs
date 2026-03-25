@@ -66,8 +66,7 @@ public class BackupService : IBackupService
             var tagOptionLists = await tagOptionListsQuery
                 .Select(ol => new TagOptionListBackup
                 {
-                    Name = ol.Name,
-                    UserId = ol.UserId
+                    Name = ol.Name
                 })
                 .ToListAsync();
 
@@ -115,7 +114,6 @@ public class BackupService : IBackupService
                     IsRepeatable = t.IsRepeatable,
                     IsRange = t.IsRange,
                     PatternName = t.Pattern != null ? t.Pattern.Name : null,
-                    UserId = t.UserId,
                     UnitKey = t.Unit != null ? t.Unit.Key : null,
                     UnitSymbol = t.Unit != null ? t.Unit.Symbol : null,
                     MinValue = t.MinValue,
@@ -138,7 +136,6 @@ public class BackupService : IBackupService
                 .Select(g => new TagGroupBackup
                 {
                     Name = g.Name,
-                    UserId = g.UserId,
                     Description = g.Description,
                     DisplayOrder = g.DisplayOrder,
                     DateCreated = g.DateCreated
@@ -182,16 +179,20 @@ public class BackupService : IBackupService
             }
 
             var activities = await activitiesQuery
+                .OrderBy(a => a.Tag.TagName)
+                .ThenBy(a => a.DateStarted)
                 .Select(a => new ActivityBackup
                 {
                     DateCreated = a.DateCreated,
                     DateStarted = a.DateStarted,
                     DateFinished = a.DateFinished,
                     Description = a.Description,
-                    TagName = a.Tag.TagName,
-                    UserId = a.UserId
+                    TagName = a.Tag.TagName
                 })
                 .ToListAsync();
+
+            var totalActivities = activities.Count;
+            activities = CompressActivitiesToStreaks(activities);
 
             // Export ScanMappings with user filtering
             var scanMappingsQuery = _context.ScanMappings
@@ -221,7 +222,7 @@ public class BackupService : IBackupService
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.4",
+                    Version = "1.7",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
@@ -230,7 +231,7 @@ public class BackupService : IBackupService
                     TotalTagGroups = tagGroups.Count,
                     TotalTags = tags.Count,
                     TotalNotifications = notifications.Count,
-                    TotalActivities = activities.Count,
+                    TotalActivities = totalActivities,
                     TotalScanMappings = scanMappings.Count
                 },
                 InputTypes = inputTypes,
@@ -471,6 +472,17 @@ public class BackupService : IBackupService
             result.IsValid = false;
         }
 
+        // Validate streak dates
+        var invalidStreaks = backupData.Activities
+            .Where(a => a.StreakEndDate.HasValue && a.StreakEndDate.Value.Date < a.DateStarted.Date)
+            .ToList();
+
+        if (invalidStreaks.Any())
+        {
+            result.Errors.Add($"Found {invalidStreaks.Count} activities with StreakEndDate before DateStarted");
+            result.IsValid = false;
+        }
+
         // Validate InputType references
         var inputTypeNames = backupData.InputTypes.Select(it => it.Name).ToHashSet();
         var invalidTagInputTypes = backupData.Tags
@@ -663,7 +675,7 @@ public class BackupService : IBackupService
             var entity = new TagOptionList
             {
                 Name = list.Name,
-                UserId = userId ?? list.UserId
+                UserId = userId
             };
 
             _context.TagOptionLists.Add(entity);
@@ -720,7 +732,7 @@ public class BackupService : IBackupService
             var entity = new TagGroup
             {
                 Name = group.Name,
-                UserId = userId ?? group.UserId,
+                UserId = userId ?? Guid.Empty,
                 Description = group.Description,
                 DisplayOrder = group.DisplayOrder,
                 DateCreated = group.DateCreated
@@ -788,7 +800,7 @@ public class BackupService : IBackupService
                     ? tagOptionListLookup[tag.OptionListKey] : null,
                 GroupId = !string.IsNullOrEmpty(tag.GroupName) && tagGroupLookup.ContainsKey(tag.GroupName)
                     ? tagGroupLookup[tag.GroupName] : null,
-                UserId = userId ?? tag.UserId
+                UserId = userId ?? Guid.Empty
             };
 
             _context.Tags.Add(entity);
@@ -862,18 +874,45 @@ public class BackupService : IBackupService
                 continue;
             }
 
-            var entity = new Activity
-            {
-                DateCreated = activity.DateCreated,
-                DateStarted = activity.DateStarted,
-                DateFinished = activity.DateFinished,
-                Description = activity.Description,
-                TagId = tagLookup[activity.TagName],
-                UserId = userId ?? activity.UserId
-            };
+            var tagId = tagLookup[activity.TagName];
+            var resolvedUserId = userId ?? Guid.Empty;
 
-            _context.Activities.Add(entity);
-            result.Statistics.ActivitiesImported++;
+            if (activity.StreakEndDate.HasValue)
+            {
+                var startDate = activity.DateStarted.Date;
+                var endDate = activity.StreakEndDate.Value.Date;
+
+                for (var date = startDate; date <= endDate; date = date.AddDays(1))
+                {
+                    var entity = new Activity
+                    {
+                        DateCreated = activity.DateCreated,
+                        DateStarted = date.Add(activity.DateStarted.TimeOfDay),
+                        DateFinished = activity.DateFinished,
+                        Description = activity.Description,
+                        TagId = tagId,
+                        UserId = resolvedUserId
+                    };
+
+                    _context.Activities.Add(entity);
+                    result.Statistics.ActivitiesImported++;
+                }
+            }
+            else
+            {
+                var entity = new Activity
+                {
+                    DateCreated = activity.DateCreated,
+                    DateStarted = activity.DateStarted,
+                    DateFinished = activity.DateFinished,
+                    Description = activity.Description,
+                    TagId = tagId,
+                    UserId = resolvedUserId
+                };
+
+                _context.Activities.Add(entity);
+                result.Statistics.ActivitiesImported++;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -1419,5 +1458,67 @@ public class BackupService : IBackupService
         }
 
         return recordsCleared;
+    }
+
+    private static List<ActivityBackup> CompressActivitiesToStreaks(List<ActivityBackup> activities)
+    {
+        if (activities.Count <= 1)
+        {
+            return activities;
+        }
+
+        var result = new List<ActivityBackup>();
+        var sorted = activities
+            .OrderBy(a => a.TagName, StringComparer.Ordinal)
+            .ThenBy(a => a.DateStarted)
+            .ToList();
+
+        var streakStart = sorted[0];
+        var streakEnd = streakStart.DateStarted.Date;
+
+        for (int i = 1; i < sorted.Count; i++)
+        {
+            var current = sorted[i];
+            var currentDate = current.DateStarted.Date;
+            var isConsecutive = currentDate == streakEnd.AddDays(1);
+            var isSameGroup = string.Equals(current.TagName, streakStart.TagName, StringComparison.Ordinal)
+                && current.Description == streakStart.Description
+                && current.DateFinished == streakStart.DateFinished;
+
+            if (isConsecutive && isSameGroup)
+            {
+                streakEnd = currentDate;
+            }
+            else
+            {
+                EmitStreak(result, streakStart, streakEnd);
+                streakStart = current;
+                streakEnd = currentDate;
+            }
+        }
+
+        EmitStreak(result, streakStart, streakEnd);
+
+        return result;
+    }
+
+    private static void EmitStreak(List<ActivityBackup> result, ActivityBackup streakStart, DateTime streakEnd)
+    {
+        if (streakEnd > streakStart.DateStarted.Date)
+        {
+            result.Add(new ActivityBackup
+            {
+                DateCreated = streakStart.DateCreated,
+                DateStarted = streakStart.DateStarted,
+                DateFinished = streakStart.DateFinished,
+                StreakEndDate = streakEnd,
+                Description = streakStart.Description,
+                TagName = streakStart.TagName
+            });
+        }
+        else
+        {
+            result.Add(streakStart);
+        }
     }
 }
