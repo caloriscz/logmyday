@@ -33,8 +33,8 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
     private readonly HashSet<(int tagId, DateOnly date)> _fulfilledTags = new();
     private const string LogPrefix = "SystemNotificationService";
 
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(2);
 
     public SystemNotificationService(
         IApiClientProvider apiClientProvider,
@@ -249,6 +249,20 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         if (activeWindow is null)
         {
             WriteDebug($"Notification {notification.Id}: current time outside active windows");
+
+            // Pre-schedule alarms for the next upcoming window so they fire in the background.
+            var nextWindow = windows
+                .Where(w => w.Start > nowLocal)
+                .OrderBy(w => w.Start)
+                .FirstOrDefault();
+
+            if (nextWindow is not null)
+            {
+                var windowDate = DateOnly.FromDateTime(nextWindow.Start);
+                var totalOccurrencesForNext = Math.Max(0, notification.MaxNudges) + 1;
+                ScheduleFutureOccurrences(notification, nextWindow, windowDate, 0, totalOccurrencesForNext, nowLocal);
+                WriteDebug($"Notification {notification.Id}: pre-scheduled {totalOccurrencesForNext} alarms for window at {nextWindow.Start:O}");
+            }
 
             return;
         }
