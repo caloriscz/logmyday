@@ -1,4 +1,5 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -10,14 +11,17 @@ public class ActivitiesController : BaseApiController
 {
     private readonly IActivityService _activityService;
     private readonly ILogger<ActivitiesController> _logger;
+    private readonly IEventLogService _eventLogService;
 
     public ActivitiesController(
         IActivityService activityService, 
         ILogger<ActivitiesController> logger,
-        IAuthService authService) : base(authService)
+        IAuthService authService,
+        IEventLogService eventLogService) : base(authService)
     {
         _activityService = activityService;
         _logger = logger;
+        _eventLogService = eventLogService;
     }
 
     [HttpGet("{id}")]
@@ -46,10 +50,38 @@ public class ActivitiesController : BaseApiController
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ActivityRequest calendarRequest)
     {
-        var userId = GetCurrentUserId();
-        var createdCalendar = await _activityService.Create(calendarRequest, userId);
+        try
+        {
+            var userId = GetCurrentUserId();
+            var createdCalendar = await _activityService.Create(calendarRequest, userId);
 
-        return Ok(createdCalendar);
+            return Ok(createdCalendar);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity creation failed: {ex.Message}",
+                $"TagId: {calendarRequest.PrimaryTagId}, Date: {calendarRequest.DateStarted:yyyy-MM-dd HH:mm}, Description: {calendarRequest.Description}");
+
+            return Conflict(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity creation failed: {ex.Message}",
+                $"TagId: {calendarRequest.PrimaryTagId}, Date: {calendarRequest.DateStarted:yyyy-MM-dd HH:mm}, Description: {calendarRequest.Description}");
+
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error creating activity for tag {TagId}", calendarRequest.PrimaryTagId);
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity creation failed for tag {calendarRequest.PrimaryTagId}",
+                $"{ex.Message}\nTagId: {calendarRequest.PrimaryTagId}, Date: {calendarRequest.DateStarted:yyyy-MM-dd HH:mm}, Description: {calendarRequest.Description}");
+
+            return StatusCode(500, "An internal error occurred while saving the activity.");
+        }
     }
 
     [HttpPut("{id}")]
@@ -123,6 +155,18 @@ public class ActivitiesController : BaseApiController
         var hasDuplicate = await _activityService.HasActivityForTimeGranularity(tagId, dateStarted, userId, activityId);
 
         return Ok(new DuplicateCheckResponse { HasDuplicate = hasDuplicate });
+    }
+
+    [HttpGet("period-sum")]
+    public async Task<IActionResult> GetPeriodSum(
+        [FromQuery] int tagId,
+        [FromQuery] DateTime dateStarted,
+        [FromQuery] int? activityId = null)
+    {
+        var userId = GetCurrentUserId();
+        var result = await _activityService.GetPeriodSum(tagId, dateStarted, userId, activityId);
+
+        return Ok(result);
     }
 
     [HttpGet("required-daily-tags-unfilled")]

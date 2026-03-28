@@ -59,6 +59,9 @@ public interface IActivityApi
     [Get("/api/activities/check-duplicate")]
     Task<DuplicateCheckResponse> CheckDuplicate(int tagId, DateTime dateStarted, int? activityId = null);
 
+    [Get("/api/activities/period-sum")]
+    Task<PeriodSumResponse> GetPeriodSum(int tagId, DateTime dateStarted, int? activityId = null);
+
     [Get("/api/activities/required-daily-tags-unfilled")]
     // Legacy endpoint: kept for future experiments with required-tag reminders. (in the future will be replaced by Notifications)
     Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate([Query] string dateString);

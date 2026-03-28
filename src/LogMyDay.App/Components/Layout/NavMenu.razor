@@ -141,6 +141,11 @@
                                 <Icon Name="file-text" Class="w-4 h-4" />
                                 <span>Reports</span>
                             </NavLink>
+                            <NavLink href="event-logs" @onclick="() => showDataMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="document-text" Class="w-4 h-4" />
+                                <span>Event Log</span>
+                            </NavLink>
                             </div>
                         </div>
                     }
@@ -314,6 +319,12 @@
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="file-text" Class="w-5 h-5" />
                         <span>Reports</span>
+                    </NavLink>
+                    <NavLink href="event-logs" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="document-text" Class="w-5 h-5" />
+                        <span>Event Log</span>
                     </NavLink>
 
                     @if (_aiAvailable)

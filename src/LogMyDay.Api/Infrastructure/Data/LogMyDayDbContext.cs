@@ -22,6 +22,8 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<ScanMapping> ScanMappings => Set<ScanMapping>();
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
+    public DbSet<EventLog> EventLogs => Set<EventLog>();
+    public DbSet<EventLogDetail> EventLogDetails => Set<EventLogDetail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +44,8 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<Setting>().ToTable("LogMyDay_Settings");
         modelBuilder.Entity<ScanMapping>().ToTable("LogMyDay_ScanMappings");
         modelBuilder.Entity<TagGroup>().ToTable("LogMyDay_TagGroups");
+        modelBuilder.Entity<EventLog>().ToTable("LogMyDay_EventLogs");
+        modelBuilder.Entity<EventLogDetail>().ToTable("LogMyDay_EventLogDetails");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -139,6 +143,22 @@ public class LogMyDayDbContext : DbContext
             entity.Property(s => s.IsActive).HasDefaultValue(true);
             entity.Property(s => s.CodeValue).HasMaxLength(512).IsRequired();
             entity.Property(s => s.DisplayName).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<EventLog>(entity =>
+        {
+            entity.HasOne(e => e.Detail)
+                .WithOne(d => d.EventLog)
+                .HasForeignKey<EventLogDetail>(d => d.EventLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.UserId, e.CreatedUtc })
+                .HasDatabaseName("IX_LogMyDay_EventLogs_UserId_CreatedUtc");
+
+            entity.HasIndex(e => e.Level)
+                .HasDatabaseName("IX_LogMyDay_EventLogs_Level");
+
+            entity.Property(e => e.Message).HasMaxLength(500).IsRequired();
         });
 
         modelBuilder.SeedData();
