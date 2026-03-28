@@ -13,6 +13,7 @@ public interface IApiClientProvider
     IAccountApi Account { get; }
     IScanMappingApi ScanMapping { get; }
     ITagGroupApi TagGroup { get; }
+    IAiApi Ai { get; }
     void Invalidate();
 }
 
@@ -26,6 +27,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private IAccountApi? _account;
     private IScanMappingApi? _scanMapping;
     private ITagGroupApi? _tagGroup;
+    private IAiApi? _ai;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -40,6 +42,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IAccountApi Account => _account ??= Build<IAccountApi>();
     public IScanMappingApi ScanMapping => _scanMapping ??= Build<IScanMappingApi>();
     public ITagGroupApi TagGroup => _tagGroup ??= Build<ITagGroupApi>();
+    public IAiApi Ai => _ai ??= Build<IAiApi>();
 
     private static readonly RefitSettings SharedRefitSettings = new()
     {
@@ -66,6 +69,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _account = null;
         _scanMapping = null;
         _tagGroup = null;
+        _ai = null;
     }
 
     public void Dispose()
