@@ -267,6 +267,7 @@
     OnActivityUpdated="@HandleActivityUpdated"
     OnCanceled="@HandleActivityCanceled"
     OnFormReset="@HandleActivityFormReset"
+    OnError="@HandleActivityError"
     ErrorMessage="@errorMessage" />
 
 @code {
@@ -562,6 +563,7 @@
 
     private async Task HandleActivityCreated(LogMyDay.Shared.DTOs.ActivityRequest activity)
     {
+        errorMessage = null;
         // Refresh the activities list when a new activity is created
         await LoadData();
         // Reset the activity for next use
@@ -589,7 +591,17 @@
 
     private Task HandleActivityFormReset()
     {
+        errorMessage = null;
         StateHasChanged();
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleActivityError(string error)
+    {
+        errorMessage = error;
+        StateHasChanged();
+
         return Task.CompletedTask;
     }
 

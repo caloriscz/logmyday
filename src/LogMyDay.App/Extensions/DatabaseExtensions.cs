@@ -1,5 +1,6 @@
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
 
 namespace LogMyDay.App.Extensions;
@@ -21,6 +22,12 @@ internal static class DatabaseExtensions
         services.AddDbContext<LogMyDayDbContext>(options =>
         {
             ConfigureProvider(options, dbOptions.Provider, connectionString);
+
+            // Suppress PendingModelChangesWarning: migrations are scaffolded against SQLite
+            // (dev) but the runtime model uses SQL Server (pre-prod/prod). The type-annotation
+            // mismatch in Designer.cs snapshots is expected with a dual-provider setup.
+            options.ConfigureWarnings(w =>
+                w.Ignore(RelationalEventId.PendingModelChangesWarning));
         });
 
         Log.Information("Database provider configured: {Provider}", dbOptions.Provider);

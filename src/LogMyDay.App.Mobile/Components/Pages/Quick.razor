@@ -401,8 +401,15 @@
     private bool IsHiddenToday(QuickActivityButton button)
     {
         var tag = availableTags.FirstOrDefault(t => t.Id == button.TagId);
+        if (tag == null || tag.IsRepeatable || !todayTagIds.Contains(button.TagId))
+        {
+            return false;
+        }
 
-        return tag != null && !tag.IsRepeatable && todayTagIds.Contains(button.TagId);
+        // Non-repeatable numeric tags accumulate — keep them visible
+        var isNumeric = tag.TypeId is 1 or 6;
+
+        return !isNumeric;
     }
 
     private void OnQuickButtonsChanged(object? sender, List<QuickActivityButton> updatedButtons)
@@ -515,10 +522,34 @@
 
             ShowSuccess($"Activity '{button.Name}' logged successfully!");
         }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var content = await ex.GetContentAsAsync<string>();
+            ShowError(SanitizeApiError(content, 409));
+        }
+        catch (Refit.ApiException ex)
+        {
+            string? content = null;
+            try { content = await ex.GetContentAsAsync<string>(); } catch { /* deserialization failed */ }
+            content ??= ex.Content;
+            ShowError(SanitizeApiError(content, (int)ex.StatusCode));
+        }
         catch (Exception ex)
         {
             ShowError($"Failed to log activity: {ex.Message}");
         }
+    }
+
+    private static string SanitizeApiError(string? content, int statusCode)
+    {
+        if (string.IsNullOrWhiteSpace(content) || content.TrimStart().StartsWith('<'))
+        {
+            return statusCode >= 500
+                ? "Something went wrong while logging the activity. Please try again."
+                : "Could not log the activity. Please try again.";
+        }
+
+        return content.Length > 300 ? content[..300] + "\u2026" : content;
     }
 
     private async Task DeleteQuickActivity(QuickActivityButton button)
