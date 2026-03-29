@@ -62,6 +62,43 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
   }
 });
 
+// Layout width management
+const LAYOUT_KEY = 'lmd-layout';
+
+function getLayout() {
+  return localStorage.getItem(LAYOUT_KEY) || 'normal';
+}
+
+function setLayout(mode) {
+  localStorage.setItem(LAYOUT_KEY, mode);
+
+  if (mode === 'wide') {
+    document.documentElement.classList.add('layout-wide');
+  } else {
+    document.documentElement.classList.remove('layout-wide');
+  }
+}
+
+function toggleLayout() {
+  const current = getLayout();
+  const next = current === 'wide' ? 'normal' : 'wide';
+  setLayout(next);
+
+  return next;
+}
+
+// Initialize layout immediately (prevents layout shift)
+(function() {
+  setLayout(getLayout());
+})();
+
+// Export functions for Blazor interop
+window.LogMyDayLayout = {
+  get: getLayout,
+  set: setLayout,
+  toggle: toggleLayout
+};
+
 // Modal management
 window.LogMyDayModal = {
   show: function(modalId) {

@@ -453,6 +453,13 @@ body {
     padding: 0;
 }
 
+/* Wide layout mode — toggled via navbar icon, persisted in localStorage */
+html.layout-wide .layout-constrained,
+html.layout-wide .max-w-screen-2xl,
+html.layout-wide .max-w-screen-lg {
+    max-width: 100% !important;
+}
+
 /* Container improvements */
 .container, .container-fluid {
     padding-top: 0;
