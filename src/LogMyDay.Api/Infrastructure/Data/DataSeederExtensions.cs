@@ -78,24 +78,24 @@ public static class DataSeederExtensions
             new InputType 
             { 
                 Id = 7, 
-                Name = "Rating 1-5", 
+                Name = "Star Rating 0-5", 
                 IsRangeEditable = true,
                 IsMinimumEditable = false,
                 IsMaximumEditable = false,
                 IsStepEditable = false,
                 IsRepeatableEditable = false,
-                Description = "Rating scale from 1 to 5 (commonly used for star ratings)" 
+                Description = "Star rating scale from 0 to 5 (higher is better)" 
             },
             new InputType 
             { 
                 Id = 8, 
-                Name = "Rating 1-10", 
+                Name = "Star Rating 0-10", 
                 IsRangeEditable = true,
                 IsMinimumEditable = false,
                 IsMaximumEditable = false,
                 IsStepEditable = false,
                 IsRepeatableEditable = false,
-                Description = "Rating scale from 1 to 10" 
+                Description = "Star rating scale from 0 to 10 (higher is better)" 
             },
             new InputType 
             { 
@@ -107,6 +107,28 @@ public static class DataSeederExtensions
                 IsStepEditable = false,
                 IsRepeatableEditable = false,
                 Description = "Percentage value from 0 to 100" 
+            },
+            new InputType 
+            { 
+                Id = 10, 
+                Name = "Score 0-5", 
+                IsRangeEditable = true,
+                IsMinimumEditable = false,
+                IsMaximumEditable = false,
+                IsStepEditable = false,
+                IsRepeatableEditable = false,
+                Description = "Score scale from 0 to 5 (lower is better, e.g. pain, severity)" 
+            },
+            new InputType 
+            { 
+                Id = 11, 
+                Name = "Score 0-10", 
+                IsRangeEditable = true,
+                IsMinimumEditable = false,
+                IsMaximumEditable = false,
+                IsStepEditable = false,
+                IsRepeatableEditable = false,
+                Description = "Score scale from 0 to 10 (lower is better, e.g. pain, severity)" 
             }
         );
     }

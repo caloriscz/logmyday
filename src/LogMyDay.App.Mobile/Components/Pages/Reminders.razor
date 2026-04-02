@@ -2,6 +2,7 @@
 @using System.Globalization
 @using System.Net
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Mobile.Components.Shared
 @using LogMyDay.App.Mobile.Services
 @using LogMyDay.Shared.Preferences
@@ -52,10 +53,25 @@
                                 <i class="bi bi-exclamation-triangle"></i>
                                 @tag.Title
                             </h5>
-                            <span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded">Required</span>
                         </div>
 
-                        @if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
+                        @if (tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10)
+                        {
+                            <div class="mb-3">
+                                <StarRating Value="@GetStarPickerValue(tag.Id)"
+                                            ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
+                                            MaxStars="@(tag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
+                            </div>
+                        }
+                        else if (tag.TypeId is InputTypeIds.Score or InputTypeIds.Score10)
+                        {
+                            <div class="mb-3">
+                                <ScoreRating Value="@GetScorePickerValue(tag.Id)"
+                                             ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
+                                             MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
+                            </div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
                         {
                             <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                 Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
@@ -63,10 +79,6 @@
                         }
 
                         <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                            <div class="flex items-center gap-1">
-                                <i class="bi bi-clock"></i>
-                                <span>Time Granularity: @tag.TimeGranularity</span>
-                            </div>
                             @if (tag.IsRepeatable)
                             {
                                 <div class="flex items-center gap-1">
@@ -83,13 +95,14 @@
                             }
                         </div>
 
-                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) ? "grid-cols-2" : "grid-cols-1")">
+                        @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10; }
+                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
                             <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
                                     @onclick="@(() => PrepareModalForTag(tag.Id))">
                                 <i class="bi bi-plus-circle"></i>
                                 <span>Add Activity</span>
                             </button>
-                            @if (HasDefaultValue(tag))
+                            @if (HasDefaultValue(tag) && !isRatingTag)
                             {
                                 <button class="@GetQuickAddButtonClasses(tag)"
                                         @onclick="@(() => QuickAddDefaultAsync(tag))"
@@ -159,6 +172,7 @@
     private bool showAddActivityModal = false;
     private bool shouldShowModalAfterRender = false;
     private readonly HashSet<int> quickAddInProgress = new();
+    private readonly Dictionary<int, int> _inlinePickerValues = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -463,6 +477,65 @@
         catch (Exception ex)
         {
             errorMessage = $"Error adding default activity: {ex.Message}";
+        }
+        finally
+        {
+            quickAddInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
+    private int GetStarPickerValue(int tagId) =>
+        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : 0;
+
+    private int? GetScorePickerValue(int tagId) =>
+        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
+
+    private async Task QuickAddWithValueAsync(TagResponse tag, int value)
+    {
+        _inlinePickerValues[tag.Id] = value;
+
+        if (!quickAddInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = value.ToString(),
+                DateStarted = startDate
+            };
+
+            await ActivityApi.CreateCalendarItem(request);
+            _inlinePickerValues.Remove(tag.Id);
+            await LoadRequiredTags();
+            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "The activity could not be created.";
+        }
+        catch (Exception ex)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            errorMessage = $"Error adding activity: {ex.Message}";
         }
         finally
         {

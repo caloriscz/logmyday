@@ -51,14 +51,14 @@ public static class InputTypeDefaults
                 Step: 0.01,
                 IsRangeApplicable: true
             ),
-            InputTypeIds.Rating1To5 => new InputTypeConstraints(
-                MinValue: 1,
+            InputTypeIds.StarRating => new InputTypeConstraints(
+                MinValue: 0,
                 MaxValue: 5,
                 Step: 1,
                 IsRangeApplicable: true
             ),
-            InputTypeIds.Rating1To10 => new InputTypeConstraints(
-                MinValue: 1,
+            InputTypeIds.StarRating10 => new InputTypeConstraints(
+                MinValue: 0,
                 MaxValue: 10,
                 Step: 1,
                 IsRangeApplicable: true
@@ -66,6 +66,18 @@ public static class InputTypeDefaults
             InputTypeIds.Percentage => new InputTypeConstraints(
                 MinValue: 0,
                 MaxValue: 100,
+                Step: 1,
+                IsRangeApplicable: true
+            ),
+            InputTypeIds.Score => new InputTypeConstraints(
+                MinValue: 0,
+                MaxValue: 5,
+                Step: 1,
+                IsRangeApplicable: true
+            ),
+            InputTypeIds.Score10 => new InputTypeConstraints(
+                MinValue: 0,
+                MaxValue: 10,
                 Step: 1,
                 IsRangeApplicable: true
             ),

@@ -139,6 +139,9 @@
     {
         _selectedGroupName = e.Value?.ToString();
         FilterTags();
+        // Sync _lastSyncedValue so OnParametersSet won't interpret the null
+        // propagated back from the parent as a value change and reset the group.
+        _lastSyncedValue = null;
         await ValueChanged.InvokeAsync(null);
     }
 

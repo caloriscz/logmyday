@@ -4,6 +4,7 @@
 @using System.Linq
 @using System.Net
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Services
 @using LogMyDay.Shared.Preferences
@@ -79,6 +80,24 @@
                             </div>
                         }
 
+                        @if (IsStarRatingTag(tag))
+                        {
+                            <div class="mt-5">
+                                <StarRating Value="@GetStarPickerValue(tag.Id)"
+                                            ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
+                                            MaxStars="@(tag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
+                            </div>
+                        }
+                        else if (IsScoreTag(tag))
+                        {
+                            <div class="mt-5">
+                                <ScoreRating Value="@GetScorePickerValue(tag.Id)"
+                                             ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
+                                             MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
+                            </div>
+                        }
+                        else
+                        {
                         <div class="relative mt-5">
                             @if (showSplit)
                             {
@@ -159,6 +178,7 @@
                                 </button>
                             }
                         </div>
+                        } @* end else (non-rating tag) *@
                     </div>
                 }
             </div>
@@ -216,6 +236,7 @@
     private Dictionary<int, ActivityResponse?> existingActivities = new();
     private readonly HashSet<int> operationInProgress = new();
     private int? openDropdownTagId;
+    private readonly Dictionary<int, int> _inlinePickerValues = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -431,6 +452,18 @@
     private bool HasStepCapability(TagResponse tag)
         => tag.Step.HasValue && !tag.IsRepeatable;
 
+    private static bool IsStarRatingTag(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private int GetStarPickerValue(int tagId) =>
+        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : 0;
+
+    private int? GetScorePickerValue(int tagId) =>
+        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
+
     private bool IsActionInProgress(int tagId)
         => operationInProgress.Contains(tagId);
 
@@ -610,6 +643,68 @@
         catch (Exception ex)
         {
             errorMessage = $"Error setting default activity: {ex.Message}";
+        }
+        finally
+        {
+            operationInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task QuickAddWithValueAsync(TagResponse tag, int value)
+    {
+        _inlinePickerValues[tag.Id] = value;
+
+        if (!operationInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        errorMessage = null;
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var existing = GetExistingActivity(tag.Id);
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = value.ToString(),
+                DateStarted = existing?.DateStarted ?? startDate
+            };
+
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
+            _inlinePickerValues.Remove(tag.Id);
+            await LoadRequiredTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details)
+                ? details
+                : "The activity could not be created.";
+        }
+        catch (Exception ex)
+        {
+            _inlinePickerValues.Remove(tag.Id);
+            errorMessage = $"Error adding activity: {ex.Message}";
         }
         finally
         {

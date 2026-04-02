@@ -103,6 +103,30 @@
                                         </p>
                                     }
                                     break;
+                                case 7:  // Star Rating 0-5
+                                    <label class="@LabelCss">Rating</label>
+                                    <StarRating Value="@(integerValue ?? 0)" ValueChanged="OnStarRatingChanged" MaxStars="5" />
+                                    break;
+                                case 8:  // Star Rating 0-10
+                                    <label class="@LabelCss">Rating</label>
+                                    <StarRating Value="@(integerValue ?? 0)" ValueChanged="OnStarRatingChanged" MaxStars="10" />
+                                    break;
+                                case 9:  // Percentage
+                                    <label class="@LabelCss">Value</label>
+                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="@InputCss"
+                                           step="@(selectedTag?.Step ?? 1)"
+                                           min="@(selectedTag?.MinValue ?? 0)"
+                                           max="@(selectedTag?.MaxValue)"
+                                           placeholder="@($"0–{selectedTag?.MaxValue ?? 100}")" />
+                                    break;
+                                case 10: // Score 0-5
+                                    <label class="@LabelCss">Score</label>
+                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="5" />
+                                    break;
+                                case 11: // Score 0-10
+                                    <label class="@LabelCss">Score</label>
+                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="10" />
+                                    break;
                                 default:
                                     <label class="@LabelCss">Description</label>
                                     <input type="text" @bind="Activity.Description" class="@InputCss" placeholder="Enter activity description" />
@@ -743,6 +767,21 @@
                     decimalValue = null;
                 }
                 break;
+            case 7:  // Star Rating 0-5
+            case 8:  // Star Rating 0-10
+            case 9:  // Percentage
+            case 10: // Score 0-5
+            case 11: // Score 0-10
+                if (int.TryParse(description, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRating))
+                {
+                    integerValue = parsedRating;
+                    Activity.Description = parsedRating.ToString(CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    integerValue = null;
+                }
+                break;
             default:
                 Activity.Description = description;
                 break;
@@ -762,6 +801,12 @@
     private void OnIntegerValueChanged()
     {
         Activity.Description = integerValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private void OnStarRatingChanged(int value)
+    {
+        integerValue = value;
+        Activity.Description = value.ToString(CultureInfo.InvariantCulture);
     }
 
     private void OnBooleanValueChanged()
