@@ -207,6 +207,10 @@
                                        {
                                            <div><ScoreDisplay Value="@calScore" MaxScore="@GetStarMax(calTag!)" /></div>
                                        }
+                                       else if (calTag?.TypeId == InputTypeIds.Boolean)
+                                       {
+                                           <div><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
+                                       }
                                        else
                                        {
                                            var displayValue = FormatActivityValue(activity);

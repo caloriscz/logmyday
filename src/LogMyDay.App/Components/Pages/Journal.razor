@@ -172,6 +172,10 @@
                                             {
                                                 <ScoreDisplay Value="@jrnScore" MaxScore="@(jrnTag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
                                             }
+                                            else if (jrnTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" />
+                                            }
                                             else
                                             {
                                                 <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">

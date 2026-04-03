@@ -110,6 +110,10 @@
                         {
                             <div class="mb-2"><ScoreDisplay Value="@mobScore1" MaxScore="@(mobTag1.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
                         }
+                        else if (mobTag1?.TypeId == InputTypeIds.Boolean)
+                        {
+                            <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
+                        }
                         else if (!string.IsNullOrEmpty(activity.Description))
                         {
                             <p class="mb-2 text-gray-700 dark:text-gray-300">@activity.Description</p>
@@ -159,6 +163,10 @@
                             else if (mobTag2?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var mobScore2))
                             {
                                 <div class="mb-2"><ScoreDisplay Value="@mobScore2" MaxScore="@(mobTag2.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
+                            }
+                            else if (mobTag2?.TypeId == InputTypeIds.Boolean)
+                            {
+                                <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
                             }
                             else if (!string.IsNullOrEmpty(activity.Description))
                             {

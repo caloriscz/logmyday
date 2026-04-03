@@ -71,6 +71,13 @@
                                              MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
                             </div>
                         }
+                        else if (tag.TypeId == InputTypeIds.Boolean)
+                        {
+                            <div class="mb-3">
+                                <BooleanToggle Value="@GetBoolPickerValue(tag.Id)"
+                                               ValueChanged="@(async v => await QuickAddBoolAsync(tag, v))" />
+                            </div>
+                        }
                         else if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
                         {
                             <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
@@ -95,7 +102,9 @@
                             }
                         </div>
 
-                        @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10; }
+                        @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
+                        @if (tag.TypeId != InputTypeIds.Boolean)
+                        {
                         <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
                             <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
                                     @onclick="@(() => PrepareModalForTag(tag.Id))">
@@ -116,6 +125,7 @@
                                 </button>
                             }
                         </div>
+                        }
                     </div>
                 }
             </div>
@@ -173,6 +183,8 @@
     private bool shouldShowModalAfterRender = false;
     private readonly HashSet<int> quickAddInProgress = new();
     private readonly Dictionary<int, int> _inlinePickerValues = new();
+    private readonly Dictionary<int, bool> _boolPickerValues = new();
+    private readonly Dictionary<int, ActivityResponse?> existingActivities = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -234,6 +246,21 @@
             if (optionLists is not null)
             {
                 optionListLookup = optionLists.ToDictionary(list => list.Id);
+            }
+
+            existingActivities.Clear();
+            if (unfilledRequiredTags?.Count > 0)
+            {
+                var activityFetchTasks = unfilledRequiredTags.Select(t =>
+                {
+                    var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
+                    return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
+                });
+                var activityResults = await Task.WhenAll(activityFetchTasks);
+                for (var i = 0; i < unfilledRequiredTags.Count; i++)
+                {
+                    existingActivities[unfilledRequiredTags[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                }
             }
 
             // Update new activity with the selected date
@@ -431,6 +458,66 @@
         return null;
     }
 
+    private async Task QuickAddBoolAsync(TagResponse tag, bool value)
+    {
+        _boolPickerValues[tag.Id] = value;
+
+        if (!quickAddInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var existing = GetExistingActivity(tag.Id);
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = value ? "true" : "false",
+                DateStarted = startDate
+            };
+
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
+            _boolPickerValues.Remove(tag.Id);
+            await LoadRequiredTags();
+            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "The activity could not be created.";
+        }
+        catch (Exception ex)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            errorMessage = $"Error adding activity: {ex.Message}";
+        }
+        finally
+        {
+            quickAddInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
     private async Task QuickAddDefaultAsync(TagResponse tag)
     {
         var defaultValue = ResolveDefaultValue(tag);
@@ -491,6 +578,44 @@
     private int? GetScorePickerValue(int tagId) =>
         _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
 
+    private bool? GetBoolPickerValue(int tagId)
+    {
+        if (_boolPickerValues.TryGetValue(tagId, out var v))
+        {
+            return v;
+        }
+
+        var existing = GetExistingActivity(tagId);
+
+        return existing != null ? BooleanDisplay.Parse(existing.PrimaryTagValue ?? existing.Description) : null;
+    }
+
+    private ActivityResponse? GetExistingActivity(int tagId)
+        => existingActivities.TryGetValue(tagId, out var act) ? act : null;
+
+    private static (DateTime start, DateTime end) GetGranularityDateRange(TagResponse tag, DateTime date)
+    {
+        var dayStart = date.Date;
+
+        return tag.TimeGranularity switch
+        {
+            Domain.Enums.TimeGranularity.Weekly =>
+                (GetStartOfWeek(dayStart), GetStartOfWeek(dayStart).AddDays(7).AddTicks(-1)),
+            Domain.Enums.TimeGranularity.Monthly =>
+                (new DateTime(dayStart.Year, dayStart.Month, 1), new DateTime(dayStart.Year, dayStart.Month, 1).AddMonths(1).AddTicks(-1)),
+            Domain.Enums.TimeGranularity.Yearly =>
+                (new DateTime(dayStart.Year, 1, 1), new DateTime(dayStart.Year + 1, 1, 1).AddTicks(-1)),
+            _ => (dayStart, dayStart.AddDays(1).AddTicks(-1))
+        };
+    }
+
+    private static DateTime GetStartOfWeek(DateTime date)
+    {
+        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+
+        return date.AddDays(-diff);
+    }
+
     private async Task QuickAddWithValueAsync(TagResponse tag, int value)
     {
         _inlinePickerValues[tag.Id] = value;
@@ -507,6 +632,7 @@
 
         try
         {
+            var existing = GetExistingActivity(tag.Id);
             var request = new ActivityRequest
             {
                 PrimaryTagId = tag.Id,
@@ -514,7 +640,15 @@
                 DateStarted = startDate
             };
 
-            await ActivityApi.CreateCalendarItem(request);
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
             _inlinePickerValues.Remove(tag.Id);
             await LoadRequiredTags();
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));

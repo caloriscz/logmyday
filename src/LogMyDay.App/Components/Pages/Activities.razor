@@ -135,6 +135,10 @@
                                             {
                                                 <ScoreDisplay Value="@dailyScore" MaxScore="@GetStarMax(dailyTag!)" />
                                             }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                            }
                                             else
                                             {
                                                 @GetActivityDisplayValue(activity)
@@ -167,6 +171,10 @@
                                         else if (IsScoreTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardScore))
                                         {
                                             <div class="mt-1"><ScoreDisplay Value="@dailyCardScore" MaxScore="@GetStarMax(dailyCardTag!)" /></div>
+                                        }
+                                        else if (dailyCardTag?.TypeId == InputTypeIds.Boolean)
+                                        {
+                                            <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
                                         }
                                         else
                                         {
@@ -255,6 +263,10 @@
                                                 {
                                                     <ScoreDisplay Value="@groupScore" MaxScore="@GetStarMax(groupTag!)" />
                                                 }
+                                                else if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                {
+                                                    <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                                }
                                                 else
                                                 {
                                                     @GetActivityDisplayValue(activity)
@@ -287,6 +299,10 @@
                                             else if (IsScoreTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardScore))
                                             {
                                                 <div class="mt-1"><ScoreDisplay Value="@groupCardScore" MaxScore="@GetStarMax(groupCardTag!)" /></div>
+                                            }
+                                            else if (groupCardTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
                                             }
                                             else
                                             {

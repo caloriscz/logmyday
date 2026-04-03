@@ -96,6 +96,13 @@
                                              MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
                             </div>
                         }
+                        else if (tag.TypeId == InputTypeIds.Boolean)
+                        {
+                            <div class="mt-5">
+                                <BooleanToggle Value="@GetBoolPickerValue(tag.Id)"
+                                               ValueChanged="@(async v => await QuickAddBoolAsync(tag, v))" />
+                            </div>
+                        }
                         else
                         {
                         <div class="relative mt-5">
@@ -237,6 +244,7 @@
     private readonly HashSet<int> operationInProgress = new();
     private int? openDropdownTagId;
     private readonly Dictionary<int, int> _inlinePickerValues = new();
+    private readonly Dictionary<int, bool> _boolPickerValues = new();
 
     // User preferences and localization
     private UserPreferencesSnapshot? userPreferences;
@@ -307,7 +315,10 @@
             if (unfilledRequiredTags?.Count > 0)
             {
                 var activityFetchTasks = unfilledRequiredTags.Select(t =>
-                    ActivityApi.GetActivities(tagId: t.Id, startDate: selectedDate.Date, endDate: selectedDate.Date, pageSize: 1));
+                {
+                    var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
+                    return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
+                });
                 var activityResults = await Task.WhenAll(activityFetchTasks);
                 for (var i = 0; i < unfilledRequiredTags.Count; i++)
                 {
@@ -458,11 +469,45 @@
     private static bool IsScoreTag(TagResponse tag) =>
         tag.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
 
+    private static (DateTime start, DateTime end) GetGranularityDateRange(TagResponse tag, DateTime date)
+    {
+        var dayStart = date.Date;
+        return tag.TimeGranularity switch
+        {
+            Domain.Enums.TimeGranularity.Weekly =>
+                (GetStartOfWeek(dayStart), GetStartOfWeek(dayStart).AddDays(7).AddTicks(-1)),
+            Domain.Enums.TimeGranularity.Monthly =>
+                (new DateTime(dayStart.Year, dayStart.Month, 1), new DateTime(dayStart.Year, dayStart.Month, 1).AddMonths(1).AddTicks(-1)),
+            Domain.Enums.TimeGranularity.Yearly =>
+                (new DateTime(dayStart.Year, 1, 1), new DateTime(dayStart.Year + 1, 1, 1).AddTicks(-1)),
+            _ => (dayStart, dayStart.AddDays(1).AddTicks(-1))
+        };
+    }
+
+    private static DateTime GetStartOfWeek(DateTime date)
+    {
+        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+
+        return date.AddDays(-diff);
+    }
+
     private int GetStarPickerValue(int tagId) =>
         _inlinePickerValues.TryGetValue(tagId, out var v) ? v : 0;
 
     private int? GetScorePickerValue(int tagId) =>
         _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
+
+    private bool? GetBoolPickerValue(int tagId)
+    {
+        if (_boolPickerValues.TryGetValue(tagId, out var v))
+        {
+            return v;
+        }
+
+        var existing = GetExistingActivity(tagId);
+
+        return existing != null ? BooleanDisplay.Parse(existing.PrimaryTagValue ?? existing.Description) : null;
+    }
 
     private bool IsActionInProgress(int tagId)
         => operationInProgress.Contains(tagId);
@@ -651,6 +696,72 @@
         }
     }
 
+    private async Task QuickAddBoolAsync(TagResponse tag, bool value)
+    {
+        _boolPickerValues[tag.Id] = value;
+
+        if (!operationInProgress.Add(tag.Id))
+        {
+            return;
+        }
+
+        errorMessage = null;
+        var today = GetTodayInDisplayZone();
+        var startDate = selectedDate.Date == today
+            ? GetCurrentDateTimeInDisplayZone()
+            : selectedDate.Date;
+
+        try
+        {
+            var existing = GetExistingActivity(tag.Id);
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = tag.Id,
+                Description = value ? "true" : "false",
+                DateStarted = startDate
+            };
+
+            if (existing != null)
+            {
+                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+            }
+            else
+            {
+                await ActivityApi.CreateCalendarItem(request);
+            }
+
+            _boolPickerValues.Remove(tag.Id);
+            await LoadRequiredTags();
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            errorMessage = "Authentication failed. Please refresh and try again.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "An activity for this tag already exists for this period.";
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "The activity could not be created.";
+        }
+        catch (Exception ex)
+        {
+            _boolPickerValues.Remove(tag.Id);
+            errorMessage = $"Error adding activity: {ex.Message}";
+        }
+        finally
+        {
+            operationInProgress.Remove(tag.Id);
+            StateHasChanged();
+        }
+    }
+
     private async Task QuickAddWithValueAsync(TagResponse tag, int value)
     {
         _inlinePickerValues[tag.Id] = value;
@@ -673,7 +784,7 @@
             {
                 PrimaryTagId = tag.Id,
                 Description = value.ToString(),
-                DateStarted = existing?.DateStarted ?? startDate
+                DateStarted = startDate
             };
 
             if (existing != null)
