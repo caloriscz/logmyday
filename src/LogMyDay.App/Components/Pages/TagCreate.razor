@@ -15,13 +15,13 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Create Tag", "Create a new activity tag")]
 
-<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-8 px-4 py-6 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Create Tag</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Define a new tag with the correct metadata and defaults.</p>
         </div>
-        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
+        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
             <Icon Name="chevron-left" Class="h-4 w-4" />
             Back to Tags
         </a>
@@ -29,20 +29,20 @@
 
     @if (!string.IsNullOrEmpty(loadError))
     {
-        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
             @loadError
         </div>
     }
 
     @if (isLoading)
     {
-        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading form data…
         </div>
     }
     else
     {
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <EditForm Model="newTag" OnValidSubmit="HandleValidSubmit">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
@@ -50,12 +50,12 @@
                 <div class="space-y-6">
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Title</label>
-                        <InputText @bind-Value="newTag.Tag" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                        <InputText @bind-Value="newTag.Tag" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
                     </div>
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Group (optional)</label>
-                        <InputSelect @bind-Value="newTag.GroupId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                        <InputSelect @bind-Value="newTag.GroupId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
                             <option value="">(None)</option>
                             @foreach (var group in availableGroups)
                             {
@@ -66,7 +66,7 @@
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Type</label>
-                        <InputSelect @bind-Value="newTag.TypeId" @bind-Value:after="OnInputTypeChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
+                        <InputSelect @bind-Value="newTag.TypeId" @bind-Value:after="OnInputTypeChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
                             @foreach (var type in inputTypes)
                             {
                                 <option value="@type.Id">@type.Name</option>
@@ -76,25 +76,25 @@
 
                     <div class="grid gap-4 sm:grid-cols-3">
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                            <InputCheckbox @bind-Value="newTag.IsRequired" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            <InputCheckbox @bind-Value="newTag.IsRequired" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Required
                         </label>
                         @if (!IsRepeatableLockedForCurrentType)
                         {
                             <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                                <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                                <InputCheckbox @bind-Value="newTag.IsRepeatable" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                                 Repeatable
                             </label>
                         }
                         <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                            <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
+                            <InputCheckbox @bind-Value="newTag.IsRange" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isSaving" />
                             Range
                         </label>
                     </div>
 
                     <div class="space-y-2">
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Time Granularity</label>
-                        <InputSelect @bind-Value="newTag.TimeGranularity" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
+                        <InputSelect @bind-Value="newTag.TimeGranularity" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving">
                             @foreach (var granularity in OrderedGranularityOptions)
                             {
                                 <option value="@granularity">@granularity</option>
@@ -105,27 +105,27 @@
                     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Default Value</label>
-                            <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
+                            <InputText @bind-Value="newTag.DefaultValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isSaving" />
                         </div>
                         @if (!IsMinimumLockedForCurrentType)
                         {
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Min Value</label>
-                                <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                                <InputNumber @bind-Value="newTag.MinValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
                             </div>
                         }
                         @if (!IsMaximumLockedForCurrentType)
                         {
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Max Value</label>
-                                <InputNumber @bind-Value="newTag.MaxValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                                <InputNumber @bind-Value="newTag.MaxValue" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
                             </div>
                         }
                         @if (!IsStepLockedForCurrentType)
                         {
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Step</label>
-                                <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
+                                <InputNumber @bind-Value="newTag.Step" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="double?" disabled="@isSaving" />
                             </div>
                         }
                     </div>
@@ -134,7 +134,7 @@
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Unit (optional)</label>
                         @if (availableUnits.Count > 0)
                         {
-                            <InputSelect @bind-Value="newTag.UnitId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                            <InputSelect @bind-Value="newTag.UnitId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
                                 <option value="">(None)</option>
                                 @foreach (var unit in availableUnits)
                                 {
@@ -144,7 +144,7 @@
                         }
                         else
                         {
-                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-sm dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
+                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-xs dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
                                 No units yet. <a href="/units" class="font-semibold underline">Let's create your first unit.</a>
                             </div>
                         }
@@ -154,7 +154,7 @@
                         <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Option List (optional)</label>
                         @if (availableOptionLists.Count > 0)
                         {
-                            <InputSelect @bind-Value="newTag.OptionListId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
+                            <InputSelect @bind-Value="newTag.OptionListId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" TValue="int?" disabled="@isSaving">
                                 <option value="">(None)</option>
                                 @foreach (var list in availableOptionLists)
                                 {
@@ -164,7 +164,7 @@
                         }
                         else
                         {
-                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-sm dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
+                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-xs dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
                                 No option lists yet. <a href="/option-lists" class="font-semibold underline">Let's create your first list.</a>
                             </div>
                         }
@@ -172,20 +172,20 @@
 
                     @if (!string.IsNullOrEmpty(errorMessage))
                     {
-                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
                             @errorMessage
                         </div>
                     }
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
                             @if (isSaving)
                             {
                                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
                             }
                             Create Tag
                         </button>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
                             Cancel
                         </button>
                     </div>

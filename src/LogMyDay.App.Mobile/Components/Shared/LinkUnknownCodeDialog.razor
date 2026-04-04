@@ -2,7 +2,7 @@
 @using LogMyDay.Domain.Enums
 @inject LogMyDay.Shared.Interfaces.IScanMappingApi ScanMappingApi
 
-<div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-gray-800">
+<div class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-gray-800">
     <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Unknown Code</h2>
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Link this code to a tag so future scans create activities automatically.</p>
@@ -45,12 +45,12 @@
 
     <div class="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-4 dark:border-slate-700">
         <button type="button"
-                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700"
+                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700"
                 @onclick="HandleSkip" disabled="@isBusy">
             Skip
         </button>
         <button type="button"
-                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 disabled:opacity-60"
+                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-primary-700 disabled:opacity-60"
                 @onclick="HandleSave" disabled="@(isBusy || !selectedTagId.HasValue)">
             @if (isBusy)
             {

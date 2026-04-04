@@ -37,7 +37,7 @@
         }
         else
         {
-            <div class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <div class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xs">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
@@ -80,7 +80,7 @@
             <div class="md:hidden space-y-3">
                 @foreach (var list in lists)
                 {
-                    <div class="rounded-xl border @(list.IsGlobal ? "border-sky-200 dark:border-sky-700" : "border-gray-200 dark:border-gray-700") bg-white dark:bg-gray-800 p-4 shadow-sm">
+                    <div class="rounded-xl border @(list.IsGlobal ? "border-sky-200 dark:border-sky-700" : "border-gray-200 dark:border-gray-700") bg-white dark:bg-gray-800 p-4 shadow-xs">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">
@@ -137,7 +137,7 @@
 
 @if (isModalOpen)
 {
-    <div class="fixed inset-0 z-[60] bg-white dark:bg-slate-900 flex flex-col" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 z-60 bg-white dark:bg-slate-900 flex flex-col" role="dialog" aria-modal="true">
         <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">@(isEditing ? "Edit Option List" : "Add Option List")</h3>
             <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2" @onclick="CloseModal">
@@ -189,7 +189,7 @@
                                         </div>
                                         <div class="flex justify-end">
                                             <button type="button"
-                                                class="px-3 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded transition-colors"
+                                                class="px-3 py-1 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-sm transition-colors"
                                                 @onclick="() => RemoveOption(option)" disabled="@isBusy">
                                                 Remove
                                             </button>
@@ -226,7 +226,7 @@
 
 @if (listPendingDelete != null)
 {
-    <div class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div class="fixed inset-0 z-70 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60" @onclick="CancelDelete"></div>
         <div class="relative z-10 w-full max-w-sm rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-2xl space-y-4" @onclick:stopPropagation="true">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Option List</h3>
@@ -258,7 +258,7 @@
         }
     };
 
-    private const string InputCss = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:outline-none";
+    private const string InputCss = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:outline-hidden";
 
     private string? loadError;
     private string? formError;

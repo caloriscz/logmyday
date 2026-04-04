@@ -25,12 +25,12 @@
     <div class="px-6 py-4">
         <!-- Filter and Sort Controls -->
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
                 <button type="button" class="btn-secondary" data-modal-show="filterModal" title="Open filters">
                     <i class="bi bi-funnel"></i> Filters
                 </button>
             </div>
-            <div class="flex items-center gap-3 flex-shrink-0">
+            <div class="flex items-center gap-3 shrink-0">
 
                 @if (displayType != "daily")
                 {
@@ -85,16 +85,16 @@
             {
                 @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
                 {
-                    <div class="card mb-3 rounded-lg p-3 shadow">
+                    <div class="card mb-3 rounded-lg p-3 shadow-xs">
                         <div class="flex justify-between items-start mb-1">
                             <h6 class="text-base font-semibold text-gray-900 dark:text-white">@activity.PrimaryTagName</h6>
                             <div class="flex items-center gap-2">
                                 <button @onclick="() => OpenEditActivityModal(activity)" type="button" title="Edit activity"
-                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary-500 text-white focus:outline-none focus:ring-2 focus:ring-primary-300">
+                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary-500 text-white focus:outline-hidden focus:ring-2 focus:ring-primary-300">
                                     <i class="bi bi-pencil text-base"></i>
                                 </button>
                                 <button @onclick="() => DeleteActivity(activity.Id)" type="button" title="Delete activity"
-                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-rose-500 text-white focus:outline-none focus:ring-2 focus:ring-rose-300">
+                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-rose-500 text-white focus:outline-hidden focus:ring-2 focus:ring-rose-300">
                                     <i class="bi bi-trash text-base"></i>
                                 </button>
                             </div>
@@ -163,7 +163,7 @@
 </button>
 
 <!-- Filter Modal - Full Screen Overlay -->
-<div id="filterModal" data-modal class="hidden fixed inset-0 z-[60] bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="filterModalLabel" aria-hidden="true">
+<div id="filterModal" data-modal class="hidden fixed inset-0 z-60 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="filterModalLabel" aria-hidden="true">
     <div data-modal-content class="w-full h-full flex flex-col">
         <!-- Modal Header - Fixed at top -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
@@ -231,7 +231,7 @@
                             &lt;
                         </button>
 
-                        <div class="flex-grow text-center">
+                        <div class="grow text-center">
                             <strong class="text-gray-900 dark:text-gray-100">@GetCurrentPeriodDisplay()</strong>
                         </div>
 

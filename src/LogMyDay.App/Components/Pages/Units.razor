@@ -10,13 +10,13 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Units", "Manage measurement units for numeric tags")]
 
-<div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Units</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Manage measurement units and conversion factors.</p>
         </div>
-        <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
+        <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
             <Icon Name="plus" Class="h-4 w-4" />
             Add Unit
         </button>
@@ -25,27 +25,27 @@
     <section class="space-y-4">
         @if (isLoading)
         {
-            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
                 <span>Loading units…</span>
             </div>
         }
         else if (!string.IsNullOrEmpty(loadError))
         {
-            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
                 @loadError
             </div>
         }
         else if (units.Count == 0)
         {
-            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                 No units available yet. Use the button above to add your first unit.
             </div>
         }
         else
         {
             <div class="hidden md:block">
-                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead class="bg-gray-50 dark:bg-slate-800">
                             <tr>
@@ -64,10 +64,10 @@
                                 <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
                                     <td class="px-1 w-[56px] py-3">
                                         <div class="flex">
-                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(unit)" disabled="@(isBusy || unit.IsBaseUnit)">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(unit)" disabled="@(isBusy || unit.IsBaseUnit)">
                                                 <Icon Name="trash" Class="h-4 w-4" />
                                             </button>
-                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(unit)" disabled="@isBusy">
+                                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(unit)" disabled="@isBusy">
                                                 <Icon Name="pencil" Class="h-4 w-4" />
                                             </button>
                                         </div>
@@ -94,7 +94,7 @@
             <div class="space-y-3 md:hidden">
                 @foreach (var unit in units)
                 {
-                    <div class="rounded-xl border @(unit.IsBaseUnit ? "border-sky-500 dark:border-sky-600" : "border-gray-200 dark:border-slate-700") bg-white p-4 shadow-sm dark:bg-slate-900">
+                    <div class="rounded-xl border @(unit.IsBaseUnit ? "border-sky-500 dark:border-sky-600" : "border-gray-200 dark:border-slate-700") bg-white p-4 shadow-xs dark:bg-slate-900">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex-1 min-w-0">
                                 <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
@@ -128,11 +128,11 @@
                         </dl>
 
                         <div class="mt-4 flex justify-end gap-2">
-                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(unit)" disabled="@isBusy">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(unit)" disabled="@isBusy">
                                 <Icon Name="pencil" Class="h-4 w-4" />
                                 <span>Edit</span>
                             </button>
-                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(unit)" disabled="@(isBusy || unit.IsBaseUnit)">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(unit)" disabled="@(isBusy || unit.IsBaseUnit)">
                                 <Icon Name="trash" Class="h-4 w-4" />
                                 <span>Delete</span>
                             </button>
@@ -141,7 +141,7 @@
                 }
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                 Total units: @units.Count
             </div>
         }
@@ -157,7 +157,7 @@
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(isEditing ? "Edit Unit" : "Add Unit")</h2>
                     <p class="text-sm text-gray-600 dark:text-slate-400">Configure conversion values and display settings.</p>
                 </div>
-                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
                     <Icon Name="close" Class="h-5 w-5" />
                     <span class="sr-only">Close</span>
                 </button>
@@ -169,7 +169,7 @@
 
                 @if (!string.IsNullOrEmpty(unitError))
                 {
-                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
                         @unitError
                     </div>
                 }
@@ -179,19 +179,19 @@
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitKey">Key</label>
-                                <InputText id="unitKey" @bind-Value="unitForm.Key" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                <InputText id="unitKey" @bind-Value="unitForm.Key" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
                                 <p class="text-xs text-gray-500 dark:text-slate-400">Internal identifier (e.g., minute, kilogram).</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitSymbol">Symbol</label>
-                                <InputText id="unitSymbol" @bind-Value="unitForm.Symbol" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                <InputText id="unitSymbol" @bind-Value="unitForm.Symbol" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
                                 <p class="text-xs text-gray-500 dark:text-slate-400">Display label (e.g., min, kg).</p>
                             </div>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitQuantity">Quantity</label>
-                            <InputSelect id="unitQuantity" @bind-Value="unitForm.QuantityId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
+                            <InputSelect id="unitQuantity" @bind-Value="unitForm.QuantityId" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
                                 <option value="0">Select a quantity…</option>
                                 @foreach (var quantity in quantities)
                                 {
@@ -203,25 +203,25 @@
                         <div class="grid gap-4 sm:grid-cols-3">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitMultiplier">Multiplier to base</label>
-                                <InputNumber id="unitMultiplier" @bind-Value="unitForm.AToBase" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                <InputNumber id="unitMultiplier" @bind-Value="unitForm.AToBase" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitOffset">Offset to base</label>
-                                <InputNumber id="unitOffset" @bind-Value="unitForm.BToBase" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                <InputNumber id="unitOffset" @bind-Value="unitForm.BToBase" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="unitDecimals">Display decimals</label>
-                                <InputNumber id="unitDecimals" @bind-Value="unitForm.Decimals" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                <InputNumber id="unitDecimals" @bind-Value="unitForm.Decimals" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
-                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
                         Cancel
                     </button>
-                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isBusy">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isBusy">
                         @if (isBusy)
                         {
                             <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -250,10 +250,10 @@
                 Delete unit <strong>@unitPendingDelete.Key</strong>? This cannot be undone.
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelDelete" disabled="@isBusy">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelDelete" disabled="@isBusy">
                     Cancel
                 </button>
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="DeleteUnit" disabled="@isBusy">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="DeleteUnit" disabled="@isBusy">
                     @if (isBusy)
                     {
                         <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>

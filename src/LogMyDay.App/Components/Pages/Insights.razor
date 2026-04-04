@@ -5,7 +5,7 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Insights", "View activity trends and data distribution")]
 
-<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-8 px-4 py-6 sm:px-6 lg:px-8">
     <div class="space-y-2">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Insights</h1>
         <p class="text-sm text-gray-600 dark:text-slate-300">Explore your data through different views and perspectives.</p>
@@ -14,9 +14,9 @@
     <!-- Insights Cards Grid -->
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <!-- Calendar Card -->
-        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
              @onclick="() => NavigateToCalendar()">
-            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-blue-400 to-purple-500">
                 <div class="absolute inset-0 bg-black/10"></div>
             </div>
             <div class="p-5 space-y-2">
@@ -26,9 +26,9 @@
         </div>
 
         <!-- Linear Calendar Card -->
-        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
              @onclick="() => NavigateToLinearCalendar()">
-            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-500">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-emerald-400 to-teal-500">
                 <div class="absolute inset-0 bg-black/10"></div>
             </div>
             <div class="p-5 space-y-2">
@@ -38,9 +38,9 @@
         </div>
 
         <!-- Journal Card -->
-        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
              @onclick="() => NavigateToJournal()">
-            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-amber-400 to-orange-500">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-amber-400 to-orange-500">
                 <div class="absolute inset-0 bg-black/10"></div>
             </div>
             <div class="p-5 space-y-2">
@@ -50,9 +50,9 @@
         </div>
 
         <!-- Statistics Card -->
-        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
              @onclick="() => NavigateToStatistics()">
-            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-rose-400 to-pink-500">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-rose-400 to-pink-500">
                 <div class="absolute inset-0 bg-black/10"></div>
             </div>
             <div class="p-5 space-y-2">
@@ -62,9 +62,9 @@
         </div>
 
         <!-- Charts Card -->
-        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
              @onclick="() => NavigateToCharts()">
-            <div class="relative h-32 overflow-hidden bg-gradient-to-br from-indigo-400 to-blue-500">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-indigo-400 to-blue-500">
                 <div class="absolute inset-0 bg-black/10"></div>
             </div>
             <div class="p-5 space-y-2">

@@ -10,11 +10,11 @@
 @using System.Security.Claims
 
 <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-    <div class="mx-auto max-w-screen-2xl px-4">
+    <div class="mx-auto max-w-(--breakpoint-2xl) px-4">
         <div class="flex items-center justify-between h-16">
             <!-- Logo/Brand -->
             <a href="" class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                <img src="images/favicon.png" alt="LogMyDay logo" class="h-8 w-8 rounded-md shadow-sm" loading="lazy" />
+                <img src="images/favicon.png" alt="LogMyDay logo" class="h-8 w-8 rounded-md shadow-xs" loading="lazy" />
                 <span>LogMyDay</span>
                 <span class="text-xs opacity-60">v@(GetAppVersion())</span>
             </a>
@@ -179,8 +179,8 @@
                             <div class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 animate-fade-in">
                             <NavLink href="profile" @onclick="() => showUserMenu = false"
                                      class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                <Icon Name="user" Class="w-4 h-4 flex-shrink-0" />
-                                <span class="break-words flex-1">@DisplayEmail</span>
+                                <Icon Name="user" Class="w-4 h-4 shrink-0" />
+                                <span class="wrap-break-word flex-1">@DisplayEmail</span>
                             </NavLink>
                             <hr class="my-1 border-gray-200 dark:border-gray-700" />
                             <NavLink href="profile" @onclick="() => showUserMenu = false"

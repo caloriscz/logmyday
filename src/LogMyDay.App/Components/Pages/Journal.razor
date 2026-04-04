@@ -16,7 +16,7 @@
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <!-- Header -->
-    <div class="bg-gradient-to-br from-amber-400 to-orange-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 shadow-lg dark:shadow-slate-900/50">
+    <div class="bg-linear-to-br from-amber-400 to-orange-500 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 shadow-lg dark:shadow-slate-900/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -35,7 +35,7 @@
 
     <!-- Filters and Controls -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 p-4 mb-6">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xs dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 p-4 mb-6">
             <div class="flex flex-wrap items-center gap-4">
                 <!-- Year Filter -->
                 <div class="flex-1 min-w-[200px]">
@@ -118,9 +118,9 @@
             <div class="space-y-6">
                 @foreach (var group in groupedActivities)
                 {
-                    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 overflow-hidden">
+                    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xs dark:shadow-slate-900/50 border border-gray-200 dark:border-slate-700 overflow-hidden">
                         <!-- Date Header -->
-                        <div class="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-900/60 dark:to-slate-800/60 border-b border-amber-200 dark:border-slate-700 px-6 py-4">
+                        <div class="bg-linear-to-r from-amber-50 to-orange-50 dark:from-slate-900/60 dark:to-slate-800/60 border-b border-amber-200 dark:border-slate-700 px-6 py-4">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
                                     <Icon Name="calendar" Class="w-5 h-5 text-amber-600 dark:text-amber-400" />
@@ -146,14 +146,14 @@
                                 <div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors">
                                     <div class="flex items-start gap-3">
                                         <!-- Time Badge -->
-                                        <div class="flex-shrink-0">
+                                        <div class="shrink-0">
                                             <div class="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-lg text-sm font-medium">
                                                 @activity.DateStarted.ToString("HH:mm")
                                             </div>
                                         </div>
 
                                         <!-- Tag Badge -->
-                                        <div class="flex-shrink-0">
+                                        <div class="shrink-0">
                                             <span class="inline-flex items-center gap-1 bg-primary-100 dark:bg-sky-500/20 text-primary-700 dark:text-sky-300 px-2 py-1 rounded-md text-xs font-medium">
                                                 <Icon Name="tag" Class="w-3 h-3" />
                                                 @activity.PrimaryTagName
@@ -162,13 +162,13 @@
 
                                         <!-- Description - wraps and continues at same indent -->
                                         <div class="flex-1 min-w-0">
-                                            <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                                            <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap wrap-break-word">
                                                 @activity.Description
                                             </div>
                                         </div>
 
                                         <!-- Action Buttons -->
-                                        <div class="flex-shrink-0 flex items-center gap-2">
+                                        <div class="shrink-0 flex items-center gap-2">
                                             <button @onclick="() => EditActivity(activity)" 
                                                     class="btn btn-sm btn-secondary">
                                                 <Icon Name="pencil" Class="w-4 h-4" />
