@@ -120,7 +120,7 @@
 
         <!-- Import Section -->
         <div class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
-            <div class="border-b border-gray-200 bg-green-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+            <div class="border-b border-gray-200 bg-success-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
                 <h2 class="text-lg font-semibold flex items-center gap-2">
                     <Icon Name="upload" Class="h-5 w-5" />
                     Import Data
@@ -175,7 +175,7 @@
                     </button>
 
                     <button type="button"
-                            class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-green-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="inline-flex items-center gap-2 rounded-lg bg-success-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-success-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-success-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                             @onclick="ImportData"
                             disabled="@(selectedFile == null || isImporting)">
                         @if (isImporting)
@@ -195,8 +195,8 @@
     </div>
 
     <!-- Danger Zone Section -->
-    <div class="bg-white shadow-xs dark:border-rose-200 dark:bg-slate-900">
-        <div class="border-b border-rose-500 bg-rose-600 px-6 py-4 text-white dark:border-rose-500 rounded-t-xl">
+    <div class="rounded-xl border border-rose-200 bg-white shadow-xs dark:border-rose-800/40 dark:bg-slate-900">
+        <div class="border-b border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-300 rounded-t-xl">
             <h2 class="text-lg font-semibold flex items-center gap-2">
                 <Icon Name="trash" Class="h-5 w-5" />
                 Danger Zone
