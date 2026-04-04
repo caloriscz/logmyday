@@ -1,5 +1,7 @@
 @page "/assistant"
 @using LogMyDay.App.Services
+@using LogMyDay.Shared.Ai
+@using LogMyDay.Shared.Attributes
 @using LogMyDay.Shared.DTOs.Ai
 @using LogMyDay.Shared.Interfaces
 @inject IAiApi AiApi
@@ -31,9 +33,22 @@
     else
     {
         <!-- Chat Header -->
-        <div class="mb-4 space-y-1">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100">Assistant</h1>
-            <p class="text-sm text-gray-500 dark:text-slate-400">Your LogMyDay navigator — ask about features, get directions, and explore what's possible.</p>
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <div class="space-y-1">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-slate-100">Assistant</h1>
+                <p class="text-sm text-gray-500 dark:text-slate-400">Your LogMyDay navigator — ask about features, get directions, and explore what's possible.</p>
+            </div>
+            @if (_messages.Count > 0)
+            {
+                <button @onclick="ClearConversation"
+                        class="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                        title="Clear conversation">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                    </svg>
+                    New chat
+                </button>
+            }
         </div>
 
         <!-- Messages Area -->
@@ -53,18 +68,13 @@
                             <p class="max-w-md text-sm text-gray-500 dark:text-slate-400">I can help you navigate features, explain how things work, and suggest where to find what you need.</p>
                         </div>
                         <div class="flex flex-wrap justify-center gap-2">
-                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                                    @onclick='() => SendQuickQuestion("What features does LogMyDay have?")'>
-                                What features are available?
-                            </button>
-                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                                    @onclick='() => SendQuickQuestion("How do I view my statistics?")'>
-                                How do I view statistics?
-                            </button>
-                            <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                                    @onclick='() => SendQuickQuestion("How do tags work?")'>
-                                How do tags work?
-                            </button>
+                            @foreach (var question in _quickQuestions)
+                            {
+                                <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                        @onclick="() => SendQuickQuestion(question.Message)">
+                                    @question.DisplayText
+                                </button>
+                            }
                         </div>
                     </div>
                 </div>
@@ -158,6 +168,7 @@
     private record ChatMessage(string Role, string Content, List<AiSuggestedAction>? SuggestedActions = null);
 
     private readonly List<ChatMessage> _messages = [];
+    private List<AiQuickQuestion> _quickQuestions = [];
     private string _currentMessage = string.Empty;
     private bool _isLoading;
     private bool _isAvailable;
@@ -168,6 +179,7 @@
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Assistant");
+        _quickQuestions = AiQuickQuestions.GetRandom(ClientContext.Web, 3);
 
         try
         {
@@ -209,7 +221,7 @@
 
             _messages.Add(new ChatMessage("assistant", response.Message, response.SuggestedActions));
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _errorMessage = "Something went wrong. Please try again.";
             // Remove the user message if we couldn't get a response
@@ -236,38 +248,11 @@
         Navigation.NavigateTo(action.Url);
     }
 
-    private static string ConvertMarkdownToHtml(string markdown)
+    private void ClearConversation()
     {
-        if (string.IsNullOrEmpty(markdown))
-        {
-            return string.Empty;
-        }
-
-        var html = markdown;
-
-        // Markdown links [text](url) - convert to clickable HTML links
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"\[([^\]]+)\]\(([^\)]+)\)", "<a href=\"$2\" class=\"text-primary-400 underline hover:text-primary-300\">$1</a>");
-
-        // Bold
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
-
-        // Italic
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"\*(.+?)\*", "<em>$1</em>");
-
-        // Inline code
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"`(.+?)`", "<code class=\"rounded-sm bg-gray-100 px-1 py-0.5 text-xs dark:bg-slate-700\">$1</code>");
-
-        // Line breaks
-        html = html.Replace("\n\n", "</p><p class=\"mt-2\">").Replace("\n", "<br />");
-
-        // Unordered lists
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"(?:^|\<br \/\>)\s*[-•]\s+(.+?)(?=\<br \/\>|$)", "<li class=\"ml-4 list-disc\">$1</li>");
-
-        if (!html.StartsWith("<"))
-        {
-            html = $"<p>{html}</p>";
-        }
-
-        return html;
+        _messages.Clear();
+        _currentMessage = string.Empty;
+        _errorMessage = null;
+        _quickQuestions = AiQuickQuestions.GetRandom(ClientContext.Web, 3);
     }
 }

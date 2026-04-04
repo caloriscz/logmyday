@@ -14,6 +14,7 @@ public interface ISystemNotificationService
     void StartMonitoring();
     void StopMonitoring();
     bool IsRunning { get; }
+    void MarkTagFulfilled(int tagId, DateOnly date);
 }
 
 public class SystemNotificationService : ISystemNotificationService, IDisposable
@@ -29,10 +30,11 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
     private readonly List<NotificationResponse> _cachedNotifications = new();
     private DateTime _lastRefreshUtc = DateTime.MinValue;
     private bool _isDisposed;
+    private readonly HashSet<(int tagId, DateOnly date)> _fulfilledTags = new();
     private const string LogPrefix = "SystemNotificationService";
 
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(2);
 
     public SystemNotificationService(
         IApiClientProvider apiClientProvider,
@@ -109,6 +111,7 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         _isRunning = false;
 
         _cachedNotifications.Clear();
+        _fulfilledTags.Clear();
         _lastRefreshUtc = DateTime.MinValue;
     }
 
@@ -217,15 +220,28 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         if (!notification.IsActive)
         {
             WriteDebug($"Notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) inactive; skipping");
+
             return;
         }
 
         WriteDebug($"Evaluating notification {notification.Id} ({notification.TagName ?? "(no tag name)"}) at {nowLocal:O}");
 
+        var today = DateOnly.FromDateTime(nowLocal);
+
+        // If the tag already has an activity logged today, suppress all notifications.
+        if (await IsTagFulfilledAsync(notification.TagId, today))
+        {
+            WriteDebug($"Notification {notification.Id}: tag {notification.TagId} already fulfilled for {today}; cancelling alarms");
+            _notificationService.CancelAlarmsForTag(notification.TagId);
+
+            return;
+        }
+
         var windows = NotificationScheduleCalculator.BuildWindows(notification, nowLocal);
         if (windows.Count == 0)
         {
             WriteDebug($"Notification {notification.Id}: no windows available");
+
             return;
         }
 
@@ -233,16 +249,31 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         if (activeWindow is null)
         {
             WriteDebug($"Notification {notification.Id}: current time outside active windows");
+
+            // Pre-schedule alarms for the next upcoming window so they fire in the background.
+            var nextWindow = windows
+                .Where(w => w.Start > nowLocal)
+                .OrderBy(w => w.Start)
+                .FirstOrDefault();
+
+            if (nextWindow is not null)
+            {
+                var windowDate = DateOnly.FromDateTime(nextWindow.Start);
+                var totalOccurrencesForNext = Math.Max(0, notification.MaxNudges) + 1;
+                ScheduleFutureOccurrences(notification, nextWindow, windowDate, 0, totalOccurrencesForNext, nowLocal);
+                WriteDebug($"Notification {notification.Id}: pre-scheduled {totalOccurrencesForNext} alarms for window at {nextWindow.Start:O}");
+            }
+
             return;
         }
 
-        var today = DateOnly.FromDateTime(nowLocal);
         var deliveriesToday = notification.LastDeliveryDate == today ? notification.DeliveriesOnLastDate : 0;
         var totalOccurrences = Math.Max(0, notification.MaxNudges) + 1;
 
         if (deliveriesToday >= totalOccurrences)
         {
             WriteDebug($"Notification {notification.Id}: daily limit reached ({deliveriesToday}/{totalOccurrences})");
+
             return;
         }
 
@@ -251,12 +282,15 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
         if (nowLocal < scheduledTime)
         {
             WriteDebug($"Notification {notification.Id}: waiting for next occurrence at {scheduledTime:O}");
+            ScheduleFutureOccurrences(notification, activeWindow, today, deliveriesToday, totalOccurrences, nowLocal);
+
             return;
         }
 
         if (notification.NextEligibleSendAfterUtc.HasValue && notification.NextEligibleSendAfterUtc.Value > nowUtc)
         {
             WriteDebug($"Notification {notification.Id}: cooldown active until {notification.NextEligibleSendAfterUtc.Value:O}");
+
             return;
         }
 
@@ -284,6 +318,79 @@ public class SystemNotificationService : ISystemNotificationService, IDisposable
             deliveriesToday = notification.LastDeliveryDate == today ? notification.DeliveriesOnLastDate : 0;
             nowUtc = DateTime.UtcNow;
         }
+
+        // Schedule any remaining future occurrences via AlarmManager so they fire in background.
+        ScheduleFutureOccurrences(notification, activeWindow, today, deliveriesToday, totalOccurrences, nowLocal);
+    }
+
+    private async Task<bool> IsTagFulfilledAsync(int tagId, DateOnly today)
+    {
+        var key = (tagId, today);
+        if (_fulfilledTags.Contains(key))
+        {
+            return true;
+        }
+
+        try
+        {
+            var activityApi = _apiClientProvider.Activity;
+            var isFulfilled = await activityApi.HasActivityForTag(tagId, today);
+            if (isFulfilled)
+            {
+                _fulfilledTags.Add(key);
+            }
+
+            return isFulfilled;
+        }
+        catch (Exception ex)
+        {
+            WriteDebug($"Error checking fulfilled status for tag {tagId}: {ex.Message}; proceeding normally");
+
+            return false;
+        }
+    }
+
+    private void ScheduleFutureOccurrences(
+        NotificationResponse notification,
+        NotificationWindow activeWindow,
+        DateOnly today,
+        int deliveriesAlreadyDone,
+        int totalOccurrences,
+        DateTime nowLocal)
+    {
+        // Cancel existing alarms first to avoid duplicates on repeated checks.
+        _notificationService.CancelAlarmsForNotification(notification.Id);
+
+        var message = string.IsNullOrWhiteSpace(notification.NotificationText)
+            ? NotificationScheduleCalculator.BuildDefaultMessage(notification)
+            : notification.NotificationText!;
+
+        var payload = new NotificationPayload
+        {
+            NotificationId = notification.Id,
+            TagId = notification.TagId,
+            TagName = notification.TagName,
+            LocalDate = today
+        };
+
+        for (var i = deliveriesAlreadyDone; i < totalOccurrences; i++)
+        {
+            var occurrenceTime = activeWindow.GetOccurrenceTime(i);
+            if (occurrenceTime <= nowLocal)
+            {
+                continue;
+            }
+
+            _notificationService.SendNotification("LogMyDay", message, notifyTime: occurrenceTime, payload: payload);
+            WriteDebug($"Notification {notification.Id}: scheduled occurrence {i + 1}/{totalOccurrences} at {occurrenceTime:O}");
+        }
+    }
+
+    public void MarkTagFulfilled(int tagId, DateOnly date)
+    {
+        _fulfilledTags.Add((tagId, date));
+        _notificationService.CancelAlarmsForTag(tagId);
+        WriteDebug($"MarkTagFulfilled: tagId={tagId}, date={date}; alarms cancelled");
     }
 
     private async Task DispatchAndPersistAsync(NotificationResponse notification, DateOnly today, int deliveriesOnDate)

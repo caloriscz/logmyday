@@ -18,7 +18,7 @@ public class BackupData
 public class BackupMetadata
 {
     public DateTime ExportDate { get; set; }
-    public string Version { get; set; } = "1.4";  // schema version of the backup file format
+    public string Version { get; set; } = "1.7";  // schema version of the backup file format
     public int TotalTags { get; set; }
     public int TotalActivities { get; set; }
     public int TotalInputTypes { get; set; }

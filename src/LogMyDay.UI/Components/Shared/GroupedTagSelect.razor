@@ -1,6 +1,9 @@
 <div class="@ContainerClass">
     <select class="@SelectClass" value="@_selectedGroupName" @onchange="OnGroupChangedAsync" @onfocus="OnFocus" disabled="@Disabled">
-        <option value="">@GroupPlaceholder</option>
+        @if (ShowAllGroupsOption)
+        {
+            <option value="">@GroupPlaceholder</option>
+        }
         @foreach (var g in _distinctGroups)
         {
             <option value="@g">@g</option>
@@ -28,7 +31,8 @@
     [Parameter] public string? ContainerClass { get; set; } = "flex flex-col gap-2 sm:flex-row sm:items-center";
     [Parameter] public string? SelectClass { get; set; }
     [Parameter] public bool Disabled { get; set; }
-    [Parameter] public string GroupPlaceholder { get; set; } = "-- Group --";
+    [Parameter] public bool ShowAllGroupsOption { get; set; } = false;
+    [Parameter] public string GroupPlaceholder { get; set; } = "(All groups)";
     [Parameter] public string TagPlaceholder { get; set; } = "-- Tag --";
     [Parameter] public EventCallback OnFocus { get; set; }
 
@@ -57,7 +61,7 @@
 
             if (Value == null)
             {
-                _selectedGroupName = null;
+                _selectedGroupName = ShowAllGroupsOption ? null : DefaultGroupSelection();
             }
             else
             {
@@ -68,6 +72,11 @@
         }
         else if (tagsChanged)
         {
+            if (Value == null && !ShowAllGroupsOption && _selectedGroupName is null or "")
+            {
+                _selectedGroupName = DefaultGroupSelection();
+            }
+
             FilterTags();
         }
     }
@@ -90,6 +99,11 @@
             .ToList();
 
         _hasUngrouped = Tags.Any(t => t.GroupName == null);
+    }
+
+    private string? DefaultGroupSelection()
+    {
+        return _hasUngrouped ? UngroupedKey : _distinctGroups.FirstOrDefault();
     }
 
     private void SyncGroupFromValue()
@@ -125,6 +139,9 @@
     {
         _selectedGroupName = e.Value?.ToString();
         FilterTags();
+        // Sync _lastSyncedValue so OnParametersSet won't interpret the null
+        // propagated back from the parent as a value change and reset the group.
+        _lastSyncedValue = null;
         await ValueChanged.InvokeAsync(null);
     }
 

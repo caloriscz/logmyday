@@ -162,7 +162,6 @@ public class BackupServiceTests
                 new() 
                 { 
                     TagName = "TestTag", 
-                    UserId = Guid.Empty, // Different userId in backup
                     IsRequired = true,
                     TimeGranularity = Domain.Enums.TimeGranularity.Daily
                 }
@@ -174,8 +173,7 @@ public class BackupServiceTests
                 { 
                     TagName = "TestTag",
                     DateStarted = DateTime.Now,
-                    Description = "Test Activity",
-                    UserId = Guid.Empty // Different userId in backup
+                    Description = "Test Activity"
                 }
             }
         };
@@ -310,7 +308,6 @@ public class BackupServiceTests
                 new() 
                 { 
                     TagName = "User1NewTag", 
-                    UserId = user1Id, 
                     IsRequired = false, 
                     TimeGranularity = Domain.Enums.TimeGranularity.Daily 
                 }
@@ -362,7 +359,378 @@ public class BackupServiceTests
         // Assert
         Assert.Single(backup.Tags);
         Assert.Equal("User1Tag", backup.Tags[0].TagName);
-        Assert.Equal(user1Id, backup.Tags[0].UserId);
+    }
+
+    // Streak compression tests
+
+    [Fact]
+    public async Task ExportDataAsync_CompressesConsecutiveDaysIntoStreak()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+        var baseDate = new DateTime(2026, 1, 1);
+
+        var tag = new Domain.Entities.Tag
+        {
+            TagName = "Supplement",
+            UserId = userId,
+            IsRequired = false,
+            TimeGranularity = Domain.Enums.TimeGranularity.Daily
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        // Add 5 consecutive days with same description
+        for (int i = 0; i < 5; i++)
+        {
+            context.Activities.Add(new Domain.Entities.Activity
+            {
+                TagId = tag.Id,
+                UserId = userId,
+                DateStarted = baseDate.AddDays(i),
+                Description = "1 pill"
+            });
+        }
+        await context.SaveChangesAsync();
+
+        // Act
+        var backup = await service.ExportDataAsync(userId: userId);
+
+        // Assert - 5 consecutive days should compress into 1 streak record
+        Assert.Single(backup.Activities);
+        var streak = backup.Activities[0];
+        Assert.Equal("Supplement", streak.TagName);
+        Assert.Equal("1 pill", streak.Description);
+        Assert.Equal(baseDate.Date, streak.DateStarted.Date);
+        Assert.NotNull(streak.StreakEndDate);
+        Assert.Equal(baseDate.AddDays(4).Date, streak.StreakEndDate!.Value.Date);
+        // TotalActivities in metadata should reflect expanded count
+        Assert.Equal(5, backup.Metadata.TotalActivities);
+    }
+
+    [Fact]
+    public async Task ExportDataAsync_DoesNotMergeGaps()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+        var baseDate = new DateTime(2026, 1, 1);
+
+        var tag = new Domain.Entities.Tag
+        {
+            TagName = "Exercise",
+            UserId = userId,
+            IsRequired = false,
+            TimeGranularity = Domain.Enums.TimeGranularity.Daily
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        // Add days 1,2,3 then skip day 4, add day 5,6
+        int[] days = { 0, 1, 2, 4, 5 };
+        foreach (var d in days)
+        {
+            context.Activities.Add(new Domain.Entities.Activity
+            {
+                TagId = tag.Id,
+                UserId = userId,
+                DateStarted = baseDate.AddDays(d),
+                Description = "Run"
+            });
+        }
+        await context.SaveChangesAsync();
+
+        // Act
+        var backup = await service.ExportDataAsync(userId: userId);
+
+        // Assert - gap splits into 2 streaks: days 0-2 and days 4-5
+        Assert.Equal(2, backup.Activities.Count);
+        Assert.Equal(baseDate.AddDays(2).Date, backup.Activities[0].StreakEndDate!.Value.Date);
+        Assert.Equal(baseDate.AddDays(5).Date, backup.Activities[1].StreakEndDate!.Value.Date);
+        Assert.Equal(5, backup.Metadata.TotalActivities);
+    }
+
+    [Fact]
+    public async Task ExportDataAsync_DoesNotMergeDifferentDescriptions()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+        var baseDate = new DateTime(2026, 1, 1);
+
+        var tag = new Domain.Entities.Tag
+        {
+            TagName = "Supplement",
+            UserId = userId,
+            IsRequired = false,
+            TimeGranularity = Domain.Enums.TimeGranularity.Daily
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        // Day 1-2: "1 pill", Day 3-4: "2 pills"
+        context.Activities.Add(new Domain.Entities.Activity { TagId = tag.Id, UserId = userId, DateStarted = baseDate, Description = "1 pill" });
+        context.Activities.Add(new Domain.Entities.Activity { TagId = tag.Id, UserId = userId, DateStarted = baseDate.AddDays(1), Description = "1 pill" });
+        context.Activities.Add(new Domain.Entities.Activity { TagId = tag.Id, UserId = userId, DateStarted = baseDate.AddDays(2), Description = "2 pills" });
+        context.Activities.Add(new Domain.Entities.Activity { TagId = tag.Id, UserId = userId, DateStarted = baseDate.AddDays(3), Description = "2 pills" });
+        await context.SaveChangesAsync();
+
+        // Act
+        var backup = await service.ExportDataAsync(userId: userId);
+
+        // Assert - different descriptions split into 2 streaks
+        Assert.Equal(2, backup.Activities.Count);
+        Assert.Equal("1 pill", backup.Activities[0].Description);
+        Assert.Equal("2 pills", backup.Activities[1].Description);
+    }
+
+    [Fact]
+    public async Task ExportDataAsync_SingleActivity_NoStreak()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+
+        var tag = new Domain.Entities.Tag
+        {
+            TagName = "OneOff",
+            UserId = userId,
+            IsRequired = false,
+            TimeGranularity = Domain.Enums.TimeGranularity.Daily
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        context.Activities.Add(new Domain.Entities.Activity
+        {
+            TagId = tag.Id,
+            UserId = userId,
+            DateStarted = new DateTime(2026, 3, 15),
+            Description = "Single event"
+        });
+        await context.SaveChangesAsync();
+
+        // Act
+        var backup = await service.ExportDataAsync(userId: userId);
+
+        // Assert - single activity should NOT have StreakEndDate
+        Assert.Single(backup.Activities);
+        Assert.Null(backup.Activities[0].StreakEndDate);
+        Assert.Equal(1, backup.Metadata.TotalActivities);
+    }
+
+    [Fact]
+    public async Task ImportDataAsync_ExpandsStreaksToIndividualActivities()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+        var baseDate = new DateTime(2026, 2, 1);
+
+        var backupData = new BackupData
+        {
+            Metadata = new BackupMetadata { Version = CurrentBackupVersion, ExportDate = DateTime.UtcNow },
+            InputTypes = new List<InputTypeBackup>(),
+            Patterns = new List<PatternBackup>(),
+            Units = new List<UnitBackup>(),
+            TagOptionLists = new List<TagOptionListBackup>(),
+            TagOptions = new List<TagOptionBackup>(),
+            TagGroups = new List<TagGroupBackup>(),
+            Tags = new List<TagBackup>
+            {
+                new() { TagName = "Vitamin", IsRequired = false, TimeGranularity = Domain.Enums.TimeGranularity.Daily }
+            },
+            Notifications = new List<NotificationBackup>(),
+            Activities = new List<ActivityBackup>
+            {
+                new()
+                {
+                    TagName = "Vitamin",
+                    DateCreated = DateTime.UtcNow,
+                    DateStarted = baseDate,
+                    StreakEndDate = baseDate.AddDays(4), // 5 days: Feb 1-5
+                    Description = "1 tablet"
+                }
+            },
+            ScanMappings = new List<ScanMappingBackup>()
+        };
+
+        // Act
+        var result = await service.ImportDataAsync(backupData, clearExistingData: false, userId: userId);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(5, result.Statistics.ActivitiesImported);
+
+        var dbActivities = await context.Activities
+            .Where(a => a.UserId == userId)
+            .OrderBy(a => a.DateStarted)
+            .ToListAsync();
+
+        Assert.Equal(5, dbActivities.Count);
+        Assert.Equal(baseDate.Date, dbActivities[0].DateStarted.Date);
+        Assert.Equal(baseDate.AddDays(4).Date, dbActivities[4].DateStarted.Date);
+        Assert.All(dbActivities, a => Assert.Equal("1 tablet", a.Description));
+    }
+
+    [Fact]
+    public async Task ImportDataAsync_HandlesLegacyFormatWithoutStreakEndDate()
+    {
+        // Arrange — simulates a v1.6 backup with no StreakEndDate
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+        var userId = Guid.NewGuid();
+
+        var backupData = new BackupData
+        {
+            Metadata = new BackupMetadata { Version = CurrentBackupVersion, ExportDate = DateTime.UtcNow },
+            InputTypes = new List<InputTypeBackup>(),
+            Patterns = new List<PatternBackup>(),
+            Units = new List<UnitBackup>(),
+            TagOptionLists = new List<TagOptionListBackup>(),
+            TagOptions = new List<TagOptionBackup>(),
+            TagGroups = new List<TagGroupBackup>(),
+            Tags = new List<TagBackup>
+            {
+                new() { TagName = "LegacyTag", IsRequired = false, TimeGranularity = Domain.Enums.TimeGranularity.Daily }
+            },
+            Notifications = new List<NotificationBackup>(),
+            Activities = new List<ActivityBackup>
+            {
+                new()
+                {
+                    TagName = "LegacyTag",
+                    DateCreated = DateTime.UtcNow,
+                    DateStarted = new DateTime(2026, 1, 15),
+                    Description = "Legacy activity"
+                    // StreakEndDate is null — legacy format
+                }
+            },
+            ScanMappings = new List<ScanMappingBackup>()
+        };
+
+        // Act
+        var result = await service.ImportDataAsync(backupData, clearExistingData: false, userId: userId);
+
+        // Assert — single activity imported, no expansion
+        Assert.True(result.Success);
+        Assert.Equal(1, result.Statistics.ActivitiesImported);
+        var dbActivities = await context.Activities.Where(a => a.UserId == userId).ToListAsync();
+        Assert.Single(dbActivities);
+    }
+
+    [Fact]
+    public async Task ExportImportRoundTrip_PreservesAllActivities()
+    {
+        // Arrange — create activities, export (with compression), import into fresh DB
+        using var exportContext = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var exportService = new BackupService(exportContext, logger.Object);
+        var userId = Guid.NewGuid();
+        var baseDate = new DateTime(2026, 1, 1);
+
+        var tag = new Domain.Entities.Tag
+        {
+            TagName = "RoundTrip",
+            UserId = userId,
+            IsRequired = false,
+            TimeGranularity = Domain.Enums.TimeGranularity.Daily
+        };
+        exportContext.Tags.Add(tag);
+        await exportContext.SaveChangesAsync();
+
+        // 3 consecutive + 1 standalone
+        for (int i = 0; i < 3; i++)
+        {
+            exportContext.Activities.Add(new Domain.Entities.Activity
+            {
+                TagId = tag.Id,
+                UserId = userId,
+                DateStarted = baseDate.AddDays(i),
+                Description = "Daily"
+            });
+        }
+        exportContext.Activities.Add(new Domain.Entities.Activity
+        {
+            TagId = tag.Id,
+            UserId = userId,
+            DateStarted = baseDate.AddDays(10),
+            Description = "One-off"
+        });
+        await exportContext.SaveChangesAsync();
+
+        // Act — export
+        var backup = await exportService.ExportDataAsync(userId: userId);
+        Assert.Equal(4, backup.Metadata.TotalActivities);
+
+        // Import into fresh context
+        using var importContext = CreateContext();
+        var importService = new BackupService(importContext, new Mock<ILogger<BackupService>>().Object);
+        var importResult = await importService.ImportDataAsync(backup, clearExistingData: false, userId: userId);
+
+        // Assert — all 4 activities restored
+        Assert.True(importResult.Success);
+        Assert.Equal(4, importResult.Statistics.ActivitiesImported);
+
+        var importedActivities = await importContext.Activities
+            .Where(a => a.UserId == userId)
+            .OrderBy(a => a.DateStarted)
+            .ToListAsync();
+
+        Assert.Equal(4, importedActivities.Count);
+        Assert.Equal(baseDate.Date, importedActivities[0].DateStarted.Date);
+        Assert.Equal(baseDate.AddDays(1).Date, importedActivities[1].DateStarted.Date);
+        Assert.Equal(baseDate.AddDays(2).Date, importedActivities[2].DateStarted.Date);
+        Assert.Equal(baseDate.AddDays(10).Date, importedActivities[3].DateStarted.Date);
+    }
+
+    [Fact]
+    public async Task ValidateBackupData_RejectsInvalidStreakEndDate()
+    {
+        // Arrange
+        using var context = CreateContext();
+        var logger = new Mock<ILogger<BackupService>>();
+        var service = new BackupService(context, logger.Object);
+
+        var backupData = new BackupData
+        {
+            Tags = new List<TagBackup>
+            {
+                new TagBackup { TagName = "Test" }
+            },
+            Activities = new List<ActivityBackup>
+            {
+                new ActivityBackup
+                {
+                    TagName = "Test",
+                    DateCreated = DateTime.UtcNow,
+                    DateStarted = new DateTime(2026, 3, 10),
+                    StreakEndDate = new DateTime(2026, 3, 5), // Before DateStarted — invalid
+                    Description = "Bad streak"
+                }
+            },
+            InputTypes = new List<InputTypeBackup>(),
+            Patterns = new List<PatternBackup>(),
+        };
+
+        // Act
+        var result = await service.ValidateBackupData(backupData);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("StreakEndDate before DateStarted"));
     }
 }
 

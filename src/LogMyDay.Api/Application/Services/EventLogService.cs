@@ -1,0 +1,103 @@
+using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
+using LogMyDay.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace LogMyDay.Api.Application.Services;
+
+public class EventLogService : IEventLogService
+{
+    private readonly LogMyDayDbContext _context;
+    private readonly ILogger<EventLogService> _logger;
+
+    public EventLogService(LogMyDayDbContext context, ILogger<EventLogService> logger)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task Log(Guid userId, EventLogLevel level, string message, string? detail = null)
+    {
+        try
+        {
+            var entry = new EventLog
+            {
+                UserId = userId,
+                Level = level,
+                Message = message.Length > 500 ? message[..500] : message,
+                CreatedUtc = DateTime.UtcNow
+            };
+
+            _context.EventLogs.Add(entry);
+
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                var detailEntity = new EventLogDetail
+                {
+                    EventLogId = entry.Id,
+                    Description = detail
+                };
+                entry.Detail = detailEntity;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write event log for user {UserId}: {Message}", userId, message);
+        }
+    }
+
+    public async Task<PagedResult<EventLogResponse>> GetPaged(int pageNumber, int pageSize, Guid userId, bool isAdmin, EventLogLevel? levelFilter = null)
+    {
+        var query = _context.EventLogs
+            .AsNoTracking()
+            .Where(e => e.UserId == userId);
+
+        if (levelFilter.HasValue)
+        {
+            query = query.Where(e => e.Level == levelFilter.Value);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(e => e.CreatedUtc)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => new EventLogResponse
+            {
+                Id = e.Id,
+                Level = e.Level.ToString(),
+                Message = e.Message,
+                CreatedUtc = e.CreatedUtc,
+                Detail = isAdmin ? e.Detail!.Description : null
+            })
+            .ToListAsync();
+
+        return new PagedResult<EventLogResponse>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<int> GetCount(Guid userId, EventLogLevel? levelFilter = null)
+    {
+        var query = _context.EventLogs
+            .AsNoTracking()
+            .Where(e => e.UserId == userId);
+
+        if (levelFilter.HasValue)
+        {
+            query = query.Where(e => e.Level == levelFilter.Value);
+        }
+
+        return await query.CountAsync();
+    }
+}

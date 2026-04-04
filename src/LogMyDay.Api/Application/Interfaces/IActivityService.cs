@@ -43,5 +43,7 @@ public interface IActivityService
     Task<List<ActivityResponse>> GetByYear(int year, Guid userId, int? tagId = null);
     Task<List<int>> GetAvailableYears(Guid userId, int? tagId = null);
     Task<bool> HasActivityForTimeGranularity(int tagId, DateTime dateStarted, Guid userId, int? excludeActivityId = null);
+    Task<bool> HasActivityForTagOnDate(int tagId, DateOnly date, Guid userId);
     Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId);
+    Task<PeriodSumResponse> GetPeriodSum(int tagId, DateTime dateStarted, Guid userId, int? excludeActivityId = null);
 }

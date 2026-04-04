@@ -1,9 +1,13 @@
-﻿using LogMyDay.Api.Application.Services;
+﻿using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Infrastructure.Repositories;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LogMyDay.Api.Tests;
 
@@ -23,7 +27,8 @@ public class ActivityServiceTests
         context.SaveChanges();
         
         var repository = new ActivityRepository(context);
-        var service = new ActivityService(context, repository);
+        var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
+        var service = new ActivityService(context, repository, eventLogService);
         var request = new ActivityRequest
         {
             DateStarted = DateTime.UtcNow.AddHours(-1),

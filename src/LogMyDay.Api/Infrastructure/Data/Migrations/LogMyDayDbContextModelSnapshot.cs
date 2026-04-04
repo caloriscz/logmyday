@@ -48,6 +48,58 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Activities", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Level")
+                        .HasDatabaseName("IX_LogMyDay_EventLogs_Level");
+
+                    b.HasIndex("UserId", "CreatedUtc")
+                        .HasDatabaseName("IX_LogMyDay_EventLogs_UserId_CreatedUtc");
+
+                    b.ToTable("LogMyDay_EventLogs", (string)null);
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLogDetail", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EventLogId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventLogId")
+                        .IsUnique();
+
+                    b.ToTable("LogMyDay_EventLogDetails", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.InputType", b =>
                 {
                     b.Property<int>("Id")
@@ -149,24 +201,24 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         new
                         {
                             Id = 7,
-                            Description = "Rating scale from 1 to 5 (commonly used for star ratings)",
+                            Description = "Star rating scale from 0 to 5 (higher is better)",
                             IsMaximumEditable = false,
                             IsMinimumEditable = false,
                             IsRangeEditable = true,
                             IsRepeatableEditable = false,
                             IsStepEditable = false,
-                            Name = "Rating 1-5"
+                            Name = "Star Rating 0-5"
                         },
                         new
                         {
                             Id = 8,
-                            Description = "Rating scale from 1 to 10",
+                            Description = "Star rating scale from 0 to 10 (higher is better)",
                             IsMaximumEditable = false,
                             IsMinimumEditable = false,
                             IsRangeEditable = true,
                             IsRepeatableEditable = false,
                             IsStepEditable = false,
-                            Name = "Rating 1-10"
+                            Name = "Star Rating 0-10"
                         },
                         new
                         {
@@ -178,6 +230,28 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                             IsRepeatableEditable = false,
                             IsStepEditable = false,
                             Name = "Percentage"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Description = "Score scale from 0 to 5 (lower is better, e.g. pain, severity)",
+                            IsMaximumEditable = false,
+                            IsMinimumEditable = false,
+                            IsRangeEditable = true,
+                            IsRepeatableEditable = false,
+                            IsStepEditable = false,
+                            Name = "Score 0-5"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Description = "Score scale from 0 to 10 (lower is better, e.g. pain, severity)",
+                            IsMaximumEditable = false,
+                            IsMinimumEditable = false,
+                            IsRangeEditable = true,
+                            IsRepeatableEditable = false,
+                            IsStepEditable = false,
+                            Name = "Score 0-10"
                         });
                 });
 
@@ -397,6 +471,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("DefaultValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("GroupId")
@@ -629,6 +706,28 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLogDetail", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.EventLog", "EventLog")
+                        .WithOne("Detail")
+                        .HasForeignKey("LogMyDay.Domain.Entities.EventLogDetail", "EventLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EventLog");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
@@ -728,6 +827,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Quantity");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
+                {
+                    b.Navigation("Detail");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.Tag", b =>

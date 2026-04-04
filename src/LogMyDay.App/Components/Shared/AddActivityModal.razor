@@ -31,7 +31,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <label class="@LabelCss" for="@($"{modalId}PrimaryTag")">Primary Tag</label>
-                        <GroupedTagSelect Tags="AvailableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="() => OnTagSelectionChanged()" SelectClass="@InputCss" />
+                        <GroupedTagSelect Tags="AvailableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="HandleTagSelectionChanged" SelectClass="@InputCss" />
                     </div>
 
                     <div class="space-y-2">
@@ -52,7 +52,20 @@
                             {
                                 case 1: // Integer
                                     <label class="@LabelCss">Value @if (!string.IsNullOrWhiteSpace(selectedTag?.UnitSymbol)) { <span class="@HelperTextCss">(@selectedTag.UnitSymbol)</span> }</label>
-                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="@InputCss" placeholder="Enter numeric value" step="1" />
+                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="@InputCss" placeholder="Enter numeric value"
+                                           step="@(selectedTag?.Step ?? 1)"
+                                           min="@(selectedTag?.MinValue)"
+                                           max="@(selectedTag?.MaxValue)" />
+                                    @if (periodSumInfo != null && selectedTag?.MaxValue.HasValue == true)
+                                    {
+                                        <p class="@HelperTextCss mt-1">
+                                            Current: @periodSumInfo.CurrentSum / @selectedTag.MaxValue
+                                            @if (periodSumInfo.RemainingCapacity.HasValue)
+                                            {
+                                                <span> — @periodSumInfo.RemainingCapacity.Value remaining</span>
+                                            }
+                                        </p>
+                                    }
                                     break;
                                 case 2: // String
                                     <label class="@LabelCss">Value</label>
@@ -74,7 +87,45 @@
                                     break;
                                 case 6: // Decimal
                                     <label class="@LabelCss">Value @if (!string.IsNullOrWhiteSpace(selectedTag?.UnitSymbol)) { <span class="@HelperTextCss">(@selectedTag.UnitSymbol)</span> }</label>
-                                    <input type="number" step="0.01" @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="@InputCss" placeholder="Enter decimal value" />
+                                    <input type="number"
+                                           step="@(selectedTag?.Step ?? 0.01)"
+                                           min="@(selectedTag?.MinValue)"
+                                           max="@(selectedTag?.MaxValue)"
+                                           @bind="decimalValue" @bind:after="OnDecimalValueChanged" class="@InputCss" placeholder="Enter decimal value" />
+                                    @if (periodSumInfo != null && selectedTag?.MaxValue.HasValue == true)
+                                    {
+                                        <p class="@HelperTextCss mt-1">
+                                            Current: @periodSumInfo.CurrentSum / @selectedTag.MaxValue
+                                            @if (periodSumInfo.RemainingCapacity.HasValue)
+                                            {
+                                                <span> — @periodSumInfo.RemainingCapacity.Value remaining</span>
+                                            }
+                                        </p>
+                                    }
+                                    break;
+                                case 7:  // Star Rating 0-5
+                                    <label class="@LabelCss">Rating</label>
+                                    <StarRating Value="@(integerValue ?? 0)" ValueChanged="OnStarRatingChanged" MaxStars="5" />
+                                    break;
+                                case 8:  // Star Rating 0-10
+                                    <label class="@LabelCss">Rating</label>
+                                    <StarRating Value="@(integerValue ?? 0)" ValueChanged="OnStarRatingChanged" MaxStars="10" />
+                                    break;
+                                case 9:  // Percentage
+                                    <label class="@LabelCss">Value</label>
+                                    <input type="number" @bind="integerValue" @bind:after="OnIntegerValueChanged" class="@InputCss"
+                                           step="@(selectedTag?.Step ?? 1)"
+                                           min="@(selectedTag?.MinValue ?? 0)"
+                                           max="@(selectedTag?.MaxValue)"
+                                           placeholder="@($"0–{selectedTag?.MaxValue ?? 100}")" />
+                                    break;
+                                case 10: // Score 0-5
+                                    <label class="@LabelCss">Score</label>
+                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="5" />
+                                    break;
+                                case 11: // Score 0-10
+                                    <label class="@LabelCss">Score</label>
+                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="10" />
                                     break;
                                 default:
                                     <label class="@LabelCss">Description</label>
@@ -119,7 +170,7 @@
 
                     @if (!string.IsNullOrEmpty(ErrorMessage))
                     {
-                        <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-200">
+                        <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-200 max-h-24 overflow-y-auto">
                             @ErrorMessage
                         </div>
                     }
@@ -157,8 +208,8 @@
                         </button>
                         <div class="relative">
                             <div class="flex">
-                                <button type="submit" class="rounded-l-lg bg-primary-600 px-4 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-hidden focus:ring-2 focus:ring-primary-500">
-                                    @(IsEditMode ? "Update Activity" : "Save Activity")
+                                <button type="submit" class="rounded-l-lg bg-primary-600 px-4 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                    @(IsEditMode ? "Update" : "Save")
                                 </button>
                                 <button type="button" @onclick="ToggleSaveDropdown" @onclick:stopPropagation="true" class="rounded-r-lg border-l border-primary-700 bg-primary-600 px-2 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-hidden focus:ring-2 focus:ring-primary-500" aria-label="More save options">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -220,6 +271,9 @@
     // Split-button state
     private bool showSaveDropdown = false;
     private bool saveAndAdvance = false;
+
+    // Period sum info for MaxValue capacity hints
+    private PeriodSumResponse? periodSumInfo;
     
     // Date input helpers for non-exact time granularities
     private DateTime? dateStartedInput = null;
@@ -366,16 +420,23 @@
             {
                 if (selectedTag.TimeGranularity != TimeGranularity.Exact)
                 {
-                    var duplicateCheck = await ActivityApi.CheckDuplicate(
-                        Activity.PrimaryTagId.Value,
-                        Activity.DateStarted,
-                        IsEditMode ? ActivityId : null);
+                    var isNumeric = selectedTag.TypeId is 1 or 6;
 
-                    if (duplicateCheck.HasDuplicate)
+                    // Non-repeatable numeric tags accumulate on the backend — skip the client-side block
+                    if (!isNumeric)
                     {
-                        var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
-                        await OnError.InvokeAsync($"Activity with tag '{selectedTag.Title}' already exists for this {granularityText}. This tag is not repeatable.");
-                        return;
+                        var duplicateCheck = await ActivityApi.CheckDuplicate(
+                            Activity.PrimaryTagId.Value,
+                            Activity.DateStarted,
+                            IsEditMode ? ActivityId : null);
+
+                        if (duplicateCheck.HasDuplicate)
+                        {
+                            var granularityText = selectedTag.TimeGranularity.ToString().ToLower();
+                            await OnError.InvokeAsync($"Activity with tag '{selectedTag.Title}' already exists for this {granularityText}. This tag is not repeatable.");
+
+                            return;
+                        }
                     }
                 }
             }
@@ -427,6 +488,12 @@
         {
             await OnError.InvokeAsync("Authentication failed. Please refresh and try again.");
         }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var content = await ex.GetContentAsAsync<string>();
+            Logger.LogWarning("Conflict saving activity: {Content}", content);
+            await OnError.InvokeAsync(SanitizeApiError(content, 409));
+        }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             var content = await ex.GetContentAsAsync<string>();
@@ -441,10 +508,61 @@
                 await OnError.InvokeAsync($"Validation error: {content ?? "Invalid data provided."}");
             }
         }
+        catch (Refit.ApiException ex)
+        {
+            string? content = null;
+            try { content = await ex.GetContentAsAsync<string>(); } catch { /* deserialization failed */ }
+            content ??= ex.Content;
+            Logger.LogWarning("API error {StatusCode} saving activity: {Content}", (int)ex.StatusCode, content);
+            await OnError.InvokeAsync(SanitizeApiError(content, (int)ex.StatusCode));
+        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error saving activity");
+            Logger.LogError(ex, "Error saving activity (type: {ExType})", ex.GetType().FullName);
             await OnError.InvokeAsync("An unexpected error occurred while saving the activity. Please try again.");
+        }
+    }
+
+    private static string SanitizeApiError(string? content, int statusCode)
+    {
+        if (string.IsNullOrWhiteSpace(content) || content.TrimStart().StartsWith('<'))
+        {
+            return statusCode >= 500
+                ? "Something went wrong while saving the activity. Please try again."
+                : "Could not save the activity. Please try again.";
+        }
+
+        return content.Length > 300 ? content[..300] + "\u2026" : content;
+    }
+
+    private async Task HandleTagSelectionChanged()
+    {
+        OnTagSelectionChanged();
+        await LoadPeriodSumInfo();
+    }
+
+    private async Task LoadPeriodSumInfo()
+    {
+        periodSumInfo = null;
+
+        if (selectedTag == null || !Activity.PrimaryTagId.HasValue)
+        {
+            return;
+        }
+
+        var isNumeric = selectedTag.TypeId is 1 or 6;
+        if (!isNumeric || !selectedTag.MaxValue.HasValue || selectedTag.TimeGranularity == TimeGranularity.Exact)
+        {
+            return;
+        }
+
+        try
+        {
+            periodSumInfo = await ActivityApi.GetPeriodSum(Activity.PrimaryTagId.Value, Activity.DateStarted, IsEditMode ? ActivityId : null);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load period sum info for tag {TagId}", Activity.PrimaryTagId);
         }
     }
 
@@ -649,6 +767,21 @@
                     decimalValue = null;
                 }
                 break;
+            case 7:  // Star Rating 0-5
+            case 8:  // Star Rating 0-10
+            case 9:  // Percentage
+            case 10: // Score 0-5
+            case 11: // Score 0-10
+                if (int.TryParse(description, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRating))
+                {
+                    integerValue = parsedRating;
+                    Activity.Description = parsedRating.ToString(CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    integerValue = null;
+                }
+                break;
             default:
                 Activity.Description = description;
                 break;
@@ -668,6 +801,12 @@
     private void OnIntegerValueChanged()
     {
         Activity.Description = integerValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    private void OnStarRatingChanged(int value)
+    {
+        integerValue = value;
+        Activity.Description = value.ToString(CultureInfo.InvariantCulture);
     }
 
     private void OnBooleanValueChanged()

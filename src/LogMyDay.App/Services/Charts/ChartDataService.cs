@@ -154,12 +154,12 @@ public class ChartDataService : IChartDataService
 
         var inputTypeId = ids.First();
 
-        if (inputTypeId == InputTypeIds.Rating1To5)
+        if (inputTypeId == InputTypeIds.StarRating || inputTypeId == InputTypeIds.Score)
         {
             return (0, 5);
         }
 
-        if (inputTypeId == InputTypeIds.Rating1To10)
+        if (inputTypeId == InputTypeIds.StarRating10 || inputTypeId == InputTypeIds.Score10)
         {
             return (0, 10);
         }

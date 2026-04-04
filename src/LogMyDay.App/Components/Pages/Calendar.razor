@@ -4,6 +4,7 @@
 @using System.Linq
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Preferences
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Services
 @using LogMyDay.App.Components.Shared
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
@@ -25,7 +26,7 @@
     <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div class="w-full max-w-sm space-y-2">
             <label for="tagPicker" class="text-sm font-medium text-gray-700 dark:text-slate-200">Select Tag</label>
-            <GroupedTagSelect Tags="@(tags?.OrderBy(t => t.Title).ToList())" @bind-Value="selectedTagId" @bind-Value:after="OnTagSelectedAsync" SelectClass="@InputCss" />
+            <GroupedTagSelect Tags="@(tags?.OrderBy(t => t.Title).ToList())" @bind-Value="selectedTagId" @bind-Value:after="OnTagSelectedAsync" SelectClass="@InputCss" GroupPlaceholder="(All groups)" ShowAllGroupsOption="true" />
         </div>
 
         <div class="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
@@ -197,10 +198,26 @@
                             <div class="flex items-start justify-between gap-3">
                                 <div class="space-y-1">
                                     <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100">@activity.PrimaryTagName</h4>
-                                    @{ var displayValue = FormatActivityValue(activity);
-                                       if (!string.IsNullOrWhiteSpace(displayValue))
+                                    @{ var calTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
+                                       if (IsStarRatingTag(calTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var calStars))
                                        {
-                                           <p class="text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                           <div><StarDisplay Value="@calStars" MaxStars="@GetStarMax(calTag!)" /></div>
+                                       }
+                                       else if (IsScoreTag(calTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var calScore))
+                                       {
+                                           <div><ScoreDisplay Value="@calScore" MaxScore="@GetStarMax(calTag!)" /></div>
+                                       }
+                                       else if (calTag?.TypeId == InputTypeIds.Boolean)
+                                       {
+                                           <div><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
+                                       }
+                                       else
+                                       {
+                                           var displayValue = FormatActivityValue(activity);
+                                           if (!string.IsNullOrWhiteSpace(displayValue))
+                                           {
+                                               <p class="text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                           }
                                        }
                                     }
                                     <p class="text-xs text-gray-500 dark:text-slate-400">@FormatActivityTime(activity)</p>
@@ -795,6 +812,15 @@
 
         return valueForDisplay;
     }
+
+    private static bool IsStarRatingTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static int GetStarMax(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
 
     private string FormatActivityTime(ActivityResponse activity)
     {

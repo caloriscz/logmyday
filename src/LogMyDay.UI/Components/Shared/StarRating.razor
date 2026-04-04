@@ -1,0 +1,71 @@
+@using Microsoft.AspNetCore.Components
+
+<div style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap;" role="radiogroup" aria-label="Rating">
+    <button type="button"
+            style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; transition: transform 0.1s; line-height: 1; margin-right: 4px;
+                   background: @(Value == 0 ? "#6b7280" : "transparent");
+                   border: 2px solid @(Value == 0 ? "#6b7280" : "#d1d5db");
+                   color: @(Value == 0 ? "#ffffff" : "#9ca3af");"
+            @onclick="SetZero" title="0" aria-label="Zero stars" aria-pressed="@(Value == 0)">
+        0
+    </button>
+    @for (int i = 1; i <= MaxStars; i++)
+    {
+        var starValue = i;
+        var isFilled = starValue <= (hoverValue ?? Value);
+        var size = MaxStars > 6 ? "24px" : "32px";
+        <button type="button"
+                style="background: none; border: none; cursor: pointer; padding: 2px; line-height: 0; transition: transform 0.1s; display: inline-flex;"
+                @onclick="() => SetValue(starValue)"
+                @onmouseover="() => hoverValue = starValue"
+                @onmouseout="() => hoverValue = null"
+                aria-label="@starValue star@(starValue != 1 ? "s" : "")"
+                title="@starValue">
+            <svg viewBox="0 0 24 24" style="width: @size; height: @size;"
+                 fill="@(isFilled ? "#f59e0b" : "none")"
+                 stroke="@(isFilled ? "#d97706" : "#9ca3af")"
+                 stroke-width="@(isFilled ? "0.5" : "1.5")">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+        </button>
+    }
+    @if (Value > 0)
+    {
+        <button type="button"
+                style="background: none; border: none; cursor: pointer; padding: 4px; margin-left: 4px; line-height: 0; color: #9ca3af; display: inline-flex;"
+                @onclick="ClearValue" title="Clear rating" aria-label="Clear rating">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    }
+    <span style="margin-left: 8px; font-size: 0.875rem; color: #6b7280;">@Value / @MaxStars</span>
+</div>
+
+@code {
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public int MaxStars { get; set; } = 5;
+
+    private int? hoverValue;
+
+    private async Task SetValue(int value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    private async Task SetZero()
+    {
+        Value = 0;
+        hoverValue = null;
+        await ValueChanged.InvokeAsync(0);
+    }
+
+    private async Task ClearValue()
+    {
+        Value = 0;
+        hoverValue = null;
+        await ValueChanged.InvokeAsync(0);
+    }
+}

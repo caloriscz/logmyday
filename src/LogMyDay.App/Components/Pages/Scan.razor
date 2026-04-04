@@ -81,6 +81,7 @@
                       OnActivityCreated="OnActivityCreated"
                       OnCanceled="OnActivityModalCanceled"
                       OnError="OnActivityModalError"
+                      ErrorMessage="@scanModalError"
                       ModalId="scanAddActivityModal" />
 }
 
@@ -97,6 +98,7 @@
     private bool showActivityModal;
     private ActivityRequest? newActivity;
     private int? preselectedTagId;
+    private string? scanModalError;
     private IList<TagResponse>? allTags;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
@@ -209,6 +211,7 @@
             DateStarted = GetCurrentDateTimeInDisplayZone()
         };
         showActivityModal = true;
+        scanModalError = null;
         pageState = PageState.Scanner;
     }
 
@@ -249,12 +252,15 @@
         showActivityModal = false;
         newActivity = null;
         preselectedTagId = null;
+        scanModalError = null;
         pageState = PageState.Scanner;
     }
 
     private Task OnActivityModalError(string error)
     {
-        // Let the modal handle its own error display
+        scanModalError = error;
+        StateHasChanged();
+
         return Task.CompletedTask;
     }
 

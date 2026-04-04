@@ -31,6 +31,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<ITagGroupService, TagGroupService>();
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IExcelExportService, ExportService>();
+        services.AddScoped<IEventLogService, EventLogService>();
         services.AddSingleton<ISettingProtector, SettingProtector>();
         services.AddScoped<ISettingsService, SettingsService>();
 

@@ -7,6 +7,8 @@ public interface INotificationManagerService
     void ReceiveNotification(string title, string message, NotificationPayload? payload = null);
     void StartPeriodicNotifications();
     void StopPeriodicNotifications();
+    void CancelAlarmsForNotification(int notificationId);
+    void CancelAlarmsForTag(int tagId);
 }
 
 public class NotificationEventArgs : EventArgs

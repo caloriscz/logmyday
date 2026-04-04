@@ -1,6 +1,7 @@
 @page "/activities"
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Mobile.Components.Shared
 @using Microsoft.AspNetCore.Components
 @using System.Collections.Generic
@@ -100,7 +101,20 @@
                             </div>
                         </div>
 
-                        @if (!string.IsNullOrEmpty(activity.Description))
+                        @{ var mobTag1 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                        @if (mobTag1?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var mobStars1))
+                        {
+                            <div class="mb-2"><StarDisplay Value="@mobStars1" MaxStars="@(mobTag1.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" /></div>
+                        }
+                        else if (mobTag1?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var mobScore1))
+                        {
+                            <div class="mb-2"><ScoreDisplay Value="@mobScore1" MaxScore="@(mobTag1.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
+                        }
+                        else if (mobTag1?.TypeId == InputTypeIds.Boolean)
+                        {
+                            <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
+                        }
+                        else if (!string.IsNullOrEmpty(activity.Description))
                         {
                             <p class="mb-2 text-gray-700 dark:text-gray-300">@activity.Description</p>
                         }
@@ -141,7 +155,20 @@
                                     </button>
                                 </div>
                             </div>
-                            @if (!string.IsNullOrEmpty(activity.Description))
+                            @{ var mobTag2 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                            @if (mobTag2?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var mobStars2))
+                            {
+                                <div class="mb-2"><StarDisplay Value="@mobStars2" MaxStars="@(mobTag2.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" /></div>
+                            }
+                            else if (mobTag2?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var mobScore2))
+                            {
+                                <div class="mb-2"><ScoreDisplay Value="@mobScore2" MaxScore="@(mobTag2.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
+                            }
+                            else if (mobTag2?.TypeId == InputTypeIds.Boolean)
+                            {
+                                <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
+                            }
+                            else if (!string.IsNullOrEmpty(activity.Description))
                             {
                                 <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
                             }
@@ -267,6 +294,7 @@
     OnActivityUpdated="@HandleActivityUpdated"
     OnCanceled="@HandleActivityCanceled"
     OnFormReset="@HandleActivityFormReset"
+    OnError="@HandleActivityError"
     ErrorMessage="@errorMessage" />
 
 @code {
@@ -562,6 +590,7 @@
 
     private async Task HandleActivityCreated(LogMyDay.Shared.DTOs.ActivityRequest activity)
     {
+        errorMessage = null;
         // Refresh the activities list when a new activity is created
         await LoadData();
         // Reset the activity for next use
@@ -589,7 +618,17 @@
 
     private Task HandleActivityFormReset()
     {
+        errorMessage = null;
         StateHasChanged();
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleActivityError(string error)
+    {
+        errorMessage = error;
+        StateHasChanged();
+
         return Task.CompletedTask;
     }
 

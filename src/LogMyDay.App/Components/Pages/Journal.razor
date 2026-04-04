@@ -1,6 +1,7 @@
 @page "/insights/journal"
 @using System.Globalization
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Services
 @using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
@@ -67,7 +68,7 @@
                 <!-- Tag Filter (String input types only) -->
                 <div class="flex-1 min-w-[200px]">
                     <label class="form-label">Tag Filter</label>
-                    <GroupedTagSelect Tags="stringTags" @bind-Value="selectedTagId" @bind-Value:after="OnFilterChanged" SelectClass="form-select w-full" />
+                    <GroupedTagSelect Tags="stringTags" @bind-Value="selectedTagId" @bind-Value:after="OnFilterChanged" SelectClass="form-select w-full" GroupPlaceholder="(All groups)" ShowAllGroupsOption="true" />
                 </div>
             </div>
             
@@ -162,9 +163,25 @@
 
                                         <!-- Description - wraps and continues at same indent -->
                                         <div class="flex-1 min-w-0">
-                                            <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap wrap-break-word">
-                                                @activity.Description
-                                            </div>
+                                            @{ var jrnTag = allTags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                            @if (jrnTag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var jrnStars))
+                                            {
+                                                <StarDisplay Value="@jrnStars" MaxStars="@(jrnTag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
+                                            }
+                                            else if (jrnTag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var jrnScore))
+                                            {
+                                                <ScoreDisplay Value="@jrnScore" MaxScore="@(jrnTag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
+                                            }
+                                            else if (jrnTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" />
+                                            }
+                                            else
+                                            {
+                                                <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">
+                                                    @activity.Description
+                                                </div>
+                                            }
                                         </div>
 
                                         <!-- Action Buttons -->

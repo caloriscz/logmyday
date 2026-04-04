@@ -28,7 +28,7 @@ else
         {
             <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-around bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-xl z-50"
                  style="padding-bottom: env(safe-area-inset-bottom, 0px); height: calc(4rem + env(safe-area-inset-bottom, 0px));">
-                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/reminders") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/reminders") || IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/reminders"))">
                     <i class="bi bi-bell text-2xl mb-1"></i>
                     <span class="text-xs font-medium">Reminders</span>
@@ -38,16 +38,19 @@ else
                     <i class="bi bi-tags text-2xl mb-1"></i>
                     <span class="text-xs font-medium">Tags</span>
                 </button>
-                <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/quick") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
-                        @onclick="@(() => NavigateTo("/quick"))">
-                    <i class="bi bi-lightning text-2xl mb-1"></i>
-                    <span class="text-xs font-medium">Quick</span>
-                </button>
                 <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsScanSection() ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/scan"))">
                     <i class="bi bi-qr-code-scan text-2xl mb-1"></i>
                     <span class="text-xs font-medium">Scan</span>
                 </button>
+                @if (_aiAvailable)
+                {
+                    <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/assistant") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
+                            @onclick="@(() => NavigateTo("/assistant"))">
+                        <i class="bi bi-stars text-2xl mb-1"></i>
+                        <span class="text-xs font-medium">AI</span>
+                    </button>
+                }
                 <button class="flex flex-col items-center justify-center flex-1 px-1 py-2 min-h-[48px] min-w-[48px] transition-all duration-200 border-0 bg-transparent @(IsActive("/activities") ? "text-primary-600 dark:text-primary-400 font-semibold" : "text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:text-primary-400 dark:hover:bg-gray-700")"
                         @onclick="@(() => NavigateTo("/activities"))">
                     <i class="bi bi-calendar3 text-2xl mb-1"></i>
@@ -65,6 +68,7 @@ else
 
 @code {
     private bool _isCheckingAuthentication = true;
+    private bool _aiAvailable;
     private bool IsLoginPage => GetCurrentPath().Equals("login", StringComparison.OrdinalIgnoreCase);
 
     private bool IsActive(string path)
@@ -143,6 +147,11 @@ else
 
         await HandlePendingNotificationAsync();
 
+        if (AuthService.IsAuthenticated)
+        {
+            _ = CheckAiAvailability();
+        }
+
         // Hide loading screen after authentication check completes
         _isCheckingAuthentication = false;
         StateHasChanged();
@@ -162,6 +171,7 @@ else
             // If user just logged in, navigate to activities page
             Navigation.NavigateTo("/reminders");
             _ = InvokeAsync(HandlePendingNotificationAsync);
+            _ = InvokeAsync(CheckAiAvailability);
         }
     }
 
@@ -169,6 +179,21 @@ else
     {
         AuthService.AuthenticationChanged -= OnAuthenticationChanged;
         NotificationNavigation.NavigationRequested -= OnNotificationNavigationRequested;
+    }
+
+    private async Task CheckAiAvailability()
+    {
+        try
+        {
+            var status = await ApiProvider.Ai.GetStatus();
+            _aiAvailable = status.IsAvailable;
+        }
+        catch
+        {
+            _aiAvailable = false;
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool _restoreAttempted;
@@ -294,6 +319,6 @@ else
             parameters.Add($"date={payload.LocalDate.Value:yyyy-MM-dd}");
         }
 
-        return parameters.Count > 0 ? "/activities?" + string.Join("&", parameters) : "/activities";
+        return parameters.Count > 0 ? "/reminders?" + string.Join("&", parameters) : "/reminders";
     }
 }

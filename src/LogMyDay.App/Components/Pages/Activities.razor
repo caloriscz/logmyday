@@ -4,6 +4,7 @@
 @using System.Linq
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Enums
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Services
 @using LogMyDay.Shared.Preferences
@@ -124,7 +125,25 @@
                                                 @activity.PrimaryTagName
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @{ var dailyTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                            @if (IsStarRatingTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyStars))
+                                            {
+                                                <StarDisplay Value="@dailyStars" MaxStars="@GetStarMax(dailyTag!)" />
+                                            }
+                                            else if (IsScoreTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyScore))
+                                            {
+                                                <ScoreDisplay Value="@dailyScore" MaxScore="@GetStarMax(dailyTag!)" />
+                                            }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                            }
+                                            else
+                                            {
+                                                @GetActivityDisplayValue(activity)
+                                            }
+                                        </td>
                                         <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                     </tr>
                                 }
@@ -144,10 +163,26 @@
                                             @activity.PrimaryTagName
                                         </span>
                                     </h3>
-                                    @{ var displayValue = GetActivityDisplayValue(activity);
-                                        if (!string.IsNullOrWhiteSpace(displayValue))
+                                    @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
+                                        if (IsStarRatingTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardStars))
                                         {
-                                            <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                            <div class="mt-1"><StarDisplay Value="@dailyCardStars" MaxStars="@GetStarMax(dailyCardTag!)" /></div>
+                                        }
+                                        else if (IsScoreTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardScore))
+                                        {
+                                            <div class="mt-1"><ScoreDisplay Value="@dailyCardScore" MaxScore="@GetStarMax(dailyCardTag!)" /></div>
+                                        }
+                                        else if (dailyCardTag?.TypeId == InputTypeIds.Boolean)
+                                        {
+                                            <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
+                                        }
+                                        else
+                                        {
+                                            var displayValue = GetActivityDisplayValue(activity);
+                                            if (!string.IsNullOrWhiteSpace(displayValue))
+                                            {
+                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                            }
                                         }
                                     }
                                 </div>
@@ -218,7 +253,25 @@
                                                     @activity.PrimaryTagName
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@GetActivityDisplayValue(activity)</td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                                @{ var groupTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                                @if (IsStarRatingTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupStars))
+                                                {
+                                                    <StarDisplay Value="@groupStars" MaxStars="@GetStarMax(groupTag!)" />
+                                                }
+                                                else if (IsScoreTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupScore))
+                                                {
+                                                    <ScoreDisplay Value="@groupScore" MaxScore="@GetStarMax(groupTag!)" />
+                                                }
+                                                else if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                {
+                                                    <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                                }
+                                                else
+                                                {
+                                                    @GetActivityDisplayValue(activity)
+                                                }
+                                            </td>
                                             <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                         </tr>
                                     }
@@ -238,10 +291,26 @@
                                                 @activity.PrimaryTagName
                                             </span>
                                         </h3>
-                                        @{ var displayValue = GetActivityDisplayValue(activity);
-                                            if (!string.IsNullOrWhiteSpace(displayValue))
+                                        @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
+                                            if (IsStarRatingTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardStars))
                                             {
-                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                                <div class="mt-1"><StarDisplay Value="@groupCardStars" MaxStars="@GetStarMax(groupCardTag!)" /></div>
+                                            }
+                                            else if (IsScoreTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardScore))
+                                            {
+                                                <div class="mt-1"><ScoreDisplay Value="@groupCardScore" MaxScore="@GetStarMax(groupCardTag!)" /></div>
+                                            }
+                                            else if (groupCardTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
+                                            }
+                                            else
+                                            {
+                                                var displayValue = GetActivityDisplayValue(activity);
+                                                if (!string.IsNullOrWhiteSpace(displayValue))
+                                                {
+                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                                }
                                             }
                                         }
                                     </div>
@@ -615,6 +684,15 @@
 
         return valueForDisplay;
     }
+
+    private static bool IsStarRatingTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static int GetStarMax(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
 
     private async Task OnDisplayTypeChanged(ChangeEventArgs e)
     {

@@ -54,6 +54,11 @@
                         </div>
 
                         <div>
+                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Description (optional)</label>
+                            <InputTextArea @bind-Value="editTag.Description" rows="3" class="@InputCss" disabled="@isSaving" placeholder="What does this tag measure? How should values be interpreted?" />
+                        </div>
+
+                        <div>
                             <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Type</label>
                             <InputSelect @bind-Value="editTag.TypeId" @bind-Value:after="OnInputTypeChanged" class="@InputCss" disabled="@isSaving">
                                 @foreach (var type in inputTypes)
@@ -404,9 +409,14 @@
             inputTypes = await ActivityApi.GetInputTypesAsync();
             var tag = await ActivityApi.GetTagById(Id);
 
+            var bareName = tag.GroupName != null && tag.Title.StartsWith(tag.GroupName + ": ", StringComparison.Ordinal)
+                ? tag.Title[(tag.GroupName.Length + 2)..]
+                : tag.Title;
+
             editTag = new TagRequest
             {
-                Tag = tag.Title,
+                Tag = bareName,
+                Description = tag.Description,
                 TypeId = ResolveTypeId(tag.TypeId),
                 IsRequired = tag.IsRequired,
                 IsRepeatable = tag.IsRepeatable,

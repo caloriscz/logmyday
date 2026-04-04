@@ -13,11 +13,13 @@ public class ActivityService : IActivityService
 {
     private readonly LogMyDayDbContext _context;
     private readonly IActivityRepository _activityRepository;
+    private readonly IEventLogService _eventLogService;
 
-    public ActivityService(LogMyDayDbContext context, IActivityRepository activityRepository)
+    public ActivityService(LogMyDayDbContext context, IActivityRepository activityRepository, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _activityRepository = activityRepository ?? throw new ArgumentNullException(nameof(activityRepository));
+        _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
 
     public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
@@ -29,13 +31,79 @@ public class ActivityService : IActivityService
             throw new ArgumentException("Invalid tag ID");
         }
 
-        // Check if tag is not repeatable and there's already an activity for this time granularity
+        var isNumeric = tag.InputTypeId is 1 or 6; // Integer or Decimal
+
+        // Non-repeatable tag handling
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
         {
-            if (await HasActivityForTimeGranularity(tag.Id, calendarRequest.DateStarted, userId))
+            if (isNumeric)
+            {
+                // Numeric non-repeatable: accumulate by Step (update existing row)
+                var (existingActivities, dateRange) = await GetActivitiesInPeriod(tag.Id, calendarRequest.DateStarted, userId);
+                var existing = existingActivities.FirstOrDefault();
+
+                if (existing != null)
+                {
+                    var step = tag.Step ?? 1.0;
+                    var currentValue = double.TryParse(existing.Description, out var parsed) ? parsed : 0.0;
+                    var newValue = currentValue + step;
+
+                    if (tag.MaxValue.HasValue && newValue > tag.MaxValue.Value)
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot add more. Maximum is {tag.MaxValue.Value}, current value is {currentValue}."
+                        );
+                    }
+
+                    existing.Description = tag.InputTypeId == 1
+                        ? ((int)newValue).ToString()
+                        : newValue.ToString("G");
+
+                    await _activityRepository.UpdateAsync(existing);
+                    await _activityRepository.SaveChangesAsync();
+
+                    await _context.Entry(existing).Reference(a => a.Tag).LoadAsync();
+                    if (existing.Tag is not null)
+                    {
+                        await _context.Entry(existing.Tag).Reference(t => t.InputType).LoadAsync();
+                        await _context.Entry(existing.Tag).Reference(t => t.Group).LoadAsync();
+                    }
+
+                    return MapToResponse(existing);
+                }
+
+                // No existing activity yet — validate MaxValue for first entry
+                if (tag.MaxValue.HasValue && double.TryParse(calendarRequest.Description, out var descVal) && descVal > tag.MaxValue.Value)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot add more. Maximum is {tag.MaxValue.Value}, current value is 0."
+                    );
+                }
+            }
+            else
+            {
+                // Non-numeric non-repeatable: keep current blocking behavior
+                if (await HasActivityForTimeGranularity(tag.Id, calendarRequest.DateStarted, userId))
+                {
+                    throw new InvalidOperationException(
+                        $"An activity for this tag already exists for the selected {tag.TimeGranularity.ToString().ToLower()} period. This tag is not repeatable."
+                    );
+                }
+            }
+        }
+
+        // Repeatable + MaxValue enforcement for numeric tags
+        if (tag.IsRepeatable && isNumeric && tag.MaxValue.HasValue && tag.TimeGranularity != TimeGranularity.Exact)
+        {
+            var (existingActivities, _) = await GetActivitiesInPeriod(tag.Id, calendarRequest.DateStarted, userId);
+            var currentSum = existingActivities
+                .Sum(a => double.TryParse(a.Description, out var v) ? v : 0.0);
+            var newValue = double.TryParse(calendarRequest.Description, out var nv) ? nv : 0.0;
+
+            if (currentSum + newValue > tag.MaxValue.Value)
             {
                 throw new InvalidOperationException(
-                    $"An activity for this tag already exists for the selected {tag.TimeGranularity.ToString().ToLower()} period. This tag is not repeatable."
+                    $"Cannot add more. Maximum is {tag.MaxValue.Value}, current total is {currentSum}."
                 );
             }
         }
@@ -61,6 +129,12 @@ public class ActivityService : IActivityService
             .Include(ct => ct.Tag)
             .ThenInclude(t => t.Group)
             .FirstAsync(c => c.Id == activity.Id);
+
+        var tagName = reloadedActivity.Tag?.TagName ?? "unknown";
+        var desc = string.IsNullOrWhiteSpace(reloadedActivity.Description)
+            ? string.Empty
+            : $" of value {reloadedActivity.Description}";
+        await _eventLogService.Log(userId, EventLogLevel.Info, $"Activity '{tagName}'{desc} added");
 
         return MapToResponse(reloadedActivity);
     }
@@ -341,50 +415,91 @@ public class ActivityService : IActivityService
         var tag = await _context.Tags.FindAsync(tagId);
         if (tag == null || tag.TimeGranularity == TimeGranularity.Exact)
         {
-            return false; // No validation for Exact granularity at the moment
+            return false;
         }
 
-        DateTime startRange,
-            endRange;
-
-        // Determine the date range based on time granularity
-        switch (tag.TimeGranularity)
-        {
-            case TimeGranularity.Daily:
-                startRange = dateStarted.Date;
-                endRange = startRange.AddDays(1).AddTicks(-1);
-                break;
-            case TimeGranularity.Hourly:
-                startRange = new DateTime(
-                    dateStarted.Year,
-                    dateStarted.Month,
-                    dateStarted.Day,
-                    dateStarted.Hour,
-                    0,
-                    0
-                );
-                endRange = startRange.AddHours(1).AddTicks(-1);
-                break;
-            case TimeGranularity.Weekly:
-                startRange = GetStartOfWeek(dateStarted);
-                endRange = startRange.AddDays(7).AddTicks(-1);
-                break;
-            case TimeGranularity.Monthly:
-                startRange = new DateTime(dateStarted.Year, dateStarted.Month, 1);
-                endRange = startRange.AddMonths(1).AddTicks(-1);
-                break;
-            case TimeGranularity.Yearly:
-                startRange = new DateTime(dateStarted.Year, 1, 1);
-                endRange = startRange.AddYears(1).AddTicks(-1);
-                break;
-            default:
-                return false;
-        }
-
-        // Use specification to check for duplicate
+        var (startRange, endRange) = GetDateRangeForGranularity(tag.TimeGranularity, dateStarted);
         var spec = new DuplicateActivityCheckSpec(tagId, userId, startRange, endRange, excludeActivityId);
 
         return await _activityRepository.AnyAsync(spec);
+    }
+
+    public async Task<PeriodSumResponse> GetPeriodSum(int tagId, DateTime dateStarted, Guid userId, int? excludeActivityId = null)
+    {
+        var tag = await _context.Tags.FindAsync(tagId);
+        if (tag == null)
+        {
+            throw new ArgumentException("Invalid tag ID");
+        }
+
+        var isNumeric = tag.InputTypeId is 1 or 6;
+        var response = new PeriodSumResponse
+        {
+            MaxValue = tag.MaxValue,
+            IsNonRepeatableNumeric = !tag.IsRepeatable && isNumeric,
+        };
+
+        if (tag.TimeGranularity == TimeGranularity.Exact)
+        {
+            return response;
+        }
+
+        var (activities, _) = await GetActivitiesInPeriod(tagId, dateStarted, userId, excludeActivityId);
+        response.CurrentSum = activities.Sum(a => double.TryParse(a.Description, out var v) ? v : 0.0);
+        response.RemainingCapacity = tag.MaxValue.HasValue ? tag.MaxValue.Value - response.CurrentSum : null;
+
+        if (!tag.IsRepeatable && isNumeric)
+        {
+            var existing = activities.FirstOrDefault();
+            if (existing != null)
+            {
+                response.ExistingValue = double.TryParse(existing.Description, out var ev) ? ev : 0.0;
+                response.ExistingActivityId = existing.Id;
+            }
+        }
+
+        return response;
+    }
+
+    private async Task<(List<Activity> activities, (DateTime start, DateTime end) dateRange)> GetActivitiesInPeriod(
+        int tagId,
+        DateTime dateStarted,
+        Guid userId,
+        int? excludeActivityId = null)
+    {
+        var tag = await _context.Tags.FindAsync(tagId);
+        if (tag == null || tag.TimeGranularity == TimeGranularity.Exact)
+        {
+            return (new List<Activity>(), (dateStarted, dateStarted));
+        }
+
+        var (startRange, endRange) = GetDateRangeForGranularity(tag.TimeGranularity, dateStarted);
+        var spec = new DuplicateActivityCheckSpec(tagId, userId, startRange, endRange, excludeActivityId);
+        var activities = await _activityRepository.GetAsync(spec);
+
+        return (activities, (startRange, endRange));
+    }
+
+    private (DateTime startRange, DateTime endRange) GetDateRangeForGranularity(TimeGranularity granularity, DateTime dateStarted)
+    {
+        return granularity switch
+        {
+            TimeGranularity.Daily => (dateStarted.Date, dateStarted.Date.AddDays(1).AddTicks(-1)),
+            TimeGranularity.Hourly => (
+                new DateTime(dateStarted.Year, dateStarted.Month, dateStarted.Day, dateStarted.Hour, 0, 0),
+                new DateTime(dateStarted.Year, dateStarted.Month, dateStarted.Day, dateStarted.Hour, 0, 0).AddHours(1).AddTicks(-1)
+            ),
+            TimeGranularity.Weekly => (GetStartOfWeek(dateStarted), GetStartOfWeek(dateStarted).AddDays(7).AddTicks(-1)),
+            TimeGranularity.Monthly => (
+                new DateTime(dateStarted.Year, dateStarted.Month, 1),
+                new DateTime(dateStarted.Year, dateStarted.Month, 1).AddMonths(1).AddTicks(-1)
+            ),
+            TimeGranularity.Yearly => (
+                new DateTime(dateStarted.Year, 1, 1),
+                new DateTime(dateStarted.Year, 1, 1).AddYears(1).AddTicks(-1)
+            ),
+            _ => (dateStarted, dateStarted),
+        };
     }
 
     public async Task<List<ActivityResponse>> GetByYear(int year, Guid userId, int? tagId = null)
@@ -412,6 +527,15 @@ public class ActivityService : IActivityService
     public async Task<List<int>> GetAvailableYears(Guid userId, int? tagId = null)
     {
         return await _activityRepository.GetAvailableYearsAsync(userId, tagId);
+    }
+
+    public async Task<bool> HasActivityForTagOnDate(int tagId, DateOnly date, Guid userId)
+    {
+        var start = date.ToDateTime(TimeOnly.MinValue);
+        var end = date.AddDays(1).ToDateTime(TimeOnly.MinValue).AddTicks(-1);
+        var spec = new DuplicateActivityCheckSpec(tagId, userId, start, end);
+
+        return await _activityRepository.AnyAsync(spec);
     }
 
     public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId)

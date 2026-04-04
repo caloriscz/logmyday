@@ -74,6 +74,7 @@ public static class MauiProgram
             builder.Services.AddTransient<IUsersApi>(sp => sp.GetRequiredService<IApiClientProvider>().Users);
             builder.Services.AddTransient<IAccountApi>(sp => sp.GetRequiredService<IApiClientProvider>().Account);
             builder.Services.AddTransient<IScanMappingApi>(sp => sp.GetRequiredService<IApiClientProvider>().ScanMapping);
+            builder.Services.AddTransient<IAiApi>(sp => sp.GetRequiredService<IApiClientProvider>().Ai);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>

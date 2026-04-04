@@ -81,6 +81,7 @@
                       OnActivityCreated="OnActivityCreated"
                       OnCanceled="CloseActivityModal"
                       OnError="OnActivityModalError"
+                      ErrorMessage="@scanModalError"
                       ModalId="scanAddActivityModal" />
 }
 
@@ -98,6 +99,7 @@
     private bool shouldShowModalAfterRender;
     private ActivityRequest? newActivity;
     private int? preselectedTagId;
+    private string? scanModalError;
     private IList<TagResponse>? allTags;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
@@ -227,6 +229,7 @@
         };
         showActivityModal = true;
         shouldShowModalAfterRender = true;
+        scanModalError = null;
         pageState = PageState.Scanner;
     }
 
@@ -269,6 +272,7 @@
         showActivityModal = false;
         newActivity = null;
         preselectedTagId = null;
+        scanModalError = null;
         scannerKey++;
         pageState = PageState.Scanner;
     }
@@ -287,6 +291,9 @@
 
     private Task OnActivityModalError(string error)
     {
+        scanModalError = error;
+        StateHasChanged();
+
         return Task.CompletedTask;
     }
 

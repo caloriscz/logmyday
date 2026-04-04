@@ -1,6 +1,7 @@
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Notifications;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +13,13 @@ public class NotificationService : INotificationService
 {
     private readonly LogMyDayDbContext _context;
     private readonly ILogger<NotificationService> _logger;
+    private readonly IEventLogService _eventLogService;
 
-    public NotificationService(LogMyDayDbContext context, ILogger<NotificationService> logger)
+    public NotificationService(LogMyDayDbContext context, ILogger<NotificationService> logger, IEventLogService eventLogService)
     {
         _context = context;
         _logger = logger;
+        _eventLogService = eventLogService;
     }
 
     public async Task<IList<NotificationResponse>> GetAll(Guid userId)
@@ -82,6 +85,9 @@ public class NotificationService : INotificationService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Created notification {NotificationId} for tag {TagId}", entity.Id, entity.TagId);
+
+        var tag = await _context.Tags.FindAsync(entity.TagId);
+        await _eventLogService.Log(userId, EventLogLevel.Info, $"Notification for tag '{tag?.TagName ?? entity.TagId.ToString()}' created");
 
         return MapToResponse(entity);
     }

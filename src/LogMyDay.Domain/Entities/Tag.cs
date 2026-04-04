@@ -12,6 +12,8 @@ public class Tag
     [Required]
     public required string TagName { get; set; }
 
+    public string? Description { get; set; }
+
     public int? InputTypeId { get; set; }
 
     [ForeignKey(nameof(InputTypeId))]

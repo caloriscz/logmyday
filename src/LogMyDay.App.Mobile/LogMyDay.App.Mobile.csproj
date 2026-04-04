@@ -8,8 +8,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>0.6.0</ApplicationDisplayVersion>
+		<ApplicationVersion>2</ApplicationVersion>
 		<ApplicationId>com.logmyday.mobile</ApplicationId>
 		<ApplicationTitle>LogMyDay Mobile</ApplicationTitle>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
