@@ -246,16 +246,34 @@ else if (unfilledRequiredTags != null)
         await LoadRequiredTags();
     }
 
+    private void RemoveTagFromList(int tagId)
+    {
+        unfilledRequiredTags?.RemoveAll(t => t.Id == tagId);
+        existingActivities.Remove(tagId);
+        _inlinePickerValues.Remove(tagId);
+        _boolPickerValues.Remove(tagId);
+        StateHasChanged();
+    }
+
+    private async Task RefreshInBackground()
+    {
+        await LoadRequiredTags(showSpinner: false);
+    }
+
     private DateTime GetCurrentDateTimeInDisplayZone()
         => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
 
     private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
 
-    private async Task LoadRequiredTags()
+    private async Task LoadRequiredTags(bool showSpinner = true)
     {
         try
         {
-            isLoading = true;
+            if (showSpinner)
+            {
+                isLoading = true;
+            }
+
             errorMessage = null;
             StateHasChanged();
 
@@ -334,9 +352,12 @@ else if (unfilledRequiredTags != null)
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
-        await LoadRequiredTags();
-
         showAddActivityModal = false;
+
+        if (activity.PrimaryTagId is > 0)
+        {
+            RemoveTagFromList(activity.PrimaryTagId.Value);
+        }
 
         var today = GetTodayInDisplayZone();
         newActivity = new ActivityRequest
@@ -349,6 +370,7 @@ else if (unfilledRequiredTags != null)
         errorMessage = null;
 
         await OnDataChanged.InvokeAsync();
+        _ = RefreshInBackground();
     }
 
     private async Task OnError(string error)
@@ -581,8 +603,9 @@ else if (unfilledRequiredTags != null)
                 await ActivityApi.CreateCalendarItem(request);
             }
 
-            await LoadRequiredTags();
+            RemoveTagFromList(tag.Id);
             await OnDataChanged.InvokeAsync();
+            _ = RefreshInBackground();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -641,8 +664,9 @@ else if (unfilledRequiredTags != null)
             }
 
             _boolPickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            RemoveTagFromList(tag.Id);
             await OnDataChanged.InvokeAsync();
+            _ = RefreshInBackground();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -708,8 +732,9 @@ else if (unfilledRequiredTags != null)
             }
 
             _inlinePickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            RemoveTagFromList(tag.Id);
             await OnDataChanged.InvokeAsync();
+            _ = RefreshInBackground();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
