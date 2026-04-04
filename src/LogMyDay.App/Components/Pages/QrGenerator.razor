@@ -8,7 +8,7 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<QrGenerator> Logger
 
-<div class="mx-auto max-w-screen-md space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-md) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <div class="space-y-1">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">QR Code Generator</h1>
         <p class="text-sm text-gray-600 dark:text-slate-300">
@@ -16,11 +16,11 @@
         </p>
     </div>
 
-    <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <div class="space-y-5">
             <div class="space-y-2">
                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Tag</label>
-                <GroupedTagSelect Tags="tags" @bind-Value="selectedTagId" @bind-Value:after="OnTagChanged" SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                <GroupedTagSelect Tags="tags" @bind-Value="selectedTagId" @bind-Value:after="OnTagChanged" SelectClass="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
             </div>
 
             <div class="space-y-2">
@@ -28,7 +28,7 @@
                     Pre-filled Value
                     <span class="font-normal text-gray-500 dark:text-slate-400">(optional)</span>
                 </label>
-                <input type="text" @bind="prefilledValue" @bind:after="OnValueChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., 400mg" />
+                <input type="text" @bind="prefilledValue" @bind:after="OnValueChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., 400mg" />
                 <p class="text-xs text-gray-500 dark:text-slate-400">This value will be pre-filled in the activity description when scanned.</p>
             </div>
 
@@ -37,7 +37,7 @@
                     Display Name
                     <span class="font-normal text-gray-500 dark:text-slate-400">(optional)</span>
                 </label>
-                <input type="text" @bind="displayName" @bind:after="OnValueChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., Magnesium 400mg" />
+                <input type="text" @bind="displayName" @bind:after="OnValueChanged" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., Magnesium 400mg" />
                 <p class="text-xs text-gray-500 dark:text-slate-400">Human-readable label printed alongside the QR code.</p>
             </div>
         </div>
@@ -45,7 +45,7 @@
 
     @if (selectedTagId.HasValue)
     {
-        <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div class="space-y-1">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Generated QR Code</h2>
                 <p class="text-xs text-gray-500 dark:text-slate-400 font-mono break-all">@generatedUri</p>
@@ -56,11 +56,11 @@
             </div>
 
             <div class="flex flex-wrap gap-3">
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700" @onclick="DownloadQr">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700" @onclick="DownloadQr">
                     <Icon Name="arrow-down-tray" Class="h-4 w-4" />
                     Download PNG
                 </button>
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="PrintQr">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="PrintQr">
                     <Icon Name="printer" Class="h-4 w-4" />
                     Print
                 </button>

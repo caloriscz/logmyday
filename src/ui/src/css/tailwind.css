@@ -1,6 +1,268 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@source '../../../LogMyDay.App/**/*.{razor,cshtml,html}';
+@source '../../../LogMyDay.App.Mobile/**/*.{razor,cshtml,html}';
+@source '../../../LogMyDay.UI/**/*.{razor,cshtml,html}';
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+  --color-success-900: #14532d;
+  --color-success-950: #052e16;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+  --color-danger-950: #450a0a;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
+
+  --font-sans:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+    sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+
+  --z-index-60: 60;
+  --z-index-70: 70;
+  --z-index-80: 80;
+  --z-index-90: 90;
+  --z-index-100: 100;
+
+  --ease-bounce-in: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* Component layer for reusable patterns */
+@utility btn {
+  /* Button base styles */
+  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-hidden focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+@utility btn-primary {
+  @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-600;
+}
+@utility btn-secondary {
+  @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
+}
+@utility btn-success {
+  @apply btn bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
+}
+@utility btn-danger {
+  @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500;
+}
+@utility btn-warning {
+  @apply btn bg-warning-600 text-white hover:bg-warning-700 focus:ring-warning-500;
+}
+@utility btn-ghost {
+  @apply btn bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800;
+}
+@utility btn-sm {
+  @apply px-3 py-1.5 text-xs;
+}
+@utility btn-lg {
+  @apply px-6 py-3 text-base;
+}
+@utility form-input {
+  /* Form elements */
+  @apply block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-primary-400 dark:focus:border-primary-400 dark:disabled:bg-gray-700;
+}
+@utility form-select {
+  @apply form-input appearance-none bg-no-repeat bg-right pr-10;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-size: 1.5em 1.5em;
+}
+@utility form-checkbox {
+  @apply w-4 h-4 text-primary-600 border-gray-300 rounded-sm focus:ring-primary-500 focus:ring-2 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-primary-400;
+}
+@utility form-radio {
+  @apply w-4 h-4 text-primary-600 border-gray-300 rounded-sm focus:ring-primary-500 focus:ring-2 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-primary-400;
+}
+@utility form-label {
+  @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+}
+@utility form-error {
+  @apply mt-1 text-sm text-danger-600 dark:text-danger-400;
+}
+@utility form-hint {
+  @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
+}
+@utility card {
+  /* Card styles */
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-xs border border-gray-200 dark:border-gray-700;
+}
+@utility card-header {
+  @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700;
+}
+@utility card-body {
+  @apply px-4 py-3;
+}
+@utility card-footer {
+  @apply px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50;
+}
+@utility alert {
+  /* Alert styles */
+  @apply p-4 rounded-lg text-sm border;
+}
+@utility alert-info {
+  @apply alert bg-primary-50 text-primary-800 border-primary-200 dark:bg-primary-900/20 dark:text-primary-200 dark:border-primary-800;
+}
+@utility alert-success {
+  @apply alert bg-success-50 text-success-800 border-success-200 dark:bg-success-900/20 dark:text-success-200 dark:border-success-800;
+}
+@utility alert-warning {
+  @apply alert bg-warning-50 text-warning-800 border-warning-200 dark:bg-warning-900/20 dark:text-warning-200 dark:border-warning-800;
+}
+@utility alert-danger {
+  @apply alert bg-danger-50 text-danger-800 border-danger-200 dark:bg-danger-900/20 dark:text-danger-200 dark:border-danger-800;
+}
+@utility badge {
+  /* Badge styles */
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+@utility badge-primary {
+  @apply badge bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-200;
+}
+@utility badge-success {
+  @apply badge bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-200;
+}
+@utility badge-danger {
+  @apply badge bg-danger-100 text-danger-800 dark:bg-danger-900/30 dark:text-danger-200;
+}
+@utility badge-warning {
+  @apply badge bg-warning-100 text-warning-800 dark:bg-warning-900/30 dark:text-warning-200;
+}
+@utility badge-secondary {
+  @apply badge bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
+}
+@utility fab {
+  /* Floating Action Button */
+  @apply fixed bottom-6 right-6 z-50 w-14 h-14 flex items-center justify-center rounded-full shadow-lg transition-all duration-300 hover:scale-110 focus:outline-hidden focus:ring-2 focus:ring-offset-2 bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+}
+@utility modal-overlay {
+  /* Modal overlay */
+  @apply fixed inset-0 z-80 bg-gray-900/50 dark:bg-gray-900/80 backdrop-blur-xs flex items-center justify-center p-4;
+}
+@utility modal-content {
+  @apply relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto w-full;
+}
+@utility modal-header {
+  @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between;
+}
+@utility modal-body {
+  @apply px-6 py-4;
+}
+@utility modal-footer {
+  @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-end gap-3;
+}
+@utility table {
+  /* Table styles */
+  @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
+
+  & thead {
+    @apply bg-gray-50 dark:bg-gray-800;
+  }
+
+  & th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
+  }
+
+  & td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100;
+  }
+
+  & tbody {
+    @apply bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700;
+  }
+}
+@utility spinner {
+  /* Loading spinner */
+  @apply inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
+}
+@utility link {
+  /* Link styles */
+  @apply text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline;
+}
+@utility text-balance {
+  text-wrap: balance;
+}
+@utility animate-fade-in {
+  animation: fadeIn 0.2s ease-in;
+}
+@utility animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+@utility animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
 
 /* Custom base styles */
 @layer base {
@@ -20,13 +282,13 @@
   textarea:focus-visible,
   [role="button"]:focus-visible,
   [tabindex="0"]:focus-visible {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900;
+    @apply outline-hidden ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900;
   }
 
   /* Remove all focus outlines from non-interactive elements */
   h1, h2, h3, h4, h5, h6, div, span, p, section, article, main, header, footer, nav {
     &:focus, &:focus-visible {
-      @apply outline-none ring-0 ring-offset-0;
+      @apply outline-hidden ring-0 ring-offset-0;
       box-shadow: none !important;
     }
   }
@@ -54,212 +316,8 @@
   }
 }
 
-/* Component layer for reusable patterns */
-@layer components {
-  /* Button base styles */
-  .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  
-  .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-600;
-  }
-  
-  .btn-secondary {
-    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600;
-  }
-  
-  .btn-success {
-    @apply btn bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
-  }
-  
-  .btn-danger {
-    @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500;
-  }
-  
-  .btn-warning {
-    @apply btn bg-warning-600 text-white hover:bg-warning-700 focus:ring-warning-500;
-  }
-  
-  .btn-ghost {
-    @apply btn bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-800;
-  }
-  
-  .btn-sm {
-    @apply px-3 py-1.5 text-xs;
-  }
-  
-  .btn-lg {
-    @apply px-6 py-3 text-base;
-  }
-  
-  /* Form elements */
-  .form-input {
-    @apply block w-full px-3 py-2 text-sm border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:ring-primary-400 dark:focus:border-primary-400 dark:disabled:bg-gray-700;
-  }
-  
-  .form-select {
-    @apply form-input appearance-none bg-no-repeat bg-right pr-10;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.5rem center;
-    background-size: 1.5em 1.5em;
-  }
-  
-  .form-checkbox,
-  .form-radio {
-    @apply w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 focus:ring-2 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-primary-400;
-  }
-  
-  .form-label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
-  }
-  
-  .form-error {
-    @apply mt-1 text-sm text-danger-600 dark:text-danger-400;
-  }
-  
-  .form-hint {
-    @apply mt-1 text-sm text-gray-500 dark:text-gray-400;
-  }
-  
-  /* Card styles */
-  .card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700;
-  }
-  
-  .card-header {
-    @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700;
-  }
-  
-  .card-body {
-    @apply px-4 py-3;
-  }
-  
-  .card-footer {
-    @apply px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50;
-  }
-  
-  /* Alert styles */
-  .alert {
-    @apply p-4 rounded-lg text-sm border;
-  }
-  
-  .alert-info {
-    @apply alert bg-primary-50 text-primary-800 border-primary-200 dark:bg-primary-900/20 dark:text-primary-200 dark:border-primary-800;
-  }
-  
-  .alert-success {
-    @apply alert bg-success-50 text-success-800 border-success-200 dark:bg-success-900/20 dark:text-success-200 dark:border-success-800;
-  }
-  
-  .alert-warning {
-    @apply alert bg-warning-50 text-warning-800 border-warning-200 dark:bg-warning-900/20 dark:text-warning-200 dark:border-warning-800;
-  }
-  
-  .alert-danger {
-    @apply alert bg-danger-50 text-danger-800 border-danger-200 dark:bg-danger-900/20 dark:text-danger-200 dark:border-danger-800;
-  }
-  
-  /* Badge styles */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-  
-  .badge-primary {
-    @apply badge bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-200;
-  }
-  
-  .badge-success {
-    @apply badge bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-200;
-  }
-  
-  .badge-danger {
-    @apply badge bg-danger-100 text-danger-800 dark:bg-danger-900/30 dark:text-danger-200;
-  }
-  
-  .badge-warning {
-    @apply badge bg-warning-100 text-warning-800 dark:bg-warning-900/30 dark:text-warning-200;
-  }
-  
-  .badge-secondary {
-    @apply badge bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200;
-  }
-  
-  /* Floating Action Button */
-  .fab {
-    @apply fixed bottom-6 right-6 z-50 w-14 h-14 flex items-center justify-center rounded-full shadow-lg transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
-  }
-  
-  /* Modal overlay */
-  .modal-overlay {
-    @apply fixed inset-0 z-80 bg-gray-900/50 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4;
-  }
-  
-  .modal-content {
-    @apply relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto w-full;
-  }
-  
-  .modal-header {
-    @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between;
-  }
-  
-  .modal-body {
-    @apply px-6 py-4;
-  }
-  
-  .modal-footer {
-    @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-end gap-3;
-  }
-  
-  /* Table styles */
-  .table {
-    @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
-  }
-  
-  .table thead {
-    @apply bg-gray-50 dark:bg-gray-800;
-  }
-  
-  .table th {
-    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
-  }
-  
-  .table td {
-    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100;
-  }
-  
-  .table tbody {
-    @apply bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700;
-  }
-  
-  /* Loading spinner */
-  .spinner {
-    @apply inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin;
-  }
-  
-  /* Link styles */
-  .link {
-    @apply text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 underline;
-  }
-}
-
 /* Utility layer for specific overrides */
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-in;
-  }
-  
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-  }
-  
-  .animate-slide-down {
-    animation: slideDown 0.3s ease-out;
-  }
   
   @keyframes fadeIn {
     from {
