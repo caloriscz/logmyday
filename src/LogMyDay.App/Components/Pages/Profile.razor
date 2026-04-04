@@ -12,7 +12,7 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Profile", "Manage user profile and preferences")]
 
-<div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <div class="space-y-1">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">My Profile</h1>
         <p class="text-sm text-gray-600 dark:text-slate-300">Manage your personal information and password.</p>
@@ -20,21 +20,21 @@
 
     @if (isLoading)
     {
-        <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
             <span>Loading profile...</span>
         </div>
     }
     else if (!string.IsNullOrEmpty(loadErrorMessage))
     {
-        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
             @loadErrorMessage
         </div>
     }
     else
     {
         <div class="grid gap-6 xl:grid-cols-2">
-            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <section class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                 <div class="rounded-t-xl border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700">
                     <h2 class="text-lg font-semibold">Profile Information</h2>
                 </div>
@@ -53,13 +53,13 @@
                         <div class="grid gap-4 md:grid-cols-2">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileEmail">Email</label>
-                                <InputText id="profileEmail" @bind-Value="profile.Email" class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="email" readonly />
+                                <InputText id="profileEmail" @bind-Value="profile.Email" class="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-900 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="email" readonly />
                                 <p class="text-xs text-gray-500 dark:text-slate-400">Email cannot be changed.</p>
                             </div>
 
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="profileDisplayName">Display Name (optional)</label>
-                                <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="name" placeholder="Enter your display name" />
+                                <InputText id="profileDisplayName" @bind-Value="profile.DisplayName" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="name" placeholder="Enter your display name" />
                             </div>
 
                             <div class="space-y-2">
@@ -86,7 +86,7 @@
                         </div>
 
                         <div class="mt-6">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isSavingProfile">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isSavingProfile">
                                 @if (isSavingProfile)
                                 {
                                     <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -102,7 +102,7 @@
                 </div>
             </section>
 
-            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <section class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                 <div class="rounded-t-xl border-b border-gray-200 bg-slate-700 px-6 py-4 text-white dark:border-slate-700">
                     <h2 class="text-lg font-semibold">Change Password</h2>
                 </div>
@@ -121,18 +121,18 @@
                         <div class="grid gap-4 md:grid-cols-2">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="currentPassword">Current Password</label>
-                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
+                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
                             </div>
 
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newPassword">New Password</label>
-                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
+                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
                                 <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
                             </div>
                         </div>
 
                         <div class="mt-6">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isChangingPassword">
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isChangingPassword">
                                 @if (isChangingPassword)
                                 {
                                     <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>

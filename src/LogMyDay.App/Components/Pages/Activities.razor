@@ -18,14 +18,14 @@
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Activities", "Browse and manage all logged activities")]
 
-<div class="mx-auto max-w-screen-2xl px-4 py-6 space-y-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) px-4 py-6 space-y-6 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-2">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
         </div>
         <div class="flex items-center">
-            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
                 <Icon Name="plus" Class="h-4 w-4" />
                 Add Activity
             </button>
@@ -34,7 +34,7 @@
 
     @if (displayType != "daily" && pagedResult != null)
     {
-        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="text-sm font-medium text-gray-700 dark:text-slate-300">
                     Page @GetCurrentPageNumber() of @totalPages
@@ -44,7 +44,7 @@
                     <button type="button" class="@GetNavButtonClasses()" @onclick="NextPage" disabled="@(GetCurrentPageNumber() == totalPages)" aria-label="Next page">Next</button>
                 </div>
                 <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
                         <Icon Name="filter" Class="h-5 w-5" />
                         <span class="sr-only">Filters</span>
                     </button>
@@ -55,7 +55,7 @@
 
     @if (loadError != null)
     {
-        <div class="rounded-lg border border-red-300 bg-red-50 p-6 text-center text-red-700 shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+        <div class="rounded-lg border border-red-300 bg-red-50 p-6 text-center text-red-700 shadow-xs dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
             <p class="font-semibold">Failed to load activities</p>
             <p class="mt-1 text-sm">@loadError</p>
             <button type="button" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700" @onclick="RetryLoad">Retry</button>
@@ -63,7 +63,7 @@
     }
     else if (pagedResult == null)
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading activities…
         </div>
     }
@@ -80,7 +80,7 @@
                     <button type="button" class="@GetNavButtonClasses(true)" @onclick="GoToToday" aria-label="Go to today">Today</button>
                 </div>
                 <div class="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" title="Open filters" aria-label="Open filters" @onclick="OpenFilterModal">
                         <Icon Name="filter" Class="h-5 w-5" />
                         <span class="sr-only">Filters</span>
                     </button>
@@ -89,14 +89,14 @@
 
             @if (!pagedResult.Items.Any())
             {
-                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                     No activities found for @FormatDate(selectedDate).
                 </div>
             }
             else
             {
                 <div class="hidden md:block">
-                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                             <thead class="bg-gray-50 dark:bg-slate-800">
                                 <tr>
@@ -112,10 +112,10 @@
                                     <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
                                         <td class="px-1 py-3">
                                             <div class="flex items-center gap-1">
-                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
                                                     <Icon Name="pencil" Class="w-4 h-4" />
                                                 </button>
-                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                                <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                                     <Icon Name="trash" Class="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -155,7 +155,7 @@
                 <div class="space-y-3 md:hidden">
                     @foreach (var activity in pagedResult.Items.OrderByDescending(a => a.DateStarted))
                     {
-                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="flex-1 min-w-0">
                                     <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
@@ -188,10 +188,10 @@
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <div class="flex items-center gap-2">
-                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
                                             <Icon Name="pencil" Class="w-4 h-4" />
                                         </button>
-                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                             <Icon Name="trash" Class="w-4 h-4" />
                                         </button>
                                     </div>
@@ -211,7 +211,7 @@
     }
     else if (!pagedResult.Items.Any())
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             No activities found for the selected criteria.
         </div>
     }
@@ -224,7 +224,7 @@
                     <h2 class="text-lg font-bold text-gray-900 dark:text-slate-100">@FormatDate(group.Key)</h2>
 
                     <div class="hidden md:block">
-                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                                 <thead class="bg-gray-50 dark:bg-slate-800">
                                     <tr>
@@ -240,10 +240,10 @@
                                         <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
                                             <td class="px-4 py-3">
                                                 <div class="flex items-center gap-2">
-                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
                                                         <Icon Name="pencil" Class="w-4 h-4" />
                                                     </button>
-                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                                         <Icon Name="trash" Class="w-4 h-4" />
                                                     </button>
                                                 </div>
@@ -283,7 +283,7 @@
                     <div class="space-y-3 md:hidden">
                         @foreach (var activity in group)
                         {
-                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="flex-1 min-w-0">
                                         <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">
@@ -314,7 +314,7 @@
                                             }
                                         }
                                     </div>
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                         <Icon Name="trash" Class="w-4 h-4" />
                                     </button>
                                 </div>
@@ -393,7 +393,7 @@
 
             <!-- Modal Footer -->
             <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-slate-700">
-                <button type="button" @onclick="CloseFilterModal" class="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-900 dark:text-slate-100 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 transition-colors">
+                <button type="button" @onclick="CloseFilterModal" class="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-900 dark:text-slate-100 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-700 focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900 transition-colors">
                     Close
                 </button>
             </div>
@@ -636,7 +636,7 @@
     private string GetOrderButtonClasses(string order)
     {
         var isActive = string.Equals(orderBy, order, System.StringComparison.OrdinalIgnoreCase);
-        var baseClasses = "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
+        var baseClasses = "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-600 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900";
         var activeClasses = "border-sky-600 bg-sky-50 text-sky-700 dark:border-sky-400 dark:bg-slate-700/60 dark:text-sky-100";
 
         return isActive ? $"{baseClasses} {activeClasses}" : baseClasses;
@@ -644,7 +644,7 @@
 
     private string GetNavButtonClasses(bool emphasize = false)
     {
-        var baseClasses = "inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
+        var baseClasses = "inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
 
         if (emphasize)
         {

@@ -5,7 +5,7 @@
         @if (!string.IsNullOrEmpty(BackUrl))
         {
             <button @onclick="HandleBack" 
-                    class="flex-shrink-0 flex items-center justify-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                    class="shrink-0 flex items-center justify-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
                     aria-label="Go back">
                 <i class="bi bi-arrow-left text-xl"></i>
             </button>
@@ -19,7 +19,7 @@
     @if (ShowReload)
     {
         <button @onclick="HandleReload"
-                class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                class="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 aria-label="Reload page">
             <i class="bi bi-arrow-clockwise text-xl"></i>
         </button>
