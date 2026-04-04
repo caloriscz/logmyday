@@ -24,6 +24,8 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
     public DbSet<EventLog> EventLogs => Set<EventLog>();
     public DbSet<EventLogDetail> EventLogDetails => Set<EventLogDetail>();
+    public DbSet<Dashboard> Dashboards => Set<Dashboard>();
+    public DbSet<DashboardPanel> DashboardPanels => Set<DashboardPanel>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +48,8 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagGroup>().ToTable("LogMyDay_TagGroups");
         modelBuilder.Entity<EventLog>().ToTable("LogMyDay_EventLogs");
         modelBuilder.Entity<EventLogDetail>().ToTable("LogMyDay_EventLogDetails");
+        modelBuilder.Entity<Dashboard>().ToTable("LogMyDay_Dashboards");
+        modelBuilder.Entity<DashboardPanel>().ToTable("LogMyDay_DashboardPanels");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -159,6 +163,43 @@ public class LogMyDayDbContext : DbContext
                 .HasDatabaseName("IX_LogMyDay_EventLogs_Level");
 
             entity.Property(e => e.Message).HasMaxLength(500).IsRequired();
+        });
+
+        modelBuilder.Entity<Dashboard>(entity =>
+        {
+            entity.Property(d => d.Name).HasMaxLength(100).IsRequired();
+            entity.Property(d => d.IsDefault).HasDefaultValue(true);
+
+            entity.HasIndex(d => d.UserId).HasDatabaseName("IX_LogMyDay_Dashboards_UserId");
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(d => d.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+            }
+        });
+
+        modelBuilder.Entity<DashboardPanel>(entity =>
+        {
+            entity.HasOne(p => p.Dashboard)
+                .WithMany(d => d.Panels)
+                .HasForeignKey(p => p.DashboardId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.Tag)
+                .WithMany()
+                .HasForeignKey(p => p.TagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(p => p.Title).HasMaxLength(100);
+            entity.Property(p => p.IsActive).HasDefaultValue(true);
+            entity.Property(p => p.DisplayOrder).HasDefaultValue(0);
+
+            entity.HasIndex(p => p.DashboardId).HasDatabaseName("IX_LogMyDay_DashboardPanels_DashboardId");
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(p => p.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+            }
         });
 
         modelBuilder.SeedData();
