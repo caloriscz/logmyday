@@ -15,13 +15,13 @@
 @inject ILogger<TagEdit> Logger
 @inject IPageTitleService PageTitleService
 
-<div class="mx-auto max-w-screen-2xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-8 px-4 py-6 sm:px-6 lg:px-8">
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="space-y-1">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">@(!string.IsNullOrEmpty(tagTitle) ? tagTitle : "Edit Tag")</h1>
             <p class="text-sm text-gray-600 dark:text-slate-300">Update the tag details and notification rules.</p>
         </div>
-        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
+        <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900">
             <Icon Name="chevron-left" Class="h-4 w-4" />
             Back to Tags
         </a>
@@ -29,19 +29,19 @@
 
     @if (isLoading)
     {
-        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             Loading tag details...
         </div>
     }
     else if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
             @errorMessage
         </div>
     }
     else if (editTag != null)
     {
-        <section class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <EditForm Model="editTag" OnValidSubmit="HandleValidSubmit">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
@@ -148,7 +148,7 @@
                         }
                         else
                         {
-                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-sm dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
+                            <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 shadow-xs dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200">
                                 No units yet. <a href="/units" class="font-semibold underline">Let's create your first unit.</a>
                             </div>
                         }
@@ -168,21 +168,21 @@
                         }
                         else
                         {
-                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-sm dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
+                            <div class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 shadow-xs dark:border-violet-500/40 dark:bg-violet-500/20 dark:text-violet-200">
                                 No option lists yet. <a href="/option-lists" class="font-semibold underline">Let's create your first list.</a>
                             </div>
                         }
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isSaving">
                             @if (isSaving)
                             {
                                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
                             }
                             Save Changes
                         </button>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="GoBack" disabled="@isSaving">
                             Cancel
                         </button>
                     </div>
@@ -190,13 +190,13 @@
             </EditForm>
         </section>
 
-        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
                     <h2 class="text-2xl font-semibold text-gray-900 dark:text-slate-100">Notifications</h2>
                     <p class="text-sm text-gray-600 dark:text-slate-300">Configure reminders that nudge you when this tag is missing.</p>
                 </div>
-                <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="StartAddNotification">
+                <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="StartAddNotification">
                     <Icon Name="plus" Class="h-4 w-4" />
                     Add Notification
                 </button>
@@ -204,7 +204,7 @@
 
             @if (!string.IsNullOrEmpty(notificationErrorMessage) && !isNotificationModalOpen)
             {
-                <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
                     @notificationErrorMessage
                 </div>
             }
@@ -217,7 +217,7 @@
             }
             else
             {
-                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                         <thead class="bg-gray-50 dark:bg-slate-800">
                             <tr>
@@ -269,10 +269,10 @@
                                     <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@notification.DateCreated.ToLocalTime().ToString("g")</td>
                                     <td class="px-4 py-3 text-right text-sm">
                                         <div class="flex justify-end gap-2">
-                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800" @onclick="() => EditNotification(notification)">
+                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800" @onclick="() => EditNotification(notification)">
                                                 Edit
                                             </button>
-                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/20" @onclick="async () => await DeleteNotificationAsync(notification.Id)">
+                                            <button type="button" class="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/20" @onclick="async () => await DeleteNotificationAsync(notification.Id)">
                                                 Delete
                                             </button>
                                         </div>
@@ -297,7 +297,7 @@
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">@(!editingNotification.Id.HasValue ? "Add Notification" : "Edit Notification")</h3>
                     <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">Fine-tune when the app should nudge you.</p>
                 </div>
-                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit">
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit">
                     <Icon Name="x" Class="h-4 w-4" />
                 </button>
             </div>
@@ -341,16 +341,16 @@
 
                     @if (!string.IsNullOrEmpty(notificationErrorMessage))
                     {
-                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
                             @notificationErrorMessage
                         </div>
                     }
 
                     <div class="flex flex-wrap items-center justify-end gap-3">
-                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900" @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">
                             Cancel
                         </button>
-                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isNotificationSaving">
+                        <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60" disabled="@isNotificationSaving">
                             @if (isNotificationSaving)
                             {
                                 <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -374,8 +374,8 @@
         .ThenBy(g => g.ToString())
         .ToArray();
 
-    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
-    private const string CheckboxCss = "h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800";
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string CheckboxCss = "h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800";
 
     private TagRequest? editTag;
     private List<InputTypeDto> inputTypes = new();

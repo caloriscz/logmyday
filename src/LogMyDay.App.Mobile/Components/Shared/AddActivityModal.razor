@@ -11,7 +11,7 @@
 @inject ILogger<AddActivityModal> Logger
 
 <!-- Add New Activity Modal - Full Screen Overlay -->
-<div id="@modalId" data-modal class="hidden fixed inset-0 z-[60] bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="@($"{modalId}Label")">
+<div id="@modalId" data-modal class="hidden fixed inset-0 z-60 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="@($"{modalId}Label")">
     <div data-modal-content class="w-full h-full flex flex-col">
         <!-- Modal Header - Fixed at top -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
@@ -70,7 +70,7 @@
                                     break;
                                 case 3: // Boolean
                                     <div class="flex items-center">
-                                        <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" id="@($"{modalId}BoolCheck")" />
+                                        <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded-sm focus:ring-primary-500" id="@($"{modalId}BoolCheck")" />
                                         <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="@($"{modalId}BoolCheck")">
                                             @selectedTag.Title
                                         </label>
@@ -175,7 +175,7 @@
                     {
                         <div class="mb-4">
                             <div class="flex items-center">
-                                <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" id="@($"{modalId}AddAnother")" />
+                                <input type="checkbox" @bind="AddAnotherAfterSave" @bind:after="OnAddAnotherChanged" class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded-sm focus:ring-primary-500" id="@($"{modalId}AddAnother")" />
                                 <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="@($"{modalId}AddAnother")">
                                     Add another activity after saving
                                 </label>
@@ -193,11 +193,11 @@
                 <div class="flex items-center justify-between gap-3">
                     <!-- Day navigation -->
                     <div class="flex items-center gap-1">
-                        <button type="button" @onclick="ShiftDateBack" class="inline-flex items-center gap-1 rounded px-2.5 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200 min-h-[36px]" title="Previous day">
+                        <button type="button" @onclick="ShiftDateBack" class="inline-flex items-center gap-1 rounded-sm px-2.5 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200 min-h-[36px]" title="Previous day">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                             <span>-1d</span>
                         </button>
-                        <button type="button" @onclick="ShiftDateForward" class="inline-flex items-center gap-1 rounded px-2.5 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200 min-h-[36px]" title="Next day">
+                        <button type="button" @onclick="ShiftDateForward" class="inline-flex items-center gap-1 rounded-sm px-2.5 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200 min-h-[36px]" title="Next day">
                             <span>+1d</span>
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         </button>

@@ -456,7 +456,9 @@ body {
 /* Wide layout mode — toggled via navbar icon, persisted in localStorage */
 html.layout-wide .layout-constrained,
 html.layout-wide .max-w-screen-2xl,
-html.layout-wide .max-w-screen-lg {
+html.layout-wide .max-w-screen-lg,
+html.layout-wide .max-w-\(--breakpoint-2xl\),
+html.layout-wide .max-w-\(--breakpoint-lg\) {
     max-width: 100% !important;
 }
 

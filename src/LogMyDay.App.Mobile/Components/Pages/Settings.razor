@@ -16,7 +16,7 @@
         <!-- Theme Settings -->
         <div class="mb-6">
             <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Appearance</h2>
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xs overflow-hidden">
                 <div class="p-4">
                     <div class="grid grid-cols-3 gap-2">
                         @foreach (var themeOption in themeOptions)
@@ -37,7 +37,7 @@
 
         <!-- Account Settings -->
         <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Account</h2>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xs overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
             <button type="button"
                     class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
                     @onclick="@(() => NavigateTo("/settings/account"))">

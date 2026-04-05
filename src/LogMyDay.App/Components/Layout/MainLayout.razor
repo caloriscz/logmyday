@@ -49,8 +49,8 @@ else
     </div>
 }
 
-<div id="blazor-error-ui" class="fixed bottom-0 left-0 right-0 z-[9999] bg-danger-600 text-white px-4 py-3 shadow-lg hidden" data-nosnippet>
-    <div class="flex items-center justify-between max-w-screen-2xl layout-constrained mx-auto">
+<div id="blazor-error-ui" class="fixed bottom-0 left-0 right-0 z-9999 bg-danger-600 text-white px-4 py-3 shadow-lg hidden" data-nosnippet>
+        <div class="flex items-center justify-between max-w-screen-2xl layout-constrained mx-auto">
         <span>An unhandled error has occurred.</span>
         <div class="flex items-center gap-3">
             <a href="." class="text-white underline hover:no-underline">Reload</a>
@@ -108,13 +108,13 @@ else
                                     {
                                         <div class="flex items-center gap-2">
                                             <input type="checkbox" @bind="booleanValue" @bind:after="OnBooleanValueChanged" class="form-checkbox" tabindex="2" id="booleanInput" />
-                                            <label class="form-label !mb-0" for="booleanInput">Value</label>
+                                            <label class="form-label mb-0!" for="booleanInput">Value</label>
                                         </div>
                                     }
                                     else if (selectedTag.TypeId == 4) // Date
                                     {
                                         <label class="form-label">Value:</label>
-                                        <CultureAwareDatePicker Value="@dateValue" ValueChanged="@OnDateValueInputChanged" ValueChangedAfter="@OnDateValueChanged" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                        <CultureAwareDatePicker Value="@dateValue" ValueChanged="@OnDateValueInputChanged" ValueChangedAfter="@OnDateValueChanged" CssClass="border-gray-300! dark:border-gray-600!" Stretch="true" />
                                     }
                                     else if (selectedTag.TypeId == 5) // Time
                                     {
@@ -147,11 +147,11 @@ else
                                     <label class="form-label">Date Started:</label>
                                     @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
                                     {
-                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="true" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="true" CssClass="border-gray-300! dark:border-gray-600!" Stretch="true" />
                                     }
                                     else
                                     {
-                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="false" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                        <CultureAwareDatePicker Value="@newActivity.DateStarted" ValueChanged="@((DateTime? v) => newActivity.DateStarted = v ?? DateTime.Now)" EnableTime="false" CssClass="border-gray-300! dark:border-gray-600!" Stretch="true" />
                                     }
                                 </div>
                                 
@@ -161,11 +161,11 @@ else
                                         <label class="form-label">Date Finished (optional):</label>
                                         @if (selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Exact || selectedTag?.TimeGranularity == LogMyDay.Domain.Enums.TimeGranularity.Hourly)
                                         {
-                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="true" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="true" CssClass="border-gray-300! dark:border-gray-600!" Stretch="true" />
                                         }
                                         else
                                         {
-                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="false" CssClass="!border-gray-300 dark:!border-gray-600" Stretch="true" />
+                                            <CultureAwareDatePicker Value="@newActivity.DateFinished" ValueChanged="@((DateTime? v) => newActivity.DateFinished = v)" EnableTime="false" CssClass="border-gray-300! dark:border-gray-600!" Stretch="true" />
                                         }
                                     </div>
                                 }
@@ -182,7 +182,7 @@ else
                                 <div class="flex items-start gap-2">
                                     <input class="form-checkbox mt-0.5" type="checkbox" @bind="addAnotherAfterSave" id="addAnotherCheck">
                                     <div class="flex-1">
-                                        <label class="form-label !mb-1 cursor-pointer" for="addAnotherCheck">
+                                        <label class="form-label mb-1! cursor-pointer" for="addAnotherCheck">
                                             <span class="flex items-center gap-1">
                                                 <Icon Name="plus" Class="w-4 h-4" />
                                                 <span>Add another activity after saving</span>
