@@ -1,0 +1,292 @@
+@page "/dashboard/panel/{PanelId:int}"
+@using LogMyDay.Domain.Constants
+@using LogMyDay.App.Services
+@inject LogMyDay.Shared.Interfaces.IDashboardApi DashboardApi
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject IPageTitleService PageTitleService
+@inject NavigationManager Navigation
+
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="/dashboard/manage" class="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200">
+            <Icon Name="arrow-left" Class="h-5 w-5" />
+        </a>
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Edit Panel</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Configure this dashboard panel.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <span class="h-10 w-10 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"></span>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Loading panel…</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(loadError))
+    {
+        <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @loadError
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @errorMessage
+            </div>
+        }
+
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div class="space-y-5 p-6">
+                <!-- Panel Type (display only) -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Panel Type</label>
+                    <select class="@InputCss" disabled>
+                        <option>Numeric Value</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">More panel types coming soon.</p>
+                </div>
+
+                <!-- Tag -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Tag</label>
+                    <GroupedTagSelect Tags="numericTags" @bind-Value="formTagId" SelectClass="@InputCss" />
+                </div>
+
+                <!-- Custom Title -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">
+                        Custom Title <span class="text-gray-400 dark:text-slate-500">(optional)</span>
+                    </label>
+                    <input type="text" class="@InputCss" @bind="formTitle" placeholder="Leave empty to use tag name" maxlength="100" />
+                </div>
+
+                <!-- Aggregation -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Aggregation</label>
+                    <select class="@InputCss" @bind="formAggregationTypeId">
+                        <option value="@AggregationTypeIds.LatestValue">Latest value</option>
+                        <option value="@AggregationTypeIds.Sum">Sum</option>
+                        <option value="@AggregationTypeIds.Average">Average</option>
+                        <option value="@AggregationTypeIds.Min">Min</option>
+                        <option value="@AggregationTypeIds.Max">Max</option>
+                        <option value="@AggregationTypeIds.Count">Count</option>
+                    </select>
+                </div>
+
+                <!-- Time Range -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Time Range</label>
+                    <select class="@InputCss" @bind="formTimeRangeId">
+                        <option value="@TimeRangeIds.Today">Today</option>
+                        <option value="@TimeRangeIds.Last7Days">Last 7 days</option>
+                        <option value="@TimeRangeIds.Last30Days">Last 30 days</option>
+                        <option value="@TimeRangeIds.ThisMonth">This month</option>
+                        <option value="@TimeRangeIds.ThisYear">This year</option>
+                        <option value="@TimeRangeIds.AllTime">All time</option>
+                    </select>
+                </div>
+
+                <!-- Size -->
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Size</label>
+                    <select class="@InputCss" @bind="formSizeId">
+                        <option value="@PanelSizeIds.Small">Small (1 column)</option>
+                        <option value="@PanelSizeIds.Wide">Wide (2 columns)</option>
+                    </select>
+                </div>
+
+                <!-- Active -->
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="chk-active" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" @bind="formIsActive" />
+                    <label for="chk-active" class="text-sm font-medium text-gray-700 dark:text-slate-300">Active (visible on dashboard)</label>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-slate-700">
+                    <div class="flex items-center gap-3">
+                        <button type="button"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-primary-600 bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-primary-400 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus:ring-offset-slate-900"
+                                @onclick="Save"
+                                disabled="@(isSaving || formTagId == null)">
+                            @if (isSaving)
+                            {
+                                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                            }
+                            Save
+                        </button>
+                        <a href="/dashboard/manage"
+                           class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+                            Cancel
+                        </a>
+                    </div>
+                    <button type="button"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 px-4 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-400 dark:hover:bg-rose-500/10 dark:focus:ring-offset-slate-900"
+                            @onclick="Delete"
+                            disabled="@isSaving">
+                        <Icon Name="trash" Class="h-4 w-4" />
+                        Delete panel
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int PanelId { get; set; }
+
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+
+    private static readonly HashSet<int> NumericInputTypeIds = new()
+    {
+        InputTypeIds.Integer, InputTypeIds.Decimal, InputTypeIds.StarRating,
+        InputTypeIds.StarRating10, InputTypeIds.Percentage, InputTypeIds.Score, InputTypeIds.Score10
+    };
+
+    private DashboardResponse? dashboard;
+    private DashboardPanelResponse? panel;
+    private List<TagResponse>? numericTags;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? loadError;
+    private string? errorMessage;
+
+    // Form state
+    private int? formTagId;
+    private string? formTitle;
+    private int formAggregationTypeId = AggregationTypeIds.LatestValue;
+    private int formTimeRangeId = TimeRangeIds.Today;
+    private int formSizeId = PanelSizeIds.Small;
+    private bool formIsActive = true;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Edit Panel");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            loadError = null;
+
+            var dashboardTask = DashboardApi.GetOrCreateDefault();
+            var tagsTask = ActivityApi.GetTags();
+
+            await Task.WhenAll(dashboardTask, tagsTask);
+
+            dashboard = await dashboardTask;
+            var allTags = await tagsTask;
+
+            numericTags = allTags?
+                .Where(t => t.TypeId.HasValue && NumericInputTypeIds.Contains(t.TypeId.Value))
+                .OrderBy(t => t.Title)
+                .ToList();
+
+            panel = dashboard.Panels.FirstOrDefault(p => p.Id == PanelId);
+
+            if (panel == null)
+            {
+                loadError = "Panel not found.";
+                return;
+            }
+
+            formTagId = panel.TagId;
+            formTitle = panel.Title;
+            formAggregationTypeId = panel.AggregationTypeId;
+            formTimeRangeId = panel.TimeRangeId;
+            formSizeId = panel.SizeId;
+            formIsActive = panel.IsActive;
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Error loading panel: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        if (dashboard == null || panel == null || formTagId == null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            var request = new DashboardPanelRequest
+            {
+                PanelTypeId = panel.PanelTypeId,
+                TagId = formTagId,
+                AggregationTypeId = formAggregationTypeId,
+                TimeRangeId = formTimeRangeId,
+                SizeId = formSizeId,
+                DisplayOrder = panel.DisplayOrder,
+                Title = string.IsNullOrWhiteSpace(formTitle) ? null : formTitle.Trim(),
+                IsActive = formIsActive
+            };
+
+            await DashboardApi.UpdatePanel(dashboard.Id, panel.Id, request);
+            Navigation.NavigateTo("/dashboard/manage");
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var details = await ex.GetContentAsAsync<string>();
+            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "Invalid panel configuration.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving panel: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (dashboard == null || panel == null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            await DashboardApi.RemovePanel(dashboard.Id, panel.Id);
+            Navigation.NavigateTo("/dashboard/manage");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting panel: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

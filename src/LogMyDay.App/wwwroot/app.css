@@ -462,6 +462,13 @@ html.layout-wide .max-w-\(--breakpoint-lg\) {
     max-width: 100% !important;
 }
 
+/* 4-column dashboard grid in wide mode on extra-large screens (2xl+) */
+@media (min-width: 1536px) {
+    html.layout-wide .dashboard-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
 /* Container improvements */
 .container, .container-fluid {
     padding-top: 0;

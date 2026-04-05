@@ -87,9 +87,9 @@
                             </div>
 
                             <div class="flex items-center gap-2">
-                                <button type="button" class="rounded-lg border border-gray-300 p-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => StartEdit(panel)" title="Edit">
+                                <a href="/dashboard/panel/@panel.Id" class="rounded-lg border border-gray-300 p-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800" title="Edit">
                                     <Icon Name="pencil" Class="h-4 w-4" />
-                                </button>
+                                </a>
                                 <button type="button" class="rounded-lg border border-rose-300 p-2 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-400 dark:hover:bg-rose-500/10" @onclick="() => DeletePanel(panel)" title="Delete" disabled="@isSaving">
                                     <Icon Name="trash" Class="h-4 w-4" />
                                 </button>
@@ -103,9 +103,7 @@
         <!-- Add / Edit Panel Form -->
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">
-                    @(editingPanelId.HasValue ? "Edit Panel" : "Add Panel")
-                </h2>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Add Panel</h2>
             </div>
             <div class="space-y-4 p-5">
                 <!-- Panel Type (locked to NumericValue for Phase 1) -->
@@ -144,14 +142,9 @@
                         {
                             <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                         }
-                        @(editingPanelId.HasValue ? "Update Panel" : "Add Panel")
+                        @("Add Panel")
                     </button>
-                    @if (editingPanelId.HasValue)
-                    {
-                        <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="CancelEdit">
-                            Cancel
-                        </button>
-                    }
+                    
                 </div>
             </div>
         </div>
@@ -179,7 +172,6 @@
     private int? formTagId;
     private int formSizeId = PanelSizeIds.Small;
     private string? formTitle;
-    private int? editingPanelId;
 
     protected override void OnInitialized()
     {
@@ -249,23 +241,13 @@
                 AggregationTypeId = AggregationTypeIds.LatestValue,
                 TimeRangeId = TimeRangeIds.Today,
                 SizeId = formSizeId,
-                DisplayOrder = editingPanelId.HasValue
-                    ? panels.First(p => p.Id == editingPanelId.Value).DisplayOrder
-                    : (panels.Count > 0 ? panels.Max(p => p.DisplayOrder) + 1 : 0),
+                DisplayOrder = panels.Count > 0 ? panels.Max(p => p.DisplayOrder) + 1 : 0,
                 Title = string.IsNullOrWhiteSpace(formTitle) ? null : formTitle.Trim(),
                 IsActive = true
             };
 
-            if (editingPanelId.HasValue)
-            {
-                await DashboardApi.UpdatePanel(dashboard.Id, editingPanelId.Value, request);
-                successMessage = "Panel updated.";
-            }
-            else
-            {
-                await DashboardApi.AddPanel(dashboard.Id, request);
-                successMessage = "Panel added.";
-            }
+            await DashboardApi.AddPanel(dashboard.Id, request);
+            successMessage = "Panel added.";
 
             ResetForm();
             await ReloadPanels();
@@ -364,24 +346,8 @@
         }
     }
 
-    private void StartEdit(DashboardPanelResponse panel)
-    {
-        editingPanelId = panel.Id;
-        formTagId = panel.TagId;
-        formSizeId = panel.SizeId;
-        formTitle = panel.Title;
-        successMessage = null;
-        errorMessage = null;
-    }
-
-    private void CancelEdit()
-    {
-        ResetForm();
-    }
-
     private void ResetForm()
     {
-        editingPanelId = null;
         formTagId = null;
         formSizeId = PanelSizeIds.Small;
         formTitle = null;
