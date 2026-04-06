@@ -359,8 +359,15 @@
     protected override async Task OnInitializedAsync()
     {
         AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        Navigation.LocationChanged += OnLocationChanged;
         await RefreshUserInfoAsync();
         await CheckAiAvailability();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        showMobileMenu = false;
+        InvokeAsync(StateHasChanged);
     }
 
     private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
@@ -500,5 +507,6 @@
     public void Dispose()
     {
         AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }
