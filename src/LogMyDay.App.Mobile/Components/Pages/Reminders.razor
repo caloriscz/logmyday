@@ -16,7 +16,7 @@
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
-    <RemindersSectionNav />
+    <RemindersSectionNav RequiredCount="@(unfilledRequiredTags?.Count ?? 0)" />
 
     <div class="max-w-7xl mx-auto px-6 py-4">
         <!-- Date Navigation -->
@@ -39,11 +39,6 @@
         }
         else if (unfilledRequiredTags?.Any() == true)
         {
-            <div class="alert-info mb-6">
-                <i class="bi bi-info-circle"></i>
-                You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
-            </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach (var tag in unfilledRequiredTags)
                 {
@@ -103,7 +98,7 @@
                         </div>
 
                         @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
-                        @if (tag.TypeId != InputTypeIds.Boolean)
+                        @if (!isRatingTag)
                         {
                         <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
                             <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
@@ -251,15 +246,26 @@
             existingActivities.Clear();
             if (unfilledRequiredTags?.Count > 0)
             {
-                var activityFetchTasks = unfilledRequiredTags.Select(t =>
+                // Only fetch existing activities for multi-day granularities (weekly/monthly/yearly).
+                // Daily/Exact/Hourly tags were confirmed unfilled by the server so their fetches would always return empty.
+                var tagsNeedingFetch = unfilledRequiredTags
+                    .Where(t => t.TimeGranularity is Domain.Enums.TimeGranularity.Weekly
+                                                  or Domain.Enums.TimeGranularity.Monthly
+                                                  or Domain.Enums.TimeGranularity.Yearly)
+                    .ToList();
+
+                if (tagsNeedingFetch.Count > 0)
                 {
-                    var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
-                    return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
-                });
-                var activityResults = await Task.WhenAll(activityFetchTasks);
-                for (var i = 0; i < unfilledRequiredTags.Count; i++)
-                {
-                    existingActivities[unfilledRequiredTags[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                    var activityFetchTasks = tagsNeedingFetch.Select(t =>
+                    {
+                        var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
+                        return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
+                    });
+                    var activityResults = await Task.WhenAll(activityFetchTasks);
+                    for (var i = 0; i < tagsNeedingFetch.Count; i++)
+                    {
+                        existingActivities[tagsNeedingFetch[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                    }
                 }
             }
 
