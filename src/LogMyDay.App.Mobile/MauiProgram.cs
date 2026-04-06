@@ -51,6 +51,10 @@ public static class MauiProgram
             builder.Services.AddSingleton<AuthenticationService>(provider => AuthenticationService.Instance);
             System.Diagnostics.Debug.WriteLine("MauiProgram: AuthenticationService registered as singleton instance");
 
+            // Register server configuration service
+            // Legacy ServerConfigurationService replaced by dynamic context/provider pattern
+            System.Diagnostics.Debug.WriteLine("MauiProgram: (Deprecated) ServerConfigurationService skipped");
+
             // Dynamic API context & clients with dynamic authentication
             builder.Services.Add(new ServiceDescriptor(typeof(IApiContext), typeof(ApiContext), ServiceLifetime.Singleton));
             builder.Services.AddTransient<DynamicAuthHandler>();
