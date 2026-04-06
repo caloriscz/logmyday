@@ -2,7 +2,7 @@
 
 <div style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap;" role="radiogroup" aria-label="Rating">
     <button type="button"
-            style="width: 26px; height: 26px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; transition: transform 0.1s; line-height: 1; margin-right: 4px;
+            style="width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; transition: transform 0.1s; line-height: 1; margin-right: 4px;
                    background: @(Value == 0 ? "#6b7280" : "transparent");
                    border: 2px solid @(Value == 0 ? "#6b7280" : "#d1d5db");
                    color: @(Value == 0 ? "#ffffff" : "#9ca3af");"
@@ -13,7 +13,7 @@
     {
         var starValue = i;
         var isFilled = starValue <= (hoverValue ?? Value);
-        var size = MaxStars > 6 ? "24px" : "32px";
+        var size = MaxStars > 6 ? "28px" : "36px";
         <button type="button"
                 style="background: none; border: none; cursor: pointer; padding: 2px; line-height: 0; transition: transform 0.1s; display: inline-flex;"
                 @onclick="() => SetValue(starValue)"
