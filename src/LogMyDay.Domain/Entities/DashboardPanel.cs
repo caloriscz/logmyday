@@ -12,16 +12,14 @@ public class DashboardPanel
     [ForeignKey(nameof(DashboardId))]
     public Dashboard Dashboard { get; set; } = null!;
 
-    public int PanelTypeId { get; set; }
+    public int WidgetTypeId { get; set; }
 
     public int? TagId { get; set; }
 
     [ForeignKey(nameof(TagId))]
     public Tag? Tag { get; set; }
 
-    public int AggregationTypeId { get; set; }
-
-    public int TimeRangeId { get; set; }
+    public string? Parameters { get; set; }
 
     public int SizeId { get; set; }
 

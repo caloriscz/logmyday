@@ -42,13 +42,14 @@
 
         <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div class="space-y-5 p-6">
-                <!-- Panel Type (display only) -->
+                <!-- Widget Type -->
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Panel Type</label>
-                    <select class="@InputCss" disabled>
-                        <option>Numeric Value</option>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Widget Type</label>
+                    <select class="@InputCss" @bind="formWidgetTypeId">
+                        <option value="@WidgetTypeIds.LatestValue">Latest Value</option>
+                        <option value="@WidgetTypeIds.WeeklyAverage">Weekly Average</option>
+                        <option value="@WidgetTypeIds.MonthlyMinMax">Monthly Min / Max</option>
                     </select>
-                    <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">More panel types coming soon.</p>
                 </div>
 
                 <!-- Tag -->
@@ -63,32 +64,6 @@
                         Custom Title <span class="text-gray-400 dark:text-slate-500">(optional)</span>
                     </label>
                     <input type="text" class="@InputCss" @bind="formTitle" placeholder="Leave empty to use tag name" maxlength="100" />
-                </div>
-
-                <!-- Aggregation -->
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Aggregation</label>
-                    <select class="@InputCss" @bind="formAggregationTypeId">
-                        <option value="@AggregationTypeIds.LatestValue">Latest value</option>
-                        <option value="@AggregationTypeIds.Sum">Sum</option>
-                        <option value="@AggregationTypeIds.Average">Average</option>
-                        <option value="@AggregationTypeIds.Min">Min</option>
-                        <option value="@AggregationTypeIds.Max">Max</option>
-                        <option value="@AggregationTypeIds.Count">Count</option>
-                    </select>
-                </div>
-
-                <!-- Time Range -->
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Time Range</label>
-                    <select class="@InputCss" @bind="formTimeRangeId">
-                        <option value="@TimeRangeIds.Today">Today</option>
-                        <option value="@TimeRangeIds.Last7Days">Last 7 days</option>
-                        <option value="@TimeRangeIds.Last30Days">Last 30 days</option>
-                        <option value="@TimeRangeIds.ThisMonth">This month</option>
-                        <option value="@TimeRangeIds.ThisYear">This year</option>
-                        <option value="@TimeRangeIds.AllTime">All time</option>
-                    </select>
                 </div>
 
                 <!-- Size -->
@@ -159,10 +134,12 @@
     // Form state
     private int? formTagId;
     private string? formTitle;
-    private int formAggregationTypeId = AggregationTypeIds.LatestValue;
-    private int formTimeRangeId = TimeRangeIds.Today;
+    private int formWidgetTypeId = WidgetTypeIds.LatestValue;
     private int formSizeId = PanelSizeIds.Small;
     private bool formIsActive = true;
+
+    private void OnPanelTypeChanged() { }
+    private void OnAggregationChanged() { }
 
     protected override void OnInitialized()
     {
@@ -208,8 +185,7 @@
 
             formTagId = panel.TagId;
             formTitle = panel.Title;
-            formAggregationTypeId = panel.AggregationTypeId;
-            formTimeRangeId = panel.TimeRangeId;
+            formWidgetTypeId = panel.WidgetTypeId;
             formSizeId = panel.SizeId;
             formIsActive = panel.IsActive;
         }
@@ -237,10 +213,8 @@
         {
             var request = new DashboardPanelRequest
             {
-                PanelTypeId = panel.PanelTypeId,
+                WidgetTypeId = formWidgetTypeId,
                 TagId = formTagId,
-                AggregationTypeId = formAggregationTypeId,
-                TimeRangeId = formTimeRangeId,
                 SizeId = formSizeId,
                 DisplayOrder = panel.DisplayOrder,
                 Title = string.IsNullOrWhiteSpace(formTitle) ? null : formTitle.Trim(),

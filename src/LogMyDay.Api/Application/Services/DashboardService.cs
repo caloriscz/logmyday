@@ -1,4 +1,6 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services.PanelProviders;
+using LogMyDay.Api.Application.Services.Widgets;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
@@ -12,21 +14,6 @@ public class DashboardService : IDashboardService
 {
     private readonly LogMyDayDbContext _context;
     private readonly ILogger<DashboardService> _logger;
-
-    private static readonly HashSet<int> ValidPanelTypeIds = new()
-    {
-        DashboardPanelTypeIds.NumericValue
-    };
-
-    private static readonly HashSet<int> ValidAggregationTypeIds = new()
-    {
-        AggregationTypeIds.LatestValue
-    };
-
-    private static readonly HashSet<int> ValidTimeRangeIds = new()
-    {
-        TimeRangeIds.Today
-    };
 
     private static readonly HashSet<int> ValidSizeIds = new()
     {
@@ -45,10 +32,13 @@ public class DashboardService : IDashboardService
         InputTypeIds.Score10
     };
 
-    public DashboardService(LogMyDayDbContext context, ILogger<DashboardService> logger)
+    private readonly PanelDataProviderFactory _panelFactory;
+
+    public DashboardService(LogMyDayDbContext context, ILogger<DashboardService> logger, PanelDataProviderFactory panelFactory)
     {
         _context = context;
         _logger = logger;
+        _panelFactory = panelFactory;
     }
 
     public async Task<IList<DashboardResponse>> GetDashboards(Guid userId)
@@ -182,10 +172,9 @@ public class DashboardService : IDashboardService
         var entity = new DashboardPanel
         {
             DashboardId = dashboardId,
-            PanelTypeId = request.PanelTypeId,
+            WidgetTypeId = request.WidgetTypeId,
             TagId = request.TagId,
-            AggregationTypeId = request.AggregationTypeId,
-            TimeRangeId = request.TimeRangeId,
+            Parameters = request.Parameters,
             SizeId = request.SizeId,
             DisplayOrder = request.DisplayOrder,
             Title = request.Title?.Trim(),
@@ -221,10 +210,9 @@ public class DashboardService : IDashboardService
             throw new KeyNotFoundException("Panel not found");
         }
 
-        panel.PanelTypeId = request.PanelTypeId;
+        panel.WidgetTypeId = request.WidgetTypeId;
         panel.TagId = request.TagId;
-        panel.AggregationTypeId = request.AggregationTypeId;
-        panel.TimeRangeId = request.TimeRangeId;
+        panel.Parameters = request.Parameters;
         panel.SizeId = request.SizeId;
         panel.DisplayOrder = request.DisplayOrder;
         panel.Title = request.Title?.Trim();
@@ -288,65 +276,11 @@ public class DashboardService : IDashboardService
             .OrderBy(p => p.DisplayOrder)
             .ToListAsync();
 
-        var today = DateTime.UtcNow.Date;
-        var tomorrow = today.AddDays(1);
-
-        // Collect all tag IDs needed for batch query
-        var tagIds = panels
-            .Where(p => p.TagId.HasValue)
-            .Select(p => p.TagId!.Value)
-            .Distinct()
-            .ToList();
-
-        // Batch load latest activities for all tags at once (today only for Phase 1)
-        var latestActivities = new Dictionary<int, Activity>();
-        if (tagIds.Count > 0)
-        {
-            var todayActivities = await _context.Activities
-                .AsNoTracking()
-                .Where(a => a.UserId == userId
-                    && tagIds.Contains(a.TagId)
-                    && a.DateStarted >= today
-                    && a.DateStarted < tomorrow)
-                .OrderByDescending(a => a.DateStarted)
-                .ToListAsync();
-
-            // Group by tag, take latest per tag
-            foreach (var group in todayActivities.GroupBy(a => a.TagId))
-            {
-                latestActivities[group.Key] = group.First();
-            }
-        }
-
         var panelDataList = new List<PanelDataResponse>();
 
         foreach (var panel in panels)
         {
-            var data = new PanelDataResponse
-            {
-                PanelId = panel.Id,
-                PanelTypeId = panel.PanelTypeId,
-                TagName = panel.Tag?.TagName,
-                UnitSymbol = panel.Tag?.Unit?.Symbol
-            };
-
-            if (panel.TagId.HasValue && latestActivities.TryGetValue(panel.TagId.Value, out var activity))
-            {
-                if (decimal.TryParse(activity.Description, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out var numericValue))
-                {
-                    data.HasData = true;
-                    data.NumericValue = numericValue;
-                    data.DisplayValue = FormatDisplayValue(numericValue, panel.Tag?.Unit?.Symbol);
-                }
-                else if (!string.IsNullOrWhiteSpace(activity.Description))
-                {
-                    // Non-numeric description — show as-is
-                    data.HasData = true;
-                    data.DisplayValue = activity.Description;
-                }
-            }
-
+            var data = await _panelFactory.GetData(panel, userId);
             panelDataList.Add(data);
         }
 
@@ -387,19 +321,11 @@ public class DashboardService : IDashboardService
 
     private async Task ValidatePanelRequest(DashboardPanelRequest request, Guid userId)
     {
-        if (!ValidPanelTypeIds.Contains(request.PanelTypeId))
-        {
-            throw new ArgumentException($"Invalid panel type: {request.PanelTypeId}");
-        }
+        var widget = WidgetCatalog.Get(request.WidgetTypeId);
 
-        if (!ValidAggregationTypeIds.Contains(request.AggregationTypeId))
+        if (widget == null)
         {
-            throw new ArgumentException($"Invalid aggregation type: {request.AggregationTypeId}");
-        }
-
-        if (!ValidTimeRangeIds.Contains(request.TimeRangeId))
-        {
-            throw new ArgumentException($"Invalid time range: {request.TimeRangeId}");
+            throw new ArgumentException($"Unknown widget type: {request.WidgetTypeId}");
         }
 
         if (!ValidSizeIds.Contains(request.SizeId))
@@ -407,11 +333,11 @@ public class DashboardService : IDashboardService
             throw new ArgumentException($"Invalid panel size: {request.SizeId}");
         }
 
-        if (request.PanelTypeId == DashboardPanelTypeIds.NumericValue)
+        if (widget.UsesTag)
         {
             if (!request.TagId.HasValue)
             {
-                throw new ArgumentException("Numeric value panel requires a tag");
+                throw new ArgumentException("This widget requires a tag");
             }
 
             var tag = await _context.Tags
@@ -425,23 +351,9 @@ public class DashboardService : IDashboardService
 
             if (tag.InputTypeId.HasValue && !NumericInputTypeIds.Contains(tag.InputTypeId.Value))
             {
-                throw new ArgumentException("Numeric value panel requires a tag with a numeric input type");
+                throw new ArgumentException("This widget requires a tag with a numeric input type");
             }
         }
-    }
-
-    private static string FormatDisplayValue(decimal value, string? unitSymbol)
-    {
-        var formatted = value == Math.Floor(value)
-            ? value.ToString("0")
-            : value.ToString("0.##");
-
-        if (!string.IsNullOrWhiteSpace(unitSymbol))
-        {
-            return $"{formatted} {unitSymbol}";
-        }
-
-        return formatted;
     }
 
     private static DashboardResponse MapToResponse(Dashboard dashboard)
@@ -461,13 +373,13 @@ public class DashboardService : IDashboardService
         return new DashboardPanelResponse
         {
             Id = panel.Id,
-            PanelTypeId = panel.PanelTypeId,
+            WidgetTypeId = panel.WidgetTypeId,
+            WidgetTypeName = WidgetCatalog.Get(panel.WidgetTypeId)?.Name,
             TagId = panel.TagId,
             TagName = panel.Tag?.TagName,
             TagUnitSymbol = panel.Tag?.Unit?.Symbol,
             InputTypeId = panel.Tag?.InputTypeId,
-            AggregationTypeId = panel.AggregationTypeId,
-            TimeRangeId = panel.TimeRangeId,
+            Parameters = panel.Parameters,
             SizeId = panel.SizeId,
             DisplayOrder = panel.DisplayOrder,
             Title = panel.Title,

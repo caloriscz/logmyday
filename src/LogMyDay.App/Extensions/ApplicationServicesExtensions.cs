@@ -3,6 +3,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Application.Services.Ai;
+using LogMyDay.Api.Application.Services.PanelProviders;
 using LogMyDay.Api.Infrastructure.Email;
 using LogMyDay.Api.Infrastructure.Repositories;
 using LogMyDay.Api.Security;
@@ -33,6 +34,13 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IExcelExportService, ExportService>();
         services.AddScoped<IEventLogService, EventLogService>();
         services.AddScoped<IDashboardService, DashboardService>();
+
+        // Panel Widget providers — order determines resolution priority when multiple providers could match
+        services.AddScoped<IPanelDataProvider, LatestValueProvider>();
+        services.AddScoped<IPanelDataProvider, WeeklyAverageProvider>();
+        services.AddScoped<IPanelDataProvider, MonthlyMinMaxProvider>();
+        services.AddScoped<PanelDataProviderFactory>();
+
         services.AddSingleton<ISettingProtector, SettingProtector>();
         services.AddScoped<ISettingsService, SettingsService>();
 

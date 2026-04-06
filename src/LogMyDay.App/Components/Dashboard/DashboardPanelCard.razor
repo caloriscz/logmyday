@@ -28,8 +28,22 @@
     {
         <div class="mt-3">
             <p class="text-3xl font-bold text-gray-300 dark:text-slate-600">&mdash;</p>
-            <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">No data today</p>
+            <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">@GetNoDataLabel()</p>
         </div>
+    }
+    else if (PanelConfig.WidgetTypeId == WidgetTypeIds.MonthlyMinMax)
+    {
+        <div class="mt-3 flex gap-4">
+            <div>
+                <p class="text-xs font-medium text-gray-400 dark:text-slate-500">Min</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">@PanelData.DisplayValue</p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-400 dark:text-slate-500">Max</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">@PanelData.SecondaryDisplayValue</p>
+            </div>
+        </div>
+        <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">@GetSubtitle()</p>
     }
     else
     {
@@ -63,30 +77,19 @@
         return PanelConfig.TagName ?? "Untitled";
     }
 
-    private string GetSubtitle()
+    private string GetNoDataLabel() => PanelConfig.WidgetTypeId switch
     {
-        var aggregation = PanelConfig.AggregationTypeId switch
-        {
-            AggregationTypeIds.LatestValue => "Latest",
-            AggregationTypeIds.Average => "Average",
-            AggregationTypeIds.Sum => "Sum",
-            AggregationTypeIds.Min => "Min",
-            AggregationTypeIds.Max => "Max",
-            AggregationTypeIds.Count => "Count",
-            _ => ""
-        };
+        WidgetTypeIds.LatestValue => "No data today",
+        WidgetTypeIds.WeeklyAverage => "No data in the last 7 days",
+        WidgetTypeIds.MonthlyMinMax => "No data in the last 30 days",
+        _ => "No data"
+    };
 
-        var timeRange = PanelConfig.TimeRangeId switch
-        {
-            TimeRangeIds.Today => "today",
-            TimeRangeIds.Last7Days => "last 7 days",
-            TimeRangeIds.Last30Days => "last 30 days",
-            TimeRangeIds.ThisMonth => "this month",
-            TimeRangeIds.ThisYear => "this year",
-            TimeRangeIds.AllTime => "all time",
-            _ => ""
-        };
-
-        return $"{aggregation} {timeRange}".Trim();
-    }
+    private string GetSubtitle() => PanelConfig.WidgetTypeId switch
+    {
+        WidgetTypeIds.LatestValue => "Latest value today",
+        WidgetTypeIds.WeeklyAverage => "Average last 7 days",
+        WidgetTypeIds.MonthlyMinMax => "Min / Max last 30 days",
+        _ => PanelConfig.WidgetTypeName ?? ""
+    };
 }

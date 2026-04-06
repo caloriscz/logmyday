@@ -78,7 +78,7 @@
                                     @(!string.IsNullOrWhiteSpace(panel.Title) ? panel.Title : panel.TagName ?? "Untitled")
                                 </p>
                                 <p class="text-xs text-gray-500 dark:text-slate-400">
-                                    @GetPanelTypeLabel(panel.PanelTypeId) · @GetSizeLabel(panel.SizeId)
+                                    @GetWidgetLabel(panel.WidgetTypeId) · @GetSizeLabel(panel.SizeId)
                                     @if (panel.TagId == null)
                                     {
                                         <span class="text-rose-500 dark:text-rose-400"> · Tag removed</span>
@@ -106,13 +106,14 @@
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Add Panel</h2>
             </div>
             <div class="space-y-4 p-5">
-                <!-- Panel Type (locked to NumericValue for Phase 1) -->
+                <!-- Widget Type -->
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Panel Type</label>
-                    <select class="@InputCss" disabled>
-                        <option>Numeric Value</option>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Widget Type</label>
+                    <select class="@InputCss" @bind="formWidgetTypeId">
+                        <option value="@WidgetTypeIds.LatestValue">Latest Value</option>
+                        <option value="@WidgetTypeIds.WeeklyAverage">Weekly Average</option>
+                        <option value="@WidgetTypeIds.MonthlyMinMax">Monthly Min / Max</option>
                     </select>
-                    <p class="mt-1 text-xs text-gray-400 dark:text-slate-500">More panel types coming soon.</p>
                 </div>
 
                 <!-- Tag Selection -->
@@ -170,6 +171,7 @@
 
     // Form state
     private int? formTagId;
+    private int formWidgetTypeId = WidgetTypeIds.LatestValue;
     private int formSizeId = PanelSizeIds.Small;
     private string? formTitle;
 
@@ -236,10 +238,8 @@
         {
             var request = new DashboardPanelRequest
             {
-                PanelTypeId = DashboardPanelTypeIds.NumericValue,
+                WidgetTypeId = formWidgetTypeId,
                 TagId = formTagId,
-                AggregationTypeId = AggregationTypeIds.LatestValue,
-                TimeRangeId = TimeRangeIds.Today,
                 SizeId = formSizeId,
                 DisplayOrder = panels.Count > 0 ? panels.Max(p => p.DisplayOrder) + 1 : 0,
                 Title = string.IsNullOrWhiteSpace(formTitle) ? null : formTitle.Trim(),
@@ -349,6 +349,7 @@
     private void ResetForm()
     {
         formTagId = null;
+        formWidgetTypeId = WidgetTypeIds.LatestValue;
         formSizeId = PanelSizeIds.Small;
         formTitle = null;
     }
@@ -366,14 +367,11 @@
             .ToList();
     }
 
-    private static string GetPanelTypeLabel(int typeId) => typeId switch
+    private static string GetWidgetLabel(int widgetTypeId) => widgetTypeId switch
     {
-        DashboardPanelTypeIds.NumericValue => "Numeric Value",
-        DashboardPanelTypeIds.BooleanStreak => "Boolean Streak",
-        DashboardPanelTypeIds.MiniChart => "Mini Chart",
-        DashboardPanelTypeIds.QuickButton => "Quick Button",
-        DashboardPanelTypeIds.TextNote => "Text Note",
-        DashboardPanelTypeIds.GoalProgress => "Goal Progress",
+        WidgetTypeIds.LatestValue => "Latest Value",
+        WidgetTypeIds.WeeklyAverage => "Weekly Average",
+        WidgetTypeIds.MonthlyMinMax => "Monthly Min / Max",
         _ => "Unknown"
     };
 
