@@ -308,10 +308,6 @@ html:not([data-bs-theme="dark"]) .navbar-brand,
     box-shadow: 0 8px 12px var(--shadow);
 }
 
-a, .btn-link {
-    color: var(--primary-color);
-}
-
 .btn-primary {
     background: linear-gradient(135deg, var(--primary-color), var(--info-color));
     border: none;
