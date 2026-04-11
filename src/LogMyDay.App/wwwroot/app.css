@@ -458,6 +458,13 @@ html.layout-wide .max-w-\(--breakpoint-lg\) {
     max-width: 100% !important;
 }
 
+/* Reminders grid: 4-col only in wide layout mode at large viewport widths */
+@media (min-width: 1920px) {
+    html.layout-wide .reminders-card-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
 /* Container improvements */
 .container, .container-fluid {
     padding-top: 0;
