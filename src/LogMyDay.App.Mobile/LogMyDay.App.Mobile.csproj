@@ -16,6 +16,10 @@
 		
 		<!-- DEBUGGING FIX: Disable Hot Reload - causes debugger to hang when stopping -->
 		<HotReloadEnabled>false</HotReloadEnabled>
+
+		<!-- MAUI Blazor Hybrid serves assets from device storage, not HTTP.
+		     BrotliCompress is unnecessary and fails when DOTNET_HOST_PATH is not set. -->
+		<BlazorEnableCompression>false</BlazorEnableCompression>
 	</PropertyGroup>
 
 	<ItemGroup>

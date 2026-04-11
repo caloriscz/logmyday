@@ -5,16 +5,19 @@
     {
         var scoreValue = i;
         var isSelected = Value == scoreValue;
+        var isHovered = _hoverValue == scoreValue;
         var color = GetScoreColor(scoreValue, MaxScore);
         var size = MaxScore > 6 ? "26px" : "38px";
         var fontSize = MaxScore > 6 ? "0.65rem" : "0.8rem";
         <button type="button"
                 style="width: @size; height: @size; border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: @fontSize; font-weight: 700; transition: transform 0.1s, box-shadow 0.1s; line-height: 1;
-                       background: @(isSelected ? color : "transparent");
-                       border: 2px solid @(isSelected ? color : "#9ca3af");
-                       color: @(isSelected ? "#ffffff" : "#9ca3af");
-                       box-shadow: @(isSelected ? $"0 0 0 2px {color}40" : "none");"
+                       background: @(isSelected ? color : isHovered ? $"{color}30" : "transparent");
+                       border: 2px solid @(isSelected || isHovered ? color : "#9ca3af");
+                       color: @(isSelected ? "#ffffff" : isHovered ? color : "#9ca3af");
+                       box-shadow: @(isSelected ? "0 0 0 3px #f59e0b80" : "none");"
                 @onclick="() => ToggleValue(scoreValue)"
+                @onmouseover="() => _hoverValue = scoreValue"
+                @onmouseout="() => _hoverValue = null"
                 title="@scoreValue"
                 aria-label="Score @scoreValue"
                 aria-pressed="@isSelected">
@@ -37,6 +40,8 @@
     [Parameter] public int? Value { get; set; }
     [Parameter] public EventCallback<int> ValueChanged { get; set; }
     [Parameter] public int MaxScore { get; set; } = 5;
+
+    private int? _hoverValue;
 
     private async Task ToggleValue(int value)
     {

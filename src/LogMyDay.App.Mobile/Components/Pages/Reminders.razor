@@ -42,7 +42,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach (var tag in unfilledRequiredTags)
                 {
-                    <div class="card border-l-4 border-yellow-500">
+                    <div @key="tag.Id" class="card border-l-4 border-yellow-500 transition duration-300 @(_dismissingTagIds.Contains(tag.Id) ? "opacity-0 scale-95 pointer-events-none" : "")">
                         <div class="flex justify-between items-start mb-2">
                             <h5 class="font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
                                 <i class="bi bi-exclamation-triangle"></i>
@@ -79,23 +79,6 @@
                                 Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
                             </div>
                         }
-
-                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                            @if (tag.IsRepeatable)
-                            {
-                                <div class="flex items-center gap-1">
-                                    <i class="bi bi-arrow-repeat"></i>
-                                    <span>Repeatable</span>
-                                </div>
-                            }
-                            @if (tag.IsRange)
-                            {
-                                <div class="flex items-center gap-1">
-                                    <i class="bi bi-arrows-expand"></i>
-                                    <span>Range Values</span>
-                                </div>
-                            }
-                        </div>
 
                         @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
                         @if (!isRatingTag)
@@ -177,6 +160,7 @@
     private bool showAddActivityModal = false;
     private bool shouldShowModalAfterRender = false;
     private readonly HashSet<int> quickAddInProgress = new();
+    private readonly HashSet<int> _dismissingTagIds = new();
     private readonly Dictionary<int, int> _inlinePickerValues = new();
     private readonly Dictionary<int, bool> _boolPickerValues = new();
     private readonly Dictionary<int, ActivityResponse?> existingActivities = new();
@@ -358,15 +342,17 @@
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
-        // Refresh the reminders list
-        await LoadRequiredTags();
+        showAddActivityModal = false;
 
-        if (activity.PrimaryTagId.HasValue)
+        if (activity?.PrimaryTagId.HasValue == true)
         {
             SystemNotificationService.MarkTagFulfilled(activity.PrimaryTagId.Value, DateOnly.FromDateTime(selectedDate));
+            _dismissingTagIds.Add(activity.PrimaryTagId.Value);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != activity.PrimaryTagId.Value).ToList();
+            _dismissingTagIds.Remove(activity.PrimaryTagId.Value);
         }
-
-        showAddActivityModal = false;
 
         // Reset the form but keep the date
         var today = GetTodayInDisplayZone();
@@ -497,8 +483,14 @@
                 await ActivityApi.CreateCalendarItem(request);
             }
 
+            StateHasChanged();
+            await Task.Delay(300);
             _boolPickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
@@ -553,8 +545,12 @@
             };
 
             await ActivityApi.CreateCalendarItem(request);
-            await LoadRequiredTags();
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -655,8 +651,14 @@
                 await ActivityApi.CreateCalendarItem(request);
             }
 
+            StateHasChanged();
+            await Task.Delay(300);
             _inlinePickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)

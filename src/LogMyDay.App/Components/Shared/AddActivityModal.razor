@@ -482,6 +482,7 @@
             else if (!AddAnotherAfterSave)
             {
                 await OnActivityCreated.InvokeAsync(Activity);
+                anyActivitiesCreated = false;
                 await HandleCloseClick();
             }
             else
