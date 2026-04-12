@@ -416,6 +416,12 @@
     {
         try
         {
+            if (!Activity.PrimaryTagId.HasValue || Activity.PrimaryTagId.Value == 0)
+            {
+                await OnError.InvokeAsync("Please select a tag before saving.");
+                return;
+            }
+
             if (Activity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
             {
                 if (selectedTag.TimeGranularity != TimeGranularity.Exact)
@@ -476,6 +482,7 @@
             else if (!AddAnotherAfterSave)
             {
                 await OnActivityCreated.InvokeAsync(Activity);
+                anyActivitiesCreated = false;
                 await HandleCloseClick();
             }
             else

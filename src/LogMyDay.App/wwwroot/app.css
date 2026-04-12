@@ -308,10 +308,6 @@ html:not([data-bs-theme="dark"]) .navbar-brand,
     box-shadow: 0 8px 12px var(--shadow);
 }
 
-a, .btn-link {
-    color: var(--primary-color);
-}
-
 .btn-primary {
     background: linear-gradient(135deg, var(--primary-color), var(--info-color));
     border: none;
@@ -460,6 +456,13 @@ html.layout-wide .max-w-screen-lg,
 html.layout-wide .max-w-\(--breakpoint-2xl\),
 html.layout-wide .max-w-\(--breakpoint-lg\) {
     max-width: 100% !important;
+}
+
+/* Reminders grid: 4-col only in wide layout mode at large viewport widths */
+@media (min-width: 1920px) {
+    html.layout-wide .reminders-card-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 /* Container improvements */

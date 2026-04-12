@@ -28,7 +28,7 @@ public static class DataSeederExtensions
                 IsMinimumEditable = false,
                 IsMaximumEditable = false,
                 IsStepEditable = false,
-                IsRepeatableEditable = false,
+                IsRepeatableEditable = true,
                 Description = "Free-form text input" 
             },
             new InputType 

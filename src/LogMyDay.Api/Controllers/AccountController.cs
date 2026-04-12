@@ -1,3 +1,4 @@
+using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
@@ -117,7 +118,7 @@ public class AccountController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            if (string.IsNullOrWhiteSpace(request.Email) || !IsValidEmail(request.Email))
+            if (string.IsNullOrWhiteSpace(request.Email) || !EmailValidator.IsValidEmail(request.Email))
             {
                 return BadRequest("Valid email is required.");
             }
@@ -166,16 +167,4 @@ public class AccountController : ControllerBase
         }
     }
 
-    private static bool IsValidEmail(string email)
-    {
-        try
-        {
-            var addr = new System.Net.Mail.MailAddress(email);
-            return addr.Address == email;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

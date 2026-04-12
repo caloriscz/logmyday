@@ -54,7 +54,7 @@ else
         <span>An unhandled error has occurred.</span>
         <div class="flex items-center gap-3">
             <a href="." class="text-white underline hover:no-underline">Reload</a>
-            <button class="text-white text-2xl leading-none hover:opacity-70" onclick="document.getElementById('blazor-error-ui').classList.add('hidden')">&times;</button>
+            <button class="text-white text-2xl leading-none hover:opacity-70" onclick="var e=document.getElementById('blazor-error-ui');e.style.display='none';e.classList.add('hidden')">&times;</button>
         </div>
     </div>
 </div>

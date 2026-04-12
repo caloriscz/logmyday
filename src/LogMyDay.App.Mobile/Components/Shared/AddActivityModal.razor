@@ -413,6 +413,12 @@
     {
         try
         {
+            if (!Activity.PrimaryTagId.HasValue || Activity.PrimaryTagId.Value == 0)
+            {
+                await OnError.InvokeAsync("Please select a tag before saving.");
+                return;
+            }
+
             // Check for duplicates if tag is selected and not repeatable
             if (Activity.PrimaryTagId.HasValue && selectedTag != null && !selectedTag.IsRepeatable)
             {

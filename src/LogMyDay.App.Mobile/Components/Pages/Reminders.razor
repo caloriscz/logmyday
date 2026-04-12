@@ -16,7 +16,7 @@
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
-    <RemindersSectionNav />
+    <RemindersSectionNav RequiredCount="@(unfilledRequiredTags?.Count ?? 0)" />
 
     <div class="max-w-7xl mx-auto px-6 py-4">
         <!-- Date Navigation -->
@@ -39,15 +39,10 @@
         }
         else if (unfilledRequiredTags?.Any() == true)
         {
-            <div class="alert-info mb-6">
-                <i class="bi bi-info-circle"></i>
-                You have <strong>@unfilledRequiredTags.Count</strong> required tag(s) that haven't been filled for @FormatDate(selectedDate).
-            </div>
-
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach (var tag in unfilledRequiredTags)
                 {
-                    <div class="card border-l-4 border-yellow-500">
+                    <div @key="tag.Id" class="card border-l-4 border-yellow-500 transition duration-300 @(_dismissingTagIds.Contains(tag.Id) ? "opacity-0 scale-95 pointer-events-none" : "")">
                         <div class="flex justify-between items-start mb-2">
                             <h5 class="font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
                                 <i class="bi bi-exclamation-triangle"></i>
@@ -85,25 +80,8 @@
                             </div>
                         }
 
-                        <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                            @if (tag.IsRepeatable)
-                            {
-                                <div class="flex items-center gap-1">
-                                    <i class="bi bi-arrow-repeat"></i>
-                                    <span>Repeatable</span>
-                                </div>
-                            }
-                            @if (tag.IsRange)
-                            {
-                                <div class="flex items-center gap-1">
-                                    <i class="bi bi-arrows-expand"></i>
-                                    <span>Range Values</span>
-                                </div>
-                            }
-                        </div>
-
                         @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
-                        @if (tag.TypeId != InputTypeIds.Boolean)
+                        @if (!isRatingTag)
                         {
                         <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
                             <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
@@ -182,6 +160,7 @@
     private bool showAddActivityModal = false;
     private bool shouldShowModalAfterRender = false;
     private readonly HashSet<int> quickAddInProgress = new();
+    private readonly HashSet<int> _dismissingTagIds = new();
     private readonly Dictionary<int, int> _inlinePickerValues = new();
     private readonly Dictionary<int, bool> _boolPickerValues = new();
     private readonly Dictionary<int, ActivityResponse?> existingActivities = new();
@@ -251,15 +230,26 @@
             existingActivities.Clear();
             if (unfilledRequiredTags?.Count > 0)
             {
-                var activityFetchTasks = unfilledRequiredTags.Select(t =>
+                // Only fetch existing activities for multi-day granularities (weekly/monthly/yearly).
+                // Daily/Exact/Hourly tags were confirmed unfilled by the server so their fetches would always return empty.
+                var tagsNeedingFetch = unfilledRequiredTags
+                    .Where(t => t.TimeGranularity is Domain.Enums.TimeGranularity.Weekly
+                                                  or Domain.Enums.TimeGranularity.Monthly
+                                                  or Domain.Enums.TimeGranularity.Yearly)
+                    .ToList();
+
+                if (tagsNeedingFetch.Count > 0)
                 {
-                    var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
-                    return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
-                });
-                var activityResults = await Task.WhenAll(activityFetchTasks);
-                for (var i = 0; i < unfilledRequiredTags.Count; i++)
-                {
-                    existingActivities[unfilledRequiredTags[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                    var activityFetchTasks = tagsNeedingFetch.Select(t =>
+                    {
+                        var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
+                        return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
+                    });
+                    var activityResults = await Task.WhenAll(activityFetchTasks);
+                    for (var i = 0; i < tagsNeedingFetch.Count; i++)
+                    {
+                        existingActivities[tagsNeedingFetch[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
+                    }
                 }
             }
 
@@ -352,15 +342,17 @@
 
     private async Task OnActivityCreated(ActivityRequest activity)
     {
-        // Refresh the reminders list
-        await LoadRequiredTags();
+        showAddActivityModal = false;
 
-        if (activity.PrimaryTagId.HasValue)
+        if (activity?.PrimaryTagId.HasValue == true)
         {
             SystemNotificationService.MarkTagFulfilled(activity.PrimaryTagId.Value, DateOnly.FromDateTime(selectedDate));
+            _dismissingTagIds.Add(activity.PrimaryTagId.Value);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != activity.PrimaryTagId.Value).ToList();
+            _dismissingTagIds.Remove(activity.PrimaryTagId.Value);
         }
-
-        showAddActivityModal = false;
 
         // Reset the form but keep the date
         var today = GetTodayInDisplayZone();
@@ -491,8 +483,14 @@
                 await ActivityApi.CreateCalendarItem(request);
             }
 
+            StateHasChanged();
+            await Task.Delay(300);
             _boolPickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
@@ -547,8 +545,12 @@
             };
 
             await ActivityApi.CreateCalendarItem(request);
-            await LoadRequiredTags();
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -649,8 +651,14 @@
                 await ActivityApi.CreateCalendarItem(request);
             }
 
+            StateHasChanged();
+            await Task.Delay(300);
             _inlinePickerValues.Remove(tag.Id);
-            await LoadRequiredTags();
+            _dismissingTagIds.Add(tag.Id);
+            StateHasChanged();
+            await Task.Delay(300);
+            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
+            _dismissingTagIds.Remove(tag.Id);
             SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)

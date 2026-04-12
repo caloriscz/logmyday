@@ -1,5 +1,6 @@
 namespace LogMyDay.Api.Infrastructure.Data;
 
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -17,15 +18,15 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
 
         // Try to find the LogMyDay.App project folder to load configuration
         var currentDir = Directory.GetCurrentDirectory();
-        Console.WriteLine($"[LogMyDayDbContextFactory] Current Directory: {currentDir}");
-        Console.WriteLine($"[LogMyDayDbContextFactory] Environment: {environmentName}");
+        Debug.WriteLine($"[LogMyDayDbContextFactory] Current Directory: {currentDir}");
+        Debug.WriteLine($"[LogMyDayDbContextFactory] Environment: {environmentName}");
 
         var appProjectDir = FindAppProjectDirectory(currentDir);
-        Console.WriteLine($"[LogMyDayDbContextFactory] App Project Directory resolved to: {appProjectDir ?? "Not Found"}");
+        Debug.WriteLine($"[LogMyDayDbContextFactory] App Project Directory resolved to: {appProjectDir ?? "Not Found"}");
 
         if (appProjectDir == null)
         {
-             Console.WriteLine("[LogMyDayDbContextFactory] WARNING: Could not find LogMyDay.App directory. Configuration might not be loaded.");
+             Debug.WriteLine("[LogMyDayDbContextFactory] WARNING: Could not find LogMyDay.App directory. Configuration might not be loaded.");
         }
 
         var builder = new ConfigurationBuilder()
@@ -43,13 +44,13 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
             ? dbOptions.ConnectionString
             : configuration.GetConnectionString("DefaultConnection");
 
-        Console.WriteLine($"[LogMyDayDbContextFactory] Provider: {dbOptions.Provider}");
-        Console.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
+        Debug.WriteLine($"[LogMyDayDbContextFactory] Provider: {dbOptions.Provider}");
+        Debug.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
 
         if (string.IsNullOrEmpty(connectionString))
         {
-            Console.WriteLine("[LogMyDayDbContextFactory] ERROR: Connection string not found.");
-            Console.WriteLine("[LogMyDayDbContextFactory] Please ensure appsettings.json or appsettings.Development.json exists in LogMyDay.App and contains the connection string.");
+            Debug.WriteLine("[LogMyDayDbContextFactory] ERROR: Connection string not found.");
+            Debug.WriteLine("[LogMyDayDbContextFactory] Please ensure appsettings.json or appsettings.Development.json exists in LogMyDay.App and contains the connection string.");
 
             throw new InvalidOperationException("Could not find a database connection string.");
         }

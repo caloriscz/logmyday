@@ -1,35 +1,35 @@
 @using Microsoft.AspNetCore.Components
 
-<div style="display: flex; align-items: center; gap: 10px;" role="group" aria-label="Boolean value">
+<div style="display: flex; align-items: center; justify-content: center; gap: 10px;" role="group" aria-label="Boolean value">
     <button type="button"
             style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; cursor: pointer;
                    font-size: 0.875rem; font-weight: 600; border: none; outline: none;
                    background: #16a34a; color: #ffffff;
                    transform: @(Value == true ? "scale(0.94)" : "scale(1)");
-                   box-shadow: @(Value == true ? "inset 0 2px 4px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.15)");
+                   box-shadow: @(Value == true ? "0 0 0 3px #16a34a60, inset 0 2px 4px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.15)");
                    transition: transform 0.1s, box-shadow 0.1s;"
             @onclick="() => Toggle(true)"
             aria-pressed="@(Value == true)"
-            title="True">
+            title="Yes">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px;">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
         </svg>
-        True
+        Yes
     </button>
     <button type="button"
             style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; cursor: pointer;
                    font-size: 0.875rem; font-weight: 600; border: none; outline: none;
                    background: #dc2626; color: #ffffff;
                    transform: @(Value == false ? "scale(0.94)" : "scale(1)");
-                   box-shadow: @(Value == false ? "inset 0 2px 4px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.15)");
+                   box-shadow: @(Value == false ? "0 0 0 3px #dc262660, inset 0 2px 4px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.15)");
                    transition: transform 0.1s, box-shadow 0.1s;"
             @onclick="() => Toggle(false)"
             aria-pressed="@(Value == false)"
-            title="False">
+            title="No">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px;">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
         </svg>
-        False
+        No
     </button>
 </div>
 
