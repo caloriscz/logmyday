@@ -100,7 +100,7 @@ public class ExtensionManager
         return true;
     }
 
-    public async Task<int> RunAsync(string name, CliApiContext apiContext, ICredentialStore credentialStore, ConfigManager configManager)
+    public async Task<int> RunAsync(string name, CliApiContext apiContext, ICredentialStore credentialStore, ConfigManager configManager, string[]? extraArgs = null)
     {
         var manifest = Get(name);
 
@@ -129,6 +129,14 @@ public class ExtensionManager
         if (manifest.Args is { Length: > 0 })
         {
             foreach (var arg in manifest.Args)
+            {
+                startInfo.ArgumentList.Add(arg);
+            }
+        }
+
+        if (extraArgs is { Length: > 0 })
+        {
+            foreach (var arg in extraArgs)
             {
                 startInfo.ArgumentList.Add(arg);
             }

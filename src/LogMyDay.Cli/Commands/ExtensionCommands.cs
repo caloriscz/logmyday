@@ -156,7 +156,8 @@ public class ExtensionCommands
 
     [Command("run", Description = "Run an installed extension")]
     public async Task Run(
-        [Argument(Description = "Extension name")] string name)
+        [Argument(Description = "Extension name")] string name,
+        [Argument(Description = "Extra arguments passed through to the extension")] string[] extraArgs = default!)
     {
         LoadActiveAccount();
 
@@ -164,7 +165,7 @@ public class ExtensionCommands
 
         try
         {
-            exitCode = await _extensionManager.RunAsync(name, _apiContext, _credentialStore, _configManager);
+            exitCode = await _extensionManager.RunAsync(name, _apiContext, _credentialStore, _configManager, extraArgs);
         }
         catch (InvalidOperationException ex)
         {
