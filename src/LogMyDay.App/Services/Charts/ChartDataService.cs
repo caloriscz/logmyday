@@ -23,10 +23,22 @@ public class ChartDataService : IChartDataService
         var inputTypes = await _activityApi.GetInputTypesAsync();
         var inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
 
-        var numericTypeIds = new HashSet<int?>(
-            inputTypes
-                .Where(it => it.Name is "Integer" or "Decimal" or "Decimal, precision 2" or "Rating 1-5" or "Rating 1-10" or "Percentage")
-                .Select(it => (int?)it.Id));
+        var numericTypeIds = new HashSet<int?>
+        {
+            InputTypeIds.Integer,
+            InputTypeIds.Decimal,
+            InputTypeIds.StarRating,
+            InputTypeIds.StarRating10,
+            InputTypeIds.Score,
+            InputTypeIds.Score10,
+            InputTypeIds.Percentage
+        };
+        // Add Decimal precision 2 by name (no dedicated constant)
+        var decimalP2Id = inputTypes.FirstOrDefault(it => it.Name == "Decimal, precision 2")?.Id;
+        if (decimalP2Id.HasValue)
+        {
+            numericTypeIds.Add(decimalP2Id.Value);
+        }
 
         var allTags = await _activityApi.GetTags();
         var numericTags = allTags

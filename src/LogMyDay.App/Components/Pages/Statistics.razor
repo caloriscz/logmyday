@@ -2,6 +2,7 @@
 @using LogMyDay.Shared.Interfaces
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.App.Services
+@using LogMyDay.Domain.Constants
 @inject IActivityApi ActivityApi
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
@@ -254,22 +255,26 @@
             var inputTypes = await ActivityApi.GetInputTypesAsync();
             inputTypeNames = inputTypes.ToDictionary(it => it.Id, it => it.Name);
             
-            // Find the IDs for numeric input types
-            var integerTypeId = inputTypes.FirstOrDefault(it => it.Name == "Integer")?.Id;
-            var decimalTypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal")?.Id;
+            // Numeric types using constants; add Decimal precision 2 by name (no constant defined)
+            var numericTypeIds = new HashSet<int>
+            {
+                InputTypeIds.Integer,
+                InputTypeIds.Decimal,
+                InputTypeIds.StarRating,
+                InputTypeIds.StarRating10,
+                InputTypeIds.Score,
+                InputTypeIds.Score10
+            };
             var decimalP2TypeId = inputTypes.FirstOrDefault(it => it.Name == "Decimal, precision 2")?.Id;
-            var rating5TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-5")?.Id;
-            var rating10TypeId = inputTypes.FirstOrDefault(it => it.Name == "Rating 1-10")?.Id;
-            
+            if (decimalP2TypeId.HasValue)
+            {
+                numericTypeIds.Add(decimalP2TypeId.Value);
+            }
+
             // Load tags and filter by numeric input types
             var allTags = await ActivityApi.GetTags();
             numericTags = allTags
-                .Where(t => t.InputTypeId.HasValue && 
-                           (t.InputTypeId == integerTypeId || 
-                            t.InputTypeId == decimalTypeId ||
-                            t.InputTypeId == decimalP2TypeId ||
-                            t.InputTypeId == rating5TypeId ||
-                            t.InputTypeId == rating10TypeId))
+                .Where(t => t.InputTypeId.HasValue && numericTypeIds.Contains(t.InputTypeId.Value))
                 .OrderBy(t => t.Title)
                 .ToList();
         }
