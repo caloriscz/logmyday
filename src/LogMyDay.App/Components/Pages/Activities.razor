@@ -19,18 +19,14 @@
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Activities", "Browse and manage all logged activities")]
 
 <div class="mx-auto max-w-(--breakpoint-2xl) px-4 py-6 space-y-6 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-2">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
-            <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
-        </div>
-        <div class="flex items-center">
+    <PageHeader Title="Activities" Subtitle="Review and manage your logged activities.">
+        <Actions>
             <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
                 <Icon Name="plus" Class="h-4 w-4" />
                 Add Activity
             </button>
-        </div>
-    </div>
+        </Actions>
+    </PageHeader>
 
     @if (displayType != "daily" && pagedResult != null)
     {
@@ -63,9 +59,7 @@
     }
     else if (pagedResult == null)
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            Loading activities…
-        </div>
+        <EmptyState Message="Loading activities…" />
     }
     else if (displayType == "daily")
     {
@@ -89,9 +83,7 @@
 
             @if (!pagedResult.Items.Any())
             {
-                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    No activities found for @FormatDate(selectedDate).
-                </div>
+                <EmptyState>No activities found for @FormatDate(selectedDate).</EmptyState>
             }
             else
             {
@@ -127,22 +119,9 @@
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             @{ var dailyTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            @if (IsStarRatingTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyStars))
-                                            {
-                                                <StarDisplay Value="@dailyStars" MaxStars="@GetStarMax(dailyTag!)" />
-                                            }
-                                            else if (IsScoreTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyScore))
-                                            {
-                                                <ScoreDisplay Value="@dailyScore" MaxScore="@GetStarMax(dailyTag!)" />
-                                            }
-                                            else if (dailyTag?.TypeId == InputTypeIds.Boolean)
-                                            {
-                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
-                                            }
-                                            else
-                                            {
-                                                @GetActivityDisplayValue(activity)
-                                            }
+                                            <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                            </ActivityValueDisplay>
                                         </td>
                                         <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                     </tr>
@@ -163,28 +142,16 @@
                                             @activity.PrimaryTagName
                                         </span>
                                     </h3>
-                                    @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
-                                        if (IsStarRatingTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardStars))
-                                        {
-                                            <div class="mt-1"><StarDisplay Value="@dailyCardStars" MaxStars="@GetStarMax(dailyCardTag!)" /></div>
-                                        }
-                                        else if (IsScoreTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardScore))
-                                        {
-                                            <div class="mt-1"><ScoreDisplay Value="@dailyCardScore" MaxScore="@GetStarMax(dailyCardTag!)" /></div>
-                                        }
-                                        else if (dailyCardTag?.TypeId == InputTypeIds.Boolean)
-                                        {
-                                            <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
-                                        }
-                                        else
-                                        {
-                                            var displayValue = GetActivityDisplayValue(activity);
-                                            if (!string.IsNullOrWhiteSpace(displayValue))
+                                    @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                    <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                        <TextFallback>
+                                            @{ var dailyCardDisplayValue = GetActivityDisplayValue(activity); }
+                                            @if (!string.IsNullOrWhiteSpace(dailyCardDisplayValue))
                                             {
-                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@dailyCardDisplayValue</p>
                                             }
-                                        }
-                                    }
+                                        </TextFallback>
+                                    </ActivityValueDisplay>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <div class="flex items-center gap-2">
@@ -211,9 +178,7 @@
     }
     else if (!pagedResult.Items.Any())
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            No activities found for the selected criteria.
-        </div>
+        <EmptyState Message="No activities found for the selected criteria." />
     }
     else
     {
@@ -255,22 +220,9 @@
                                             </td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                                 @{ var groupTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                                @if (IsStarRatingTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupStars))
-                                                {
-                                                    <StarDisplay Value="@groupStars" MaxStars="@GetStarMax(groupTag!)" />
-                                                }
-                                                else if (IsScoreTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupScore))
-                                                {
-                                                    <ScoreDisplay Value="@groupScore" MaxScore="@GetStarMax(groupTag!)" />
-                                                }
-                                                else if (groupTag?.TypeId == InputTypeIds.Boolean)
-                                                {
-                                                    <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
-                                                }
-                                                else
-                                                {
-                                                    @GetActivityDisplayValue(activity)
-                                                }
+                                                <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                    <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                                </ActivityValueDisplay>
                                             </td>
                                             <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                         </tr>
@@ -291,28 +243,16 @@
                                                 @activity.PrimaryTagName
                                             </span>
                                         </h3>
-                                        @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
-                                            if (IsStarRatingTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardStars))
-                                            {
-                                                <div class="mt-1"><StarDisplay Value="@groupCardStars" MaxStars="@GetStarMax(groupCardTag!)" /></div>
-                                            }
-                                            else if (IsScoreTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardScore))
-                                            {
-                                                <div class="mt-1"><ScoreDisplay Value="@groupCardScore" MaxScore="@GetStarMax(groupCardTag!)" /></div>
-                                            }
-                                            else if (groupCardTag?.TypeId == InputTypeIds.Boolean)
-                                            {
-                                                <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
-                                            }
-                                            else
-                                            {
-                                                var displayValue = GetActivityDisplayValue(activity);
-                                                if (!string.IsNullOrWhiteSpace(displayValue))
+                                        @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                        <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                            <TextFallback>
+                                                @{ var groupCardDisplayValue = GetActivityDisplayValue(activity); }
+                                                @if (!string.IsNullOrWhiteSpace(groupCardDisplayValue))
                                                 {
-                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@groupCardDisplayValue</p>
                                                 }
-                                            }
-                                        }
+                                            </TextFallback>
+                                        </ActivityValueDisplay>
                                     </div>
                                     <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                         <Icon Name="trash" Class="w-4 h-4" />
@@ -684,15 +624,6 @@
 
         return valueForDisplay;
     }
-
-    private static bool IsStarRatingTag(TagResponse? tag) =>
-        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
-
-    private static bool IsScoreTag(TagResponse? tag) =>
-        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
-
-    private static int GetStarMax(TagResponse tag) =>
-        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
 
     private async Task OnDisplayTypeChanged(ChangeEventArgs e)
     {

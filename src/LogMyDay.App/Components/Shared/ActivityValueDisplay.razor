@@ -1,0 +1,54 @@
+@using LogMyDay.Domain.Constants
+
+@{
+    var maxScore = (TypeId == InputTypeIds.StarRating10 || TypeId == InputTypeIds.Score10) ? 10 : 5;
+}
+
+@if (TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(Value, out var stars))
+{
+    @if (WrapperClass is not null)
+    {
+        <div class="@WrapperClass"><StarDisplay Value="@stars" MaxStars="@maxScore" /></div>
+    }
+    else
+    {
+        <StarDisplay Value="@stars" MaxStars="@maxScore" />
+    }
+}
+else if (TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(Value, out var score))
+{
+    @if (WrapperClass is not null)
+    {
+        <div class="@WrapperClass"><ScoreDisplay Value="@score" MaxScore="@maxScore" /></div>
+    }
+    else
+    {
+        <ScoreDisplay Value="@score" MaxScore="@maxScore" />
+    }
+}
+else if (TypeId == InputTypeIds.Boolean)
+{
+    @if (WrapperClass is not null)
+    {
+        <div class="@WrapperClass"><BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" /></div>
+    }
+    else
+    {
+        <BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" />
+    }
+}
+else if (TextFallback is not null)
+{
+    @TextFallback
+}
+else if (!string.IsNullOrEmpty(Value))
+{
+    <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">@Value</div>
+}
+
+@code {
+    [Parameter] public int? TypeId { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? WrapperClass { get; set; }
+    [Parameter] public RenderFragment? TextFallback { get; set; }
+}

@@ -39,12 +39,7 @@
                     <h2 class="text-lg font-semibold">Profile Information</h2>
                 </div>
                 <div class="space-y-5 p-6">
-                    @if (!string.IsNullOrEmpty(profileStatusMessage))
-                    {
-                        <div class="rounded-lg border @(profileStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
-                            @profileStatusMessage
-                        </div>
-                    }
+                    <StatusAlert Message="@profileStatusMessage" IsError="@profileStatusIsError" />
 
                     <EditForm Model="profile" OnValidSubmit="SaveProfileAsync">
                         <DataAnnotationsValidator />
@@ -107,12 +102,7 @@
                     <h2 class="text-lg font-semibold">Change Password</h2>
                 </div>
                 <div class="space-y-5 p-6">
-                    @if (!string.IsNullOrEmpty(passwordStatusMessage))
-                    {
-                        <div class="rounded-lg border @(passwordStatusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
-                            @passwordStatusMessage
-                        </div>
-                    }
+                    <StatusAlert Message="@passwordStatusMessage" IsError="@passwordStatusIsError" />
 
                     <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
                         <DataAnnotationsValidator />

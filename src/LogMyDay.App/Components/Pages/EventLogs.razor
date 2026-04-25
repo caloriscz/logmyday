@@ -12,27 +12,20 @@
 @attribute [Authorize]
 
 <div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-1">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Event Log</h1>
-            <p class="text-sm text-gray-600 dark:text-slate-300">System events and error messages for your account.</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <select @bind="selectedLevel" @bind:after="LoadEvents"
-                    class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                <option value="">All Levels</option>
-                <option value="Info">Info</option>
-                <option value="Error">Error</option>
-            </select>
-        </div>
-    </div>
+    <PageHeader Title="Event Log" Subtitle="System events and error messages for your account.">
+        <Actions>
+            <div class="flex items-center gap-3">
+                <select @bind="selectedLevel" @bind:after="LoadEvents"
+                        class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                    <option value="">All Levels</option>
+                    <option value="Info">Info</option>
+                    <option value="Error">Error</option>
+                </select>
+            </div>
+        </Actions>
+    </PageHeader>
 
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-        <div class="rounded-lg border @(statusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-100" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
-            @statusMessage
-        </div>
-    }
+    <StatusAlert Message="@statusMessage" IsError="@statusIsError" />
 
     @if (isLoading)
     {

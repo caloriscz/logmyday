@@ -23,21 +23,7 @@
         <p class="text-sm text-gray-600 dark:text-slate-300">Generate and download activity reports in various formats.</p>
     </div>
 
-    @if (!string.IsNullOrEmpty(state.StatusMessage))
-    {
-        <div class="rounded-lg border @(state.IsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" : "border-green-200 bg-green-50 text-green-700 dark:border-green-500/40 dark:bg-green-500/20 dark:text-green-200") px-4 py-3 shadow-xs">
-            <div class="flex items-start justify-between gap-3">
-                <div class="flex items-start gap-2">
-                    <Icon Name="@(state.IsError ? "exclamation-triangle" : "check-circle")" Class="h-5 w-5 mt-0.5 shrink-0" />
-                    <span class="text-sm">@state.StatusMessage</span>
-                </div>
-                <button type="button" class="text-current hover:opacity-70 transition-opacity" @onclick="() => state.ClearStatus()">
-                    <Icon Name="close" Class="h-5 w-5" />
-                    <span class="sr-only">Close</span>
-                </button>
-            </div>
-        </div>
-    }
+    <StatusAlert Message="@state.StatusMessage" IsError="@state.IsError" OnDismiss="() => state.ClearStatus()" />
 
     <div class="grid gap-6 lg:grid-cols-2">
         <!-- Excel Export Section -->
