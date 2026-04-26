@@ -93,9 +93,9 @@
                             <thead class="bg-gray-50 dark:bg-slate-800">
                                 <tr>
                                     <th scope="col" class="w-10 px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                    <th scope="col" class="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Time</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300" colspan="2">Description</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -112,18 +112,54 @@
                                                 </button>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 text-sm font-medium">
+                                        <td class="whitespace-nowrap px-3 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
                                             <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
                                                 @activity.PrimaryTagName
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                        <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             @{ var dailyTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
-                                                <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
-                                            </ActivityValueDisplay>
+                                            @if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanSwitch
+                                                    Value="@GetBoolValue(activity)"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
+                                            }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Integer)
+                                            {
+                                                <IntegerStepper
+                                                    Value="@GetIntegerValue(activity)"
+                                                    Step="@(dailyTag.Step ?? 1)"
+                                                    Min="@dailyTag.MinValue"
+                                                    Max="@dailyTag.MaxValue"
+                                                    Unit="@dailyTag.UnitSymbol"
+                                                    ShowValue="false"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, dailyTag, v))" />
+                                            }
                                         </td>
-                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                        <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@GetBoolValue(activity)" />
+                                            }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Integer)
+                                            {
+                                                <span class="tabular-nums font-medium text-gray-900 dark:text-slate-100">@GetIntegerValue(activity)</span>
+                                                @if (!string.IsNullOrEmpty(dailyTag.UnitSymbol))
+                                                {
+                                                    <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@dailyTag.UnitSymbol</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                    <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                                </ActivityValueDisplay>
+                                            }
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -193,18 +229,18 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                                 <thead class="bg-gray-50 dark:bg-slate-800">
                                     <tr>
-                                        <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                        <th scope="col" class="w-10 px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
+                                        <th scope="col" class="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Time</th>
+                                        <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                        <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300" colspan="2">Description</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                     @foreach (var activity in group)
                                     {
                                         <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center gap-2">
+                                            <td class="px-1 py-3">
+                                                <div class="flex items-center gap-1">
                                                     <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
                                                         <Icon Name="pencil" Class="w-4 h-4" />
                                                     </button>
@@ -213,18 +249,54 @@
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-sm font-medium">
+                                            <td class="whitespace-nowrap px-3 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
                                                 <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
                                                     @activity.PrimaryTagName
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                                 @{ var groupTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                                <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
-                                                    <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
-                                                </ActivityValueDisplay>
+                                                @if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                {
+                                                    <BooleanSwitch
+                                                        Value="@GetBoolValue(activity)"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
+                                                }
+                                                else if (groupTag?.TypeId == InputTypeIds.Integer)
+                                                {
+                                                    <IntegerStepper
+                                                        Value="@GetIntegerValue(activity)"
+                                                        Step="@(groupTag.Step ?? 1)"
+                                                        Min="@groupTag.MinValue"
+                                                        Max="@groupTag.MaxValue"
+                                                        Unit="@groupTag.UnitSymbol"
+                                                        ShowValue="false"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, groupTag, v))" />
+                                                }
                                             </td>
-                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                            <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                                @if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                {
+                                                    <BooleanDisplay Value="@GetBoolValue(activity)" />
+                                                }
+                                                else if (groupTag?.TypeId == InputTypeIds.Integer)
+                                                {
+                                                    <span class="tabular-nums font-medium text-gray-900 dark:text-slate-100">@GetIntegerValue(activity)</span>
+                                                    @if (!string.IsNullOrEmpty(groupTag.UnitSymbol))
+                                                    {
+                                                        <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@groupTag.UnitSymbol</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                        <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                                    </ActivityValueDisplay>
+                                                }
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -397,6 +469,11 @@
     private string periodSort = "desc";
     private bool isInitialized = false;
     private string? loadError;
+
+    // Inline stepper state
+    private Dictionary<int, int> _pendingValues = new();
+    private Dictionary<int, bool?> _pendingBoolValues = new();
+    private HashSet<int> _savingIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -1068,5 +1145,106 @@
         isEditMode = false;
         editingActivityId = null;
         errorMessage = null;
+    }
+
+    private int GetIntegerValue(ActivityResponse activity)
+    {
+        if (_pendingValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description ?? "0";
+
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private bool? GetBoolValue(ActivityResponse activity)
+    {
+        if (_pendingBoolValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return bool.TryParse(raw, out var v) ? v : null;
+    }
+
+    private async Task OnBooleanToggleChanged(ActivityResponse activity, bool newValue)
+    {
+        _pendingBoolValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description;
+            _pendingBoolValues[activity.Id] = bool.TryParse(returnedRaw, out var returnedBool) ? returnedBool : null;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} boolean value inline", activity.Id);
+            _pendingBoolValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnIntegerStepperChanged(ActivityResponse activity, TagResponse tag, int newValue)
+    {
+        _pendingValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(CultureInfo.InvariantCulture),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description ?? "0";
+            if (int.TryParse(returnedRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var returnedInt))
+            {
+                _pendingValues[activity.Id] = returnedInt;
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} value inline", activity.Id);
+            _pendingValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
+        }
     }
 }

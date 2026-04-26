@@ -1,0 +1,65 @@
+<div class="flex items-center gap-2">
+    <div class="inline-flex overflow-hidden rounded-md border border-gray-200 dark:border-slate-700">
+        <button type="button"
+                class="inline-flex h-7 w-7 items-center justify-center text-sky-600 transition-colors hover:bg-sky-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-40 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900"
+                @onclick="Decrement"
+                disabled="@IsDecrementDisabled"
+                aria-label="Decrease value">
+            <Icon Name="minus" Class="w-3.5 h-3.5" />
+        </button>
+        <div class="w-px bg-gray-200 dark:bg-slate-700"></div>
+        <button type="button"
+                class="inline-flex h-7 w-7 items-center justify-center text-sky-600 transition-colors hover:bg-sky-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-40 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900"
+                @onclick="Increment"
+                disabled="@IsIncrementDisabled"
+                aria-label="Increase value">
+            <Icon Name="plus" Class="w-3.5 h-3.5" />
+        </button>
+    </div>
+
+    @if (ShowValue)
+    {
+        <span class="min-w-[2rem] text-sm tabular-nums font-medium text-gray-900 dark:text-slate-100">@Value</span>
+
+        @if (!string.IsNullOrEmpty(Unit))
+        {
+            <span class="text-xs text-gray-500 dark:text-slate-400">@Unit</span>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int Value { get; set; }
+    [Parameter] public double Step { get; set; } = 1;
+    [Parameter] public double? Min { get; set; }
+    [Parameter] public double? Max { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ShowValue { get; set; } = true;
+    [Parameter] public string? Unit { get; set; }
+    [Parameter] public EventCallback<int> OnValueChanged { get; set; }
+
+    private bool IsDecrementDisabled => Disabled || (Min.HasValue && Value - Step < Min.Value);
+    private bool IsIncrementDisabled => Disabled || (Max.HasValue && Value + Step > Max.Value);
+
+    private async Task Decrement()
+    {
+        var newValue = (int)Math.Round(Value - Step);
+        if (Min.HasValue && newValue < Min.Value)
+        {
+            return;
+        }
+
+        await OnValueChanged.InvokeAsync(newValue);
+    }
+
+    private async Task Increment()
+    {
+        var newValue = (int)Math.Round(Value + Step);
+        if (Max.HasValue && newValue > Max.Value)
+        {
+            return;
+        }
+
+        await OnValueChanged.InvokeAsync(newValue);
+    }
+}
