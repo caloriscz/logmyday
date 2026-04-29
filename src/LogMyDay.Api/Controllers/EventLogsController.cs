@@ -16,7 +16,15 @@ public class EventLogsController : BaseApiController
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetEventLogs([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, [FromQuery] string? level = null)
+    public async Task<IActionResult> GetEventLogs(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? level = null,
+        [FromQuery] string? message = null,
+        [FromQuery] DateTime? dateFrom = null,
+        [FromQuery] DateTime? dateTo = null,
+        [FromQuery] string sortBy = "time",
+        [FromQuery] bool sortDesc = true)
     {
         var userId = GetCurrentUserId();
         var isAdmin = User.Claims.Any(c => c.Type == "is_admin" && c.Value == "true");
@@ -27,13 +35,17 @@ public class EventLogsController : BaseApiController
             levelFilter = parsed;
         }
 
-        var result = await _eventLogService.GetPaged(pageNumber, pageSize, userId, isAdmin, levelFilter);
+        var result = await _eventLogService.GetPaged(pageNumber, pageSize, userId, isAdmin, levelFilter, message, dateFrom, dateTo, sortBy, sortDesc);
 
         return Ok(result);
     }
 
     [HttpGet("count")]
-    public async Task<IActionResult> GetCount([FromQuery] string? level = null)
+    public async Task<IActionResult> GetCount(
+        [FromQuery] string? level = null,
+        [FromQuery] string? message = null,
+        [FromQuery] DateTime? dateFrom = null,
+        [FromQuery] DateTime? dateTo = null)
     {
         var userId = GetCurrentUserId();
 
@@ -43,8 +55,17 @@ public class EventLogsController : BaseApiController
             levelFilter = parsed;
         }
 
-        var count = await _eventLogService.GetCount(userId, levelFilter);
+        var count = await _eventLogService.GetCount(userId, levelFilter, message, dateFrom, dateTo);
 
         return Ok(count);
+    }
+
+    [HttpDelete]
+    public async Task<IActionResult> DeleteEventLogs([FromQuery] int? olderThanDays = null)
+    {
+        var userId = GetCurrentUserId();
+        await _eventLogService.DeleteEvents(userId, olderThanDays);
+
+        return NoContent();
     }
 }
