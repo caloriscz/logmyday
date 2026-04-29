@@ -164,24 +164,7 @@
                                         <!-- Description - wraps and continues at same indent -->
                                         <div class="flex-1 min-w-0">
                                             @{ var jrnTag = allTags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            @if (jrnTag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var jrnStars))
-                                            {
-                                                <StarDisplay Value="@jrnStars" MaxStars="@(jrnTag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
-                                            }
-                                            else if (jrnTag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var jrnScore))
-                                            {
-                                                <ScoreDisplay Value="@jrnScore" MaxScore="@(jrnTag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
-                                            }
-                                            else if (jrnTag?.TypeId == InputTypeIds.Boolean)
-                                            {
-                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" />
-                                            }
-                                            else
-                                            {
-                                                <div class="text-gray-900 dark:text-slate-100 whitespace-pre-wrap break-words">
-                                                    @activity.Description
-                                                </div>
-                                            }
+                                            <ActivityValueDisplay TypeId="@jrnTag?.TypeId" Value="@activity.Description" />
                                         </div>
 
                                         <!-- Action Buttons -->

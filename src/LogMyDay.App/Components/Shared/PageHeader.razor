@@ -1,0 +1,19 @@
+<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="space-y-1">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">@Title</h1>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <p class="text-sm text-gray-600 dark:text-slate-300">@Subtitle</p>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        @Actions
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

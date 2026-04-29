@@ -51,7 +51,7 @@ public class EventLogService : IEventLogService
         }
     }
 
-    public async Task<PagedResult<EventLogResponse>> GetPaged(int pageNumber, int pageSize, Guid userId, bool isAdmin, EventLogLevel? levelFilter = null)
+    public async Task<PagedResult<EventLogResponse>> GetPaged(int pageNumber, int pageSize, Guid userId, bool isAdmin, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null, string sortBy = "time", bool sortDesc = true)
     {
         var query = _context.EventLogs
             .AsNoTracking()
@@ -62,10 +62,37 @@ public class EventLogService : IEventLogService
             query = query.Where(e => e.Level == levelFilter.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(messageFilter))
+        {
+            query = query.Where(e => EF.Functions.Like(e.Message, $"%{messageFilter}%"));
+        }
+
+        if (dateFrom.HasValue)
+        {
+            query = query.Where(e => e.CreatedUtc >= dateFrom.Value);
+        }
+
+        if (dateTo.HasValue)
+        {
+            query = query.Where(e => e.CreatedUtc <= dateTo.Value);
+        }
+
         var totalCount = await query.CountAsync();
 
-        var items = await query
-            .OrderByDescending(e => e.CreatedUtc)
+        IOrderedQueryable<Domain.Entities.EventLog> ordered = (sortBy?.ToLowerInvariant()) switch
+        {
+            "level" => sortDesc
+                ? query.OrderByDescending(e => e.Level)
+                : query.OrderBy(e => e.Level),
+            "message" => sortDesc
+                ? query.OrderByDescending(e => e.Message)
+                : query.OrderBy(e => e.Message),
+            _ => sortDesc
+                ? query.OrderByDescending(e => e.CreatedUtc)
+                : query.OrderBy(e => e.CreatedUtc),
+        };
+
+        var items = await ordered
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Select(e => new EventLogResponse
@@ -87,7 +114,7 @@ public class EventLogService : IEventLogService
         };
     }
 
-    public async Task<int> GetCount(Guid userId, EventLogLevel? levelFilter = null)
+    public async Task<int> GetCount(Guid userId, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null)
     {
         var query = _context.EventLogs
             .AsNoTracking()
@@ -98,6 +125,34 @@ public class EventLogService : IEventLogService
             query = query.Where(e => e.Level == levelFilter.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(messageFilter))
+        {
+            query = query.Where(e => EF.Functions.Like(e.Message, $"%{messageFilter}%"));
+        }
+
+        if (dateFrom.HasValue)
+        {
+            query = query.Where(e => e.CreatedUtc >= dateFrom.Value);
+        }
+
+        if (dateTo.HasValue)
+        {
+            query = query.Where(e => e.CreatedUtc <= dateTo.Value);
+        }
+
         return await query.CountAsync();
+    }
+
+    public async Task DeleteEvents(Guid userId, int? olderThanDays)
+    {
+        var query = _context.EventLogs.Where(e => e.UserId == userId);
+
+        if (olderThanDays.HasValue)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-olderThanDays.Value);
+            query = query.Where(e => e.CreatedUtc < cutoff);
+        }
+
+        await query.ExecuteDeleteAsync();
     }
 }

@@ -8,31 +8,68 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILogger<EventLogs> Logger
 @inject IPageTitleService PageTitleService
+@inject IJSRuntime JSRuntime
 
 @attribute [Authorize]
 
 <div class="mx-auto max-w-screen-2xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-1">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Event Log</h1>
-            <p class="text-sm text-gray-600 dark:text-slate-300">System events and error messages for your account.</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <select @bind="selectedLevel" @bind:after="LoadEvents"
+    <PageHeader Title="Event Log" Subtitle="System events and error messages for your account.">
+        <Actions>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" @onclick="DownloadLog" disabled="@isLoading"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Download .log
+                </button>
+                <button type="button" @onclick='() => DeleteEvents(null)' disabled="@_isDeleting"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-medium text-rose-600 shadow-sm transition-colors hover:bg-rose-50 disabled:opacity-50 dark:border-rose-800 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-950/40">
+                    Delete All
+                </button>
+                <button type="button" @onclick='() => DeleteEvents(30)' disabled="@_isDeleting"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+                    &gt; 30 days
+                </button>
+                <button type="button" @onclick='() => DeleteEvents(90)' disabled="@_isDeleting"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+                    &gt; 90 days
+                </button>
+            </div>
+        </Actions>
+    </PageHeader>
+
+    @* Filter Form *@
+    <form @onsubmit="ApplyFilter" @onsubmit:preventDefault class="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500 dark:text-slate-400">Level</label>
+            <select @bind="_selectedLevel"
                     class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 <option value="">All Levels</option>
                 <option value="Info">Info</option>
                 <option value="Error">Error</option>
             </select>
         </div>
-    </div>
-
-    @if (!string.IsNullOrEmpty(statusMessage))
-    {
-        <div class="rounded-lg border @(statusIsError ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-100" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-100") px-4 py-3 text-sm">
-            @statusMessage
+        <div class="flex flex-col gap-1 flex-1 min-w-40">
+            <label class="text-xs font-medium text-gray-500 dark:text-slate-400">Message</label>
+            <input type="text" @bind="_messageFilter" placeholder="Contains…"
+                   class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500" />
         </div>
-    }
+        <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500 dark:text-slate-400">From</label>
+            <input type="date" @bind="_dateFrom"
+                   class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+        </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500 dark:text-slate-400">To</label>
+            <input type="date" @bind="_dateTo"
+                   class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100" />
+        </div>
+        <button type="submit"
+                class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+            Apply
+        </button>
+    </form>
+
+    <StatusAlert Message="@statusMessage" IsError="@statusIsError" />
 
     @if (isLoading)
     {
@@ -64,13 +101,25 @@
             <table class="w-full text-left text-sm">
                 <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                     <tr>
-                        <th class="px-4 py-3 w-24">Level</th>
-                        <th class="px-4 py-3">Message</th>
+                        <th class="px-4 py-3 w-24">
+                            <button type="button" @onclick='() => SetSort("level")' class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-slate-200 transition-colors">
+                                Level @SortIndicator("level")
+                            </button>
+                        </th>
+                        <th class="px-4 py-3">
+                            <button type="button" @onclick='() => SetSort("message")' class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-slate-200 transition-colors">
+                                Message @SortIndicator("message")
+                            </button>
+                        </th>
                         @if (isAdmin)
                         {
                             <th class="px-4 py-3">Detail</th>
                         }
-                        <th class="px-4 py-3 w-44">Time</th>
+                        <th class="px-4 py-3 w-44">
+                            <button type="button" @onclick='() => SetSort("time")' class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-slate-200 transition-colors">
+                                Time @SortIndicator("time")
+                            </button>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-slate-700/60">
@@ -142,7 +191,13 @@
     private bool isAdmin;
     private string? statusMessage;
     private bool statusIsError;
-    private string selectedLevel = "";
+    private string _selectedLevel = "";
+    private string? _messageFilter;
+    private DateTime? _dateFrom;
+    private DateTime? _dateTo;
+    private string _sortBy = "time";
+    private bool _sortDesc = true;
+    private bool _isDeleting;
     private int pageNumber = 1;
     private int pageSize = 50;
     private int totalPages => pagedResult == null || pagedResult.PageSize == 0
@@ -171,8 +226,8 @@
         {
             isLoading = true;
             statusMessage = null;
-            var level = string.IsNullOrEmpty(selectedLevel) ? null : selectedLevel;
-            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level);
+            var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
+            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
         }
         catch (Exception ex)
         {
@@ -183,6 +238,95 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task ApplyFilter()
+    {
+        pageNumber = 1;
+        await LoadEvents();
+    }
+
+    private async Task SetSort(string column)
+    {
+        if (_sortBy == column)
+        {
+            _sortDesc = !_sortDesc;
+        }
+        else
+        {
+            _sortBy = column;
+            _sortDesc = true;
+        }
+
+        await LoadEvents();
+    }
+
+    private string SortIndicator(string column)
+    {
+        if (_sortBy != column)
+        {
+            return "";
+        }
+
+        return _sortDesc ? "▼" : "▲";
+    }
+
+    private async Task DownloadLog()
+    {
+        try
+        {
+            var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
+            var all = await EventLogApi.GetEventLogs(1, 10000, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var item in all.Items)
+            {
+                sb.AppendLine($"[{item.CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}] [{item.Level.ToUpper()}] {item.Message}");
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", "events.log", base64, "text/plain");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to download event log");
+            statusMessage = "Failed to download log. Please try again.";
+            statusIsError = true;
+        }
+    }
+
+    private async Task DeleteEvents(int? olderThanDays)
+    {
+        var confirmMessage = olderThanDays.HasValue
+            ? $"Delete all events older than {olderThanDays} days?"
+            : "Delete ALL events? This cannot be undone.";
+
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", confirmMessage);
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            _isDeleting = true;
+            statusMessage = null;
+            await EventLogApi.DeleteEventLogs(olderThanDays);
+            pageNumber = 1;
+            await LoadEvents();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete event logs");
+            statusMessage = "Failed to delete events. Please try again.";
+            statusIsError = true;
+        }
+        finally
+        {
+            _isDeleting = false;
         }
     }
 

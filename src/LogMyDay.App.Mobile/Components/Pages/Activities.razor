@@ -102,26 +102,46 @@
                         </div>
 
                         @{ var mobTag1 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                        @if (mobTag1?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var mobStars1))
+                        @if (IsStarRatingTag(mobTag1))
                         {
-                            <div class="mb-2"><StarDisplay Value="@mobStars1" MaxStars="@(mobTag1.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" /></div>
+                            <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag1!)" /></div>
+                            <div class="mb-2">
+                                <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag1!)"
+                                    ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag1!, v))" />
+                            </div>
                         }
-                        else if (mobTag1?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var mobScore1))
+                        else if (IsScoreTag(mobTag1))
                         {
-                            <div class="mb-2"><ScoreDisplay Value="@mobScore1" MaxScore="@(mobTag1.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
+                            <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag1!)" /></div>
+                            <div class="mb-2">
+                                <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag1!)"
+                                    ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag1!, v))" />
+                            </div>
                         }
                         else if (mobTag1?.TypeId == InputTypeIds.Boolean)
                         {
-                            <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
+                            <div class="mb-2"><BooleanDisplay Value="@GetBoolValue(activity)" /></div>
+                            <div class="mb-2">
+                                <BooleanSwitch Value="@GetBoolValue(activity)" Disabled="@IsSaving(activity.Id)"
+                                    OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
+                            </div>
                         }
-                        else if (!string.IsNullOrEmpty(activity.Description))
+                        else if (mobTag1?.TypeId == InputTypeIds.Integer)
                         {
-                            <p class="mb-2 text-gray-700 dark:text-gray-300">@activity.Description</p>
+                            <p class="mb-2 text-gray-700 dark:text-gray-300">@GetIntegerValue(activity)@(mobTag1.UnitSymbol is not null ? " " + mobTag1.UnitSymbol : "")</p>
+                            <div class="mb-2">
+                                <IntegerStepper Value="@GetIntegerValue(activity)" Step="@(mobTag1.Step ?? 1)"
+                                    Min="@mobTag1.MinValue" Max="@mobTag1.MaxValue" Unit="@mobTag1.UnitSymbol"
+                                    ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag1, v))" />
+                            </div>
                         }
-
-                        <div class="text-sm text-gray-600 dark:text-gray-400">
-                            <strong class="text-gray-900 dark:text-white">Time</strong>: @GetActivityDateDisplay(activity)
-                        </div>
+                        else if (!string.IsNullOrEmpty(activity.PrimaryTagValue ?? activity.Description))
+                        {
+                            <p class="mb-2 text-gray-700 dark:text-gray-300">@(activity.PrimaryTagValue ?? activity.Description)</p>
+                        }
                     </div>
                 }
             }
@@ -156,26 +176,46 @@
                                 </div>
                             </div>
                             @{ var mobTag2 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                            @if (mobTag2?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 && int.TryParse(activity.Description, out var mobStars2))
+                            @if (IsStarRatingTag(mobTag2))
                             {
-                                <div class="mb-2"><StarDisplay Value="@mobStars2" MaxStars="@(mobTag2.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" /></div>
+                                <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag2!)" /></div>
+                                <div class="mb-2">
+                                    <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag2!)"
+                                        ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag2!, v))" />
+                                </div>
                             }
-                            else if (mobTag2?.TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(activity.Description, out var mobScore2))
+                            else if (IsScoreTag(mobTag2))
                             {
-                                <div class="mb-2"><ScoreDisplay Value="@mobScore2" MaxScore="@(mobTag2.TypeId == InputTypeIds.Score10 ? 10 : 5)" /></div>
+                                <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag2!)" /></div>
+                                <div class="mb-2">
+                                    <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag2!)"
+                                        ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag2!, v))" />
+                                </div>
                             }
                             else if (mobTag2?.TypeId == InputTypeIds.Boolean)
                             {
-                                <div class="mb-2"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.Description)" /></div>
+                                <div class="mb-2"><BooleanDisplay Value="@GetBoolValue(activity)" /></div>
+                                <div class="mb-2">
+                                    <BooleanSwitch Value="@GetBoolValue(activity)" Disabled="@IsSaving(activity.Id)"
+                                        OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
+                                </div>
                             }
-                            else if (!string.IsNullOrEmpty(activity.Description))
+                            else if (mobTag2?.TypeId == InputTypeIds.Integer)
                             {
-                                <p class="text-gray-700 dark:text-gray-300 mb-2">@activity.Description</p>
+                                <p class="mb-2 text-gray-700 dark:text-gray-300">@GetIntegerValue(activity)@(mobTag2.UnitSymbol is not null ? " " + mobTag2.UnitSymbol : "")</p>
+                                <div class="mb-2">
+                                    <IntegerStepper Value="@GetIntegerValue(activity)" Step="@(mobTag2.Step ?? 1)"
+                                        Min="@mobTag2.MinValue" Max="@mobTag2.MaxValue" Unit="@mobTag2.UnitSymbol"
+                                        ShowValue="false" Disabled="@IsSaving(activity.Id)"
+                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, mobTag2, v))" />
+                                </div>
                             }
-                            <div class="text-sm text-gray-500 dark:text-gray-400">
-                                <strong class="block text-gray-600 dark:text-gray-300">Time</strong>
-                                <span class="tabular-nums text-gray-900 dark:text-gray-100">@GetActivityDateDisplay(activity)</span>
-                            </div>
+                            else if (!string.IsNullOrEmpty(activity.PrimaryTagValue ?? activity.Description))
+                            {
+                                <p class="text-gray-700 dark:text-gray-300 mb-2">@(activity.PrimaryTagValue ?? activity.Description)</p>
+                            }
                         </div>
                     }
                 </div>
@@ -322,6 +362,11 @@
     private bool _pendingNotificationModal;
     private int? _pendingNotificationTagId;
     private DateOnly? _pendingNotificationDate;
+
+    // Inline edit state
+    private Dictionary<int, int> _pendingValues = new();
+    private Dictionary<int, bool?> _pendingBoolValues = new();
+    private HashSet<int> _savingIds = new();
 
     // Display and filtering
     private string displayType = "daily";
@@ -902,6 +947,117 @@
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to save filter preferences");
+        }
+    }
+
+    private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private static bool IsStarRatingTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static int GetStarMax(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
+
+    private int GetIntegerValue(ActivityResponse activity)
+    {
+        if (_pendingValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description ?? "0";
+
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private bool? GetBoolValue(ActivityResponse activity)
+    {
+        if (_pendingBoolValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+
+        return bool.TryParse(raw, out var v) ? v : null;
+    }
+
+    private async Task OnBooleanToggleChanged(ActivityResponse activity, bool newValue)
+    {
+        _pendingBoolValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description;
+            _pendingBoolValues[activity.Id] = bool.TryParse(returnedRaw, out var returnedBool) ? returnedBool : null;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} boolean value inline", activity.Id);
+            _pendingBoolValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnIntegerStepperChanged(ActivityResponse activity, TagResponse tag, int newValue)
+    {
+        _pendingValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(CultureInfo.InvariantCulture),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description ?? "0";
+            if (int.TryParse(returnedRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var returnedInt))
+            {
+                _pendingValues[activity.Id] = returnedInt;
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} value inline", activity.Id);
+            _pendingValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
         }
     }
 

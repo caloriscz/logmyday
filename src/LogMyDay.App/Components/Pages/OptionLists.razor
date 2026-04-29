@@ -11,16 +11,14 @@
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Option Lists", "Manage predefined value lists for tags")]
 
 <div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-1">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Option Lists</h1>
-            <p class="text-sm text-gray-600 dark:text-slate-300">Create reusable option lists to power tag dropdowns.</p>
-        </div>
-        <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
-            <Icon Name="plus" Class="h-4 w-4" />
-            Add Option List
-        </button>
-    </div>
+    <PageHeader Title="Option Lists" Subtitle="Create reusable option lists to power tag dropdowns.">
+        <Actions>
+            <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
+                <Icon Name="plus" Class="h-4 w-4" />
+                Add Option List
+            </button>
+        </Actions>
+    </PageHeader>
 
     <section class="space-y-4">
         @if (isLoading)
@@ -38,9 +36,7 @@
         }
         else if (lists.Count == 0)
         {
-            <div class="rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                No option lists yet. Use the button above to create your first reusable list.
-            </div>
+            <EmptyState Message="No option lists yet. Use the button above to create your first reusable list." />
         }
         else
         {

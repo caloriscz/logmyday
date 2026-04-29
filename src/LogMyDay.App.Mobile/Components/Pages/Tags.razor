@@ -189,15 +189,21 @@
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Input Type:</label>
-                        <InputSelect @bind-Value="newTag.TypeId" 
+                        <InputSelect @bind-Value="newTag.TypeId" @bind-Value:after="OnAddInputTypeChanged"
                             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                             <option value="">-- Select Type --</option>
-                            <option value="1">Integer</option>
-                            <option value="2">String</option>
-                            <option value="3">Boolean</option>
-                            <option value="4">Date</option>
+                            @foreach (var type in inputTypes)
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
                         </InputSelect>
                     </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Description (optional):</label>
+                        <InputTextArea @bind-Value="newTag.Description" rows="2"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                            placeholder="What does this tag measure?" /></div>
 
                     <div class="mb-4">
                         <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Time Granularity:</label>
@@ -221,14 +227,18 @@
                                 Required
                             </label>
                         </div>
-                        <div class="flex items-center">
-                            <InputCheckbox @bind-Value="newTag.IsRepeatable" 
-                                class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded-sm focus:ring-primary-500" 
-                                id="repeatableCheck" />
-                            <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="repeatableCheck">
-                                Repeatable
-                            </label>
-                        </div>
+                        @if (!IsRepeatableLockedForNewType || newTag.IsRepeatable)
+                        {
+                            <div class="flex items-center">
+                                <InputCheckbox @bind-Value="newTag.IsRepeatable" 
+                                    class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded-sm focus:ring-primary-500" 
+                                    id="repeatableCheck"
+                                    disabled="@IsRepeatableLockedForNewType" />
+                                <label class="ml-2 text-sm text-gray-700 dark:text-gray-300" for="repeatableCheck">
+                                    Repeatable
+                                </label>
+                            </div>
+                        }
                         <div class="flex items-center">
                             <InputCheckbox @bind-Value="newTag.IsRange" 
                                 class="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 rounded-sm focus:ring-primary-500" 
@@ -237,6 +247,79 @@
                                 Range
                             </label>
                         </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Default Value (optional):</label>
+                            <InputText @bind-Value="newTag.DefaultValue"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500" />
+                        </div>
+                        @if (!IsMinimumLockedForNewType || newTag.MinValue.HasValue)
+                        {
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Min Value:</label>
+                                <InputNumber @bind-Value="newTag.MinValue" TValue="double?"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    disabled="@IsMinimumLockedForNewType" />
+                            </div>
+                        }
+                        @if (!IsMaximumLockedForNewType || newTag.MaxValue.HasValue)
+                        {
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Value:</label>
+                                <InputNumber @bind-Value="newTag.MaxValue" TValue="double?"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    disabled="@IsMaximumLockedForNewType" />
+                            </div>
+                        }
+                        @if (!IsStepLockedForNewType || newTag.Step.HasValue)
+                        {
+                            <div>
+                                <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Step:</label>
+                                <InputNumber @bind-Value="newTag.Step" TValue="double?"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    disabled="@IsStepLockedForNewType" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Unit (optional):</label>
+                        @if (availableUnits.Count > 0)
+                        {
+                            <InputSelect @bind-Value="newTag.UnitId" TValue="int?"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                                <option value="">(None)</option>
+                                @foreach (var unit in availableUnits)
+                                {
+                                    <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <p class="text-sm text-gray-500 dark:text-gray-400">No units available.</p>
+                        }
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Option List (optional):</label>
+                        @if (availableOptionLists.Count > 0)
+                        {
+                            <InputSelect @bind-Value="newTag.OptionListId" TValue="int?"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                                <option value="">(None)</option>
+                                @foreach (var list in availableOptionLists)
+                                {
+                                    <option value="@list.Id">@list.Name</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <p class="text-sm text-gray-500 dark:text-gray-400">No option lists available.</p>
+                        }
                     </div>
 
                     @if (!string.IsNullOrEmpty(errorMessage))
@@ -331,6 +414,9 @@
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
     private LogMyDay.Shared.DTOs.TagRequest newTag = new() { Tag = "" };
     private string? errorMessage;
+    private List<InputTypeDto> inputTypes = new();
+    private List<UnitResponse> availableUnits = new();
+    private List<TagOptionListResponse> availableOptionLists = new();
 
     private LogMyDay.Shared.DTOs.TagRequest? editTag;
     private int? editTagId;
@@ -349,7 +435,7 @@
         }
 
         PageTitleService.SetTitle("Tags");
-        await LoadTags();
+        await Task.WhenAll(LoadTags(), LoadSupportingData());
     }
 
     public async ValueTask DisposeAsync()
@@ -373,6 +459,100 @@
         {
             Logger.LogError(ex, "Error loading tags");
             errorMessage = $"Error loading tags: {ex.Message}";
+        }
+    }
+
+    private async Task LoadSupportingData()
+    {
+        try
+        {
+            inputTypes = await ActivityApi.GetInputTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading input types");
+        }
+
+        try
+        {
+            availableUnits = (await ActivityApi.GetUnitsAsync())
+                .OrderBy(u => u.QuantityKey)
+                .ThenBy(u => u.Key)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading units");
+        }
+
+        try
+        {
+            availableOptionLists = (await ActivityApi.GetTagOptionListsAsync())
+                .OrderBy(l => l.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading option lists");
+        }
+    }
+
+    private bool IsRepeatableLockedForNewType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsRepeatableEditable;
+        }
+    }
+
+    private bool IsMinimumLockedForNewType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsMinimumEditable;
+        }
+    }
+
+    private bool IsMaximumLockedForNewType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsMaximumEditable;
+        }
+    }
+
+    private bool IsStepLockedForNewType
+    {
+        get
+        {
+            var currentType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+            return currentType != null && !currentType.IsStepEditable;
+        }
+    }
+
+    private void OnAddInputTypeChanged()
+    {
+        var selectedType = inputTypes.FirstOrDefault(it => it.Id == newTag.TypeId);
+        if (selectedType != null && !selectedType.IsRangeEditable)
+        {
+            var constraints = LogMyDay.Domain.Helpers.InputTypeDefaults.GetConstraintsForType(newTag.TypeId);
+            newTag.MinValue = constraints.MinValue;
+            newTag.MaxValue = constraints.MaxValue;
+            newTag.Step = constraints.Step;
+        }
+        else
+        {
+            newTag.MinValue = null;
+            newTag.MaxValue = null;
+            newTag.Step = null;
+        }
+
+        if (selectedType != null && !selectedType.IsRepeatableEditable)
+        {
+            newTag.IsRepeatable = false;
         }
     }
 

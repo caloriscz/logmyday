@@ -19,18 +19,14 @@
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Activities", "Browse and manage all logged activities")]
 
 <div class="mx-auto max-w-(--breakpoint-2xl) px-4 py-6 space-y-6 sm:px-6 lg:px-8">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="space-y-2">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-slate-100">Activities</h1>
-            <p class="text-sm text-gray-600 dark:text-slate-300">Review and manage your logged activities.</p>
-        </div>
-        <div class="flex items-center">
+    <PageHeader Title="Activities" Subtitle="Review and manage your logged activities.">
+        <Actions>
             <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="OpenAddActivityModal" title="Add activity">
                 <Icon Name="plus" Class="h-4 w-4" />
                 Add Activity
             </button>
-        </div>
-    </div>
+        </Actions>
+    </PageHeader>
 
     @if (displayType != "daily" && pagedResult != null)
     {
@@ -63,9 +59,7 @@
     }
     else if (pagedResult == null)
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            Loading activities…
-        </div>
+        <EmptyState Message="Loading activities…" />
     }
     else if (displayType == "daily")
     {
@@ -89,9 +83,7 @@
 
             @if (!pagedResult.Items.Any())
             {
-                <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    No activities found for @FormatDate(selectedDate).
-                </div>
+                <EmptyState>No activities found for @FormatDate(selectedDate).</EmptyState>
             }
             else
             {
@@ -101,9 +93,9 @@
                             <thead class="bg-gray-50 dark:bg-slate-800">
                                 <tr>
                                     <th scope="col" class="w-10 px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                    <th scope="col" class="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Time</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                    <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300" colspan="2">Description</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
@@ -120,31 +112,69 @@
                                                 </button>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 text-sm font-medium">
+                                        <td class="whitespace-nowrap px-3 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                        <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
                                             <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
                                                 @activity.PrimaryTagName
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                        <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             @{ var dailyTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            @if (IsStarRatingTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyStars))
+                                            @if (dailyTag?.TypeId == InputTypeIds.Boolean)
                                             {
-                                                <StarDisplay Value="@dailyStars" MaxStars="@GetStarMax(dailyTag!)" />
+                                                <BooleanSwitch
+                                                    Value="@GetBoolValue(activity)"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
                                             }
-                                            else if (IsScoreTag(dailyTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyScore))
+                                            else if (dailyTag?.TypeId == InputTypeIds.Integer)
                                             {
-                                                <ScoreDisplay Value="@dailyScore" MaxScore="@GetStarMax(dailyTag!)" />
+                                                <IntegerStepper
+                                                    Value="@GetIntegerValue(activity)"
+                                                    Step="@(dailyTag.Step ?? 1)"
+                                                    Min="@dailyTag.MinValue"
+                                                    Max="@dailyTag.MaxValue"
+                                                    Unit="@dailyTag.UnitSymbol"
+                                                    ShowValue="false"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, dailyTag, v))" />
                                             }
-                                            else if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            else if (IsStarRatingTag(dailyTag) || IsScoreTag(dailyTag))
                                             {
-                                                <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                                <IntegerStepper
+                                                    Value="@GetIntegerValue(activity)"
+                                                    Step="1"
+                                                    Min="0"
+                                                    Max="@GetStarMax(dailyTag!)"
+                                                    ShowValue="false"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, dailyTag!, v))" />
+                                            }
+                                        </td>
+                                        <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            @if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            {
+                                                <BooleanDisplay Value="@GetBoolValue(activity)" />
+                                            }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Integer)
+                                            {
+                                                <span class="tabular-nums font-medium text-gray-900 dark:text-slate-100">@GetIntegerValue(activity)</span>
+                                                @if (!string.IsNullOrEmpty(dailyTag.UnitSymbol))
+                                                {
+                                                    <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@dailyTag.UnitSymbol</span>
+                                                }
+                                            }
+                                            else if (IsStarRatingTag(dailyTag) || IsScoreTag(dailyTag))
+                                            {
+                                                <ActivityValueDisplay TypeId="@dailyTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                             }
                                             else
                                             {
-                                                @GetActivityDisplayValue(activity)
+                                                <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                    <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                                </ActivityValueDisplay>
                                             }
                                         </td>
-                                        <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -163,27 +193,22 @@
                                             @activity.PrimaryTagName
                                         </span>
                                     </h3>
-                                    @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
-                                        if (IsStarRatingTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardStars))
-                                        {
-                                            <div class="mt-1"><StarDisplay Value="@dailyCardStars" MaxStars="@GetStarMax(dailyCardTag!)" /></div>
-                                        }
-                                        else if (IsScoreTag(dailyCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var dailyCardScore))
-                                        {
-                                            <div class="mt-1"><ScoreDisplay Value="@dailyCardScore" MaxScore="@GetStarMax(dailyCardTag!)" /></div>
-                                        }
-                                        else if (dailyCardTag?.TypeId == InputTypeIds.Boolean)
-                                        {
-                                            <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
-                                        }
-                                        else
-                                        {
-                                            var displayValue = GetActivityDisplayValue(activity);
-                                            if (!string.IsNullOrWhiteSpace(displayValue))
-                                            {
-                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
-                                            }
-                                        }
+                                    @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                    @if (IsStarRatingTag(dailyCardTag) || IsScoreTag(dailyCardTag))
+                                    {
+                                        <ActivityValueDisplay TypeId="@dailyCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                    }
+                                    else
+                                    {
+                                        <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                            <TextFallback>
+                                                @{ var dailyCardDisplayValue = GetActivityDisplayValue(activity); }
+                                                @if (!string.IsNullOrWhiteSpace(dailyCardDisplayValue))
+                                                {
+                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@dailyCardDisplayValue</p>
+                                                }
+                                            </TextFallback>
+                                        </ActivityValueDisplay>
                                     }
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -211,9 +236,7 @@
     }
     else if (!pagedResult.Items.Any())
     {
-        <div class="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            No activities found for the selected criteria.
-        </div>
+        <EmptyState Message="No activities found for the selected criteria." />
     }
     else
     {
@@ -228,18 +251,18 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                                 <thead class="bg-gray-50 dark:bg-slate-800">
                                     <tr>
-                                        <th scope="col" class="w-20 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Actions</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Description</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Date</th>
+                                        <th scope="col" class="w-10 px-1 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300"></th>
+                                        <th scope="col" class="whitespace-nowrap px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Time</th>
+                                        <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300">Tag</th>
+                                        <th scope="col" class="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-slate-300" colspan="2">Description</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                     @foreach (var activity in group)
                                     {
                                         <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
-                                            <td class="px-4 py-3">
-                                                <div class="flex items-center gap-2">
+                                            <td class="px-1 py-3">
+                                                <div class="flex items-center gap-1">
                                                     <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => OpenEditActivityModal(activity)" aria-label="Edit activity">
                                                         <Icon Name="pencil" Class="w-4 h-4" />
                                                     </button>
@@ -248,31 +271,69 @@
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td class="px-4 py-3 text-sm font-medium">
+                                            <td class="whitespace-nowrap px-3 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-sm font-medium">
                                                 <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold tracking-wide text-sky-900 ring-1 ring-sky-500/20 dark:bg-sky-600/20 dark:text-sky-300 dark:ring-sky-500/30">
                                                     @activity.PrimaryTagName
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                                 @{ var groupTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                                @if (IsStarRatingTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupStars))
+                                                @if (groupTag?.TypeId == InputTypeIds.Boolean)
                                                 {
-                                                    <StarDisplay Value="@groupStars" MaxStars="@GetStarMax(groupTag!)" />
+                                                    <BooleanSwitch
+                                                        Value="@GetBoolValue(activity)"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnBooleanToggleChanged(activity, v))" />
                                                 }
-                                                else if (IsScoreTag(groupTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupScore))
+                                                else if (groupTag?.TypeId == InputTypeIds.Integer)
                                                 {
-                                                    <ScoreDisplay Value="@groupScore" MaxScore="@GetStarMax(groupTag!)" />
+                                                    <IntegerStepper
+                                                        Value="@GetIntegerValue(activity)"
+                                                        Step="@(groupTag.Step ?? 1)"
+                                                        Min="@groupTag.MinValue"
+                                                        Max="@groupTag.MaxValue"
+                                                        Unit="@groupTag.UnitSymbol"
+                                                        ShowValue="false"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, groupTag, v))" />
                                                 }
-                                                else if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                else if (IsStarRatingTag(groupTag) || IsScoreTag(groupTag))
                                                 {
-                                                    <BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" />
+                                                    <IntegerStepper
+                                                        Value="@GetIntegerValue(activity)"
+                                                        Step="1"
+                                                        Min="0"
+                                                        Max="@GetStarMax(groupTag!)"
+                                                        ShowValue="false"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, groupTag!, v))" />
+                                                }
+                                            </td>
+                                            <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
+                                                @if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                {
+                                                    <BooleanDisplay Value="@GetBoolValue(activity)" />
+                                                }
+                                                else if (groupTag?.TypeId == InputTypeIds.Integer)
+                                                {
+                                                    <span class="tabular-nums font-medium text-gray-900 dark:text-slate-100">@GetIntegerValue(activity)</span>
+                                                    @if (!string.IsNullOrEmpty(groupTag.UnitSymbol))
+                                                    {
+                                                        <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@groupTag.UnitSymbol</span>
+                                                    }
+                                                }
+                                                else if (IsStarRatingTag(groupTag) || IsScoreTag(groupTag))
+                                                {
+                                                    <ActivityValueDisplay TypeId="@groupTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                                 }
                                                 else
                                                 {
-                                                    @GetActivityDisplayValue(activity)
+                                                    <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                        <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
+                                                    </ActivityValueDisplay>
                                                 }
                                             </td>
-                                            <td class="px-4 py-3 text-sm tabular-nums text-gray-700 dark:text-slate-200">@GetActivityDateDisplay(activity)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -291,27 +352,22 @@
                                                 @activity.PrimaryTagName
                                             </span>
                                         </h3>
-                                        @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
-                                            if (IsStarRatingTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardStars))
-                                            {
-                                                <div class="mt-1"><StarDisplay Value="@groupCardStars" MaxStars="@GetStarMax(groupCardTag!)" /></div>
-                                            }
-                                            else if (IsScoreTag(groupCardTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var groupCardScore))
-                                            {
-                                                <div class="mt-1"><ScoreDisplay Value="@groupCardScore" MaxScore="@GetStarMax(groupCardTag!)" /></div>
-                                            }
-                                            else if (groupCardTag?.TypeId == InputTypeIds.Boolean)
-                                            {
-                                                <div class="mt-1"><BooleanDisplay Value="@BooleanDisplay.Parse(activity.PrimaryTagValue ?? activity.Description)" /></div>
-                                            }
-                                            else
-                                            {
-                                                var displayValue = GetActivityDisplayValue(activity);
-                                                if (!string.IsNullOrWhiteSpace(displayValue))
-                                                {
-                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
-                                                }
-                                            }
+                                        @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
+                                        @if (IsStarRatingTag(groupCardTag) || IsScoreTag(groupCardTag))
+                                        {
+                                            <ActivityValueDisplay TypeId="@groupCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                        }
+                                        else
+                                        {
+                                            <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                                <TextFallback>
+                                                    @{ var groupCardDisplayValue = GetActivityDisplayValue(activity); }
+                                                    @if (!string.IsNullOrWhiteSpace(groupCardDisplayValue))
+                                                    {
+                                                        <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@groupCardDisplayValue</p>
+                                                    }
+                                                </TextFallback>
+                                            </ActivityValueDisplay>
                                         }
                                     </div>
                                     <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
@@ -457,6 +513,11 @@
     private string periodSort = "desc";
     private bool isInitialized = false;
     private string? loadError;
+
+    // Inline stepper state
+    private Dictionary<int, int> _pendingValues = new();
+    private Dictionary<int, bool?> _pendingBoolValues = new();
+    private HashSet<int> _savingIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -684,15 +745,6 @@
 
         return valueForDisplay;
     }
-
-    private static bool IsStarRatingTag(TagResponse? tag) =>
-        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
-
-    private static bool IsScoreTag(TagResponse? tag) =>
-        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
-
-    private static int GetStarMax(TagResponse tag) =>
-        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
 
     private async Task OnDisplayTypeChanged(ChangeEventArgs e)
     {
@@ -1137,5 +1189,115 @@
         isEditMode = false;
         editingActivityId = null;
         errorMessage = null;
+    }
+
+    private int GetIntegerValue(ActivityResponse activity)
+    {
+        if (_pendingValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description ?? "0";
+
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private static bool IsStarRatingTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static int GetStarMax(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
+
+    private bool? GetBoolValue(ActivityResponse activity)
+    {
+        if (_pendingBoolValues.TryGetValue(activity.Id, out var pending))
+        {
+            return pending;
+        }
+
+        var raw = activity.PrimaryTagValue ?? activity.Description;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        return bool.TryParse(raw, out var v) ? v : null;
+    }
+
+    private async Task OnBooleanToggleChanged(ActivityResponse activity, bool newValue)
+    {
+        _pendingBoolValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description;
+            _pendingBoolValues[activity.Id] = bool.TryParse(returnedRaw, out var returnedBool) ? returnedBool : null;
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} boolean value inline", activity.Id);
+            _pendingBoolValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnIntegerStepperChanged(ActivityResponse activity, TagResponse tag, int newValue)
+    {
+        _pendingValues[activity.Id] = newValue;
+        _savingIds.Add(activity.Id);
+
+        try
+        {
+            var request = new ActivityRequest
+            {
+                PrimaryTagId = activity.PrimaryTagId,
+                Description = newValue.ToString(CultureInfo.InvariantCulture),
+                DateStarted = activity.DateStarted,
+                DateFinished = activity.DateFinished
+            };
+
+            var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+
+            var returnedRaw = updated.PrimaryTagValue ?? updated.Description ?? "0";
+            if (int.TryParse(returnedRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var returnedInt))
+            {
+                _pendingValues[activity.Id] = returnedInt;
+            }
+        }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating activity {ActivityId} value inline", activity.Id);
+            _pendingValues.Remove(activity.Id);
+        }
+        finally
+        {
+            _savingIds.Remove(activity.Id);
+            StateHasChanged();
+        }
     }
 }
