@@ -1,0 +1,25 @@
+<button type="button"
+        class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:pointer-events-none disabled:opacity-50 @BackgroundClass"
+        role="switch"
+        aria-checked="@(IsOn.ToString().ToLower())"
+        aria-label="Toggle boolean value"
+        disabled="@Disabled"
+        title="@(IsOn ? "True – click to set False" : "False – click to set True")"
+        @onclick="Toggle">
+    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out @KnobClass"></span>
+</button>
+
+@code {
+    [Parameter] public bool? Value { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<bool> OnValueChanged { get; set; }
+
+    private bool IsOn => Value == true;
+    private string BackgroundClass => IsOn ? "bg-green-500 dark:bg-green-600" : "bg-gray-300 dark:bg-slate-600";
+    private string KnobClass => IsOn ? "translate-x-5" : "translate-x-0";
+
+    private async Task Toggle()
+    {
+        await OnValueChanged.InvokeAsync(!IsOn);
+    }
+}

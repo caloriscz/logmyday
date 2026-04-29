@@ -139,6 +139,17 @@
                                                     Disabled="@IsSaving(activity.Id)"
                                                     OnValueChanged="@(v => OnIntegerStepperChanged(activity, dailyTag, v))" />
                                             }
+                                            else if (IsStarRatingTag(dailyTag) || IsScoreTag(dailyTag))
+                                            {
+                                                <IntegerStepper
+                                                    Value="@GetIntegerValue(activity)"
+                                                    Step="1"
+                                                    Min="0"
+                                                    Max="@GetStarMax(dailyTag!)"
+                                                    ShowValue="false"
+                                                    Disabled="@IsSaving(activity.Id)"
+                                                    OnValueChanged="@(v => OnIntegerStepperChanged(activity, dailyTag!, v))" />
+                                            }
                                         </td>
                                         <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             @if (dailyTag?.TypeId == InputTypeIds.Boolean)
@@ -152,6 +163,10 @@
                                                 {
                                                     <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@dailyTag.UnitSymbol</span>
                                                 }
+                                            }
+                                            else if (IsStarRatingTag(dailyTag) || IsScoreTag(dailyTag))
+                                            {
+                                                <ActivityValueDisplay TypeId="@dailyTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                             }
                                             else
                                             {
@@ -179,15 +194,22 @@
                                         </span>
                                     </h3>
                                     @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                    <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
-                                        <TextFallback>
-                                            @{ var dailyCardDisplayValue = GetActivityDisplayValue(activity); }
-                                            @if (!string.IsNullOrWhiteSpace(dailyCardDisplayValue))
-                                            {
-                                                <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@dailyCardDisplayValue</p>
-                                            }
-                                        </TextFallback>
-                                    </ActivityValueDisplay>
+                                    @if (IsStarRatingTag(dailyCardTag) || IsScoreTag(dailyCardTag))
+                                    {
+                                        <ActivityValueDisplay TypeId="@dailyCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                    }
+                                    else
+                                    {
+                                        <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                            <TextFallback>
+                                                @{ var dailyCardDisplayValue = GetActivityDisplayValue(activity); }
+                                                @if (!string.IsNullOrWhiteSpace(dailyCardDisplayValue))
+                                                {
+                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@dailyCardDisplayValue</p>
+                                                }
+                                            </TextFallback>
+                                        </ActivityValueDisplay>
+                                    }
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <div class="flex items-center gap-2">
@@ -276,6 +298,17 @@
                                                         Disabled="@IsSaving(activity.Id)"
                                                         OnValueChanged="@(v => OnIntegerStepperChanged(activity, groupTag, v))" />
                                                 }
+                                                else if (IsStarRatingTag(groupTag) || IsScoreTag(groupTag))
+                                                {
+                                                    <IntegerStepper
+                                                        Value="@GetIntegerValue(activity)"
+                                                        Step="1"
+                                                        Min="0"
+                                                        Max="@GetStarMax(groupTag!)"
+                                                        ShowValue="false"
+                                                        Disabled="@IsSaving(activity.Id)"
+                                                        OnValueChanged="@(v => OnIntegerStepperChanged(activity, groupTag!, v))" />
+                                                }
                                             </td>
                                             <td class="w-full px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                                 @if (groupTag?.TypeId == InputTypeIds.Boolean)
@@ -289,6 +322,10 @@
                                                     {
                                                         <span class="ml-1 text-xs text-gray-500 dark:text-slate-400">@groupTag.UnitSymbol</span>
                                                     }
+                                                }
+                                                else if (IsStarRatingTag(groupTag) || IsScoreTag(groupTag))
+                                                {
+                                                    <ActivityValueDisplay TypeId="@groupTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                                 }
                                                 else
                                                 {
@@ -316,15 +353,22 @@
                                             </span>
                                         </h3>
                                         @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                        <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
-                                            <TextFallback>
-                                                @{ var groupCardDisplayValue = GetActivityDisplayValue(activity); }
-                                                @if (!string.IsNullOrWhiteSpace(groupCardDisplayValue))
-                                                {
-                                                    <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@groupCardDisplayValue</p>
-                                                }
-                                            </TextFallback>
-                                        </ActivityValueDisplay>
+                                        @if (IsStarRatingTag(groupCardTag) || IsScoreTag(groupCardTag))
+                                        {
+                                            <ActivityValueDisplay TypeId="@groupCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                        }
+                                        else
+                                        {
+                                            <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                                <TextFallback>
+                                                    @{ var groupCardDisplayValue = GetActivityDisplayValue(activity); }
+                                                    @if (!string.IsNullOrWhiteSpace(groupCardDisplayValue))
+                                                    {
+                                                        <p class="mt-1 text-sm text-gray-700 dark:text-slate-200">@groupCardDisplayValue</p>
+                                                    }
+                                                </TextFallback>
+                                            </ActivityValueDisplay>
+                                        }
                                     </div>
                                     <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivity(activity.Id)" aria-label="Delete activity">
                                         <Icon Name="trash" Class="w-4 h-4" />
@@ -1160,6 +1204,15 @@
     }
 
     private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private static bool IsStarRatingTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;
+
+    private static bool IsScoreTag(TagResponse? tag) =>
+        tag?.TypeId is InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static int GetStarMax(TagResponse tag) =>
+        tag.TypeId is InputTypeIds.StarRating10 or InputTypeIds.Score10 ? 10 : 5;
 
     private bool? GetBoolValue(ActivityResponse activity)
     {
