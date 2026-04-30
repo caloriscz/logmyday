@@ -1,0 +1,793 @@
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
+@using Refit
+
+@inject ITodoApi TodoApi
+@inject IActivityApi ActivityApi
+@inject IJSRuntime JS
+@inject ILogger<TodoListsPanel> Logger
+
+@if (_loadError != null)
+{
+    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+        @_loadError
+    </div>
+}
+else if (_lists == null)
+{
+    <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
+        <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-slate-700 dark:border-t-slate-300"></span>
+        Loading to-do lists…
+    </div>
+}
+else
+{
+    @* Tab bar *@
+    <div class="flex items-center gap-1 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
+        @foreach (var list in _lists)
+        {
+            var isActive = _activeListId == list.Id;
+            <button type="button"
+                    class="@(isActive ? "border-b-2 border-primary-600 text-primary-700 dark:border-primary-400 dark:text-primary-300 font-semibold" : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100") whitespace-nowrap px-4 py-2.5 text-sm transition-colors focus:outline-hidden"
+                    @onclick="() => _activeListId = list.Id">
+                @list.Name
+            </button>
+        }
+        <button type="button"
+                class="inline-flex items-center gap-1 whitespace-nowrap px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors focus:outline-hidden"
+                title="Add list"
+                @onclick="OpenAddListModal">
+            <Icon Name="plus" Class="h-4 w-4" />
+        </button>
+    </div>
+
+    @* Active tab content *@
+    @if (_activeList != null)
+    {
+        var activeList = _activeList;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var activeItems = activeList.Items
+            .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate <= today))
+            .OrderBy(i => i.DisplayOrder)
+            .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
+            .ThenBy(i => i.DateCreated)
+            .ToList();
+        var doneItems = activeList.Items.Where(i => i.IsDone).ToList();
+
+        <div class="py-4 space-y-1">
+            @* Header row for active list *@
+            <div class="mb-3 flex items-center justify-between">
+                <span class="text-sm text-gray-500 dark:text-slate-400">
+                    @activeItems.Count item@(activeItems.Count == 1 ? "" : "s")
+                    @if (activeList.CompletionTagName != null)
+                    {
+                        <span class="ml-2 inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                            @activeList.CompletionTagName
+                        </span>
+                    }
+                </span>
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+                            @onclick="() => OpenEditListModal(activeList)"
+                            disabled="@_isBusy">
+                        <Icon Name="pencil" Class="h-3.5 w-3.5" />
+                        Edit list
+                    </button>
+                    <button type="button"
+                            class="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10 transition-colors"
+                            @onclick="() => ConfirmDeleteList(activeList)"
+                            disabled="@_isBusy">
+                        <Icon Name="trash" Class="h-3.5 w-3.5" />
+                        Delete list
+                    </button>
+                </div>
+            </div>
+
+            @* Active items *@
+            @if (!activeItems.Any())
+            {
+                <p class="py-4 text-center text-sm text-gray-400 dark:text-slate-500">No pending items. Add one below.</p>
+            }
+            else
+            {
+                @foreach (var item in activeItems)
+                {
+                    var isOverdue = item.DueDate.HasValue && item.DueDate.Value < today;
+                    <div class="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors @(isOverdue ? "border-l-2 border-rose-400" : "")">
+                        <input type="checkbox"
+                               class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:focus:ring-offset-slate-900 cursor-pointer"
+                               checked="@item.IsDone"
+                               @onchange="() => CompleteItemAsync(item)"
+                               disabled="@_isBusy" />
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm text-gray-900 dark:text-slate-100">@item.Title</span>
+                                @if (isOverdue)
+                                {
+                                    <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                                        Overdue
+                                    </span>
+                                }
+                                @if (item.DueDate.HasValue && !isOverdue)
+                                {
+                                    <span class="text-xs text-gray-400 dark:text-slate-500">due @item.DueDate.Value.ToString("MMM d")</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                            {
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-slate-400 truncate">@item.Notes</p>
+                            }
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button type="button"
+                                    class="inline-flex items-center rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-hidden"
+                                    title="Edit item"
+                                    @onclick="() => OpenEditItemModal(item)"
+                                    disabled="@_isBusy">
+                                <Icon Name="pencil" Class="h-3.5 w-3.5" />
+                            </button>
+                            <button type="button"
+                                    class="inline-flex items-center rounded p-1 text-gray-400 hover:text-rose-500 dark:hover:text-rose-400 focus:outline-hidden"
+                                    title="Delete item"
+                                    @onclick="() => DeleteItemAsync(item)"
+                                    disabled="@_isBusy">
+                                <Icon Name="trash" Class="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+
+            @* Inline add item form *@
+            <form class="mt-3 flex items-center gap-2" @onsubmit="AddItemInlineAsync" @onsubmit:preventDefault>
+                <input type="text"
+                       class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500"
+                       placeholder="Add an item…"
+                       maxlength="500"
+                       @bind="_newItemTitle"
+                       @bind:event="oninput"
+                       disabled="@_isBusy" />
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60 focus:outline-hidden"
+                        disabled="@(string.IsNullOrWhiteSpace(_newItemTitle) || _isBusy)">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    Add
+                </button>
+                <button type="button"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 disabled:opacity-60 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        title="Add with details"
+                        @onclick="() => OpenAddItemModal(activeList.Id)"
+                        disabled="@_isBusy">
+                    <Icon Name="dots-horizontal" Class="h-4 w-4" />
+                </button>
+            </form>
+
+            @if (!string.IsNullOrEmpty(_itemError))
+            {
+                <div class="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                    @_itemError
+                </div>
+            }
+
+            @* Completed items toggle *@
+            @if (doneItems.Any())
+            {
+                <div class="mt-4 border-t border-gray-200 pt-3 dark:border-slate-700">
+                    <button type="button"
+                            class="text-sm text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                            @onclick="() => _showDone = !_showDone">
+                        @(_showDone ? "Hide" : "Show") completed (@doneItems.Count)
+                    </button>
+
+                    @if (_showDone)
+                    {
+                        <div class="mt-2 space-y-1">
+                            @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                            {
+                                <div class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
+                                    <input type="checkbox"
+                                           class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
+                                           checked="@item.IsDone"
+                                           @onchange="() => ReopenItemAsync(item)"
+                                           disabled="@_isBusy" />
+                                    <span class="flex-1 text-sm line-through text-gray-500 dark:text-slate-400">@item.Title</span>
+                                    <button type="button"
+                                            class="inline-flex items-center rounded p-1 text-gray-300 hover:text-rose-500 dark:hover:text-rose-400 focus:outline-hidden"
+                                            title="Delete item"
+                                            @onclick="() => DeleteItemAsync(item)"
+                                            disabled="@_isBusy">
+                                        <Icon Name="trash" Class="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else if (_lists.Count == 0)
+    {
+        <div class="py-8 text-center text-sm text-gray-400 dark:text-slate-500">
+            No lists yet. Click <button type="button" class="underline hover:no-underline" @onclick="OpenAddListModal">+ Add list</button> to create one.
+        </div>
+    }
+}
+
+@* ── List Create/Edit Modal ── *@
+@if (_showListModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!_isBusy) CloseListModal(); }">
+        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(_isEditingList ? "Edit list" : "New list")</h3>
+                <button type="button"
+                        class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                        @onclick="CloseListModal" disabled="@_isBusy">
+                    <Icon Name="x" Class="h-5 w-5" />
+                </button>
+            </div>
+            <EditForm Model="_listForm" OnValidSubmit="SaveListAsync">
+                <DataAnnotationsValidator />
+                <div class="space-y-4 px-6 py-5">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Name <span class="text-rose-500">*</span></label>
+                        <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                   @bind-Value="_listForm.Name"
+                                   maxlength="200"
+                                   placeholder="e.g. Work tasks" />
+                        <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-rose-600 dark:text-rose-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log activity when done</label>
+                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                @bind="_listForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        @if (_listForm.CompletionTagId.HasValue && _allTags != null)
+                        {
+                            var selectedTag = _allTags.FirstOrDefault(t => t.Id == _listForm.CompletionTagId.Value);
+                            @if (selectedTag != null && !selectedTag.IsRepeatable)
+                            {
+                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                    This tag is not repeatable — completing multiple items on the same day may conflict.
+                                </p>
+                            }
+                        }
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(_listError))
+                {
+                    <div class="mx-6 mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @_listError
+                    </div>
+                }
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            @onclick="CloseListModal" disabled="@_isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60 focus:outline-hidden"
+                            disabled="@_isBusy">
+                        @if (_isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="check" Class="h-4 w-4" />
+                            <span>@(_isEditingList ? "Save changes" : "Create list")</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@* ── Item Create/Edit Modal ── *@
+@if (_showItemModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!_isBusy) CloseItemModal(); }">
+        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(_isEditingItem ? "Edit item" : "New item")</h3>
+                <button type="button"
+                        class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                        @onclick="CloseItemModal" disabled="@_isBusy">
+                    <Icon Name="x" Class="h-5 w-5" />
+                </button>
+            </div>
+            <EditForm Model="_itemForm" OnValidSubmit="SaveItemAsync">
+                <DataAnnotationsValidator />
+                <div class="space-y-4 px-6 py-5">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Title <span class="text-rose-500">*</span></label>
+                        <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                   @bind-Value="_itemForm.Title"
+                                   maxlength="500"
+                                   placeholder="What needs to be done?" />
+                        <ValidationMessage For="@(() => _itemForm.Title)" class="mt-1 text-xs text-rose-600 dark:text-rose-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Notes</label>
+                        <InputTextArea class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                       @bind-Value="_itemForm.Notes"
+                                       rows="2"
+                                       placeholder="Optional notes" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Start date</label>
+                            <input type="date"
+                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                   value="@(_itemForm.StartDate?.ToString("yyyy-MM-dd") ?? "")"
+                                   @onchange="e => _itemForm.StartDate = ParseDateOnly(e.Value?.ToString())" />
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Due date</label>
+                            <input type="date"
+                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                   value="@(_itemForm.DueDate?.ToString("yyyy-MM-dd") ?? "")"
+                                   @onchange="e => _itemForm.DueDate = ParseDateOnly(e.Value?.ToString())" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Remind me at</label>
+                        <input type="time"
+                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                               value="@(_itemForm.NotifyAt?.ToString("HH:mm") ?? "")"
+                               @onchange="e => _itemForm.NotifyAt = ParseTimeOnly(e.Value?.ToString())" />
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(_itemModalError))
+                {
+                    <div class="mx-6 mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @_itemModalError
+                    </div>
+                }
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            @onclick="CloseItemModal" disabled="@_isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60 focus:outline-hidden"
+                            disabled="@_isBusy">
+                        @if (_isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="check" Class="h-4 w-4" />
+                            <span>@(_isEditingItem ? "Save changes" : "Add item")</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@* ── Delete list confirmation ── *@
+@if (_pendingDeleteList != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete list</h3>
+            </div>
+            <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                Delete <strong>@_pendingDeleteList.Name</strong> and all its items? This cannot be undone.
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        @onclick="() => _pendingDeleteList = null" disabled="@_isBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 disabled:opacity-60 focus:outline-hidden"
+                        @onclick="DeleteListConfirmedAsync" disabled="@_isBusy">
+                    @if (_isBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                    }
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IList<TodoListResponse>? _lists;
+    private IList<TagResponse>? _allTags;
+    private int _activeListId;
+    private string? _loadError;
+    private string? _listError;
+    private string? _itemError;
+    private string? _itemModalError;
+    private bool _isBusy;
+    private bool _showDone;
+
+    // List modal state
+    private bool _showListModal;
+    private bool _isEditingList;
+    private int _editingListId;
+    private TodoListRequest _listForm = new() { Name = string.Empty };
+
+    // Item modal state
+    private bool _showItemModal;
+    private bool _isEditingItem;
+    private int _editingItemId;
+    private int _addItemToListId;
+    private TodoItemRequest _itemForm = new() { Title = string.Empty };
+    private string _newItemTitle = string.Empty;
+
+    // Delete confirmation
+    private TodoListResponse? _pendingDeleteList;
+
+    private TodoListResponse? _activeList =>
+        _lists?.FirstOrDefault(l => l.Id == _activeListId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RequestNotificationPermissionAsync();
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            var listsTask = TodoApi.GetTodoLists();
+            var tagsTask = ActivityApi.GetTags();
+            await Task.WhenAll(listsTask, tagsTask);
+            _lists = listsTask.Result;
+            _allTags = tagsTask.Result;
+
+            if (_lists.Count > 0 && !_lists.Any(l => l.Id == _activeListId))
+            {
+                _activeListId = _lists[0].Id;
+            }
+
+            await ScheduleNotificationsAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to load todo data");
+            _loadError = "Could not load to-do lists. Please refresh the page.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Unexpected error loading todo data");
+            _loadError = "Could not load to-do lists. Please refresh the page.";
+        }
+    }
+
+    private async Task RequestNotificationPermissionAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("todoNotifications.requestPermission");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Notification permission request failed");
+        }
+    }
+
+    private async Task ScheduleNotificationsAsync()
+    {
+        if (_lists == null)
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var items = _lists
+            .SelectMany(l => l.Items)
+            .Where(i => !i.IsDone && i.NotifyAt.HasValue && (i.StartDate == null || i.StartDate <= today))
+            .Select(i => new
+            {
+                id = i.Id,
+                title = i.Title,
+                notifyAtMs = (long)i.NotifyAt!.Value.ToTimeSpan().TotalMilliseconds
+            })
+            .ToArray();
+
+        try
+        {
+            await JS.InvokeVoidAsync("todoNotifications.scheduleNotifications", (object)items);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to schedule todo notifications");
+        }
+    }
+
+    // ── List modal ──
+
+    private void OpenAddListModal()
+    {
+        _isEditingList = false;
+        _listForm = new TodoListRequest { Name = string.Empty };
+        _listError = null;
+        _showListModal = true;
+    }
+
+    private void OpenEditListModal(TodoListResponse list)
+    {
+        _isEditingList = true;
+        _editingListId = list.Id;
+        _listForm = new TodoListRequest
+        {
+            Name = list.Name,
+            CompletionTagId = list.CompletionTagId,
+            DisplayOrder = list.DisplayOrder
+        };
+        _listError = null;
+        _showListModal = true;
+    }
+
+    private void CloseListModal()
+    {
+        _showListModal = false;
+        _listError = null;
+    }
+
+    private async Task SaveListAsync()
+    {
+        _isBusy = true;
+        _listError = null;
+        try
+        {
+            if (_isEditingList)
+            {
+                await TodoApi.UpdateTodoList(_editingListId, _listForm);
+            }
+            else
+            {
+                var created = await TodoApi.CreateTodoList(_listForm);
+                _activeListId = created.Id;
+            }
+
+            _showListModal = false;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to save todo list");
+            _listError = "Failed to save. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void ConfirmDeleteList(TodoListResponse list)
+    {
+        _pendingDeleteList = list;
+    }
+
+    private async Task DeleteListConfirmedAsync()
+    {
+        if (_pendingDeleteList == null)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        try
+        {
+            await TodoApi.DeleteTodoList(_pendingDeleteList.Id);
+            _pendingDeleteList = null;
+            await LoadDataAsync();
+
+            if (_lists != null && _lists.Count > 0 && !_lists.Any(l => l.Id == _activeListId))
+            {
+                _activeListId = _lists[0].Id;
+            }
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to delete todo list");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    // ── Item modal ──
+
+    private void OpenAddItemModal(int listId)
+    {
+        _isEditingItem = false;
+        _addItemToListId = listId;
+        _itemForm = new TodoItemRequest { Title = _newItemTitle.Trim(), ListId = listId };
+        _newItemTitle = string.Empty;
+        _itemModalError = null;
+        _showItemModal = true;
+    }
+
+    private void OpenEditItemModal(TodoItemResponse item)
+    {
+        _isEditingItem = true;
+        _editingItemId = item.Id;
+        _itemForm = new TodoItemRequest
+        {
+            ListId = item.ListId,
+            Title = item.Title,
+            Notes = item.Notes,
+            StartDate = item.StartDate,
+            DueDate = item.DueDate,
+            NotifyAt = item.NotifyAt,
+            DisplayOrder = item.DisplayOrder
+        };
+        _itemModalError = null;
+        _showItemModal = true;
+    }
+
+    private void CloseItemModal()
+    {
+        _showItemModal = false;
+        _itemModalError = null;
+    }
+
+    private async Task SaveItemAsync()
+    {
+        _isBusy = true;
+        _itemModalError = null;
+        try
+        {
+            if (_isEditingItem)
+            {
+                await TodoApi.UpdateTodoItem(_editingItemId, _itemForm);
+            }
+            else
+            {
+                await TodoApi.CreateTodoItem(_itemForm);
+            }
+
+            _showItemModal = false;
+            _newItemTitle = string.Empty;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to save todo item");
+            _itemModalError = "Failed to save. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task AddItemInlineAsync()
+    {
+        var title = _newItemTitle.Trim();
+        if (string.IsNullOrEmpty(title) || _activeList == null)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _itemError = null;
+        try
+        {
+            await TodoApi.CreateTodoItem(new TodoItemRequest { ListId = _activeList.Id, Title = title });
+            _newItemTitle = string.Empty;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to add todo item inline");
+            _itemError = "Failed to add item. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task CompleteItemAsync(TodoItemResponse item)
+    {
+        _isBusy = true;
+        try
+        {
+            await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task ReopenItemAsync(TodoItemResponse item)
+    {
+        _isBusy = true;
+        try
+        {
+            await TodoApi.ReopenItem(item.Id);
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to reopen todo item {ItemId}", item.Id);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task DeleteItemAsync(TodoItemResponse item)
+    {
+        _isBusy = true;
+        try
+        {
+            await TodoApi.DeleteTodoItem(item.Id);
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to delete todo item {ItemId}", item.Id);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    // ── Helpers ──
+
+    private static DateOnly? ParseDateOnly(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParse(value, out var d) ? d : null;
+    }
+
+    private static TimeOnly? ParseTimeOnly(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return TimeOnly.TryParse(value, out var t) ? t : null;
+    }
+}

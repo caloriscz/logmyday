@@ -24,6 +24,8 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
     public DbSet<EventLog> EventLogs => Set<EventLog>();
     public DbSet<EventLogDetail> EventLogDetails => Set<EventLogDetail>();
+    public DbSet<TodoList> TodoLists => Set<TodoList>();
+    public DbSet<TodoItem> TodoItems => Set<TodoItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +48,8 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagGroup>().ToTable("LogMyDay_TagGroups");
         modelBuilder.Entity<EventLog>().ToTable("LogMyDay_EventLogs");
         modelBuilder.Entity<EventLogDetail>().ToTable("LogMyDay_EventLogDetails");
+        modelBuilder.Entity<TodoList>().ToTable("LogMyDay_TodoLists");
+        modelBuilder.Entity<TodoItem>().ToTable("LogMyDay_TodoItems");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -159,6 +163,44 @@ public class LogMyDayDbContext : DbContext
                 .HasDatabaseName("IX_LogMyDay_EventLogs_Level");
 
             entity.Property(e => e.Message).HasMaxLength(500).IsRequired();
+        });
+
+        modelBuilder.Entity<TodoList>(entity =>
+        {
+            entity.HasMany(l => l.Items)
+                .WithOne(i => i.List)
+                .HasForeignKey(i => i.ListId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(l => l.CompletionTag)
+                .WithMany()
+                .HasForeignKey(l => l.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
+
+            entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
+            entity.Property(l => l.DisplayOrder).HasDefaultValue(0);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(l => l.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+            }
+        });
+
+        modelBuilder.Entity<TodoItem>(entity =>
+        {
+            entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
+            entity.Property(i => i.IsDone).HasDefaultValue(false);
+            entity.Property(i => i.DisplayOrder).HasDefaultValue(0);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(i => i.StartDate).HasColumnType("date");
+                entity.Property(i => i.DueDate).HasColumnType("date");
+                entity.Property(i => i.DoneAt).HasColumnType("datetime2");
+            }
         });
 
         modelBuilder.SeedData();
