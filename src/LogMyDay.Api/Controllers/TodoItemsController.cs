@@ -110,4 +110,23 @@ public class TodoItemsController : BaseApiController
             return NotFound(ex.Message);
         }
     }
+
+    [HttpPatch("/api/todo-lists/{listId:int}/items/reorder")]
+    public async Task<IActionResult> Reorder(int listId, [FromBody] IList<TodoItemReorderRequest> items)
+    {
+        var userId = GetCurrentUserId();
+
+        try
+        {
+            await _todoItemService.Reorder(listId, items, userId);
+
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Todo list {ListId} not found for user {UserId}", listId, userId);
+
+            return NotFound(ex.Message);
+        }
+    }
 }

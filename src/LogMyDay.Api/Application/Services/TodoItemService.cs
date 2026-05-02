@@ -112,6 +112,33 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
+    public async Task Reorder(int listId, IList<TodoItemReorderRequest> items, Guid userId)
+    {
+        var list = await _context.TodoLists.FirstOrDefaultAsync(l => l.Id == listId && l.UserId == userId);
+
+        if (list == null)
+        {
+            throw new KeyNotFoundException("Todo list not found");
+        }
+
+        var itemIds = items.Select(i => i.Id).ToList();
+        var dbItems = await _context.TodoItems
+            .Where(i => i.ListId == listId && itemIds.Contains(i.Id))
+            .ToListAsync();
+
+        foreach (var dbItem in dbItems)
+        {
+            var req = items.FirstOrDefault(r => r.Id == dbItem.Id);
+
+            if (req != null)
+            {
+                dbItem.DisplayOrder = req.DisplayOrder;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     private async Task<Domain.Entities.TodoItem> LoadItemForUser(int id, Guid userId)
     {
         var item = await _context.TodoItems

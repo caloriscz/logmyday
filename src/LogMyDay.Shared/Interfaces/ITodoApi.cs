@@ -29,6 +29,9 @@ public interface ITodoApi
     [Post("/api/todo-items/{id}/complete")]
     Task<TodoItemResponse> CompleteItem(int id, [Body] TodoItemCompleteRequest request);
 
+    [Patch("/api/todo-lists/{listId}/items/reorder")]
+    Task ReorderItems(int listId, [Body] IList<TodoItemReorderRequest> items);
+
     [Post("/api/todo-items/{id}/reopen")]
     Task<TodoItemResponse> ReopenItem(int id);
 }
