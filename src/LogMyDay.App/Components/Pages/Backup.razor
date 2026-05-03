@@ -82,6 +82,14 @@
                                 <dt class="font-medium text-gray-600 dark:text-slate-400">Scan Mappings</dt>
                                 <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalScanMappings</dd>
                             </div>
+                            <div>
+                                <dt class="font-medium text-gray-600 dark:text-slate-400">Todo Lists</dt>
+                                <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTodoLists</dd>
+                            </div>
+                            <div>
+                                <dt class="font-medium text-gray-600 dark:text-slate-400">Todo Items</dt>
+                                <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTodoItems</dd>
+                            </div>
                         </dl>
                     </div>
                 }
@@ -285,6 +293,14 @@
                                     <div class="flex justify-between">
                                         <dt class="font-medium text-gray-600 dark:text-slate-400">Scan Mappings:</dt>
                                         <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.ScanMappingsImported imported, @importResult.Statistics.ScanMappingsSkipped skipped</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Todo Lists:</dt>
+                                        <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TodoListsImported imported, @importResult.Statistics.TodoListsSkipped skipped</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Todo Items:</dt>
+                                        <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TodoItemsImported imported, @importResult.Statistics.TodoItemsSkipped skipped</dd>
                                     </div>
                                 </dl>
                             </div>

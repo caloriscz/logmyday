@@ -217,12 +217,51 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            // Export TodoLists with items and user filtering
+            var todoListsQuery = _context.TodoLists
+                .Include(l => l.Items)
+                    .ThenInclude(i => i.CompletionTag)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                todoListsQuery = todoListsQuery.Where(l => l.UserId == userId);
+            }
+
+            var todoLists = await todoListsQuery
+                .Select(l => new TodoListBackup
+                {
+                    Name = l.Name,
+                    DisplayOrder = l.DisplayOrder,
+                    ListType = l.ListType,
+                    DateCreated = l.DateCreated,
+                    Items = l.Items.Select(i => new TodoItemBackup
+                    {
+                        Title = i.Title,
+                        Notes = i.Notes,
+                        StartDate = i.StartDate,
+                        DueDate = i.DueDate,
+                        NotifyAt = i.NotifyAt,
+                        IsDone = i.IsDone,
+                        DoneAt = i.DoneAt,
+                        DisplayOrder = i.DisplayOrder,
+                        DateCreated = i.DateCreated,
+                        RecurrenceType = i.RecurrenceType,
+                        AutoLogMode = i.AutoLogMode,
+                        CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null,
+                        MonitorDaysBack = i.MonitorDaysBack,
+                        MonitorFromDate = i.MonitorFromDate,
+                        MonitorToDate = i.MonitorToDate
+                    }).ToList()
+                })
+                .ToListAsync();
+
             var backupData = new BackupData
             {
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.7",
+                    Version = "1.8",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
@@ -232,7 +271,9 @@ public class BackupService : IBackupService
                     TotalTags = tags.Count,
                     TotalNotifications = notifications.Count,
                     TotalActivities = totalActivities,
-                    TotalScanMappings = scanMappings.Count
+                    TotalScanMappings = scanMappings.Count,
+                    TotalTodoLists = todoLists.Count,
+                    TotalTodoItems = todoLists.Sum(l => l.Items.Count)
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -243,7 +284,8 @@ public class BackupService : IBackupService
                 Tags = tags,
                 Notifications = notifications,
                 Activities = activities,
-                ScanMappings = scanMappings
+                ScanMappings = scanMappings,
+                TodoLists = todoLists
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -297,6 +339,7 @@ public class BackupService : IBackupService
                 await ImportNotificationsAsync(backupData.Notifications, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
                 await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
+                await ImportTodoListsAsync(backupData.TodoLists, result, userId);
 
                 await transaction.CommitAsync();
                 result.Message = "Data import completed successfully";
@@ -351,7 +394,29 @@ public class BackupService : IBackupService
             _context.ScanMappings.RemoveRange(scanMappingsToDelete);
             recordsCleared += scanMappingsToDelete.Count;
 
-            // 3. Clear notifications (depends on tags)
+            // 3. Clear todo items (depends on todo lists)
+            var todoItemsQuery = _context.TodoItems
+                .Include(i => i.List)
+                .AsQueryable();
+            if (userId.HasValue)
+            {
+                todoItemsQuery = todoItemsQuery.Where(i => i.List.UserId == userId);
+            }
+            var todoItemsToDelete = await todoItemsQuery.ToListAsync();
+            _context.TodoItems.RemoveRange(todoItemsToDelete);
+            recordsCleared += todoItemsToDelete.Count;
+
+            // 4. Clear todo lists
+            var todoListsQuery = _context.TodoLists.AsQueryable();
+            if (userId.HasValue)
+            {
+                todoListsQuery = todoListsQuery.Where(l => l.UserId == userId);
+            }
+            var todoListsToDelete = await todoListsQuery.ToListAsync();
+            _context.TodoLists.RemoveRange(todoListsToDelete);
+            recordsCleared += todoListsToDelete.Count;
+
+            // 5. Clear notifications (depends on tags)
             var notificationsQuery = _context.Notifications
                 .Include(n => n.Tag)
                 .AsQueryable();
@@ -363,7 +428,7 @@ public class BackupService : IBackupService
             _context.Notifications.RemoveRange(notificationsToDelete);
             recordsCleared += notificationsToDelete.Count;
 
-            // 4. Clear tags (depends on units and option lists)
+            // 6. Clear tags (depends on units and option lists)
             var tagsQuery = _context.Tags.AsQueryable();
             if (userId.HasValue)
             {
@@ -373,7 +438,7 @@ public class BackupService : IBackupService
             _context.Tags.RemoveRange(tagsToDelete);
             recordsCleared += tagsToDelete.Count;
 
-            // 5. Clear tag groups
+            // 7. Clear tag groups
             var tagGroupsQuery = _context.TagGroups.AsQueryable();
             if (userId.HasValue)
             {
@@ -383,7 +448,7 @@ public class BackupService : IBackupService
             _context.TagGroups.RemoveRange(tagGroupsToDelete);
             recordsCleared += tagGroupsToDelete.Count;
 
-            // 6. Clear tag options (depends on tag option lists)
+            // 8. Clear tag options (depends on tag option lists)
             var tagOptionsQuery = _context.TagOptions
                 .Include(to => to.OptionList)
                 .AsQueryable();
@@ -395,7 +460,7 @@ public class BackupService : IBackupService
             _context.TagOptions.RemoveRange(tagOptionsToDelete);
             recordsCleared += tagOptionsToDelete.Count;
 
-            // 5. Clear tag option lists
+            // 9. Clear tag option lists
             var tagOptionListsQuery = _context.TagOptionLists.AsQueryable();
             if (userId.HasValue)
             {
@@ -961,6 +1026,75 @@ public class BackupService : IBackupService
         }
 
         await _context.SaveChangesAsync();
+    }
+
+    private async Task ImportTodoListsAsync(List<TodoListBackup> todoLists, BackupImportResult result, Guid? userId)
+    {
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        var existingListNames = await _context.TodoLists
+            .Where(l => userId == null || l.UserId == userId)
+            .Select(l => l.Name)
+            .ToHashSetAsync();
+
+        foreach (var list in todoLists)
+        {
+            if (existingListNames.Contains(list.Name))
+            {
+                result.Statistics.TodoListsSkipped++;
+                result.Statistics.TodoItemsSkipped += list.Items.Count;
+                continue;
+            }
+
+            var listEntity = new TodoList
+            {
+                Name = list.Name,
+                DisplayOrder = list.DisplayOrder,
+                ListType = list.ListType,
+                DateCreated = list.DateCreated,
+                UserId = userId ?? Guid.Empty
+            };
+
+            _context.TodoLists.Add(listEntity);
+            await _context.SaveChangesAsync();
+            result.Statistics.TodoListsImported++;
+
+            foreach (var item in list.Items)
+            {
+                int? completionTagId = null;
+                if (!string.IsNullOrEmpty(item.CompletionTagName) && tagLookup.ContainsKey(item.CompletionTagName))
+                {
+                    completionTagId = tagLookup[item.CompletionTagName];
+                }
+
+                var itemEntity = new TodoItem
+                {
+                    ListId = listEntity.Id,
+                    Title = item.Title,
+                    Notes = item.Notes,
+                    StartDate = item.StartDate,
+                    DueDate = item.DueDate,
+                    NotifyAt = item.NotifyAt,
+                    IsDone = item.IsDone,
+                    DoneAt = item.DoneAt,
+                    DisplayOrder = item.DisplayOrder,
+                    DateCreated = item.DateCreated,
+                    RecurrenceType = item.RecurrenceType,
+                    AutoLogMode = item.AutoLogMode,
+                    CompletionTagId = completionTagId,
+                    MonitorDaysBack = item.MonitorDaysBack,
+                    MonitorFromDate = item.MonitorFromDate,
+                    MonitorToDate = item.MonitorToDate
+                };
+
+                _context.TodoItems.Add(itemEntity);
+                result.Statistics.TodoItemsImported++;
+            }
+
+            await _context.SaveChangesAsync();
+        }
     }
 
     // NEW: Secure user-scoped backup methods (v2.0)
