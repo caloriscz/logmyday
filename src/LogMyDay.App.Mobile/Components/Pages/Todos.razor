@@ -1,4 +1,5 @@
 @page "/todos"
+@using LogMyDay.Domain.Enums
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
 @using Refit
@@ -59,11 +60,9 @@
                             <div class="flex items-center gap-2 min-w-0">
                                 <h3 class="truncate text-base font-semibold text-gray-900 dark:text-gray-100">@list.Name</h3>
                                 <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">@activeItems.Count</span>
-                                @if (list.CompletionTagName != null)
+                                @if (list.ListType == TodoListType.Reminder)
                                 {
-                                    <span class="shrink-0 inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                                        @list.CompletionTagName
-                                    </span>
+                                    <span class="shrink-0 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">Reminder</span>
                                 }
                             </div>
                             <div class="flex items-center gap-1 shrink-0">
@@ -127,6 +126,10 @@
                                                 @if (item.DueDate.HasValue && !isOverdue)
                                                 {
                                                     <span class="text-xs text-gray-400 dark:text-gray-500">due @item.DueDate.Value.ToString("MMM d")</span>
+                                                }
+                                                @if (item.RecurrenceType != RecurrenceType.None)
+                                                {
+                                                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
                                                 }
                                             </div>
                                             @if (!string.IsNullOrWhiteSpace(item.Notes))
@@ -230,7 +233,7 @@
 @* ── List Create/Edit Modal ── *@
 @if (_showListModal)
 {
-    <div class="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
         @* Header *@
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
             <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">@(_isEditingList ? "Edit list" : "New list")</h3>
@@ -252,34 +255,17 @@
                         <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log activity when done</label>
-                        <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                @bind="_listForm.CompletionTagId">
-                            <option value="">— None —</option>
-                            @if (_allTags != null)
-                            {
-                                @foreach (var tag in _allTags)
-                                {
-                                    <option value="@tag.Id">@tag.Title</option>
-                                }
-                            }
-                        </select>
-                        @if (_listForm.CompletionTagId.HasValue && _allTags != null)
-                        {
-                            var sel = _allTags.FirstOrDefault(t => t.Id == _listForm.CompletionTagId.Value);
-                            @if (sel != null && !sel.IsRepeatable)
-                            {
-                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                    This tag is not repeatable — completing multiple items on the same day may conflict.
-                                </p>
-                            }
-                        }
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">List type</label>
+                        <InputSelect @bind-Value="_listForm.ListType" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="@TodoListType.Basic">Basic</option>
+                            <option value="@TodoListType.Reminder">Reminder</option>
+                        </InputSelect>
                     </div>
                 </div>
             </EditForm>
         </div>
         @* Sticky footer — plain div, always visible *@
-        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
             @if (!string.IsNullOrEmpty(_listError))
             {
                 <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
@@ -302,12 +288,11 @@
         </div>
     </div>
 }
-}
 
 @* ── Item Create/Edit Modal ── *@
 @if (_showItemModal)
 {
-    <div class="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
         @* Header *@
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
             <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">@(_isEditingItem ? "Edit item" : "New item")</h3>
@@ -328,12 +313,58 @@
                                    placeholder="What needs to be done?" />
                         <ValidationMessage For="@(() => _itemForm.Title)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
                     </div>
+                    @if (_currentListForItemModal?.ListType == TodoListType.Reminder)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Value <span class="text-red-500">*</span></label>
+                            @if (IsNumericInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
+                            {
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Enter a number" />
+                            }
+                            else
+                            {
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Enter a value" />
+                            }
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Logged as activity value when completed.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
+                            <InputTextArea class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           rows="3"
+                                           placeholder="Optional notes" />
+                        </div>
+                    }
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Notes</label>
-                        <InputTextArea class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                       @bind-Value="_itemForm.Notes"
-                                       rows="3"
-                                       placeholder="Optional notes" />
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log tag</label>
+                        <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @bind="_itemForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
+                        {
+                            var selItemTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
+                            @if (selItemTag != null && !selItemTag.IsRepeatable)
+                            {
+                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                    This tag is not repeatable — completing multiple items on the same day may conflict.
+                                </p>
+                            }
+                        }
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -351,11 +382,75 @@
                                    @onchange="e => _itemForm.DueDate = ParseDateOnly(e.Value?.ToString())" />
                         </div>
                     </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Recurrence</label>
+                        <InputSelect @bind-Value="_itemForm.RecurrenceType" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="@RecurrenceType.None">None (one-time)</option>
+                            <option value="@RecurrenceType.Daily">Daily</option>
+                            <option value="@RecurrenceType.Weekly">Weekly</option>
+                        </InputSelect>
+                    </div>
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value)?.IsRepeatable == false)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
+                            <InputSelect @bind-Value="_itemForm.AutoLogMode" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
+                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
+                            </InputSelect>
+                        </div>
+                    }
+                    @if (_itemForm.RecurrenceType != RecurrenceType.None && _itemForm.CompletionTagId.HasValue)
+                    {
+                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Activity monitoring window</p>
+                            <div class="flex items-center gap-6">
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@_monitorUseDaysBack"
+                                           @onchange="() => { _monitorUseDaysBack = true; _itemForm.MonitorFromDate = null; _itemForm.MonitorToDate = null; }" />
+                                    Last N days
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@(!_monitorUseDaysBack)"
+                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; }" />
+                                    Date range
+                                </label>
+                            </div>
+                            @if (_monitorUseDaysBack)
+                            {
+                                <div>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Days back from today (0 = today only)</label>
+                                    <InputNumber @bind-Value="_itemForm.MonitorDaysBack"
+                                                 class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                 min="0" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">From</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorFromDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorFromDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">To</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorToDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorToDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </EditForm>
         </div>
         @* Sticky footer — plain div, always visible *@
-        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
             @if (!string.IsNullOrEmpty(_itemModalError))
             {
                 <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
@@ -382,7 +477,7 @@
 @* ── Delete list confirmation ── *@
 @if (_pendingDeleteList != null)
 {
-    <div class="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
         @* Header *@
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
             <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Delete list</h3>
@@ -398,7 +493,7 @@
             </p>
         </div>
         @* Sticky footer *@
-        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
             <div class="flex items-center justify-end gap-3">
                 <button type="button"
                         class="min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"
@@ -446,6 +541,8 @@
     private bool _isEditingItem;
     private int _editingItemId;
     private int _addItemToListId;
+    private TodoListResponse? _currentListForItemModal;
+    private bool _monitorUseDaysBack = true;
     private TodoItemRequest _itemForm = new() { Title = string.Empty };
     private EditContext _itemEditContext = null!;
 
@@ -523,8 +620,8 @@
         _listForm = new TodoListRequest
         {
             Name = list.Name,
-            CompletionTagId = list.CompletionTagId,
-            DisplayOrder = list.DisplayOrder
+            DisplayOrder = list.DisplayOrder,
+            ListType = list.ListType
         };
         _listEditContext = new EditContext(_listForm);
         _listError = null;
@@ -565,7 +662,9 @@
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to save todo list");
-            _listError = "Failed to save. Please try again.";
+            _listError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest && !string.IsNullOrWhiteSpace(ex.Content)
+                ? ex.Content.Trim('"')
+                : "Failed to save. Please try again.";
         }
         finally
         {
@@ -608,6 +707,8 @@
     {
         _isEditingItem = false;
         _addItemToListId = listId;
+        _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == listId);
+        _monitorUseDaysBack = true;
         _itemForm = new TodoItemRequest { Title = string.Empty, ListId = listId };
         _itemEditContext = new EditContext(_itemForm);
         _itemModalError = null;
@@ -618,6 +719,8 @@
     {
         _isEditingItem = true;
         _editingItemId = item.Id;
+        _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == item.ListId);
+        _monitorUseDaysBack = item.MonitorFromDate == null;
         _itemForm = new TodoItemRequest
         {
             ListId = item.ListId,
@@ -626,7 +729,13 @@
             StartDate = item.StartDate,
             DueDate = item.DueDate,
             NotifyAt = item.NotifyAt,
-            DisplayOrder = item.DisplayOrder
+            DisplayOrder = item.DisplayOrder,
+            RecurrenceType = item.RecurrenceType,
+            AutoLogMode = item.AutoLogMode,
+            MonitorDaysBack = item.MonitorDaysBack,
+            MonitorFromDate = item.MonitorFromDate,
+            MonitorToDate = item.MonitorToDate,
+            CompletionTagId = item.CompletionTagId
         };
         _itemEditContext = new EditContext(_itemForm);
         _itemModalError = null;
@@ -814,6 +923,9 @@
 
     private static DateOnly? ParseDateOnly(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : DateOnly.TryParse(value, out var d) ? d : null;
+
+    private static bool IsNumericInputType(int? inputTypeId) =>
+        inputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
 
     private async Task OnDropLastAsync(int listId)
     {

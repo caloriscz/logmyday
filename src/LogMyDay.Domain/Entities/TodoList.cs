@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Domain.Entities;
 
@@ -15,12 +16,9 @@ public class TodoList
     [MaxLength(200)]
     public required string Name { get; set; }
 
-    public int? CompletionTagId { get; set; }
-
-    [ForeignKey(nameof(CompletionTagId))]
-    public Tag? CompletionTag { get; set; }
-
     public int DisplayOrder { get; set; } = 0;
+
+    public TodoListType ListType { get; set; } = TodoListType.Basic;
 
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
 

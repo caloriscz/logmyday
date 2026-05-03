@@ -172,11 +172,6 @@ public class LogMyDayDbContext : DbContext
                 .HasForeignKey(i => i.ListId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(l => l.CompletionTag)
-                .WithMany()
-                .HasForeignKey(l => l.CompletionTagId)
-                .OnDelete(DeleteBehavior.SetNull);
-
             entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
 
             entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
@@ -190,6 +185,11 @@ public class LogMyDayDbContext : DbContext
 
         modelBuilder.Entity<TodoItem>(entity =>
         {
+            entity.HasOne(i => i.CompletionTag)
+                .WithMany()
+                .HasForeignKey(i => i.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
             entity.Property(i => i.IsDone).HasDefaultValue(false);
             entity.Property(i => i.DisplayOrder).HasDefaultValue(0);

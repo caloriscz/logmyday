@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Domain.Entities;
 
@@ -33,4 +34,19 @@ public class TodoItem
     public int DisplayOrder { get; set; } = 0;
 
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
+
+    public RecurrenceType RecurrenceType { get; set; } = RecurrenceType.None;
+
+    public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
+
+    public int? CompletionTagId { get; set; }
+
+    [ForeignKey(nameof(CompletionTagId))]
+    public Tag? CompletionTag { get; set; }
+
+    public int? MonitorDaysBack { get; set; }
+
+    public DateOnly? MonitorFromDate { get; set; }
+
+    public DateOnly? MonitorToDate { get; set; }
 }

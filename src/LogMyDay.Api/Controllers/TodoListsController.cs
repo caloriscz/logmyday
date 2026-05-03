@@ -34,9 +34,18 @@ public class TodoListsController : BaseApiController
     public async Task<ActionResult<TodoListResponse>> Create(TodoListRequest request)
     {
         var userId = GetCurrentUserId();
-        var list = await _todoListService.Create(request, userId);
+        try
+        {
+            var list = await _todoListService.Create(request, userId);
 
-        return Created(string.Empty, list);
+            return Created(string.Empty, list);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid todo list create request for user {UserId}", userId);
+
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -54,6 +63,12 @@ public class TodoListsController : BaseApiController
             _logger.LogWarning(ex, "Todo list {ListId} not found for user {UserId}", id, userId);
 
             return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid todo list update request for list {ListId}, user {UserId}", id, userId);
+
+            return BadRequest(ex.Message);
         }
     }
 
