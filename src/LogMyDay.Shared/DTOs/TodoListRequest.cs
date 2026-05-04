@@ -12,4 +12,6 @@ public class TodoListRequest
     public int DisplayOrder { get; set; } = 0;
 
     public TodoListType ListType { get; set; } = TodoListType.Basic;
+
+    public int? CompletionTagId { get; set; }
 }

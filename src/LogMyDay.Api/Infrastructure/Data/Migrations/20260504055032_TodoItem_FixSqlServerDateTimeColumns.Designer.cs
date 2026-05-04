@@ -3,6 +3,7 @@ using System;
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LogMyDay.Api.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(LogMyDayDbContext))]
-    partial class LogMyDayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260504055032_TodoItem_FixSqlServerDateTimeColumns")]
+    partial class TodoItem_FixSqlServerDateTimeColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.10");
@@ -682,9 +685,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("CompletionTagId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("TEXT");
 
@@ -705,9 +705,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CompletionTagId")
-                        .HasDatabaseName("IX_LogMyDay_TodoLists_CompletionTagId");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
@@ -942,16 +939,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("CompletionTag");
 
                     b.Navigation("List");
-                });
-
-            modelBuilder.Entity("LogMyDay.Domain.Entities.TodoList", b =>
-                {
-                    b.HasOne("LogMyDay.Domain.Entities.Tag", "CompletionTag")
-                        .WithMany()
-                        .HasForeignKey("CompletionTagId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("CompletionTag");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.Unit", b =>

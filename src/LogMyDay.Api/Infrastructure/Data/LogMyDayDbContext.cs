@@ -172,7 +172,13 @@ public class LogMyDayDbContext : DbContext
                 .HasForeignKey(i => i.ListId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(l => l.CompletionTag)
+                .WithMany()
+                .HasForeignKey(l => l.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
+            entity.HasIndex(l => l.CompletionTagId).HasDatabaseName("IX_LogMyDay_TodoLists_CompletionTagId");
 
             entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
             entity.Property(l => l.DisplayOrder).HasDefaultValue(0);
@@ -199,7 +205,10 @@ public class LogMyDayDbContext : DbContext
                 entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
                 entity.Property(i => i.StartDate).HasColumnType("date");
                 entity.Property(i => i.DueDate).HasColumnType("date");
+                entity.Property(i => i.NotifyAt).HasColumnType("time");
                 entity.Property(i => i.DoneAt).HasColumnType("datetime2");
+                entity.Property(i => i.MonitorFromDate).HasColumnType("date");
+                entity.Property(i => i.MonitorToDate).HasColumnType("date");
             }
         });
 

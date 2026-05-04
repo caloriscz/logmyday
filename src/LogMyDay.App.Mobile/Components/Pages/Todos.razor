@@ -261,6 +261,24 @@
                             <option value="@TodoListType.Reminder">Reminder</option>
                         </InputSelect>
                     </div>
+                    @if (_listForm.ListType == TodoListType.Basic)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log tag</label>
+                            <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    @bind="_listForm.CompletionTagId">
+                                <option value="">— None —</option>
+                                @if (_allTags != null)
+                                {
+                                    @foreach (var tag in _allTags)
+                                    {
+                                        <option value="@tag.Id">@tag.Title</option>
+                                    }
+                                }
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Activity logged for every item completed in this list.</p>
+                        </div>
+                    }
                 </div>
             </EditForm>
         </div>
@@ -342,6 +360,8 @@
                                            placeholder="Optional notes" />
                         </div>
                     }
+                    @if (_currentListForItemModal?.ListType == TodoListType.Reminder)
+                    {
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log tag</label>
                         <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -358,14 +378,15 @@
                         @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
                         {
                             var selItemTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
-                            @if (selItemTag != null && !selItemTag.IsRepeatable)
+                            @if (selItemTag != null && !selItemTag.IsRepeatable && _itemForm.AutoLogMode != AutoLogMode.Add)
                             {
                                 <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                    This tag is not repeatable — completing multiple items on the same day may conflict.
+                                    This tag is not repeatable — completing multiple items on the same day will replace the existing activity.
                                 </p>
                             }
                         }
                     </div>
+                    }
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Start date</label>
@@ -412,7 +433,7 @@
                                 </label>
                                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                     <input type="radio" class="text-primary-600" checked="@(!_monitorUseDaysBack)"
-                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; }" />
+                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; _itemForm.MonitorFromDate = DateOnly.FromDateTime(DateTime.Today); }" />
                                     Date range
                                 </label>
                             </div>
@@ -621,7 +642,8 @@
         {
             Name = list.Name,
             DisplayOrder = list.DisplayOrder,
-            ListType = list.ListType
+            ListType = list.ListType,
+            CompletionTagId = list.CompletionTagId
         };
         _listEditContext = new EditContext(_listForm);
         _listError = null;
@@ -709,7 +731,7 @@
         _addItemToListId = listId;
         _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == listId);
         _monitorUseDaysBack = true;
-        _itemForm = new TodoItemRequest { Title = string.Empty, ListId = listId };
+        _itemForm = new TodoItemRequest { Title = string.Empty, ListId = listId, MonitorDaysBack = 0 };
         _itemEditContext = new EditContext(_itemForm);
         _itemModalError = null;
         _showItemModal = true;
@@ -776,7 +798,14 @@
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to save todo item");
-            _itemModalError = "Failed to save. Please try again.";
+            _itemModalError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest && !string.IsNullOrWhiteSpace(ex.Content)
+                ? ex.Content.Trim('"')
+                : $"Failed to save (HTTP {(int)ex.StatusCode}). Please try again.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error saving todo item");
+            _itemModalError = "An unexpected error occurred. Please try again.";
         }
         finally
         {

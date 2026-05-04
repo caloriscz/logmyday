@@ -31,6 +31,12 @@ public class TodoItemsController : BaseApiController
 
             return Created(string.Empty, item);
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Validation failed creating todo item for user {UserId}", userId);
+
+            return BadRequest(ex.Message);
+        }
         catch (KeyNotFoundException ex)
         {
             _logger.LogWarning(ex, "Todo list not found for user {UserId}", userId);
@@ -48,6 +54,12 @@ public class TodoItemsController : BaseApiController
             await _todoItemService.Update(id, request, userId);
 
             return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Validation failed updating todo item {ItemId} for user {UserId}", id, userId);
+
+            return BadRequest(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
