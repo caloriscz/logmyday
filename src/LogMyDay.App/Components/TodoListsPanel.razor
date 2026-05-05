@@ -124,6 +124,10 @@ else
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-sm text-gray-900 dark:text-slate-100">@item.Title</span>
+                                        @if (list.ListType == TodoListType.Reminder && !string.IsNullOrWhiteSpace(item.Notes))
+                                        {
+                                            <span class="text-sm text-gray-500 dark:text-slate-400">@item.Notes</span>
+                                        }
                                         @if (isOverdue)
                                         {
                                             <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Overdue</span>
@@ -137,12 +141,22 @@ else
                                             <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><Icon Name="arrow-repeat" Class="me-1 h-3 w-3" />@item.RecurrenceType</span>
                                         }
                                     </div>
-                                    @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                    @if (list.ListType != TodoListType.Reminder && !string.IsNullOrWhiteSpace(item.Notes))
                                     {
                                         <p class="mt-0.5 text-xs text-gray-500 dark:text-slate-400 truncate">@item.Notes</p>
                                     }
                                 </div>
                                 <div class="flex items-center gap-1 shrink-0">
+                                    @if (list.ListType == TodoListType.Basic)
+                                    {
+                                        <button type="button"
+                                                class="inline-flex items-center rounded p-1 @(_copiedItemId == item.Id ? "text-green-500" : "text-gray-400 hover:text-gray-600 dark:hover:text-slate-200") focus:outline-hidden"
+                                                title="@(_copiedItemId == item.Id ? "Copied!" : "Copy title")"
+                                                @onclick="() => CopyItemTitleAsync(item)"
+                                                disabled="@_isBusy">
+                                            <Icon Name="@(_copiedItemId == item.Id ? "check" : "copy")" Class="h-3.5 w-3.5" />
+                                        </button>
+                                    }
                                     <button type="button"
                                             class="inline-flex items-center rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-hidden"
                                             title="Edit item"
@@ -535,6 +549,7 @@ else
     private TodoItemResponse? _dragOverItem;
     private int _dragFromListId;
     private int _dragOverLastZoneListId;
+    private int _copiedItemId;
 
     // List modal state
     private bool _showListModal;
@@ -908,6 +923,15 @@ else
         {
             _isBusy = false;
         }
+    }
+
+    private async Task CopyItemTitleAsync(TodoItemResponse item)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", item.Title);
+        _copiedItemId = item.Id;
+        await Task.Delay(2000);
+        _copiedItemId = 0;
+        StateHasChanged();
     }
 
     private async Task OnDropItemAsync(TodoItemResponse target, int listId)

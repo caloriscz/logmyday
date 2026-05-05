@@ -9,7 +9,7 @@
 @inject ILogger<Todos> Logger
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="To-Do Lists" ShowReload="true" OnReload="LoadDataAsync" />
+    <TopBar Title="Todos" ShowReload="true" OnReload="LoadDataAsync" />
 
     <div class="max-w-7xl mx-auto px-6 py-4">
 
@@ -119,6 +119,10 @@
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center gap-2 flex-wrap">
                                                 <span class="text-sm text-gray-900 dark:text-gray-100">@item.Title</span>
+                                                @if (list.ListType == TodoListType.Reminder && !string.IsNullOrWhiteSpace(item.Notes))
+                                                {
+                                                    <span class="text-sm text-gray-500 dark:text-gray-400">@item.Notes</span>
+                                                }
                                                 @if (isOverdue)
                                                 {
                                                     <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-300">Overdue</span>
@@ -132,12 +136,22 @@
                                                     <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
                                                 }
                                             </div>
-                                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                            @if (list.ListType != TodoListType.Reminder && !string.IsNullOrWhiteSpace(item.Notes))
                                             {
                                                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">@item.Notes</p>
                                             }
                                         </div>
                                         <div class="flex items-center gap-1 shrink-0">
+                                            @if (list.ListType == TodoListType.Basic)
+                                            {
+                                                <button type="button"
+                                                        class="p-2 @(_copiedItemId == item.Id ? "text-green-500" : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200")"
+                                                        title="@(_copiedItemId == item.Id ? "Copied!" : "Copy title")"
+                                                        @onclick="() => CopyItemTitleAsync(item)"
+                                                        disabled="@_isBusy">
+                                                    <i class="bi bi-@(_copiedItemId == item.Id ? "check-lg" : "clipboard") text-sm"></i>
+                                                </button>
+                                            }
                                             <button type="button"
                                                     class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                                                     title="Edit"
@@ -528,6 +542,7 @@
     private TodoItemResponse? _dragOverItem;
     private int _dragFromListId;
     private int _dragOverLastZoneListId;
+    private int _copiedItemId;
 
     private System.Threading.Timer? _refreshTimer;
 
@@ -858,6 +873,15 @@
         {
             _isBusy = false;
         }
+    }
+
+    private async Task CopyItemTitleAsync(TodoItemResponse item)
+    {
+        await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.SetTextAsync(item.Title);
+        _copiedItemId = item.Id;
+        await Task.Delay(2000);
+        _copiedItemId = 0;
+        StateHasChanged();
     }
 
     private async Task OnDropItemAsync(TodoItemResponse target, int listId)
