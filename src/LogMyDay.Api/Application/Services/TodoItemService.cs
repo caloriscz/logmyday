@@ -124,12 +124,7 @@ public class TodoItemService : ITodoItemService
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
-        // Basic lists use the list-level completion tag; Reminder lists use the per-item tag.
-        var effectiveTagId = item.List.ListType == TodoListType.Basic
-            ? item.List.CompletionTagId
-            : item.CompletionTagId;
-
-        if (effectiveTagId.HasValue)
+        if (item.CompletionTagId.HasValue)
         {
             if (item.AutoLogMode == AutoLogMode.ResetIfExists)
             {
@@ -137,7 +132,7 @@ public class TodoItemService : ITodoItemService
 
                 var existing = await _context.Activities
                     .FirstOrDefaultAsync(a =>
-                        a.TagId == effectiveTagId.Value &&
+                        a.TagId == item.CompletionTagId.Value &&
                         a.UserId == userId &&
                         a.DateStarted >= windowStart &&
                         a.DateStarted < windowEnd);
@@ -146,16 +141,16 @@ public class TodoItemService : ITodoItemService
                 {
                     existing.DateStarted = request.DoneAt;
                     existing.Description = item.List.ListType == TodoListType.Reminder ? item.Notes : item.Title;
-                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, effectiveTagId.Value, id);
+                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
                 }
                 else
                 {
-                    await LogActivityAsync(item, request.DoneAt, userId, effectiveTagId.Value);
+                    await LogActivityAsync(item, request.DoneAt, userId);
                 }
             }
             else
             {
-                await LogActivityAsync(item, request.DoneAt, userId, effectiveTagId.Value);
+                await LogActivityAsync(item, request.DoneAt, userId);
             }
         }
 
@@ -164,17 +159,17 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
-    private async Task LogActivityAsync(Domain.Entities.TodoItem item, DateTime doneAt, Guid userId, int tagId)
+    private async Task LogActivityAsync(Domain.Entities.TodoItem item, DateTime doneAt, Guid userId)
     {
         var activityRequest = new ActivityRequest
         {
-            PrimaryTagId = tagId,
+            PrimaryTagId = item.CompletionTagId!.Value,
             Description = item.List.ListType == TodoListType.Reminder ? item.Notes : item.Title,
             DateStarted = doneAt
         };
 
         await _activityService.Create(activityRequest, userId);
-        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", tagId, item.Id);
+        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", item.CompletionTagId.Value, item.Id);
     }
 
     private static bool IsNumericInputType(int? inputTypeId) =>

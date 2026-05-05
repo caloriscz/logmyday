@@ -26,7 +26,6 @@ public class TodoListService : ITodoListService
 
         var lists = await _context.TodoLists
             .AsNoTracking()
-            .Include(l => l.CompletionTag)
             .Include(l => l.Items)
             .ThenInclude(i => i.CompletionTag)
             .Where(l => l.UserId == userId)
@@ -43,7 +42,6 @@ public class TodoListService : ITodoListService
 
         var list = await _context.TodoLists
             .AsNoTracking()
-            .Include(l => l.CompletionTag)
             .Include(l => l.Items)
             .ThenInclude(i => i.CompletionTag)
             .FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId);
@@ -64,7 +62,6 @@ public class TodoListService : ITodoListService
             Name = request.Name,
             DisplayOrder = request.DisplayOrder,
             ListType = request.ListType,
-            CompletionTagId = request.ListType == Domain.Enums.TodoListType.Basic ? request.CompletionTagId : null,
             DateCreated = DateTime.UtcNow
         };
 
@@ -88,7 +85,6 @@ public class TodoListService : ITodoListService
         list.Name = request.Name;
         list.DisplayOrder = request.DisplayOrder;
         list.ListType = request.ListType;
-        list.CompletionTagId = request.ListType == Domain.Enums.TodoListType.Basic ? request.CompletionTagId : null;
 
         await _context.SaveChangesAsync();
     }
@@ -116,8 +112,6 @@ public class TodoListService : ITodoListService
             DisplayOrder = list.DisplayOrder,
             ListType = list.ListType,
             DateCreated = list.DateCreated,
-            CompletionTagId = list.CompletionTagId,
-            CompletionTagName = list.CompletionTag?.TagName,
             Items = list.Items
                 .OrderBy(i => i.DisplayOrder)
                 .ThenBy(i => i.DueDate)

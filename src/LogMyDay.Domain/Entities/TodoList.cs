@@ -20,10 +20,6 @@ public class TodoList
 
     public TodoListType ListType { get; set; } = TodoListType.Basic;
 
-    public int? CompletionTagId { get; set; }
-
-    public Tag? CompletionTag { get; set; }
-
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
 
     public ICollection<TodoItem> Items { get; set; } = new List<TodoItem>();
