@@ -132,6 +132,7 @@ public class TodoListService : ITodoListService
             NotifyAt = item.NotifyAt,
             IsDone = ComputeEffectiveIsDone(item, user),
             DoneAt = item.DoneAt,
+            IsSkipped = ComputeEffectiveIsSkipped(item, user),
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
@@ -143,6 +144,52 @@ public class TodoListService : ITodoListService
             CompletionTagName = item.CompletionTag?.TagName,
             CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
         };
+
+    private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user)
+    {
+        if (item.SkippedAt == null || item.RecurrenceType == RecurrenceType.None)
+        {
+            return false;
+        }
+
+        TimeZoneInfo tz;
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            tz = TimeZoneInfo.Utc;
+        }
+
+        var skippedLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.SkippedAt.Value, tz));
+        var todayLocal = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+
+        if (item.RecurrenceType == RecurrenceType.Daily)
+        {
+            return skippedLocalDate == todayLocal;
+        }
+
+        if (item.RecurrenceType == RecurrenceType.Weekly)
+        {
+            DayOfWeek firstDay;
+            try
+            {
+                firstDay = new CultureInfo(user?.Culture ?? "en-US").DateTimeFormat.FirstDayOfWeek;
+            }
+            catch (CultureNotFoundException)
+            {
+                firstDay = DayOfWeek.Monday;
+            }
+
+            var skippedWeekStart = GetWeekStart(skippedLocalDate, firstDay);
+            var todayWeekStart = GetWeekStart(todayLocal, firstDay);
+
+            return skippedWeekStart == todayWeekStart;
+        }
+
+        return false;
+    }
 
     private static bool ComputeEffectiveIsDone(TodoItem item, User? user)
     {

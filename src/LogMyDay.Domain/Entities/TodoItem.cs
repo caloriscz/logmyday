@@ -31,6 +31,8 @@ public class TodoItem
 
     public DateTime? DoneAt { get; set; }
 
+    public DateTime? SkippedAt { get; set; }
+
     public int DisplayOrder { get; set; } = 0;
 
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;

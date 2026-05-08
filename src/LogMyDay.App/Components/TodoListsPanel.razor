@@ -49,13 +49,15 @@ else
             var today = DateOnly.FromDateTime(DateTime.Today);
             var listId = list.Id;
             var activeItems = list.Items
-                .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate <= today))
+                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate <= today))
                 .OrderBy(i => i.DisplayOrder)
                 .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
                 .ThenBy(i => i.DateCreated)
                 .ToList();
             var doneItems = list.Items.Where(i => i.IsDone).ToList();
+            var skippedItems = list.Items.Where(i => i.IsSkipped).ToList();
             var showDoneForThis = _showDonePerList.Contains(listId);
+            var showSkippedForThis = _showSkippedPerList.Contains(listId);
 
             <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900" style="min-height: 600px;">
 
@@ -108,7 +110,7 @@ else
                             var isOverdue = item.DueDate.HasValue && item.DueDate.Value < today;
                             var isDragging = _draggingItem?.Id == item.Id;
                             var isDragOver = _dragOverItem?.Id == item.Id && !isDragging;
-                            <div class="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors @(isOverdue ? "border-l-2 border-rose-400" : "") @(isDragging ? "opacity-40" : "") @(isDragOver ? "ring-2 ring-primary-400 ring-inset" : "")"
+                            <div @key="item.Id" class="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors @(isOverdue ? "border-l-2 border-rose-400" : "") @(isDragging ? "opacity-40" : "") @(isDragOver ? "ring-2 ring-primary-400 ring-inset" : "")"
                                  draggable="true"
                                  @ondragstart="() => { _draggingItem = item; _dragFromListId = listId; }"
                                  @ondragover:preventDefault
@@ -157,6 +159,16 @@ else
                                             <Icon Name="@(_copiedItemId == item.Id ? "check" : "copy")" Class="h-3.5 w-3.5" />
                                         </button>
                                     }
+                                    @if (item.RecurrenceType != RecurrenceType.None)
+                                    {
+                                        <button type="button"
+                                                class="inline-flex items-center rounded p-1 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 focus:outline-hidden"
+                                                title="Skip for this period"
+                                                @onclick="() => SkipItemAsync(item)"
+                                                disabled="@_isBusy">
+                                            <Icon Name="skip" Class="h-3.5 w-3.5" />
+                                        </button>
+                                    }
                                     <button type="button"
                                             class="inline-flex items-center rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-hidden"
                                             title="Edit item"
@@ -201,7 +213,7 @@ else
                                 <div class="mt-2 space-y-0.5">
                                     @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
                                     {
-                                        <div class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
+                                        <div @key="item.Id" class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
                                             <input type="checkbox"
                                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
                                                    checked="@item.IsDone"
@@ -215,6 +227,33 @@ else
                                                     disabled="@_isBusy">
                                                 <Icon Name="trash" Class="h-3.5 w-3.5" />
                                             </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Skipped items toggle *@
+                    @if (skippedItems.Any())
+                    {
+                        <div class="mt-3 border-t border-gray-200 pt-2 dark:border-slate-700">
+                            <button type="button"
+                                    class="text-xs text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                                    @onclick="() => ToggleShowSkipped(listId)">
+                                @(showSkippedForThis ? "Hide" : "Show") skipped (@skippedItems.Count)
+                            </button>
+                            @if (showSkippedForThis)
+                            {
+                                <div class="mt-2 space-y-0.5">
+                                    @foreach (var item in skippedItems)
+                                    {
+                                        <div @key="item.Id" class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
+                                            <span class="flex-1 text-sm text-gray-500 dark:text-slate-400">@item.Title</span>
+                                            @if (item.RecurrenceType != RecurrenceType.None)
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><Icon Name="arrow-repeat" Class="me-1 h-3 w-3" />@item.RecurrenceType</span>
+                                            }
                                         </div>
                                     }
                                 </div>
@@ -540,6 +579,7 @@ else
 
     // Per-list state
     private readonly HashSet<int> _showDonePerList = new();
+    private readonly HashSet<int> _showSkippedPerList = new();
     private readonly Dictionary<int, string?> _itemErrorPerList = new();
 
     private bool _notificationsNeedUpdate;
@@ -851,13 +891,21 @@ else
         }
     }
 
+    private void ToggleShowSkipped(int listId)
+    {
+        if (!_showSkippedPerList.Remove(listId))
+        {
+            _showSkippedPerList.Add(listId);
+        }
+    }
+
     private async Task CompleteItemAsync(TodoItemResponse item)
     {
-        _isBusy = true;
         try
         {
-            await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
-            await LoadDataAsync();
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            UpdateItemInList(updated);
+            _notificationsNeedUpdate = true;
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -870,19 +918,15 @@ else
             Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
             _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
         }
-        finally
-        {
-            _isBusy = false;
-        }
     }
 
     private async Task ReopenItemAsync(TodoItemResponse item)
     {
-        _isBusy = true;
         try
         {
-            await TodoApi.ReopenItem(item.Id);
-            await LoadDataAsync();
+            var updated = await TodoApi.ReopenItem(item.Id);
+            UpdateItemInList(updated);
+            _notificationsNeedUpdate = true;
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -895,9 +939,39 @@ else
             Logger.LogWarning(ex, "Failed to reopen todo item {ItemId}", item.Id);
             _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
         }
-        finally
+    }
+
+    private async Task SkipItemAsync(TodoItemResponse item)
+    {
+        try
         {
-            _isBusy = false;
+            var updated = await TodoApi.SkipItem(item.Id);
+            UpdateItemInList(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Logger.LogWarning(ex, "Todo item {ItemId} not found when skipping", item.Id);
+            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to skip todo item {ItemId}", item.Id);
+            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+        }
+    }
+
+    private void UpdateItemInList(TodoItemResponse updated)
+    {
+        var list = _lists?.FirstOrDefault(l => l.Id == updated.ListId);
+        if (list == null) return;
+        for (var i = 0; i < list.Items.Count; i++)
+        {
+            if (list.Items[i].Id == updated.Id)
+            {
+                list.Items[i] = updated;
+                return;
+            }
         }
     }
 

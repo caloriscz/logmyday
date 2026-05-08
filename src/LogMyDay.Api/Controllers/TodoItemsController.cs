@@ -123,6 +123,42 @@ public class TodoItemsController : BaseApiController
         }
     }
 
+    [HttpPost("{id:int}/skip")]
+    public async Task<ActionResult<TodoItemResponse>> Skip(int id)
+    {
+        var userId = GetCurrentUserId();
+        try
+        {
+            var item = await _todoItemService.Skip(id, userId);
+
+            return Ok(item);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Todo item {ItemId} not found for user {UserId}", id, userId);
+
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpPost("{id:int}/unskip")]
+    public async Task<ActionResult<TodoItemResponse>> Unskip(int id)
+    {
+        var userId = GetCurrentUserId();
+        try
+        {
+            var item = await _todoItemService.Unskip(id, userId);
+
+            return Ok(item);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Todo item {ItemId} not found for user {UserId}", id, userId);
+
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpPatch("/api/todo-lists/{listId:int}/items/reorder")]
     public async Task<IActionResult> Reorder(int listId, [FromBody] IList<TodoItemReorderRequest> items)
     {

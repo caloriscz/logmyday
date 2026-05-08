@@ -13,6 +13,7 @@ public class TodoItemResponse
     public TimeOnly? NotifyAt { get; set; }
     public bool IsDone { get; set; }
     public DateTime? DoneAt { get; set; }
+    public bool IsSkipped { get; set; }
     public int DisplayOrder { get; set; }
     public DateTime DateCreated { get; set; }
     public RecurrenceType RecurrenceType { get; set; }

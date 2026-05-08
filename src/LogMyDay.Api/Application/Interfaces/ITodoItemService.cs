@@ -9,5 +9,7 @@ public interface ITodoItemService
     Task Delete(int id, Guid userId);
     Task<TodoItemResponse> Complete(int id, TodoItemCompleteRequest request, Guid userId);
     Task<TodoItemResponse> Reopen(int id, Guid userId);
+    Task<TodoItemResponse> Skip(int id, Guid userId);
+    Task<TodoItemResponse> Unskip(int id, Guid userId);
     Task Reorder(int listId, IList<TodoItemReorderRequest> items, Guid userId);
 }

@@ -228,6 +228,28 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
+    public async Task<TodoItemResponse> Skip(int id, Guid userId)
+    {
+        var item = await LoadItemForUser(id, userId);
+
+        item.SkippedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return MapToResponse(item);
+    }
+
+    public async Task<TodoItemResponse> Unskip(int id, Guid userId)
+    {
+        var item = await LoadItemForUser(id, userId);
+
+        item.SkippedAt = null;
+
+        await _context.SaveChangesAsync();
+
+        return MapToResponse(item);
+    }
+
     public async Task Reorder(int listId, IList<TodoItemReorderRequest> items, Guid userId)
     {
         var list = await _context.TodoLists.FirstOrDefaultAsync(l => l.Id == listId && l.UserId == userId);
@@ -281,6 +303,7 @@ public class TodoItemService : ITodoItemService
             NotifyAt = item.NotifyAt,
             IsDone = item.IsDone,
             DoneAt = item.DoneAt,
+            IsSkipped = false,
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
