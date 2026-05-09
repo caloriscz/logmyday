@@ -111,13 +111,6 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
-        if (item.List.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue
-            && !IsBooleanInputType(item.CompletionTag?.InputTypeId)
-            && string.IsNullOrWhiteSpace(item.Notes))
-        {
-            throw new InvalidOperationException("Cannot complete: a value is required for this Reminder item.");
-        }
-
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 

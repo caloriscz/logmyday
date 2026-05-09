@@ -1,3 +1,4 @@
+@using LogMyDay.Domain.Constants
 @using LogMyDay.Domain.Enums
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
@@ -48,12 +49,11 @@ else
         {
             var today = DateTime.Today;
             var listId = list.Id;
-            var activeItems = list.Items
-                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today))
-                .OrderBy(i => i.DisplayOrder)
-                .ThenBy(i => i.DueDate ?? DateTime.MaxValue)
-                .ThenBy(i => i.DateCreated)
-                .ToList();
+            var filteredItems = list.Items
+                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today));
+            var activeItems = list.ListType == TodoListType.Reminder
+                ? filteredItems.OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue).ThenBy(i => i.DisplayOrder).ThenBy(i => i.DateCreated).ToList()
+                : filteredItems.OrderBy(i => i.DisplayOrder).ThenBy(i => i.DueDate ?? DateTime.MaxValue).ThenBy(i => i.DateCreated).ToList();
             var doneItems = list.Items.Where(i => i.IsDone).ToList();
             var skippedItems = list.Items.Where(i => i.IsSkipped).ToList();
             var showDoneForThis = _showDonePerList.Contains(listId);
@@ -374,47 +374,100 @@ else
                     </div>
                     @if (_currentListForItemModal?.ListType == TodoListType.Reminder)
                     {
+                        @* Tag selector first *@
                         <div>
-                            @if (IsBooleanInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
-                            {
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Value</label>
-                                <div class="flex gap-3">
-                                    <button type="button"
-                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
-                                            @onclick="() => _booleanBoolValue = _booleanBoolValue == true ? null : true">
-                                        Yes
-                                    </button>
-                                    <button type="button"
-                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
-                                            @onclick="() => { _booleanBoolValue = _booleanBoolValue == false ? (bool?)null : false; }">
-                                        No
-                                    </button>
-                                    <button type="button"
-                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == null ? "border-primary-500 bg-primary-600 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700")"
-                                            @onclick="() => _booleanBoolValue = null">
-                                        Not specified
-                                    </button>
-                                </div>
-                                <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Logged as activity value when completed. Selecting Yes or No will immediately complete and log this item.</p>
-                            }
-                            else
-                            {
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Value <span class="text-rose-500">*</span></label>
-                                @if (IsNumericInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Select the tag</label>
+                            <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    @bind="_itemForm.CompletionTagId">
+                                <option value="">— None —</option>
+                                @if (_allTags != null)
                                 {
-                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                               @bind-Value="_itemForm.Notes"
-                                               placeholder="Enter a number" />
+                                    @foreach (var tag in _allTags)
+                                    {
+                                        <option value="@tag.Id">@tag.Title</option>
+                                    }
                                 }
-                                else
+                            </select>
+                            @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
+                            {
+                                var selectedItemTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
+                                @if (selectedItemTag != null && !selectedItemTag.IsRepeatable && _itemForm.AutoLogMode != AutoLogMode.Add)
                                 {
-                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                               @bind-Value="_itemForm.Notes"
-                                               placeholder="Enter a value" />
+                                    <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                        This tag is not repeatable — completing multiple items on the same day will replace the existing activity.
+                                    </p>
                                 }
-                                <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Logged as activity value when completed.</p>
                             }
                         </div>
+                        @* Value input — only shown when a tag with a known type is selected *@
+                        @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { } _editTag && _editTag.InputTypeId.HasValue)
+                        {
+                            var _editTagInputTypeId = _editTag.InputTypeId;
+                            <div>
+                                @if (_editTagInputTypeId == InputTypeIds.Boolean)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <div class="flex gap-3">
+                                        <button type="button"
+                                                class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                                                @onclick="() => _booleanBoolValue = _booleanBoolValue == true ? null : true">
+                                            Yes
+                                        </button>
+                                        <button type="button"
+                                                class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
+                                                @onclick="() => { _booleanBoolValue = _booleanBoolValue == false ? (bool?)null : false; }">
+                                            No
+                                        </button>
+                                        <button type="button"
+                                                class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == null ? "border-primary-500 bg-primary-600 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700")"
+                                                @onclick="() => _booleanBoolValue = null">
+                                            Not specified
+                                        </button>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-selected answer when completing this reminder.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.Integer || _editTagInputTypeId == InputTypeIds.Decimal || _editTagInputTypeId == InputTypeIds.Percentage)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                               @bind-Value="_itemForm.Notes"
+                                               placeholder="Pre-filled number (optional)" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-filled when completing this reminder. Can be changed at completion time.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.String)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                               @bind-Value="_itemForm.Notes"
+                                               placeholder="Pre-filled text (optional)" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-filled when completing this reminder. Can be changed at completion time.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.StarRating)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="5" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-selected rating. Can be changed at completion time.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.StarRating10)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="10" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-selected rating. Can be changed at completion time.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.Score)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="5" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-selected score. Can be changed at completion time.</p>
+                                }
+                                else if (_editTagInputTypeId == InputTypeIds.Score10)
+                                {
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Default value</label>
+                                    <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="10" />
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Pre-selected score. Can be changed at completion time.</p>
+                                }
+                            </div>
+                        }
                     }
                     else
                     {
@@ -426,30 +479,23 @@ else
                                            placeholder="Optional notes" />
                         </div>
                     }
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log tag</label>
-                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                @bind="_itemForm.CompletionTagId">
-                            <option value="">— None —</option>
-                            @if (_allTags != null)
-                            {
-                                @foreach (var tag in _allTags)
+                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log tag</label>
+                            <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    @bind="_itemForm.CompletionTagId">
+                                <option value="">— None —</option>
+                                @if (_allTags != null)
                                 {
-                                    <option value="@tag.Id">@tag.Title</option>
+                                    @foreach (var tag in _allTags)
+                                    {
+                                        <option value="@tag.Id">@tag.Title</option>
+                                    }
                                 }
-                            }
-                        </select>
-                        @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
-                        {
-                            var selectedItemTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
-                            @if (selectedItemTag != null && !selectedItemTag.IsRepeatable && _itemForm.AutoLogMode != AutoLogMode.Add)
-                            {
-                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                    This tag is not repeatable — completing multiple items on the same day will replace the existing activity.
-                                </p>
-                            }
-                        }
-                    </div>
+                            </select>
+                        </div>
+                    }
                     <div class="grid grid-cols-2 gap-4">
                         @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
                         {
@@ -573,47 +619,86 @@ else
     </div>
 }
 
-@* ── Boolean Quick-Complete Modal ── *@
-@if (_showBoolQuickModal && _boolQuickItem != null)
+@* ── Quick-Complete Modal ── *@
+@if (_showQuickModal && _quickItem != null)
 {
-    <div class="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/70 p-4 sm:items-center" @onclick="() => { if (!_isBoolQuickBusy) { _showBoolQuickModal = false; } }">
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/70 p-4 sm:items-center" @onclick="() => { if (!_isQuickBusy) { _showQuickModal = false; } }">
         <div class="w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
             <div class="px-6 pt-5 pb-1 text-center">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Complete Reminder</p>
-                <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-slate-100">@_boolQuickItem.Title</h3>
+                <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-slate-100">@_quickItem.Title</h3>
             </div>
             <div class="px-6 py-4 space-y-3">
-                <div class="flex gap-3">
-                    <button type="button"
-                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_boolQuickValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
-                            @onclick="() => _boolQuickValue = true">
-                        <i class="bi bi-check-lg me-1"></i>Yes
-                    </button>
-                    <button type="button"
-                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_boolQuickValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
-                            @onclick="() => _boolQuickValue = false">
-                        <i class="bi bi-x-lg me-1"></i>No
-                    </button>
-                </div>
+                @if (_quickInputTypeId == InputTypeIds.Boolean)
+                {
+                    <div class="flex gap-3">
+                        <button type="button"
+                                class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                                @onclick="() => _quickBoolValue = true">
+                            <i class="bi bi-check-lg me-1"></i>Yes
+                        </button>
+                        <button type="button"
+                                class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
+                                @onclick="() => _quickBoolValue = false">
+                            <i class="bi bi-x-lg me-1"></i>No
+                        </button>
+                    </div>
+                }
+                else if (_quickInputTypeId == InputTypeIds.String)
+                {
+                    <textarea class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                              rows="3" placeholder="Enter value…"
+                              @bind="_quickStringValue"></textarea>
+                }
+                else if (_quickInputTypeId == InputTypeIds.Integer || _quickInputTypeId == InputTypeIds.Decimal || _quickInputTypeId == InputTypeIds.Percentage)
+                {
+                    @if (!_quickAllowUnfilled)
+                    {
+                        <input type="number" step="any"
+                               class="w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                               placeholder="Value"
+                               @bind="_quickDecimalValue" />
+                    }
+                    <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 cursor-pointer select-none">
+                        <input type="checkbox" class="rounded" @bind="_quickAllowUnfilled" />
+                        Leave unfilled
+                    </label>
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating10)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="10" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score10)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="10" />
+                }
             </div>
-            @if (!string.IsNullOrEmpty(_boolQuickError))
+            @if (!string.IsNullOrEmpty(_quickError))
             {
                 <div class="mx-6 mb-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
-                    @_boolQuickError
+                    @_quickError
                 </div>
             }
             <div class="flex gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
                 <button type="button"
                         class="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                        @onclick="() => { _showBoolQuickModal = false; _boolQuickItem = null; }"
-                        disabled="@_isBoolQuickBusy">
+                        @onclick="() => { _showQuickModal = false; _quickItem = null; }"
+                        disabled="@_isQuickBusy">
                     Cancel
                 </button>
                 <button type="button"
                         class="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60 focus:outline-hidden"
-                        @onclick="SaveBoolQuickAsync"
-                        disabled="@_isBoolQuickBusy">
-                    @if (_isBoolQuickBusy)
+                        @onclick="SaveQuickAsync"
+                        disabled="@_isQuickBusy">
+                    @if (_isQuickBusy)
                     {
                         <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
                     }
@@ -693,14 +778,20 @@ else
     private TodoListResponse? _currentListForItemModal;
     private bool _monitorUseDaysBack = true;
     private bool? _booleanBoolValue;
+    private int? _editIntValue;
     private TodoItemRequest _itemForm = new() { Title = string.Empty };
 
-    // Boolean quick-complete modal state
-    private bool _showBoolQuickModal;
-    private TodoItemResponse? _boolQuickItem;
-    private bool? _boolQuickValue;
-    private bool _isBoolQuickBusy;
-    private string? _boolQuickError;
+    // Quick-complete modal state (Boolean, String, Numeric, StarRating, Score)
+    private bool _showQuickModal;
+    private TodoItemResponse? _quickItem;
+    private int? _quickInputTypeId;
+    private bool? _quickBoolValue;
+    private string? _quickStringValue;
+    private decimal? _quickDecimalValue;
+    private int? _quickIntValue;
+    private bool _quickAllowUnfilled;
+    private bool _isQuickBusy;
+    private string? _quickError;
 
     // Delete confirmation
     private TodoListResponse? _pendingDeleteList;
@@ -912,6 +1003,7 @@ else
         _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == listId);
         _monitorUseDaysBack = true;
         _booleanBoolValue = null;
+        _editIntValue = null;
         _itemForm = new TodoItemRequest { Title = string.Empty, ListId = listId, MonitorDaysBack = 0 };
         _itemModalError = null;
         _showItemModal = true;
@@ -946,6 +1038,7 @@ else
             "false" => false,
             _ => null
         };
+        _editIntValue = !string.IsNullOrWhiteSpace(item.Notes) && int.TryParse(item.Notes, out var parsedInt) ? parsedInt : null;
         _showItemModal = true;
     }
 
@@ -954,6 +1047,7 @@ else
         _showItemModal = false;
         _itemModalError = null;
         _booleanBoolValue = null;
+        _editIntValue = null;
     }
 
     private async Task SaveItemAsync()
@@ -964,10 +1058,17 @@ else
         {
             var isBooleanType = IsBooleanInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId)
                 && _currentListForItemModal?.ListType == TodoListType.Reminder;
+            var isStarScoreType = _currentListForItemModal?.ListType == TodoListType.Reminder &&
+                _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId is
+                    InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10;
 
             if (isBooleanType)
             {
                 _itemForm.Notes = _booleanBoolValue.HasValue ? (_booleanBoolValue.Value ? "true" : "false") : null;
+            }
+            else if (isStarScoreType)
+            {
+                _itemForm.Notes = _editIntValue?.ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
 
             if (_isEditingItem)
@@ -991,6 +1092,7 @@ else
 
             _showItemModal = false;
             _booleanBoolValue = null;
+            _editIntValue = null;
             await LoadDataAsync();
         }
         catch (ApiException ex) when (_isEditingItem && ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -1031,21 +1133,38 @@ else
     {
         if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
         {
-            // Resolve InputTypeId from the response or fall back to the cached tag list
             var effectiveInputTypeId = item.CompletionTagInputTypeId
                 ?? _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId)?.InputTypeId;
 
-            if (IsBooleanInputType(effectiveInputTypeId))
+            if (IsQuickCompleteInputType(effectiveInputTypeId))
             {
-                _boolQuickItem = item;
-                _boolQuickValue = item.Notes switch { "true" => true, "false" => false, _ => null };
-                _boolQuickError = null;
-                _showBoolQuickModal = true;
-                StateHasChanged();
+                if (HasValidPrefilledValue(item, effectiveInputTypeId))
+                {
+                    try
+                    {
+                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        UpdateItemInList(updated);
+                        _notificationsNeedUpdate = true;
+                    }
+                    catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
+                        _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+                        await LoadDataAsync();
+                    }
+                    catch (ApiException ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
+                        _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+                    }
+                    return;
+                }
+
+                OpenQuickCompleteModal(item, effectiveInputTypeId);
                 return;
             }
 
-            // Non-Boolean or untyped completion tag: fall back to full edit modal (old behaviour)
+            // Unrecognized type: fall back to full edit modal
             OpenEditItemModal(item);
             return;
         }
@@ -1069,47 +1188,82 @@ else
         }
     }
 
-    private async Task SaveBoolQuickAsync()
+    private async Task SaveQuickAsync()
     {
-        if (_boolQuickItem == null || !_boolQuickValue.HasValue)
+        if (_quickItem == null) return;
+
+        string? notes;
+        switch (_quickInputTypeId)
         {
-            _boolQuickError = "Please select Yes or No.";
-            return;
+            case InputTypeIds.Boolean:
+                if (!_quickBoolValue.HasValue) { _quickError = "Please select Yes or No."; return; }
+                notes = _quickBoolValue.Value ? "true" : "false";
+                break;
+            case InputTypeIds.String:
+                notes = string.IsNullOrWhiteSpace(_quickStringValue) ? null : _quickStringValue.Trim();
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (_quickAllowUnfilled)
+                {
+                    notes = null;
+                }
+                else if (!_quickDecimalValue.HasValue)
+                {
+                    _quickError = "Please enter a value.";
+                    return;
+                }
+                else
+                {
+                    notes = _quickDecimalValue.Value.ToString("0.#############################", System.Globalization.CultureInfo.InvariantCulture);
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                notes = _quickIntValue?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                break;
+            default:
+                notes = null;
+                break;
         }
-        _isBoolQuickBusy = true;
-        _boolQuickError = null;
+
+        _isQuickBusy = true;
+        _quickError = null;
         try
         {
             var req = new TodoItemRequest
             {
-                ListId = _boolQuickItem.ListId,
-                Title = _boolQuickItem.Title,
-                Notes = _boolQuickValue.HasValue ? (_boolQuickValue.Value ? "true" : "false") : null,
-                StartDate = _boolQuickItem.StartDate,
-                DueDate = _boolQuickItem.DueDate,
-                NotifyAt = _boolQuickItem.NotifyAt,
-                DisplayOrder = _boolQuickItem.DisplayOrder,
-                RecurrenceType = _boolQuickItem.RecurrenceType,
-                AutoLogMode = _boolQuickItem.AutoLogMode,
-                MonitorDaysBack = _boolQuickItem.MonitorDaysBack,
-                MonitorFromDate = _boolQuickItem.MonitorFromDate,
-                MonitorToDate = _boolQuickItem.MonitorToDate,
-                CompletionTagId = _boolQuickItem.CompletionTagId
+                ListId = _quickItem.ListId,
+                Title = _quickItem.Title,
+                Notes = notes,
+                StartDate = _quickItem.StartDate,
+                DueDate = _quickItem.DueDate,
+                NotifyAt = _quickItem.NotifyAt,
+                DisplayOrder = _quickItem.DisplayOrder,
+                RecurrenceType = _quickItem.RecurrenceType,
+                AutoLogMode = _quickItem.AutoLogMode,
+                MonitorDaysBack = _quickItem.MonitorDaysBack,
+                MonitorFromDate = _quickItem.MonitorFromDate,
+                MonitorToDate = _quickItem.MonitorToDate,
+                CompletionTagId = _quickItem.CompletionTagId
             };
-            await TodoApi.UpdateTodoItem(_boolQuickItem.Id, req);
-            await TodoApi.CompleteItem(_boolQuickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
-            _showBoolQuickModal = false;
-            _boolQuickItem = null;
+            await TodoApi.UpdateTodoItem(_quickItem.Id, req);
+            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            _showQuickModal = false;
+            _quickItem = null;
             await LoadDataAsync();
         }
         catch (ApiException ex)
         {
-            Logger.LogWarning(ex, "Failed to complete Boolean todo item");
-            _boolQuickError = "Failed to save. Please try again.";
+            Logger.LogWarning(ex, "Failed to complete todo item via quick modal");
+            _quickError = "Failed to save. Please try again.";
         }
         finally
         {
-            _isBoolQuickBusy = false;
+            _isQuickBusy = false;
         }
     }
 
@@ -1359,6 +1513,79 @@ else
         }
 
         return TimeOnly.TryParse(value, out var t) ? t : null;
+    }
+
+    private static bool IsQuickCompleteInputType(int? id) => id is
+        InputTypeIds.Boolean or InputTypeIds.String or
+        InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage or
+        InputTypeIds.StarRating or InputTypeIds.StarRating10 or
+        InputTypeIds.Score or InputTypeIds.Score10;
+
+    private static bool HasValidPrefilledValue(TodoItemResponse item, int? inputTypeId)
+    {
+        if (string.IsNullOrWhiteSpace(item.Notes)) return false;
+        return inputTypeId switch
+        {
+            InputTypeIds.Boolean => item.Notes is "true" or "false",
+            InputTypeIds.String => true,
+            InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
+                decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _),
+            InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
+                int.TryParse(item.Notes, out var v) && v > 0,
+            _ => false
+        };
+    }
+
+    private void OpenQuickCompleteModal(TodoItemResponse item, int? inputTypeId)
+    {
+        _quickItem = item;
+        _quickInputTypeId = inputTypeId;
+        _quickBoolValue = null;
+        _quickStringValue = null;
+        _quickDecimalValue = null;
+        _quickIntValue = null;
+        _quickAllowUnfilled = false;
+        _quickError = null;
+
+        switch (inputTypeId)
+        {
+            case InputTypeIds.Boolean:
+                _quickBoolValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+                break;
+            case InputTypeIds.String:
+                _quickStringValue = item.Notes;
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (!string.IsNullOrWhiteSpace(item.Notes) &&
+                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+                {
+                    _quickDecimalValue = d;
+                }
+                else
+                {
+                    var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+                    if (!string.IsNullOrWhiteSpace(tag?.DefaultValue) &&
+                        decimal.TryParse(tag.DefaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var defVal))
+                    {
+                        _quickDecimalValue = defVal;
+                    }
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                if (!string.IsNullOrWhiteSpace(item.Notes) && int.TryParse(item.Notes, out var iv))
+                {
+                    _quickIntValue = iv;
+                }
+                break;
+        }
+
+        _showQuickModal = true;
+        StateHasChanged();
     }
 
     private static bool IsNumericInputType(int? inputTypeId) =>
