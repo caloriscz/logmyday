@@ -5,6 +5,7 @@
 @using System.Net
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Enums
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Services
 @using LogMyDay.Shared.Preferences
@@ -211,7 +212,10 @@
     }
 
     <div class="border-t border-gray-200 pt-6 dark:border-slate-700">
-        <TodoListsPanel HomepageOnly="true" />
+        <TodoListsPanel HomepageOnly="true" FilterType="TodoListType.Reminder" Title="Reminder Todos" />
+    </div>
+    <div class="border-t border-gray-200 pt-6 dark:border-slate-700">
+        <TodoListsPanel HomepageOnly="true" FilterType="TodoListType.Basic" Title="Todos" />
     </div>
 </div>
 

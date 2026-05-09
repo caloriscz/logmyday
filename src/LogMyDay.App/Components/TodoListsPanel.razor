@@ -10,15 +10,37 @@
 @inject IJSRuntime JS
 @inject ILogger<TodoListsPanel> Logger
 
+@if (!HomepageOnly || (_lists != null && _lists.Count > 0))
+{
 <div class="mb-4 flex items-center justify-between">
-    <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">To-Do Lists</h2>
-    <button type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            @onclick="OpenAddListModal"
-            disabled="@(_lists == null)">
-        <Icon Name="plus" Class="h-4 w-4" />
-        New list
-    </button>
+    <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">@(Title ?? "To-Do Lists")</h2>
+    <div class="flex items-center gap-2">
+        @if (!HomepageOnly)
+        {
+            <div class="flex overflow-hidden rounded-lg border border-gray-300 dark:border-slate-700">
+                <button type="button"
+                        class="px-3 py-1.5 text-sm font-medium transition-colors focus:outline-hidden @(_viewMode == TodoViewMode.ListsView ? "bg-primary-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700")"
+                        @onclick="() => _viewMode = TodoViewMode.ListsView">
+                    Lists
+                </button>
+                <button type="button"
+                        class="border-l border-gray-300 px-3 py-1.5 text-sm font-medium transition-colors focus:outline-hidden dark:border-slate-700 @(_viewMode == TodoViewMode.FlatView ? "bg-primary-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700")"
+                        @onclick="() => _viewMode = TodoViewMode.FlatView">
+                    All Tasks
+                </button>
+            </div>
+        }
+        @if (!IsReminderHomepageMode)
+        {
+            <button type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    @onclick="OpenAddListModal"
+                    disabled="@(_lists == null)">
+                <Icon Name="plus" Class="h-4 w-4" />
+                New list
+            </button>
+        }
+    </div>
 </div>
 
 @if (_loadError != null)
@@ -43,8 +65,10 @@ else if (_lists.Count == 0)
 }
 else
 {
-    @* Grid of panels — 1 col → 2 col sm → 3 col 2xl → 4 col 3xl *@
-    <div class="todo-list-grid grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
+    @if (_viewMode == TodoViewMode.ListsView)
+    {
+    @* Grid of panels — 1 col → 2 col sm → 3 col 2xl → 4 col 3xl; single-column for reminder homepage mode *@
+    <div class="@(IsReminderHomepageMode ? "flex flex-col gap-6" : "todo-list-grid grid gap-6 sm:grid-cols-2 2xl:grid-cols-3")">
         @foreach (var list in _lists)
         {
             var today = DateTime.Today;
@@ -59,19 +83,27 @@ else
             var showDoneForThis = _showDonePerList.Contains(listId);
             var showSkippedForThis = _showSkippedPerList.Contains(listId);
 
-            <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900" style="min-height: 600px;">
+            <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900" style="@(IsReminderHomepageMode ? "" : "min-height: 600px;")">
 
                 @* Panel header *@
-                <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-slate-700">
+                <div class="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-3">
                     <div class="flex items-center gap-2 min-w-0">
                         <h3 class="truncate text-base font-semibold text-gray-900 dark:text-slate-100">@list.Name</h3>
                         <span class="shrink-0 text-xs text-gray-500 dark:text-slate-400">@activeItems.Count</span>
-                        @if (list.ListType == TodoListType.Reminder)
+                        @if (list.ListType == TodoListType.Reminder && !IsReminderHomepageMode)
                         {
                             <span class="shrink-0 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">Reminder</span>
                         }
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
+                        @if (IsReminderHomepageMode && doneItems.Any())
+                        {
+                            <button type="button"
+                                    class="text-xs text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors px-1"
+                                    @onclick="() => ToggleShowDone(listId)">
+                                @(showDoneForThis ? "Hide" : "Show") completed (@doneItems.Count)
+                            </button>
+                        }
                         <button type="button"
                                 class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-primary-700 focus:outline-hidden disabled:opacity-60"
                                 @onclick="() => OpenAddItemModal(listId)"
@@ -97,7 +129,7 @@ else
                 </div>
 
                 @* Items area — scrollable *@
-                <div class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5" style="min-height: 480px;">
+                <div class="@(IsReminderHomepageMode ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4" : "flex-1 overflow-y-auto px-3 py-3 space-y-0.5")" style="@(IsReminderHomepageMode ? "" : "min-height: 480px;")">
                     @if (!activeItems.Any())
                     {
                         <p class="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No pending items.</p>
@@ -106,10 +138,66 @@ else
                     {
                         @foreach (var item in activeItems)
                         {
-
                             var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < today;
                             var isDragging = _draggingItem?.Id == item.Id;
                             var isDragOver = _dragOverItem?.Id == item.Id && !isDragging;
+                            @if (IsReminderHomepageMode)
+                            {
+                                <div @key="item.Id" class="rounded-xl border @(isOverdue ? "border-rose-500/60 dark:border-rose-500/40" : "border-gray-200 dark:border-slate-700") bg-gray-50 dark:bg-slate-800 p-4 flex items-center gap-4 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700/70">
+                                    @* Square complete button *@
+                                    <button type="button"
+                                            class="h-8 w-8 shrink-0 rounded-lg border-2 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-center justify-center text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors focus:outline-hidden disabled:opacity-50"
+                                            title="Complete"
+                                            @onclick="() => CompleteItemAsync(item, list)"
+                                            disabled="@_isBusy">
+                                        <Icon Name="check" Class="h-4 w-4" />
+                                    </button>
+                                    @* Content *@
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-semibold text-gray-900 dark:text-slate-100">@item.Title</span>
+                                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                            {
+                                                <span class="text-sm text-gray-500 dark:text-slate-400">@item.Notes</span>
+                                            }
+                                            @if (isOverdue)
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Overdue</span>
+                                            }
+                                        </div>
+                                        @if (item.RecurrenceType != RecurrenceType.None)
+                                        {
+                                            <div class="mt-1.5">
+                                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><Icon Name="arrow-repeat" Class="me-1 h-3 w-3" />@item.RecurrenceType</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    @* Actions — no delete; icon + label per mockup *@
+                                    <div class="flex items-center gap-5 shrink-0">
+                                        @if (item.RecurrenceType != RecurrenceType.None)
+                                        {
+                                            <button type="button"
+                                                    class="inline-flex flex-col items-center gap-0.5 text-gray-400 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors focus:outline-hidden disabled:opacity-50"
+                                                    title="Skip for this period"
+                                                    @onclick="() => SkipItemAsync(item)"
+                                                    disabled="@_isBusy">
+                                                <Icon Name="skip" Class="h-5 w-5" />
+                                                <span class="text-xs font-medium uppercase tracking-wide">Skip</span>
+                                            </button>
+                                        }
+                                        <button type="button"
+                                                class="inline-flex flex-col items-center gap-0.5 text-gray-400 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors focus:outline-hidden disabled:opacity-50"
+                                                title="Edit item"
+                                                @onclick="() => OpenEditItemModal(item)"
+                                                disabled="@_isBusy">
+                                            <Icon Name="pencil" Class="h-5 w-5" />
+                                            <span class="text-xs font-medium uppercase tracking-wide">Edit</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
                             <div @key="item.Id" class="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors @(isOverdue ? "border-l-2 border-rose-400" : "") @(isDragging ? "opacity-40" : "") @(isDragOver ? "ring-2 ring-primary-400 ring-inset" : "")"
                                  draggable="true"
                                  @ondragstart="() => { _draggingItem = item; _dragFromListId = listId; }"
@@ -185,8 +273,11 @@ else
                                     </button>
                                 </div>
                             </div>
+                            }
                         }
 
+                        @if (!IsReminderHomepageMode)
+                        {
                         @* Sentinel drop zone — invisible until drag is active in this list *@
                         <div class="mt-1 transition-all @(_dragFromListId == listId ? (_dragOverLastZoneListId == listId ? "flex h-10 items-center justify-center rounded-lg border-2 border-dashed border-primary-400 bg-primary-50 dark:bg-primary-500/10" : "h-10 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600") : "h-0 overflow-hidden")"
                              @ondragover:preventDefault
@@ -197,10 +288,11 @@ else
                                 <span class="text-xs text-primary-500 select-none">Drop here to place last</span>
                             }
                         </div>
+                        }
                     }
 
-                    @* Completed items toggle *@
-                    @if (doneItems.Any())
+                    @* Completed items toggle — hidden inside grid for reminder mode (toggle is in header; list shown below grid) *@
+                    @if (!IsReminderHomepageMode && doneItems.Any())
                     {
                         <div class="mt-3 border-t border-gray-200 pt-2 dark:border-slate-700">
                             <button type="button"
@@ -235,7 +327,7 @@ else
                     }
 
                     @* Skipped items toggle *@
-                    @if (skippedItems.Any())
+                    @if (!IsReminderHomepageMode && skippedItems.Any())
                     {
                         <div class="mt-3 border-t border-gray-200 pt-2 dark:border-slate-700">
                             <button type="button"
@@ -262,6 +354,31 @@ else
                     }
                 </div>
 
+                @* Completed items for reminder homepage mode — full-width below the grid *@
+                @if (IsReminderHomepageMode && showDoneForThis && doneItems.Any())
+                {
+                    <div class="border-t border-gray-200 dark:border-slate-700 px-4 py-3 space-y-1">
+                        @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                        {
+                            <div @key="item.Id" class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
+                                <input type="checkbox"
+                                       class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
+                                       checked="@item.IsDone"
+                                       @onchange="() => ReopenItemAsync(item)"
+                                       disabled="@_isBusy" />
+                                <span class="flex-1 text-sm line-through text-gray-500 dark:text-slate-400">@item.Title</span>
+                                <button type="button"
+                                        class="inline-flex items-center rounded p-1 text-gray-300 hover:text-rose-500 dark:hover:text-rose-400 focus:outline-hidden"
+                                        title="Delete item"
+                                        @onclick="() => DeleteItemAsync(item)"
+                                        disabled="@_isBusy">
+                                    <Icon Name="trash" Class="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
                 @* Panel footer: error only (visible when an item save fails) *@
                 @if (!string.IsNullOrEmpty(_itemErrorPerList.GetValueOrDefault(listId)))
                 {
@@ -275,6 +392,71 @@ else
             </div>
         }
     </div>
+    }
+    else
+    {
+        @if (!FlatItems.Any())
+        {
+            <div class="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No pending items.</div>
+        }
+        else
+        {
+            <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white shadow-xs dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
+                @foreach (var pair in FlatItems)
+                {
+                    var flatList = pair.List;
+                    var flatItem = pair.Item;
+                    var flatToday = DateTime.Today;
+                    var isOverdue = flatItem.DueDate.HasValue && flatItem.DueDate.Value.Date < flatToday;
+                    <div @key="flatItem.Id" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <input type="checkbox"
+                               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:focus:ring-offset-slate-900 cursor-pointer"
+                               checked="@flatItem.IsDone"
+                               @onchange="() => CompleteItemAsync(flatItem, flatList)"
+                               disabled="@_isBusy" />
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm text-gray-900 dark:text-slate-100">@flatItem.Title</span>
+                                @if (isOverdue)
+                                {
+                                    <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Overdue</span>
+                                }
+                                @if (flatItem.DueDate.HasValue && !isOverdue)
+                                {
+                                    <span class="text-xs text-gray-400 dark:text-slate-500">due @flatItem.DueDate.Value.ToString("MMM d")</span>
+                                }
+                                @if (flatItem.RecurrenceType != RecurrenceType.None)
+                                {
+                                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><Icon Name="arrow-repeat" Class="me-1 h-3 w-3" />@flatItem.RecurrenceType</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-slate-800 dark:text-slate-400">@flatList.Name</span>
+                            @if (flatItem.RecurrenceType != RecurrenceType.None)
+                            {
+                                <button type="button"
+                                        class="inline-flex items-center rounded p-1 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 focus:outline-hidden"
+                                        title="Skip for this period"
+                                        @onclick="() => SkipItemAsync(flatItem)"
+                                        disabled="@_isBusy">
+                                    <Icon Name="skip" Class="h-3.5 w-3.5" />
+                                </button>
+                            }
+                            <button type="button"
+                                    class="inline-flex items-center rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 focus:outline-hidden"
+                                    title="Edit item"
+                                    @onclick="() => OpenEditItemModal(flatItem)"
+                                    disabled="@_isBusy">
+                                <Icon Name="pencil" Class="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+}
 }
 
 @* ── List Create/Edit Modal ── *@
@@ -593,7 +775,17 @@ else
                         @_itemModalError
                     </div>
                 }
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                <div class="flex items-center gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    @if (_isEditingItem)
+                    {
+                        <button type="button"
+                                class="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-xs transition-colors hover:bg-rose-50 focus:outline-hidden dark:border-rose-500/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-500/10 disabled:opacity-60"
+                                @onclick="DeleteEditingItemAsync" disabled="@_isBusy">
+                            <Icon Name="trash" Class="h-4 w-4" />
+                            Delete
+                        </button>
+                    }
+                    <div class="flex-1"></div>
                     <button type="button"
                             class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                             @onclick="CloseItemModal" disabled="@_isBusy">
@@ -742,6 +934,11 @@ else
 
 @code {
     [Parameter] public bool HomepageOnly { get; set; }
+    [Parameter] public TodoListType? FilterType { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    private enum TodoViewMode { ListsView, FlatView }
+    private TodoViewMode _viewMode = TodoViewMode.ListsView;
 
     private IList<TodoListResponse>? _lists;
     private IList<TagResponse>? _allTags;
@@ -756,6 +953,22 @@ else
     private readonly Dictionary<int, string?> _itemErrorPerList = new();
 
     private bool _notificationsNeedUpdate;
+
+    private bool IsReminderHomepageMode => HomepageOnly && FilterType == TodoListType.Reminder;
+
+    private IReadOnlyList<(TodoListResponse List, TodoItemResponse Item)> FlatItems
+    {
+        get
+        {
+            if (_lists == null) return Array.Empty<(TodoListResponse, TodoItemResponse)>();
+            var today = DateTime.Today;
+            return _lists
+                .SelectMany(l => l.Items
+                    .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today))
+                    .Select(i => (List: l, Item: i)))
+                .ToList();
+        }
+    }
 
     // Drag state
     private TodoItemResponse? _draggingItem;
@@ -774,6 +987,7 @@ else
     private bool _showItemModal;
     private bool _isEditingItem;
     private int _editingItemId;
+    private TodoItemResponse? _editingItemFull;
     private int _addItemToListId;
     private TodoListResponse? _currentListForItemModal;
     private bool _monitorUseDaysBack = true;
@@ -845,6 +1059,10 @@ else
             if (HomepageOnly)
             {
                 _lists = _lists.Where(l => l.ShowOnHomepage).ToList();
+            }
+            if (FilterType.HasValue)
+            {
+                _lists = _lists.Where(l => l.ListType == FilterType.Value).ToList();
             }
             _allTags = tagsTask.Result;
             _itemErrorPerList.Clear();
@@ -1013,6 +1231,7 @@ else
     {
         _isEditingItem = true;
         _editingItemId = item.Id;
+        _editingItemFull = item;
         _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == item.ListId);
         _monitorUseDaysBack = item.MonitorFromDate == null;
         _itemForm = new TodoItemRequest
@@ -1048,6 +1267,14 @@ else
         _itemModalError = null;
         _booleanBoolValue = null;
         _editIntValue = null;
+    }
+
+    private async Task DeleteEditingItemAsync()
+    {
+        if (_editingItemFull is null) { return; }
+
+        CloseItemModal();
+        await DeleteItemAsync(_editingItemFull);
     }
 
     private async Task SaveItemAsync()

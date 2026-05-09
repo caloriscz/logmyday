@@ -814,7 +814,7 @@
             var listsTask = TodoApi.GetTodoLists();
             var tagsTask = ActivityApi.GetTags();
             await Task.WhenAll(listsTask, tagsTask);
-            _lists = listsTask.Result;
+            _lists = listsTask.Result.Where(l => l.ListType == TodoListType.Basic).ToList();
             _allTags = tagsTask.Result;
             _itemErrorPerList.Clear();
         }
