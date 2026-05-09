@@ -21,9 +21,9 @@ public class TodoItem
 
     public string? Notes { get; set; }
 
-    public DateOnly? StartDate { get; set; }
+    public DateTime? StartDate { get; set; }
 
-    public DateOnly? DueDate { get; set; }
+    public DateTime? DueDate { get; set; }
 
     public TimeOnly? NotifyAt { get; set; }
 

@@ -8,6 +8,7 @@ public class TodoListResponse
     public required string Name { get; set; }
     public int DisplayOrder { get; set; }
     public TodoListType ListType { get; set; }
+    public bool ShowOnHomepage { get; set; }
     public DateTime DateCreated { get; set; }
     public IList<TodoItemResponse> Items { get; set; } = new List<TodoItemResponse>();
 }

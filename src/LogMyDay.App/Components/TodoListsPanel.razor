@@ -46,12 +46,12 @@ else
     <div class="todo-list-grid grid gap-6 sm:grid-cols-2 2xl:grid-cols-3">
         @foreach (var list in _lists)
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = DateTime.Today;
             var listId = list.Id;
             var activeItems = list.Items
-                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate <= today))
+                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today))
                 .OrderBy(i => i.DisplayOrder)
-                .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
+                .ThenBy(i => i.DueDate ?? DateTime.MaxValue)
                 .ThenBy(i => i.DateCreated)
                 .ToList();
             var doneItems = list.Items.Where(i => i.IsDone).ToList();
@@ -107,7 +107,7 @@ else
                         @foreach (var item in activeItems)
                         {
 
-                            var isOverdue = item.DueDate.HasValue && item.DueDate.Value < today;
+                            var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < today;
                             var isDragging = _draggingItem?.Id == item.Id;
                             var isDragOver = _dragOverItem?.Id == item.Id && !isDragging;
                             <div @key="item.Id" class="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors @(isOverdue ? "border-l-2 border-rose-400" : "") @(isDragging ? "opacity-40" : "") @(isDragOver ? "ring-2 ring-primary-400 ring-inset" : "")"
@@ -121,7 +121,7 @@ else
                                 <input type="checkbox"
                                        class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:focus:ring-offset-slate-900 cursor-pointer"
                                        checked="@item.IsDone"
-                                       @onchange="() => CompleteItemAsync(item)"
+                                       @onchange="() => CompleteItemAsync(item, list)"
                                        disabled="@_isBusy" />
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 flex-wrap">
@@ -308,6 +308,13 @@ else
                             <option value="@TodoListType.Reminder">Reminder</option>
                         </InputSelect>
                     </div>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="chk-show-on-homepage-web"
+                               class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
+                               checked="@_listForm.ShowOnHomepage"
+                               @onchange="e => _listForm.ShowOnHomepage = (bool)(e.Value ?? false)" />
+                        <label for="chk-show-on-homepage-web" class="text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">Show on homepage</label>
+                    </div>
                 </div>
                 @if (!string.IsNullOrEmpty(_listError))
                 {
@@ -368,20 +375,45 @@ else
                     @if (_currentListForItemModal?.ListType == TodoListType.Reminder)
                     {
                         <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Value <span class="text-rose-500">*</span></label>
-                            @if (IsNumericInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
+                            @if (IsBooleanInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
                             {
-                                <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                           @bind-Value="_itemForm.Notes"
-                                           placeholder="Enter a number" />
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Value</label>
+                                <div class="flex gap-3">
+                                    <button type="button"
+                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                                            @onclick="() => _booleanBoolValue = _booleanBoolValue == true ? null : true">
+                                        Yes
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
+                                            @onclick="() => { _booleanBoolValue = _booleanBoolValue == false ? (bool?)null : false; }">
+                                        No
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors @(_booleanBoolValue == null ? "border-primary-500 bg-primary-600 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700")"
+                                            @onclick="() => _booleanBoolValue = null">
+                                        Not specified
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Logged as activity value when completed. Selecting Yes or No will immediately complete and log this item.</p>
                             }
                             else
                             {
-                                <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                           @bind-Value="_itemForm.Notes"
-                                           placeholder="Enter a value" />
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Value <span class="text-rose-500">*</span></label>
+                                @if (IsNumericInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId))
+                                {
+                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                               @bind-Value="_itemForm.Notes"
+                                               placeholder="Enter a number" />
+                                }
+                                else
+                                {
+                                    <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                               @bind-Value="_itemForm.Notes"
+                                               placeholder="Enter a value" />
+                                }
+                                <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Logged as activity value when completed.</p>
                             }
-                            <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Logged as activity value when completed.</p>
                         </div>
                     }
                     else
@@ -419,20 +451,23 @@ else
                         }
                     </div>
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Start date</label>
-                            <input type="date"
-                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                   value="@(_itemForm.StartDate?.ToString("yyyy-MM-dd") ?? "")"
-                                   @onchange="e => _itemForm.StartDate = ParseDateOnly(e.Value?.ToString())" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Due date</label>
-                            <input type="date"
-                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                   value="@(_itemForm.DueDate?.ToString("yyyy-MM-dd") ?? "")"
-                                   @onchange="e => _itemForm.DueDate = ParseDateOnly(e.Value?.ToString())" />
-                        </div>
+                        @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
+                        {
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Start date</label>
+                                <input type="datetime-local"
+                                       class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                       value="@(_itemForm.StartDate?.ToString("yyyy-MM-ddTHH:mm") ?? "")"
+                                       @onchange="e => _itemForm.StartDate = ParseDateTime(e.Value?.ToString())" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Due date</label>
+                                <input type="datetime-local"
+                                       class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                       value="@(_itemForm.DueDate?.ToString("yyyy-MM-ddTHH:mm") ?? "")"
+                                       @onchange="e => _itemForm.DueDate = ParseDateTime(e.Value?.ToString())" />
+                            </div>
+                        }
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Remind me at</label>
@@ -538,6 +573,57 @@ else
     </div>
 }
 
+@* ── Boolean Quick-Complete Modal ── *@
+@if (_showBoolQuickModal && _boolQuickItem != null)
+{
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-gray-900/70 p-4 sm:items-center" @onclick="() => { if (!_isBoolQuickBusy) { _showBoolQuickModal = false; } }">
+        <div class="w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="px-6 pt-5 pb-1 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Complete Reminder</p>
+                <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-slate-100">@_boolQuickItem.Title</h3>
+            </div>
+            <div class="px-6 py-4 space-y-3">
+                <div class="flex gap-3">
+                    <button type="button"
+                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_boolQuickValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                            @onclick="() => _boolQuickValue = true">
+                        <i class="bi bi-check-lg me-1"></i>Yes
+                    </button>
+                    <button type="button"
+                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_boolQuickValue == false ? "border-rose-500 bg-rose-500 text-white" : "border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/10")"
+                            @onclick="() => _boolQuickValue = false">
+                        <i class="bi bi-x-lg me-1"></i>No
+                    </button>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_boolQuickError))
+            {
+                <div class="mx-6 mb-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                    @_boolQuickError
+                </div>
+            }
+            <div class="flex gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button"
+                        class="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        @onclick="() => { _showBoolQuickModal = false; _boolQuickItem = null; }"
+                        disabled="@_isBoolQuickBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="flex-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60 focus:outline-hidden"
+                        @onclick="SaveBoolQuickAsync"
+                        disabled="@_isBoolQuickBusy">
+                    @if (_isBoolQuickBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                    }
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @* ── Delete list confirmation ── *@
 @if (_pendingDeleteList != null)
 {
@@ -570,6 +656,8 @@ else
 }
 
 @code {
+    [Parameter] public bool HomepageOnly { get; set; }
+
     private IList<TodoListResponse>? _lists;
     private IList<TagResponse>? _allTags;
     private string? _loadError;
@@ -604,7 +692,15 @@ else
     private int _addItemToListId;
     private TodoListResponse? _currentListForItemModal;
     private bool _monitorUseDaysBack = true;
+    private bool? _booleanBoolValue;
     private TodoItemRequest _itemForm = new() { Title = string.Empty };
+
+    // Boolean quick-complete modal state
+    private bool _showBoolQuickModal;
+    private TodoItemResponse? _boolQuickItem;
+    private bool? _boolQuickValue;
+    private bool _isBoolQuickBusy;
+    private string? _boolQuickError;
 
     // Delete confirmation
     private TodoListResponse? _pendingDeleteList;
@@ -655,6 +751,10 @@ else
             var tagsTask = ActivityApi.GetTags();
             await Task.WhenAll(listsTask, tagsTask);
             _lists = listsTask.Result;
+            if (HomepageOnly)
+            {
+                _lists = _lists.Where(l => l.ShowOnHomepage).ToList();
+            }
             _allTags = tagsTask.Result;
             _itemErrorPerList.Clear();
             _notificationsNeedUpdate = true;
@@ -690,10 +790,10 @@ else
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = DateTime.Today;
         var items = _lists
             .SelectMany(l => l.Items)
-            .Where(i => !i.IsDone && i.NotifyAt.HasValue && (i.StartDate == null || i.StartDate <= today))
+            .Where(i => !i.IsDone && i.NotifyAt.HasValue && (i.StartDate == null || i.StartDate.Value.Date <= today))
             .Select(i => new
             {
                 id = i.Id,
@@ -730,7 +830,8 @@ else
         {
             Name = list.Name,
             DisplayOrder = list.DisplayOrder,
-            ListType = list.ListType
+            ListType = list.ListType,
+            ShowOnHomepage = list.ShowOnHomepage
         };
         _listError = null;
         _showListModal = true;
@@ -810,6 +911,7 @@ else
         _addItemToListId = listId;
         _currentListForItemModal = _lists?.FirstOrDefault(l => l.Id == listId);
         _monitorUseDaysBack = true;
+        _booleanBoolValue = null;
         _itemForm = new TodoItemRequest { Title = string.Empty, ListId = listId, MonitorDaysBack = 0 };
         _itemModalError = null;
         _showItemModal = true;
@@ -838,6 +940,12 @@ else
             CompletionTagId = item.CompletionTagId
         };
         _itemModalError = null;
+        _booleanBoolValue = item.Notes switch
+        {
+            "true" => true,
+            "false" => false,
+            _ => null
+        };
         _showItemModal = true;
     }
 
@@ -845,6 +953,7 @@ else
     {
         _showItemModal = false;
         _itemModalError = null;
+        _booleanBoolValue = null;
     }
 
     private async Task SaveItemAsync()
@@ -853,16 +962,35 @@ else
         _itemModalError = null;
         try
         {
+            var isBooleanType = IsBooleanInputType(_allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId)?.InputTypeId)
+                && _currentListForItemModal?.ListType == TodoListType.Reminder;
+
+            if (isBooleanType)
+            {
+                _itemForm.Notes = _booleanBoolValue.HasValue ? (_booleanBoolValue.Value ? "true" : "false") : null;
+            }
+
             if (_isEditingItem)
             {
                 await TodoApi.UpdateTodoItem(_editingItemId, _itemForm);
+
+                if (isBooleanType && _booleanBoolValue.HasValue)
+                {
+                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                }
             }
             else
             {
-                await TodoApi.CreateTodoItem(_itemForm);
+                var created = await TodoApi.CreateTodoItem(_itemForm);
+
+                if (isBooleanType && _booleanBoolValue.HasValue)
+                {
+                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                }
             }
 
             _showItemModal = false;
+            _booleanBoolValue = null;
             await LoadDataAsync();
         }
         catch (ApiException ex) when (_isEditingItem && ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -899,8 +1027,29 @@ else
         }
     }
 
-    private async Task CompleteItemAsync(TodoItemResponse item)
+    private async Task CompleteItemAsync(TodoItemResponse item, TodoListResponse list)
     {
+        if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
+        {
+            // Resolve InputTypeId from the response or fall back to the cached tag list
+            var effectiveInputTypeId = item.CompletionTagInputTypeId
+                ?? _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId)?.InputTypeId;
+
+            if (IsBooleanInputType(effectiveInputTypeId))
+            {
+                _boolQuickItem = item;
+                _boolQuickValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+                _boolQuickError = null;
+                _showBoolQuickModal = true;
+                StateHasChanged();
+                return;
+            }
+
+            // Non-Boolean or untyped completion tag: fall back to full edit modal (old behaviour)
+            OpenEditItemModal(item);
+            return;
+        }
+
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
@@ -917,6 +1066,50 @@ else
         {
             Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
             _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+        }
+    }
+
+    private async Task SaveBoolQuickAsync()
+    {
+        if (_boolQuickItem == null || !_boolQuickValue.HasValue)
+        {
+            _boolQuickError = "Please select Yes or No.";
+            return;
+        }
+        _isBoolQuickBusy = true;
+        _boolQuickError = null;
+        try
+        {
+            var req = new TodoItemRequest
+            {
+                ListId = _boolQuickItem.ListId,
+                Title = _boolQuickItem.Title,
+                Notes = _boolQuickValue.HasValue ? (_boolQuickValue.Value ? "true" : "false") : null,
+                StartDate = _boolQuickItem.StartDate,
+                DueDate = _boolQuickItem.DueDate,
+                NotifyAt = _boolQuickItem.NotifyAt,
+                DisplayOrder = _boolQuickItem.DisplayOrder,
+                RecurrenceType = _boolQuickItem.RecurrenceType,
+                AutoLogMode = _boolQuickItem.AutoLogMode,
+                MonitorDaysBack = _boolQuickItem.MonitorDaysBack,
+                MonitorFromDate = _boolQuickItem.MonitorFromDate,
+                MonitorToDate = _boolQuickItem.MonitorToDate,
+                CompletionTagId = _boolQuickItem.CompletionTagId
+            };
+            await TodoApi.UpdateTodoItem(_boolQuickItem.Id, req);
+            await TodoApi.CompleteItem(_boolQuickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            _showBoolQuickModal = false;
+            _boolQuickItem = null;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete Boolean todo item");
+            _boolQuickError = "Failed to save. Please try again.";
+        }
+        finally
+        {
+            _isBoolQuickBusy = false;
         }
     }
 
@@ -1027,11 +1220,11 @@ else
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = DateTime.Today;
         var ordered = list.Items
-            .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate <= today))
+            .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate.Value.Date <= today))
             .OrderBy(i => i.DisplayOrder)
-            .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
+            .ThenBy(i => i.DueDate ?? DateTime.MaxValue)
             .ThenBy(i => i.DateCreated)
             .ToList();
 
@@ -1092,11 +1285,11 @@ else
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = DateTime.Today;
         var ordered = list.Items
-            .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate <= today))
+            .Where(i => !i.IsDone && (i.StartDate == null || i.StartDate.Value.Date <= today))
             .OrderBy(i => i.DisplayOrder)
-            .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
+            .ThenBy(i => i.DueDate ?? DateTime.MaxValue)
             .ThenBy(i => i.DateCreated)
             .ToList();
 
@@ -1138,6 +1331,16 @@ else
 
     // ── Helpers ──
 
+    private static DateTime? ParseDateTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return DateTime.TryParse(value, out var d) ? d : null;
+    }
+
     private static DateOnly? ParseDateOnly(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1160,4 +1363,7 @@ else
 
     private static bool IsNumericInputType(int? inputTypeId) =>
         inputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
+
+    private static bool IsBooleanInputType(int? inputTypeId) =>
+        inputTypeId == 3;
 }

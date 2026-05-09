@@ -31,8 +31,6 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo list not found");
         }
 
-        ValidateReminderItemValue(list.ListType, request.CompletionTagId, request.Notes);
-
         Domain.Entities.Tag? completionTag = null;
         if (request.CompletionTagId.HasValue)
         {
@@ -77,8 +75,6 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
-        ValidateReminderItemValue(item.List.ListType, request.CompletionTagId, request.Notes);
-
         item.Title = request.Title;
         item.Notes = request.Notes;
         item.StartDate = request.StartDate;
@@ -116,6 +112,7 @@ public class TodoItemService : ITodoItemService
         }
 
         if (item.List.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue
+            && !IsBooleanInputType(item.CompletionTag?.InputTypeId)
             && string.IsNullOrWhiteSpace(item.Notes))
         {
             throw new InvalidOperationException("Cannot complete: a value is required for this Reminder item.");
@@ -142,6 +139,28 @@ public class TodoItemService : ITodoItemService
                     existing.DateStarted = request.DoneAt;
                     existing.Description = item.List.ListType == TodoListType.Reminder ? item.Notes : item.Title;
                     _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
+                }
+                else
+                {
+                    await LogActivityAsync(item, request.DoneAt, userId);
+                }
+            }
+            else if (item.List.ListType == TodoListType.Reminder)
+            {
+                // Reminder items: upsert today's activity so non-repeatable tags are never blocked
+                var todayUtc = request.DoneAt.Date;
+                var existing = await _context.Activities
+                    .FirstOrDefaultAsync(a =>
+                        a.TagId == item.CompletionTagId.Value &&
+                        a.UserId == userId &&
+                        a.DateStarted >= todayUtc &&
+                        a.DateStarted < todayUtc.AddDays(1));
+
+                if (existing != null)
+                {
+                    existing.DateStarted = request.DoneAt;
+                    existing.Description = item.Notes;
+                    _logger.LogInformation("Updated activity {ActivityId} for tag {TagId} on Reminder item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
                 }
                 else
                 {
@@ -175,9 +194,17 @@ public class TodoItemService : ITodoItemService
     private static bool IsNumericInputType(int? inputTypeId) =>
         inputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
 
-    private static void ValidateReminderItemValue(TodoListType listType, int? completionTagId, string? notes)
+    private static bool IsBooleanInputType(int? inputTypeId) =>
+        inputTypeId == 3;
+
+    private static void ValidateReminderItemValue(TodoListType listType, int? completionTagId, string? notes, int? inputTypeId = null)
     {
         if (listType != TodoListType.Reminder || !completionTagId.HasValue)
+        {
+            return;
+        }
+
+        if (IsBooleanInputType(inputTypeId))
         {
             return;
         }

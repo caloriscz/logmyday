@@ -20,6 +20,8 @@ public class TodoList
 
     public TodoListType ListType { get; set; } = TodoListType.Basic;
 
+    public bool ShowOnHomepage { get; set; } = false;
+
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
 
     public ICollection<TodoItem> Items { get; set; } = new List<TodoItem>();

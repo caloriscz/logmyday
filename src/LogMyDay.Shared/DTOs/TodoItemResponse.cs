@@ -8,8 +8,8 @@ public class TodoItemResponse
     public int ListId { get; set; }
     public required string Title { get; set; }
     public string? Notes { get; set; }
-    public DateOnly? StartDate { get; set; }
-    public DateOnly? DueDate { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? DueDate { get; set; }
     public TimeOnly? NotifyAt { get; set; }
     public bool IsDone { get; set; }
     public DateTime? DoneAt { get; set; }

@@ -12,4 +12,6 @@ public class TodoListRequest
     public int DisplayOrder { get; set; } = 0;
 
     public TodoListType ListType { get; set; } = TodoListType.Basic;
+
+    public bool ShowOnHomepage { get; set; } = false;
 }

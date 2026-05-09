@@ -103,6 +103,12 @@ public class TodoItemsController : BaseApiController
 
             return NotFound(ex.Message);
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Cannot complete todo item {ItemId} for user {UserId}", id, userId);
+
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("{id:int}/reopen")]
