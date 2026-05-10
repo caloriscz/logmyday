@@ -71,10 +71,11 @@ else
     <div class="@(IsReminderHomepageMode ? "flex flex-col gap-6" : "todo-list-grid grid gap-6 sm:grid-cols-2 2xl:grid-cols-3")">
         @foreach (var list in _lists)
         {
-            var today = DateTime.Today;
+            var effectiveDate = SelectedDate?.Date ?? DateTime.Today;
             var listId = list.Id;
             var filteredItems = list.Items
-                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today));
+                .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= effectiveDate))
+                .Where(i => !IsReminderHomepageMode || !IsOutsideMonitoringWindow(i, effectiveDate));
             var activeItems = list.ListType == TodoListType.Reminder
                 ? filteredItems.OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue).ThenBy(i => i.DisplayOrder).ThenBy(i => i.DateCreated).ToList()
                 : filteredItems.OrderBy(i => i.DisplayOrder).ThenBy(i => i.DueDate ?? DateTime.MaxValue).ThenBy(i => i.DateCreated).ToList();
@@ -138,7 +139,7 @@ else
                     {
                         @foreach (var item in activeItems)
                         {
-                            var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < today;
+                            var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < effectiveDate;
                             var isDragging = _draggingItem?.Id == item.Id;
                             var isDragOver = _dragOverItem?.Id == item.Id && !isDragging;
                             @if (IsReminderHomepageMode)
@@ -936,6 +937,9 @@ else
     [Parameter] public bool HomepageOnly { get; set; }
     [Parameter] public TodoListType? FilterType { get; set; }
     [Parameter] public string? Title { get; set; }
+    [Parameter] public DateTime? SelectedDate { get; set; }
+
+    private DateTime? _prevSelectedDate;
 
     private enum TodoViewMode { ListsView, FlatView }
     private TodoViewMode _viewMode = TodoViewMode.ListsView;
@@ -956,15 +960,26 @@ else
 
     private bool IsReminderHomepageMode => HomepageOnly && FilterType == TodoListType.Reminder;
 
+    private static bool IsOutsideMonitoringWindow(TodoItemResponse item, DateTime date)
+    {
+        if (item.MonitorFromDate.HasValue && item.MonitorToDate.HasValue)
+        {
+            var d = DateOnly.FromDateTime(date);
+            return d < item.MonitorFromDate.Value || d > item.MonitorToDate.Value;
+        }
+
+        return false;
+    }
+
     private IReadOnlyList<(TodoListResponse List, TodoItemResponse Item)> FlatItems
     {
         get
         {
             if (_lists == null) return Array.Empty<(TodoListResponse, TodoItemResponse)>();
-            var today = DateTime.Today;
+            var effectiveDate = SelectedDate?.Date ?? DateTime.Today;
             return _lists
                 .SelectMany(l => l.Items
-                    .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= today))
+                    .Where(i => !i.IsDone && !i.IsSkipped && (i.StartDate == null || i.StartDate.Value.Date <= effectiveDate))
                     .Select(i => (List: l, Item: i)))
                 .ToList();
         }
@@ -1014,6 +1029,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _prevSelectedDate = SelectedDate;
         await LoadDataAsync();
         _refreshTimer = new System.Threading.Timer(
             async _ => await InvokeAsync(async () =>
@@ -1027,6 +1043,15 @@ else
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SelectedDate != _prevSelectedDate)
+        {
+            _prevSelectedDate = SelectedDate;
+            await LoadDataAsync();
+        }
     }
 
     public void Dispose()
@@ -1052,7 +1077,8 @@ else
     {
         try
         {
-            var listsTask = TodoApi.GetTodoLists();
+            var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
+            var listsTask = TodoApi.GetTodoLists(dateParam);
             var tagsTask = ActivityApi.GetTags();
             await Task.WhenAll(listsTask, tagsTask);
             _lists = listsTask.Result;

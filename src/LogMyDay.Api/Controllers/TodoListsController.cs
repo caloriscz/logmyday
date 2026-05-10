@@ -22,10 +22,11 @@ public class TodoListsController : BaseApiController
     }
 
     [HttpGet]
-    public async Task<ActionResult<IList<TodoListResponse>>> GetAll()
+    public async Task<ActionResult<IList<TodoListResponse>>> GetAll([FromQuery] string? date = null)
     {
         var userId = GetCurrentUserId();
-        var lists = await _todoListService.GetAll(userId);
+        DateOnly? parsedDate = DateOnly.TryParse(date, out var d) ? d : null;
+        var lists = await _todoListService.GetAll(userId, parsedDate);
 
         return Ok(lists);
     }

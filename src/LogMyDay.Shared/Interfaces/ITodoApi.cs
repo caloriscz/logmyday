@@ -6,7 +6,7 @@ namespace LogMyDay.Shared.Interfaces;
 public interface ITodoApi
 {
     [Get("/api/todo-lists")]
-    Task<IList<TodoListResponse>> GetTodoLists();
+    Task<IList<TodoListResponse>> GetTodoLists([AliasAs("date")] string? date = null);
 
     [Post("/api/todo-lists")]
     Task<TodoListResponse> CreateTodoList([Body] TodoListRequest request);

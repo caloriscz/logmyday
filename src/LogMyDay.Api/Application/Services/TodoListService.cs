@@ -20,7 +20,7 @@ public class TodoListService : ITodoListService
         _logger = logger;
     }
 
-    public async Task<IList<TodoListResponse>> GetAll(Guid userId)
+    public async Task<IList<TodoListResponse>> GetAll(Guid userId, DateOnly? date = null)
     {
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
@@ -33,7 +33,7 @@ public class TodoListService : ITodoListService
             .ThenBy(l => l.DateCreated)
             .ToListAsync();
 
-        return lists.Select(l => MapToResponse(l, user)).ToList();
+        return lists.Select(l => MapToResponse(l, user, date)).ToList();
     }
 
     public async Task<TodoListResponse> GetById(int id, Guid userId)
@@ -106,7 +106,7 @@ public class TodoListService : ITodoListService
         _logger.LogInformation("Deleted todo list {ListId} for user {UserId}", id, userId);
     }
 
-    private static TodoListResponse MapToResponse(TodoList list, User? user) =>
+    private static TodoListResponse MapToResponse(TodoList list, User? user, DateOnly? date = null) =>
         new()
         {
             Id = list.Id,
@@ -124,11 +124,11 @@ public class TodoListService : ITodoListService
                     .OrderBy(i => i.DisplayOrder)
                     .ThenBy(i => i.DueDate)
                     .ThenBy(i => i.DateCreated))
-                .Select(i => MapItemToResponse(i, user))
+                .Select(i => MapItemToResponse(i, user, date))
                 .ToList()
         };
 
-    private static TodoItemResponse MapItemToResponse(TodoItem item, User? user) =>
+    private static TodoItemResponse MapItemToResponse(TodoItem item, User? user, DateOnly? date = null) =>
         new()
         {
             Id = item.Id,
@@ -138,9 +138,9 @@ public class TodoListService : ITodoListService
             StartDate = item.StartDate,
             DueDate = item.DueDate,
             NotifyAt = item.NotifyAt,
-            IsDone = ComputeEffectiveIsDone(item, user),
+            IsDone = ComputeEffectiveIsDone(item, user, date),
             DoneAt = item.DoneAt,
-            IsSkipped = ComputeEffectiveIsSkipped(item, user),
+            IsSkipped = ComputeEffectiveIsSkipped(item, user, date),
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
@@ -153,7 +153,7 @@ public class TodoListService : ITodoListService
             CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
         };
 
-    private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user)
+    private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user, DateOnly? date = null)
     {
         if (item.SkippedAt == null || item.RecurrenceType == RecurrenceType.None)
         {
@@ -171,11 +171,11 @@ public class TodoListService : ITodoListService
         }
 
         var skippedLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.SkippedAt.Value, tz));
-        var todayLocal = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
 
         if (item.RecurrenceType == RecurrenceType.Daily)
         {
-            return skippedLocalDate == todayLocal;
+            return skippedLocalDate == referenceDate;
         }
 
         if (item.RecurrenceType == RecurrenceType.Weekly)
@@ -191,15 +191,15 @@ public class TodoListService : ITodoListService
             }
 
             var skippedWeekStart = GetWeekStart(skippedLocalDate, firstDay);
-            var todayWeekStart = GetWeekStart(todayLocal, firstDay);
+            var referenceDateWeekStart = GetWeekStart(referenceDate, firstDay);
 
-            return skippedWeekStart == todayWeekStart;
+            return skippedWeekStart == referenceDateWeekStart;
         }
 
         return false;
     }
 
-    private static bool ComputeEffectiveIsDone(TodoItem item, User? user)
+    private static bool ComputeEffectiveIsDone(TodoItem item, User? user, DateOnly? date = null)
     {
         if (!item.IsDone || item.DoneAt == null || item.RecurrenceType == RecurrenceType.None)
         {
@@ -217,11 +217,11 @@ public class TodoListService : ITodoListService
         }
 
         var doneLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.DoneAt.Value, tz));
-        var todayLocal = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
 
         if (item.RecurrenceType == RecurrenceType.Daily)
         {
-            return doneLocalDate == todayLocal;
+            return doneLocalDate == referenceDate;
         }
 
         if (item.RecurrenceType == RecurrenceType.Weekly)
@@ -237,9 +237,9 @@ public class TodoListService : ITodoListService
             }
 
             var doneWeekStart = GetWeekStart(doneLocalDate, firstDay);
-            var todayWeekStart = GetWeekStart(todayLocal, firstDay);
+            var referenceDateWeekStart = GetWeekStart(referenceDate, firstDay);
 
-            return doneWeekStart == todayWeekStart;
+            return doneWeekStart == referenceDateWeekStart;
         }
 
         return item.IsDone;
