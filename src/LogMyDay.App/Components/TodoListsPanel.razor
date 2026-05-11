@@ -84,7 +84,30 @@ else
             var showDoneForThis = _showDonePerList.Contains(listId);
             var showSkippedForThis = _showSkippedPerList.Contains(listId);
 
-            <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900" style="@(IsReminderHomepageMode ? "" : "min-height: 600px;")">
+            @if (IsReminderHomepageMode)
+            {
+                <ReminderTodo @key="listId"
+                              List="list"
+                              ActiveItems="activeItems"
+                              DoneItems="doneItems"
+                              ShowDone="showDoneForThis"
+                              IsBusy="_isBusy"
+                              EffectiveDate="effectiveDate"
+                              ItemError="@_itemErrorPerList.GetValueOrDefault(listId)"
+                              OnToggleShowDone="() => ToggleShowDone(listId)"
+                              OnAddItem="() => OpenAddItemModal(listId)"
+                              OnEditList="() => OpenEditListModal(list)"
+                              OnDeleteList="() => ConfirmDeleteList(list)"
+                              OnCompleteItem="async item => await CompleteItemAsync(item, list)"
+                              OnSkipItem="SkipItemAsync"
+                              OnEditItem="OpenEditItemModal"
+                              OnReopenItem="ReopenItemAsync"
+                              OnDeleteItem="DeleteItemAsync"
+                              OnReload="LoadDataAsync" />
+            }
+            else
+            {
+            <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900" style="min-height: 600px;">
 
                 @* Panel header *@
                 <div class="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-3">
@@ -391,6 +414,7 @@ else
                     </div>
                 }
             </div>
+            }
         }
     </div>
     }

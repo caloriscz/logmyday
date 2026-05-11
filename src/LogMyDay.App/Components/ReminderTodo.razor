@@ -1,0 +1,121 @@
+@using LogMyDay.Domain.Enums
+
+<div class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900">
+
+    @* Panel header *@
+    <div class="flex items-center justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-3">
+        <div class="flex items-center gap-2 min-w-0">
+            <h3 class="truncate text-base font-semibold text-gray-900 dark:text-slate-100">@List.Name</h3>
+            <span class="shrink-0 text-xs text-gray-500 dark:text-slate-400">@ActiveItems.Count</span>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+            @if (DoneItems.Any())
+            {
+                <button type="button"
+                        class="text-xs text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors px-1"
+                        @onclick="() => OnToggleShowDone.InvokeAsync()">
+                    @(ShowDone ? "Hide" : "Show") completed (@DoneItems.Count)
+                </button>
+            }
+            <button type="button"
+                    class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs transition hover:bg-primary-700 focus:outline-hidden disabled:opacity-60"
+                    @onclick="() => OnAddItem.InvokeAsync()"
+                    disabled="@IsBusy">
+                <Icon Name="plus" Class="h-3.5 w-3.5" />
+                Add item
+            </button>
+            <button type="button"
+                    class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-slate-200 dark:hover:bg-slate-800 focus:outline-hidden transition-colors"
+                    title="Edit list"
+                    @onclick="() => OnEditList.InvokeAsync()"
+                    disabled="@IsBusy">
+                <Icon Name="pencil" Class="h-3.5 w-3.5" />
+            </button>
+            <button type="button"
+                    class="inline-flex items-center rounded-md p-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 focus:outline-hidden transition-colors"
+                    title="Delete list"
+                    @onclick="() => OnDeleteList.InvokeAsync()"
+                    disabled="@IsBusy">
+                <Icon Name="trash" Class="h-3.5 w-3.5" />
+            </button>
+        </div>
+    </div>
+
+    @* Items grid *@
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4">
+        @if (!ActiveItems.Any())
+        {
+            <p class="py-8 text-center text-sm text-gray-400 dark:text-slate-500">No pending items.</p>
+        }
+        else
+        {
+            @foreach (var item in ActiveItems)
+            {
+                var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < EffectiveDate.Date;
+                <ReminderTodoItem Item="item"
+                                  IsOverdue="isOverdue"
+                                  IsBusy="IsBusy"
+                                  OnComplete="OnCompleteItem"
+                                  OnSkip="OnSkipItem"
+                                  OnEdit="OnEditItem" />
+            }
+        }
+    </div>
+
+    @* Completed items — full-width below the grid *@
+    @if (ShowDone && DoneItems.Any())
+    {
+        <div class="border-t border-gray-200 dark:border-slate-700 px-4 py-3 space-y-1">
+            @foreach (var item in DoneItems.OrderByDescending(i => i.DoneAt))
+            {
+                <div @key="item.Id" class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
+                    <input type="checkbox"
+                           class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
+                           checked="@item.IsDone"
+                           @onchange="() => OnReopenItem.InvokeAsync(item)"
+                           disabled="@IsBusy" />
+                    <span class="flex-1 text-sm line-through text-gray-500 dark:text-slate-400">@item.Title</span>
+                    <button type="button"
+                            class="inline-flex items-center rounded p-1 text-gray-300 hover:text-rose-500 dark:hover:text-rose-400 focus:outline-hidden"
+                            title="Delete item"
+                            @onclick="() => OnDeleteItem.InvokeAsync(item)"
+                            disabled="@IsBusy">
+                        <Icon Name="trash" Class="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    @* Error footer *@
+    @if (!string.IsNullOrEmpty(ItemError))
+    {
+        <div class="border-t border-gray-200 px-4 py-2 dark:border-slate-700">
+            <div class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                <span class="flex-1">@ItemError</span>
+                <button type="button" class="shrink-0 font-medium underline hover:no-underline" @onclick="() => OnReload.InvokeAsync()">Reload</button>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TodoListResponse List { get; set; } = null!;
+    [Parameter, EditorRequired] public List<TodoItemResponse> ActiveItems { get; set; } = [];
+    [Parameter, EditorRequired] public List<TodoItemResponse> DoneItems { get; set; } = [];
+    [Parameter] public bool ShowDone { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public DateTime EffectiveDate { get; set; }
+    [Parameter] public string? ItemError { get; set; }
+    [Parameter] public EventCallback OnToggleShowDone { get; set; }
+    [Parameter] public EventCallback OnAddItem { get; set; }
+    [Parameter] public EventCallback OnEditList { get; set; }
+    [Parameter] public EventCallback OnDeleteList { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnCompleteItem { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnSkipItem { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnEditItem { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnReopenItem { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnDeleteItem { get; set; }
+    [Parameter] public EventCallback OnReload { get; set; }
+}
