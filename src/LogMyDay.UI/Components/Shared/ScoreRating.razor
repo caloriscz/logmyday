@@ -38,7 +38,7 @@
 
 @code {
     [Parameter] public int? Value { get; set; }
-    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
     [Parameter] public int MaxScore { get; set; } = 5;
 
     private int? _hoverValue;
@@ -52,7 +52,7 @@
     private async Task ClearValue()
     {
         Value = null;
-        await ValueChanged.InvokeAsync(0);
+        await ValueChanged.InvokeAsync(null);
     }
 
     private static string GetScoreColor(int value, int max)

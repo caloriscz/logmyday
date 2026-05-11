@@ -36,7 +36,7 @@ public interface ITodoApi
     Task<TodoItemResponse> ReopenItem(int id);
 
     [Post("/api/todo-items/{id}/skip")]
-    Task<TodoItemResponse> SkipItem(int id);
+    Task<TodoItemResponse> SkipItem(int id, [AliasAs("date")] string? date = null);
 
     [Post("/api/todo-items/{id}/unskip")]
     Task<TodoItemResponse> UnskipItem(int id);

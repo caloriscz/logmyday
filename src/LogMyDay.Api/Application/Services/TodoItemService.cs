@@ -248,11 +248,30 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
-    public async Task<TodoItemResponse> Skip(int id, Guid userId)
+    public async Task<TodoItemResponse> Skip(int id, Guid userId, DateOnly? date = null)
     {
         var item = await LoadItemForUser(id, userId);
 
-        item.SkippedAt = DateTime.UtcNow;
+        if (date.HasValue)
+        {
+            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            TimeZoneInfo tz;
+            try
+            {
+                tz = TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                tz = TimeZoneInfo.Utc;
+            }
+
+            var localMidnight = date.Value.ToDateTime(TimeOnly.MinValue);
+            item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, tz);
+        }
+        else
+        {
+            item.SkippedAt = DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync();
 
@@ -323,7 +342,7 @@ public class TodoItemService : ITodoItemService
             NotifyAt = item.NotifyAt,
             IsDone = item.IsDone,
             DoneAt = item.DoneAt,
-            IsSkipped = false,
+            IsSkipped = item.SkippedAt != null && item.RecurrenceType != RecurrenceType.None,
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,

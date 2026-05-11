@@ -130,12 +130,13 @@ public class TodoItemsController : BaseApiController
     }
 
     [HttpPost("{id:int}/skip")]
-    public async Task<ActionResult<TodoItemResponse>> Skip(int id)
+    public async Task<ActionResult<TodoItemResponse>> Skip(int id, [FromQuery] string? date = null)
     {
         var userId = GetCurrentUserId();
+        DateOnly? parsedDate = DateOnly.TryParse(date, out var d) ? d : null;
         try
         {
-            var item = await _todoItemService.Skip(id, userId);
+            var item = await _todoItemService.Skip(id, userId, parsedDate);
 
             return Ok(item);
         }

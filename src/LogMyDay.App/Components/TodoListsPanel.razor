@@ -723,7 +723,7 @@ else
                             </InputSelect>
                         </div>
                     }
-                    @if (_itemForm.RecurrenceType != RecurrenceType.None && _itemForm.CompletionTagId.HasValue)
+                    @if (_itemForm.RecurrenceType != RecurrenceType.None)
                     {
                         <div class="rounded-lg border border-gray-200 p-4 space-y-3 dark:border-slate-700">
                             <p class="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Activity monitoring window</p>
@@ -962,9 +962,17 @@ else
 
     private static bool IsOutsideMonitoringWindow(TodoItemResponse item, DateTime date)
     {
+        var d = DateOnly.FromDateTime(date);
+
+        if (item.MonitorDaysBack.HasValue)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var windowStart = today.AddDays(-item.MonitorDaysBack.Value);
+            return d < windowStart || d > today;
+        }
+
         if (item.MonitorFromDate.HasValue && item.MonitorToDate.HasValue)
         {
-            var d = DateOnly.FromDateTime(date);
             return d < item.MonitorFromDate.Value || d > item.MonitorToDate.Value;
         }
 
@@ -1545,7 +1553,7 @@ else
     {
         try
         {
-            var updated = await TodoApi.SkipItem(item.Id);
+            var updated = await TodoApi.SkipItem(item.Id, SelectedDate?.ToString("yyyy-MM-dd"));
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)

@@ -62,7 +62,7 @@
                         {
                             <div class="mb-3">
                                 <ScoreRating Value="@GetScorePickerValue(tag.Id)"
-                                             ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
+                                             ValueChanged="@(async v => { if (v.HasValue) await QuickAddWithValueAsync(tag, v.Value); })"
                                              MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
                             </div>
                         }
