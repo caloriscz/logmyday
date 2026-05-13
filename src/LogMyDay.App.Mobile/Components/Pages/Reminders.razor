@@ -1,688 +1,1251 @@
 @page "/reminders"
 @using System.Globalization
-@using System.Net
-@using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Constants
-@using LogMyDay.App.Mobile.Components.Shared
-@using LogMyDay.App.Mobile.Services
+@using LogMyDay.Domain.Enums
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
 @using LogMyDay.Shared.Preferences
-@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
-@inject NavigationManager Navigation
+@using Refit
+@implements IDisposable
+@inject ITodoApi TodoApi
+@inject IActivityApi ActivityApi
+@inject ILogger<Reminders> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
-@inject ISharedDataCache SharedDataCache
-@inject IJSRuntime JSRuntime
-@inject ISystemNotificationService SystemNotificationService
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
-    <RemindersSectionNav RequiredCount="@(unfilledRequiredTags?.Count ?? 0)" />
+    <TopBar Title="Reminders" ShowReload="true" OnReload="LoadDataAsync" />
 
-    <div class="max-w-7xl mx-auto px-6 py-4">
-        <!-- Date Navigation -->
+    <div class="max-w-7xl mx-auto px-4 py-4">
+
+        @* Date navigation *@
         <div class="flex items-center justify-center gap-2 mb-6">
-            <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
-                &lt;
-            </button>
-            <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="inline-block" Placeholder="Select date" />
-            <button class="btn-secondary" @onclick="NextDay" title="Next Day">
-                &gt;
-            </button>
+            <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">&lt;</button>
+            <CultureAwareDatePicker Value="@_selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="inline-block" Placeholder="Select date" />
+            <button class="btn-secondary" @onclick="NextDay" title="Next Day">&gt;</button>
         </div>
 
-        @if (isLoading)
+        @if (_loadError != null)
         {
-            <div class="text-center">
-                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
-                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading reminders...</p>
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
+                @_loadError
             </div>
         }
-        else if (unfilledRequiredTags?.Any() == true)
+        else if (_lists == null)
         {
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                @foreach (var tag in unfilledRequiredTags)
+            <div class="flex items-center justify-center gap-3 py-16 text-gray-500 dark:text-gray-400">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+                <span class="text-sm">Loading reminders…</span>
+            </div>
+        }
+        else if (_lists.Count == 0)
+        {
+            <div class="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                No reminder lists yet. Create one from the Todos page.
+            </div>
+        }
+        else
+        {
+            <div class="flex flex-col gap-5">
+                @foreach (var list in _lists)
                 {
-                    <div @key="tag.Id" class="card border-l-4 border-yellow-500 transition duration-300 @(_dismissingTagIds.Contains(tag.Id) ? "opacity-0 scale-95 pointer-events-none" : "")">
-                        <div class="flex justify-between items-start mb-2">
-                            <h5 class="font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                @tag.Title
-                            </h5>
+                    var listId = list.Id;
+                    var effectiveDate = _selectedDate.Date;
+                    var filteredItems = list.Items
+                        .Where(i => !i.IsDone && !i.IsSkipped
+                            && (i.StartDate == null || i.StartDate.Value.Date <= effectiveDate)
+                            && !IsOutsideMonitoringWindow(i, effectiveDate));
+                    var activeItems = filteredItems
+                        .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
+                        .ThenBy(i => i.DisplayOrder)
+                        .ThenBy(i => i.DateCreated)
+                        .ToList();
+                    var doneItems = list.Items.Where(i => i.IsDone).ToList();
+                    var showDone = _showDonePerList.Contains(listId);
+
+                    <div @key="listId" class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+
+                        @* List header *@
+                        <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <h3 class="truncate text-base font-semibold text-gray-900 dark:text-gray-100">@list.Name</h3>
+                                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">@activeItems.Count</span>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                @if (doneItems.Any())
+                                {
+                                    <button type="button"
+                                            class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-1 transition-colors"
+                                            @onclick="() => ToggleShowDone(listId)">
+                                        @(showDone ? "Hide" : "Show") done (@doneItems.Count)
+                                    </button>
+                                }
+                                <button type="button"
+                                        class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
+                                        @onclick="() => OpenAddItemModal(listId)"
+                                        disabled="@_isBusy">
+                                    <i class="bi bi-plus-lg"></i>
+                                    Add
+                                </button>
+                                <button type="button"
+                                        class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                        title="Edit list"
+                                        @onclick="() => OpenEditListModal(list)"
+                                        disabled="@_isBusy">
+                                    <i class="bi bi-pencil text-sm"></i>
+                                </button>
+                                <button type="button"
+                                        class="p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                        title="Delete list"
+                                        @onclick="() => ConfirmDeleteList(list)"
+                                        disabled="@_isBusy">
+                                    <i class="bi bi-trash text-sm"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        @if (tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10)
-                        {
-                            <div class="mb-3">
-                                <StarRating Value="@GetStarPickerValue(tag.Id)"
-                                            ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
-                                            MaxStars="@(tag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
-                            </div>
-                        }
-                        else if (tag.TypeId is InputTypeIds.Score or InputTypeIds.Score10)
-                        {
-                            <div class="mb-3">
-                                <ScoreRating Value="@GetScorePickerValue(tag.Id)"
-                                             ValueChanged="@(async v => { if (v.HasValue) await QuickAddWithValueAsync(tag, v.Value); })"
-                                             MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
-                            </div>
-                        }
-                        else if (tag.TypeId == InputTypeIds.Boolean)
-                        {
-                            <div class="mb-3">
-                                <BooleanToggle Value="@GetBoolPickerValue(tag.Id)"
-                                               ValueChanged="@(async v => await QuickAddBoolAsync(tag, v))" />
-                            </div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
-                        {
-                            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
-                            </div>
-                        }
-
-                        @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
-                        @if (!isRatingTag)
-                        {
-                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
-                            <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
-                                    @onclick="@(() => PrepareModalForTag(tag.Id))">
-                                <i class="bi bi-plus-circle"></i>
-                                <span>Add Activity</span>
-                            </button>
-                            @if (HasDefaultValue(tag) && !isRatingTag)
+                        @* Active items grid *@
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                            @if (!activeItems.Any())
                             {
-                                <button class="@GetQuickAddButtonClasses(tag)"
-                                        @onclick="@(() => QuickAddDefaultAsync(tag))"
-                                        disabled="@IsQuickAddDisabled(tag)">
-                                    <i class="bi bi-check-circle"></i>
-                                    <span>Use Default</span>
-                                    @if (IsQuickAddInProgress(tag.Id))
-                                    {
-                                        <div class="inline-block animate-spin text-lg">⟳</div>
-                                    }
-                                </button>
+                                <p class="col-span-full py-8 text-center text-sm text-gray-400 dark:text-gray-500">No pending reminders.</p>
+                            }
+                            else
+                            {
+                                @foreach (var item in activeItems)
+                                {
+                                    var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < effectiveDate;
+                                    <div @key="item.Id" class="rounded-xl border @(isOverdue ? "border-red-400/60" : "border-gray-200 dark:border-gray-700") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3">
+                                        <button type="button"
+                                                class="h-9 w-9 shrink-0 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 flex items-center justify-center text-transparent hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors disabled:opacity-50"
+                                                title="Complete"
+                                                @onclick="() => CompleteItemAsync(item, list)"
+                                                disabled="@_isBusy">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="font-semibold text-sm text-gray-900 dark:text-gray-100">@item.Title</span>
+                                                @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                                {
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400">@item.Notes</span>
+                                                }
+                                                @if (isOverdue)
+                                                {
+                                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-300">Overdue</span>
+                                                }
+                                                @if (item.RecurrenceType != RecurrenceType.None)
+                                                {
+                                                    <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3 shrink-0">
+                                            @if (item.RecurrenceType != RecurrenceType.None)
+                                            {
+                                                <button type="button"
+                                                        class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
+                                                        title="Skip"
+                                                        @onclick="() => SkipItemAsync(item)"
+                                                        disabled="@_isBusy">
+                                                    <i class="bi bi-skip-forward text-lg"></i>
+                                                    <span class="text-xs uppercase tracking-wide">Skip</span>
+                                                </button>
+                                            }
+                                            <button type="button"
+                                                    class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                                                    title="Edit"
+                                                    @onclick="() => OpenEditItemModal(item)"
+                                                    disabled="@_isBusy">
+                                                <i class="bi bi-pencil text-lg"></i>
+                                                <span class="text-xs uppercase tracking-wide">Edit</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
                             }
                         </div>
+
+                        @* Completed items grid *@
+                        @if (showDone && doneItems.Any())
+                        {
+                            <div class="border-t border-gray-200 dark:border-gray-700">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
+                                    @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                                    {
+                                        <div @key="item.Id" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3 opacity-60">
+                                            <button type="button"
+                                                    class="h-9 w-9 shrink-0 rounded-lg border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white hover:border-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-400 transition-colors disabled:opacity-50"
+                                                    title="Re-open"
+                                                    @onclick="() => ReopenItemAsync(item)"
+                                                    disabled="@_isBusy">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="font-semibold text-sm text-gray-500 dark:text-gray-400 line-through">@item.Title</span>
+                                            </div>
+                                            <button type="button"
+                                                    class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                                                    title="Edit"
+                                                    @onclick="() => OpenEditItemModal(item)"
+                                                    disabled="@_isBusy">
+                                                <i class="bi bi-pencil text-lg"></i>
+                                                <span class="text-xs uppercase tracking-wide">Edit</span>
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @* Per-list error *@
+                        @if (_itemErrorPerList.TryGetValue(listId, out var itemErr) && !string.IsNullOrEmpty(itemErr))
+                        {
+                            <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+                                <div class="flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/20 px-3 py-2 text-xs text-red-700 dark:text-red-200">
+                                    <span class="flex-1">@itemErr</span>
+                                    <button type="button" class="shrink-0 font-medium underline hover:no-underline" @onclick="LoadDataAsync">Reload</button>
+                                </div>
+                            </div>
                         }
                     </div>
                 }
             </div>
         }
-        else
-        {
-            <div class="alert-success">
-                <i class="bi bi-check-circle"></i>
-                Great! All required tags have been filled for @FormatDate(selectedDate).
-            </div>
-        }
-
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="alert-danger mt-4">
-                <i class="bi bi-exclamation-triangle"></i>
-                @errorMessage
-            </div>
-        }
     </div>
 </div>
 
-<!-- Add Activity Modal -->
-@if (showAddActivityModal && allTags != null && newActivity != null)
+@* ── Quick-Complete Modal ── *@
+@if (_showQuickModal && _quickItem != null)
 {
-    <AddActivityModal Activity="newActivity"
-                      AvailableTags="allTags"
-                      OptionLists="optionLists"
-                      OptionListLookup="optionListLookup"
-                      DisplayCulture="displayCulture"
-                      DisplayTimeZone="displayTimeZone"
-                      ErrorMessage="@errorMessage"
-                      PreselectedTagId="preselectedTagId"
-                      PreselectedDate="selectedDate"
-                      OnActivityCreated="OnActivityCreated"
-                      OnCanceled="CloseAddActivityModal"
-                      OnError="OnError"
-                      ModalId="addActivityModal" />
+    <div class="fixed inset-0 z-[70] flex items-end justify-center bg-gray-900/70 p-4" @onclick="() => { if (!_isQuickBusy) { _showQuickModal = false; } }">
+        <div class="w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl" @onclick:stopPropagation="true">
+            <div class="px-6 pt-5 pb-1 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Complete Reminder</p>
+                <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">@_quickItem.Title</h3>
+            </div>
+            <div class="px-6 py-4 space-y-3">
+                @if (_quickInputTypeId == InputTypeIds.Boolean)
+                {
+                    <div class="flex gap-3">
+                        <button type="button"
+                                class="flex-1 min-h-[52px] rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200")"
+                                @onclick="() => _quickBoolValue = true">
+                            <i class="bi bi-check-lg me-1"></i>Yes
+                        </button>
+                        <button type="button"
+                                class="flex-1 min-h-[52px] rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == false ? "border-red-500 bg-red-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200")"
+                                @onclick="() => _quickBoolValue = false">
+                            <i class="bi bi-x-lg me-1"></i>No
+                        </button>
+                    </div>
+                }
+                else if (_quickInputTypeId == InputTypeIds.String)
+                {
+                    <textarea class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                              rows="3" placeholder="Enter value…"
+                              @bind="_quickStringValue"></textarea>
+                }
+                else if (_quickInputTypeId == InputTypeIds.Integer || _quickInputTypeId == InputTypeIds.Decimal || _quickInputTypeId == InputTypeIds.Percentage)
+                {
+                    @if (!_quickAllowUnfilled)
+                    {
+                        <input type="number" step="any"
+                               class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                               placeholder="Value"
+                               @bind="_quickDecimalValue" />
+                    }
+                    <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                        <input type="checkbox" class="rounded" @bind="_quickAllowUnfilled" />
+                        Leave unfilled
+                    </label>
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating10)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="10" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score10)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="10" />
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(_quickError))
+            {
+                <div class="mx-6 mb-3 rounded-lg border border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/20 px-4 py-2 text-sm text-red-700 dark:text-red-200">
+                    @_quickError
+                </div>
+            }
+            <div class="flex gap-3 border-t border-gray-200 dark:border-gray-700 px-6 py-4" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+                <button type="button"
+                        class="flex-1 min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="() => { _showQuickModal = false; _quickItem = null; }"
+                        disabled="@_isQuickBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="flex-1 min-h-[48px] rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        @onclick="SaveQuickAsync"
+                        disabled="@_isQuickBusy">
+                    @if (_isQuickBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Item Create/Edit Modal ── *@
+@if (_showItemModal)
+{
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
+        <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">@(_isEditingItem ? "Edit item" : "New item")</h3>
+            <button type="button" class="-mr-2 p-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300" @onclick="CloseItemModal" disabled="@_isBusy">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <EditForm EditContext="_itemEditContext">
+                <DataAnnotationsValidator />
+                <div class="space-y-5">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title <span class="text-red-500">*</span></label>
+                        <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                   @bind-Value="_itemForm.Title"
+                                   maxlength="500"
+                                   placeholder="What needs to be done?" />
+                        <ValidationMessage For="@(() => _itemForm.Title)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Select the tag</label>
+                        <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @bind="_itemForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
+                        {
+                            var selTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
+                            @if (selTag != null && !selTag.IsRepeatable && _itemForm.AutoLogMode != AutoLogMode.Add)
+                            {
+                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                    This tag is not repeatable — completing multiple items on the same day will replace the existing activity.
+                                </p>
+                            }
+                        }
+                    </div>
+                    @* Value input — only shown when a tag with a known input type is selected *@
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { } _editTag && _editTag.InputTypeId.HasValue)
+                    {
+                        var _editTagInputTypeId = _editTag.InputTypeId;
+                        <div>
+                            @if (_editTagInputTypeId == InputTypeIds.Boolean)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <div class="flex gap-3">
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                                            @onclick="() => _booleanBoolValue = _booleanBoolValue == true ? null : true">
+                                        <i class="bi bi-check-lg me-1"></i>Yes
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == false ? "border-red-500 bg-red-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-500/10")"
+                                            @onclick="() => { _booleanBoolValue = _booleanBoolValue == false ? (bool?)null : false; }">
+                                        <i class="bi bi-x-lg me-1"></i>No
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == null ? "border-primary-500 bg-primary-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700")"
+                                            @onclick="() => _booleanBoolValue = null">
+                                        Not specified
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected answer when completing this reminder.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Integer || _editTagInputTypeId == InputTypeIds.Decimal || _editTagInputTypeId == InputTypeIds.Percentage)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Pre-filled number (optional)" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-filled when completing this reminder. Can be changed at completion time.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.String)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Pre-filled text (optional)" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-filled when completing this reminder. Can be changed at completion time.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.StarRating)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="5" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected rating. Can be changed at completion time.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.StarRating10)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="10" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected rating. Can be changed at completion time.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Score)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="5" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected score. Can be changed at completion time.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Score10)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="10" />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected score. Can be changed at completion time.</p>
+                            }
+                        </div>
+                    }
+                    @* Auto-log mode — only for non-repeatable tags *@
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value)?.IsRepeatable == false)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
+                            <InputSelect @bind-Value="_itemForm.AutoLogMode" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
+                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
+                            </InputSelect>
+                        </div>
+                    }
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Remind me at</label>
+                        <input type="time"
+                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                               value="@(_itemForm.NotifyAt?.ToString("HH:mm") ?? "")"
+                               @onchange="e => _itemForm.NotifyAt = ParseTimeOnly(e.Value?.ToString())" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Recurrence</label>
+                        <InputSelect @bind-Value="_itemForm.RecurrenceType" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="@RecurrenceType.None">None (one-time)</option>
+                            <option value="@RecurrenceType.Daily">Daily</option>
+                            <option value="@RecurrenceType.Weekly">Weekly</option>
+                        </InputSelect>
+                    </div>
+                    @if (_itemForm.RecurrenceType != RecurrenceType.None && _itemForm.CompletionTagId.HasValue)
+                    {
+                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Activity monitoring window</p>
+                            <div class="flex items-center gap-6">
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@_monitorUseDaysBack"
+                                           @onchange="() => { _monitorUseDaysBack = true; _itemForm.MonitorFromDate = null; _itemForm.MonitorToDate = null; }" />
+                                    Last N days
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@(!_monitorUseDaysBack)"
+                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; _itemForm.MonitorFromDate = DateOnly.FromDateTime(DateTime.Today); }" />
+                                    Date range
+                                </label>
+                            </div>
+                            @if (_monitorUseDaysBack)
+                            {
+                                <div>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Days back from today (0 = today only)</label>
+                                    <InputNumber @bind-Value="_itemForm.MonitorDaysBack"
+                                                 class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                 min="0" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">From</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorFromDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorFromDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">To</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorToDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorToDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </EditForm>
+        </div>
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
+            @if (!string.IsNullOrEmpty(_itemModalError))
+            {
+                <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
+                    @_itemModalError
+                </div>
+            }
+            <div class="flex items-center justify-end gap-3">
+                @if (_isEditingItem)
+                {
+                    <button type="button"
+                            class="min-h-[48px] rounded-xl border border-red-200 dark:border-red-500/40 bg-white dark:bg-gray-800 px-5 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
+                            @onclick="DeleteEditingItemAsync" disabled="@_isBusy">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                }
+                <button type="button"
+                        class="min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="CloseItemModal" disabled="@_isBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        @onclick="SubmitItemFormAsync" disabled="@_isBusy">
+                    @if (_isBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    @(_isEditingItem ? "Save changes" : "Add item")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── List Edit Modal ── *@
+@if (_showListModal)
+{
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
+        <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Edit list</h3>
+            <button type="button" class="-mr-2 p-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300" @onclick="CloseListModal" disabled="@_isBusy">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <EditForm EditContext="_listEditContext">
+                <DataAnnotationsValidator />
+                <div class="space-y-5">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span class="text-red-500">*</span></label>
+                        <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                   @bind-Value="_listForm.Name"
+                                   maxlength="200"
+                                   placeholder="List name" />
+                        <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="chk-show-hp" class="h-5 w-5 rounded border-gray-300 text-primary-600 dark:border-gray-600 cursor-pointer"
+                               checked="@_listForm.ShowOnHomepage"
+                               @onchange="e => _listForm.ShowOnHomepage = (bool)(e.Value ?? false)" />
+                        <label for="chk-show-hp" class="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">Show on homepage</label>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
+            @if (!string.IsNullOrEmpty(_listError))
+            {
+                <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
+                    @_listError
+                </div>
+            }
+            <div class="flex items-center justify-end gap-3">
+                <button type="button"
+                        class="min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="CloseListModal" disabled="@_isBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        @onclick="SubmitListFormAsync" disabled="@_isBusy">
+                    @if (_isBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    Save changes
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Delete list confirmation ── *@
+@if (_pendingDeleteList != null)
+{
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
+        <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Delete list</h3>
+            <button type="button" class="-mr-2 p-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                    @onclick="() => _pendingDeleteList = null" disabled="@_isBusy">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <p class="text-base text-gray-700 dark:text-gray-300">
+                Delete <strong>@_pendingDeleteList.Name</strong> and all its items? This cannot be undone.
+            </p>
+        </div>
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
+            <div class="flex items-center justify-end gap-3">
+                <button type="button"
+                        class="min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="() => _pendingDeleteList = null" disabled="@_isBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        @onclick="DeleteListConfirmedAsync" disabled="@_isBusy">
+                    @if (_isBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
-    [SupplyParameterFromQuery(Name = "tagId")] [Parameter] public int? QueryTagId { get; set; }
-    [SupplyParameterFromQuery(Name = "date")] [Parameter] public string? QueryDate { get; set; }
+    // ── State ────────────────────────────────────────────────────────────────
+    private List<TodoListResponse>? _lists;
+    private IList<TagResponse>? _allTags;
+    private DateTime _selectedDate = DateTime.Today;
+    private string? _loadError;
+    private bool _isBusy;
 
-    private List<TagResponse>? unfilledRequiredTags;
-    private IList<TagResponse>? allTags;
-    private IList<TagOptionListResponse>? optionLists;
-    private Dictionary<int, TagOptionListResponse>? optionListLookup;
-    private DateTime selectedDate = DateTime.Today;
-    private bool isLoading = true;
-    private string? errorMessage;
-    private ActivityRequest newActivity = new();
-    private int? preselectedTagId;
-    private bool showAddActivityModal = false;
-    private bool shouldShowModalAfterRender = false;
-    private readonly HashSet<int> quickAddInProgress = new();
-    private readonly HashSet<int> _dismissingTagIds = new();
-    private readonly Dictionary<int, int> _inlinePickerValues = new();
-    private readonly Dictionary<int, bool> _boolPickerValues = new();
-    private readonly Dictionary<int, ActivityResponse?> existingActivities = new();
+    private readonly HashSet<int> _showDonePerList = new();
+    private readonly Dictionary<int, string?> _itemErrorPerList = new();
 
-    // User preferences and localization
-    private UserPreferencesSnapshot? userPreferences;
-    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
-    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    // Item modal
+    private bool _showItemModal;
+    private bool _isEditingItem;
+    private int _editingItemId;
+    private int _itemModalListId;
+    private TodoItemRequest _itemForm = new() { Title = string.Empty };
+    private EditContext _itemEditContext = default!;
+    private string? _itemModalError;
+    private bool? _booleanBoolValue;
+    private int? _editIntValue;
+    private bool _monitorUseDaysBack;
 
+    // Quick-complete modal
+    private bool _showQuickModal;
+    private TodoItemResponse? _quickItem;
+    private int? _quickInputTypeId;
+    private bool? _quickBoolValue;
+    private string? _quickStringValue;
+    private decimal? _quickDecimalValue;
+    private int? _quickIntValue;
+    private bool _quickAllowUnfilled;
+    private bool _isQuickBusy;
+    private string? _quickError;
+
+    // List modal
+    private bool _showListModal;
+    private int _editingListId;
+    private TodoListRequest _listForm = new() { Name = string.Empty };
+    private EditContext _listEditContext = default!;
+    private string? _listError;
+
+    // Delete list
+    private TodoListResponse? _pendingDeleteList;
+
+    // Auto-refresh
+    private System.Threading.Timer? _refreshTimer;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Reminders");
-        userPreferences = await UserPreferencesService.GetAsync();
-        displayCulture = userPreferences.Culture;
-        displayTimeZone = userPreferences.TimeZone;
+        _itemEditContext = new EditContext(_itemForm);
+        _listEditContext = new EditContext(_listForm);
+        await LoadDataAsync();
+        _refreshTimer = new System.Threading.Timer(
+            _ => InvokeAsync(async () => { await LoadDataAsync(); StateHasChanged(); }),
+            null,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(30));
+    }
 
-        var today = GetTodayInDisplayZone();
+    public void Dispose() => _refreshTimer?.Dispose();
 
-        if (!string.IsNullOrWhiteSpace(QueryDate) && DateOnly.TryParse(QueryDate, out var parsedDate))
+    // ── Data ──────────────────────────────────────────────────────────────────
+    private async Task LoadDataAsync()
+    {
+        _loadError = null;
+        try
         {
-            selectedDate = parsedDate.ToDateTime(TimeOnly.MinValue);
+            var dateParam = _selectedDate.ToString("yyyy-MM-dd");
+            var all = await TodoApi.GetTodoLists(dateParam);
+            _lists = all.Where(l => l.ListType == TodoListType.Reminder).ToList();
+            if (_allTags == null)
+            {
+                _allTags = await ActivityApi.GetTags();
+            }
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to load reminder todo lists");
+            _loadError = "Failed to load reminders. Tap reload to try again.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load reminder todo lists");
+            _loadError = "Failed to load reminders. Tap reload to try again.";
+        }
+    }
+
+    // ── Date navigation ───────────────────────────────────────────────────────
+    private async Task PreviousDay() { _selectedDate = _selectedDate.AddDays(-1); await LoadDataAsync(); }
+    private async Task NextDay()     { _selectedDate = _selectedDate.AddDays(1);  await LoadDataAsync(); }
+    private async Task OnDatePickerValueChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue) { _selectedDate = newDate.Value; await LoadDataAsync(); }
+    }
+
+    // ── Toggle show-done ──────────────────────────────────────────────────────
+    private void ToggleShowDone(int listId)
+    {
+        if (!_showDonePerList.Remove(listId))
+        {
+            _showDonePerList.Add(listId);
+        }
+    }
+
+    // ── Monitoring window filter ───────────────────────────────────────────────
+    private static bool IsOutsideMonitoringWindow(TodoItemResponse item, DateTime effectiveDate)
+    {
+        if (item.MonitorFromDate.HasValue && effectiveDate.Date < item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue).Date) return true;
+        if (item.MonitorToDate.HasValue   && effectiveDate.Date > item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).Date)   return true;
+        if (item.MonitorDaysBack.HasValue)
+        {
+            var windowStart = effectiveDate.AddDays(-item.MonitorDaysBack.Value).Date;
+            if (effectiveDate.Date < windowStart) return true;
+        }
+
+        return false;
+    }
+
+    // ── Complete / Reopen / Skip ───────────────────────────────────────────────
+    private async Task CompleteItemAsync(TodoItemResponse item, TodoListResponse list)
+    {
+        if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
+        {
+            var effectiveInputTypeId = item.CompletionTagInputTypeId
+                ?? _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId)?.InputTypeId;
+
+            if (IsQuickCompleteInputType(effectiveInputTypeId))
+            {
+                if (HasValidPrefilledValue(item, effectiveInputTypeId))
+                {
+                    try
+                    {
+                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        UpdateItemInList(updated);
+                    }
+                    catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
+                        _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+                        await LoadDataAsync();
+                    }
+                    catch (ApiException ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
+                        _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+                    }
+
+                    return;
+                }
+
+                OpenQuickCompleteModal(item, effectiveInputTypeId);
+
+                return;
+            }
+
+            // Unrecognized type: fall back to full edit modal
+            OpenEditItemModal(item);
+
+            return;
+        }
+
+        try
+        {
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            UpdateItemInList(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
+            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
+            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+        }
+    }
+
+    private async Task ReopenItemAsync(TodoItemResponse item)
+    {
+        try
+        {
+            var updated = await TodoApi.ReopenItem(item.Id);
+            UpdateItemInList(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Logger.LogWarning(ex, "Todo item {ItemId} not found when reopening", item.Id);
+            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to reopen todo item {ItemId}", item.Id);
+            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+        }
+    }
+
+    private async Task SkipItemAsync(TodoItemResponse item)
+    {
+        try
+        {
+            var updated = await TodoApi.SkipItem(item.Id, _selectedDate.ToString("yyyy-MM-dd"));
+            UpdateItemInList(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Logger.LogWarning(ex, "Todo item {ItemId} not found when skipping", item.Id);
+            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to skip todo item {ItemId}", item.Id);
+            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+        }
+    }
+
+    private void UpdateItemInList(TodoItemResponse updated)
+    {
+        var list = _lists?.FirstOrDefault(l => l.Id == updated.ListId);
+        if (list == null) return;
+
+        for (var i = 0; i < list.Items.Count; i++)
+        {
+            if (list.Items[i].Id == updated.Id)
+            {
+                list.Items[i] = updated;
+
+                return;
+            }
+        }
+    }
+
+    // ── Quick-complete modal ───────────────────────────────────────────────────
+    private void OpenQuickCompleteModal(TodoItemResponse item, int? inputTypeId)
+    {
+        _quickItem = item;
+        _quickInputTypeId = inputTypeId;
+        _quickBoolValue = null;
+        _quickStringValue = null;
+        _quickDecimalValue = null;
+        _quickIntValue = null;
+        _quickAllowUnfilled = false;
+        _quickError = null;
+
+        switch (inputTypeId)
+        {
+            case InputTypeIds.Boolean:
+                _quickBoolValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+                break;
+            case InputTypeIds.String:
+                _quickStringValue = item.Notes;
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (!string.IsNullOrWhiteSpace(item.Notes) &&
+                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+                {
+                    _quickDecimalValue = d;
+                }
+                else
+                {
+                    var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+                    if (!string.IsNullOrWhiteSpace(tag?.DefaultValue) &&
+                        decimal.TryParse(tag.DefaultValue, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var defVal))
+                    {
+                        _quickDecimalValue = defVal;
+                    }
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                if (!string.IsNullOrWhiteSpace(item.Notes) && int.TryParse(item.Notes, out var iv))
+                {
+                    _quickIntValue = iv;
+                }
+                break;
+        }
+
+        _showQuickModal = true;
+    }
+
+    private async Task SaveQuickAsync()
+    {
+        if (_quickItem == null) return;
+
+        string? notes;
+        switch (_quickInputTypeId)
+        {
+            case InputTypeIds.Boolean:
+                if (!_quickBoolValue.HasValue) { _quickError = "Please select Yes or No."; return; }
+                notes = _quickBoolValue.Value ? "true" : "false";
+                break;
+            case InputTypeIds.String:
+                notes = string.IsNullOrWhiteSpace(_quickStringValue) ? null : _quickStringValue.Trim();
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (_quickAllowUnfilled)
+                {
+                    notes = null;
+                }
+                else if (!_quickDecimalValue.HasValue)
+                {
+                    _quickError = "Please enter a value.";
+                    return;
+                }
+                else
+                {
+                    notes = _quickDecimalValue.Value.ToString("0.#############################", CultureInfo.InvariantCulture);
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                notes = _quickIntValue?.ToString(CultureInfo.InvariantCulture);
+                break;
+            default:
+                notes = null;
+                break;
+        }
+
+        _isQuickBusy = true;
+        _quickError = null;
+        try
+        {
+            var req = new TodoItemRequest
+            {
+                ListId = _quickItem.ListId,
+                Title = _quickItem.Title,
+                Notes = notes,
+                StartDate = _quickItem.StartDate,
+                DueDate = _quickItem.DueDate,
+                NotifyAt = _quickItem.NotifyAt,
+                DisplayOrder = _quickItem.DisplayOrder,
+                RecurrenceType = _quickItem.RecurrenceType,
+                AutoLogMode = _quickItem.AutoLogMode,
+                MonitorDaysBack = _quickItem.MonitorDaysBack,
+                MonitorFromDate = _quickItem.MonitorFromDate,
+                MonitorToDate = _quickItem.MonitorToDate,
+                CompletionTagId = _quickItem.CompletionTagId
+            };
+            await TodoApi.UpdateTodoItem(_quickItem.Id, req);
+            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            _showQuickModal = false;
+            _quickItem = null;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete todo item via quick modal");
+            _quickError = "Failed to save. Please try again.";
+        }
+        finally
+        {
+            _isQuickBusy = false;
+        }
+    }
+
+    // ── Item create/edit modal ─────────────────────────────────────────────────
+    private void OpenAddItemModal(int listId)
+    {
+        _isEditingItem = false;
+        _editingItemId = 0;
+        _itemModalListId = listId;
+        _itemForm = new TodoItemRequest
+        {
+            Title = string.Empty,
+            ListId = listId,
+            RecurrenceType = RecurrenceType.None
+        };
+        _itemEditContext = new EditContext(_itemForm);
+        _booleanBoolValue = null;
+        _editIntValue = null;
+        _monitorUseDaysBack = true;
+        _itemModalError = null;
+        _showItemModal = true;
+    }
+
+    private void OpenEditItemModal(TodoItemResponse item)
+    {
+        _isEditingItem = true;
+        _editingItemId = item.Id;
+        _itemModalListId = item.ListId;
+        _itemForm = new TodoItemRequest
+        {
+            ListId = item.ListId,
+            Title = item.Title,
+            Notes = item.Notes,
+            StartDate = item.StartDate,
+            DueDate = item.DueDate,
+            NotifyAt = item.NotifyAt,
+            DisplayOrder = item.DisplayOrder,
+            RecurrenceType = item.RecurrenceType,
+            AutoLogMode = item.AutoLogMode,
+            MonitorDaysBack = item.MonitorDaysBack,
+            MonitorFromDate = item.MonitorFromDate,
+            MonitorToDate = item.MonitorToDate,
+            CompletionTagId = item.CompletionTagId
+        };
+        _itemEditContext = new EditContext(_itemForm);
+
+        // Restore boolean / int for boolean/score tags
+        var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+        if (IsBooleanInputType(tag?.InputTypeId))
+        {
+            _booleanBoolValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+            _itemForm.Notes = null; // controlled by _booleanBoolValue
+        }
+        else if (tag?.InputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10)
+        {
+            _editIntValue = int.TryParse(item.Notes, out var v) ? v : null;
+            _itemForm.Notes = null;
         }
         else
         {
-            selectedDate = today;
+            _booleanBoolValue = null;
+            _editIntValue = null;
         }
 
-        newActivity = new ActivityRequest
-        {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date
-        };
-
-        await LoadRequiredTags();
+        _monitorUseDaysBack = item.MonitorDaysBack.HasValue || (!item.MonitorFromDate.HasValue && !item.MonitorToDate.HasValue);
+        _itemModalError = null;
+        _showItemModal = true;
     }
 
-    private DateTime GetCurrentDateTimeInDisplayZone()
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
-
-    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
-
-    private async Task LoadRequiredTags()
+    private void CloseItemModal()
     {
+        _showItemModal = false;
+        _itemModalError = null;
+        _booleanBoolValue = null;
+        _editIntValue = null;
+    }
+
+    private async Task SubmitItemFormAsync()
+    {
+        if (!_itemEditContext.Validate()) return;
+        await SaveItemAsync();
+    }
+
+    private async Task SaveItemAsync()
+    {
+        _isBusy = true;
+        _itemModalError = null;
         try
         {
-            isLoading = true;
-            errorMessage = null;
-            StateHasChanged();
+            var tag = _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId);
+            var isBooleanType = IsBooleanInputType(tag?.InputTypeId);
+            var isStarScoreType = tag?.InputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10;
 
-            // Load both unfilled required tags and all tags for the modal
-            var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
-            var allTagsTask = SharedDataCache.GetTagsAsync();
-            var optionListsTask = SharedDataCache.GetOptionListsAsync();
-
-            await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
-
-            unfilledRequiredTags = await unfilledTask;
-            allTags = await allTagsTask;
-            optionLists = await optionListsTask;
-
-            if (optionLists is not null)
+            if (isBooleanType)
             {
-                optionListLookup = optionLists.ToDictionary(list => list.Id);
+                _itemForm.Notes = _booleanBoolValue.HasValue ? (_booleanBoolValue.Value ? "true" : "false") : null;
+            }
+            else if (isStarScoreType)
+            {
+                _itemForm.Notes = _editIntValue?.ToString(CultureInfo.InvariantCulture);
             }
 
-            existingActivities.Clear();
-            if (unfilledRequiredTags?.Count > 0)
+            if (_isEditingItem)
             {
-                // Only fetch existing activities for multi-day granularities (weekly/monthly/yearly).
-                // Daily/Exact/Hourly tags were confirmed unfilled by the server so their fetches would always return empty.
-                var tagsNeedingFetch = unfilledRequiredTags
-                    .Where(t => t.TimeGranularity is Domain.Enums.TimeGranularity.Weekly
-                                                  or Domain.Enums.TimeGranularity.Monthly
-                                                  or Domain.Enums.TimeGranularity.Yearly)
-                    .ToList();
+                await TodoApi.UpdateTodoItem(_editingItemId, _itemForm);
 
-                if (tagsNeedingFetch.Count > 0)
+                if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    var activityFetchTasks = tagsNeedingFetch.Select(t =>
-                    {
-                        var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
-                        return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
-                    });
-                    var activityResults = await Task.WhenAll(activityFetchTasks);
-                    for (var i = 0; i < tagsNeedingFetch.Count; i++)
-                    {
-                        existingActivities[tagsNeedingFetch[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
-                    }
+                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                }
+            }
+            else
+            {
+                var created = await TodoApi.CreateTodoItem(_itemForm);
+
+                if (isBooleanType && _booleanBoolValue.HasValue)
+                {
+                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
                 }
             }
 
-            // Update new activity with the selected date
-            var today = GetTodayInDisplayZone();
-            newActivity.DateStarted = selectedDate.Date == today ? GetCurrentDateTimeInDisplayZone() : selectedDate.Date;
+            _showItemModal = false;
+            _booleanBoolValue = null;
+            _editIntValue = null;
+            await LoadDataAsync();
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        catch (ApiException ex)
         {
-            // Authentication expired (e.g., password changed)
-            // DynamicAuthHandler will trigger automatic logout and redirect
-            errorMessage = "Your session has expired. Redirecting to login...";
-            unfilledRequiredTags = new List<TagResponse>();
-            allTags = new List<TagResponse>();
-            optionLists = new List<TagOptionListResponse>();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error loading reminders: {ex.Message}";
-            unfilledRequiredTags = new List<TagResponse>();
-            allTags = new List<TagResponse>();
-            optionLists = new List<TagOptionListResponse>();
+            Logger.LogWarning(ex, "Failed to save todo item");
+            _itemModalError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest && !string.IsNullOrWhiteSpace(ex.Content)
+                ? ex.Content.Trim('"')
+                : "Failed to save. Please try again.";
         }
         finally
         {
-            isLoading = false;
-            StateHasChanged();
+            _isBusy = false;
         }
     }
 
-    private async Task RefreshReminders()
+    private async Task DeleteEditingItemAsync()
     {
-        await LoadRequiredTags();
-    }
-
-    private void NavigateToAddActivity(int tagId)
-    {
-        Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
-    }
-
-    private void PrepareModalForTag(int tagId)
-    {
-        preselectedTagId = tagId;
-        var today = GetTodayInDisplayZone();
-        newActivity = new ActivityRequest
+        if (!_isEditingItem) return;
+        _isBusy = true;
+        try
         {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date,
-            PrimaryTagId = tagId
+            await TodoApi.DeleteTodoItem(_editingItemId);
+            _showItemModal = false;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to delete todo item {ItemId}", _editingItemId);
+            _itemModalError = "Failed to delete. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    // ── List edit modal ────────────────────────────────────────────────────────
+    private void OpenEditListModal(TodoListResponse list)
+    {
+        _editingListId = list.Id;
+        _listForm = new TodoListRequest
+        {
+            Name = list.Name,
+            ListType = TodoListType.Reminder,
+            ShowOnHomepage = list.ShowOnHomepage
         };
-        showAddActivityModal = true;
-        shouldShowModalAfterRender = true;
+        _listEditContext = new EditContext(_listForm);
+        _listError = null;
+        _showListModal = true;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private void CloseListModal()
     {
-        if (shouldShowModalAfterRender && showAddActivityModal)
-        {
-            shouldShowModalAfterRender = false;
-            try
-            {
-                await Task.Delay(50); // Small delay to ensure DOM is ready
-                await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
-            }
-            catch (Exception ex)
-            {
-                // Log but don't throw - modal might still work via Blazor rendering
-                Console.WriteLine($"Error showing modal via JS: {ex.Message}");
-            }
-        }
+        _showListModal = false;
+        _listError = null;
     }
 
-    private async Task CloseAddActivityModal()
+    private async Task SubmitListFormAsync()
     {
-        // Hide modal via JavaScript first
+        if (!_listEditContext.Validate()) return;
+        await SaveListAsync();
+    }
+
+    private async Task SaveListAsync()
+    {
+        _isBusy = true;
+        _listError = null;
         try
         {
-            await JSRuntime.InvokeVoidAsync("hideModal", "addActivityModal");
+            await TodoApi.UpdateTodoList(_editingListId, _listForm);
+            _showListModal = false;
+            await LoadDataAsync();
         }
-        catch (Exception ex)
+        catch (ApiException ex)
         {
-            Console.WriteLine($"Error hiding modal via JS: {ex.Message}");
-        }
-
-        showAddActivityModal = false;
-        preselectedTagId = null;
-        errorMessage = null;
-    }
-
-    private async Task OnActivityCreated(ActivityRequest activity)
-    {
-        showAddActivityModal = false;
-
-        if (activity?.PrimaryTagId.HasValue == true)
-        {
-            SystemNotificationService.MarkTagFulfilled(activity.PrimaryTagId.Value, DateOnly.FromDateTime(selectedDate));
-            _dismissingTagIds.Add(activity.PrimaryTagId.Value);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != activity.PrimaryTagId.Value).ToList();
-            _dismissingTagIds.Remove(activity.PrimaryTagId.Value);
-        }
-
-        // Reset the form but keep the date
-        var today = GetTodayInDisplayZone();
-        newActivity = new ActivityRequest
-        {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date
-        };
-        preselectedTagId = null;
-        errorMessage = null;
-    }
-
-    private async Task OnDatePickerValueChanged(DateTime? newDate)
-    {
-        if (newDate.HasValue)
-        {
-            selectedDate = newDate.Value;
-            await LoadRequiredTags();
-        }
-    }
-
-    private async Task OnError(string error)
-    {
-        errorMessage = error;
-        await Task.CompletedTask;
-    }
-
-    private async Task PreviousDay()
-    {
-        selectedDate = selectedDate.AddDays(-1);
-        await LoadRequiredTags();
-    }
-
-    private async Task NextDay()
-    {
-        selectedDate = selectedDate.AddDays(1);
-        await LoadRequiredTags();
-    }
-
-    private string FormatDate(DateTime date)
-    {
-        var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
-        return date.ToString(pattern, displayCulture);
-    }
-
-    private bool HasDefaultValue(TagResponse tag)
-        => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
-
-    private bool IsQuickAddDisabled(TagResponse tag)
-        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
-
-    private bool IsQuickAddInProgress(int tagId)
-        => quickAddInProgress.Contains(tagId);
-
-    private string GetQuickAddButtonClasses(TagResponse tag)
-    {
-        var baseClasses = "px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-1";
-
-        if (IsQuickAddDisabled(tag))
-        {
-            return $"{baseClasses} bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50";
-        }
-
-        return $"{baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800";
-    }
-
-    private string? GetDefaultValueLabel(TagResponse tag)
-    {
-        var value = ResolveDefaultValue(tag);
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (tag.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
-        {
-            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
-            if (option is not null)
-            {
-                return option.DisplayName ?? option.Value;
-            }
-        }
-
-        return value;
-    }
-
-    private string? ResolveDefaultValue(TagResponse tag)
-    {
-        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
-        {
-            return tag.DefaultValue;
-        }
-
-        return null;
-    }
-
-    private async Task QuickAddBoolAsync(TagResponse tag, bool value)
-    {
-        _boolPickerValues[tag.Id] = value;
-
-        if (!quickAddInProgress.Add(tag.Id))
-        {
-            return;
-        }
-
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
-
-        try
-        {
-            var existing = GetExistingActivity(tag.Id);
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = value ? "true" : "false",
-                DateStarted = startDate
-            };
-
-            if (existing != null)
-            {
-                await ActivityApi.UpdateCalendarItem(existing.Id, request);
-            }
-            else
-            {
-                await ActivityApi.CreateCalendarItem(request);
-            }
-
-            StateHasChanged();
-            await Task.Delay(300);
-            _boolPickerValues.Remove(tag.Id);
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            _boolPickerValues.Remove(tag.Id);
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            _boolPickerValues.Remove(tag.Id);
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "The activity could not be created.";
-        }
-        catch (Exception ex)
-        {
-            _boolPickerValues.Remove(tag.Id);
-            errorMessage = $"Error adding activity: {ex.Message}";
+            Logger.LogWarning(ex, "Failed to save todo list");
+            _listError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest && !string.IsNullOrWhiteSpace(ex.Content)
+                ? ex.Content.Trim('"')
+                : "Failed to save. Please try again.";
         }
         finally
         {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
+            _isBusy = false;
         }
     }
 
-    private async Task QuickAddDefaultAsync(TagResponse tag)
+    // ── Delete list ───────────────────────────────────────────────────────────
+    private void ConfirmDeleteList(TodoListResponse list) => _pendingDeleteList = list;
+
+    private async Task DeleteListConfirmedAsync()
     {
-        var defaultValue = ResolveDefaultValue(tag);
-        if (string.IsNullOrWhiteSpace(defaultValue))
-        {
-            errorMessage = "No default value is configured for this tag.";
-            return;
-        }
-
-        if (!quickAddInProgress.Add(tag.Id))
-        {
-            return;
-        }
-
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
-
+        if (_pendingDeleteList == null) return;
+        _isBusy = true;
         try
         {
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = defaultValue,
-                DateStarted = startDate
-            };
-
-            await ActivityApi.CreateCalendarItem(request);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
+            await TodoApi.DeleteTodoList(_pendingDeleteList.Id);
+            _pendingDeleteList = null;
+            await LoadDataAsync();
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        catch (ApiException ex)
         {
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details)
-                ? details
-                : "The activity could not be created with the default value.";
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error adding default activity: {ex.Message}";
+            Logger.LogWarning(ex, "Failed to delete todo list {ListId}", _pendingDeleteList?.Id);
+            _pendingDeleteList = null;
+            _loadError = "Failed to delete list. Please try again.";
         }
         finally
         {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
+            _isBusy = false;
         }
     }
 
-    private int GetStarPickerValue(int tagId) =>
-        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : 0;
+    // ── Static helpers ────────────────────────────────────────────────────────
+    private static bool IsQuickCompleteInputType(int? id) => id is
+        InputTypeIds.Boolean or InputTypeIds.String or
+        InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage or
+        InputTypeIds.StarRating or InputTypeIds.StarRating10 or
+        InputTypeIds.Score or InputTypeIds.Score10;
 
-    private int? GetScorePickerValue(int tagId) =>
-        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
-
-    private bool? GetBoolPickerValue(int tagId)
+    private static bool HasValidPrefilledValue(TodoItemResponse item, int? inputTypeId)
     {
-        if (_boolPickerValues.TryGetValue(tagId, out var v))
+        if (string.IsNullOrWhiteSpace(item.Notes)) return false;
+
+        return inputTypeId switch
         {
-            return v;
-        }
-
-        var existing = GetExistingActivity(tagId);
-
-        return existing != null ? BooleanDisplay.Parse(existing.PrimaryTagValue ?? existing.Description) : null;
-    }
-
-    private ActivityResponse? GetExistingActivity(int tagId)
-        => existingActivities.TryGetValue(tagId, out var act) ? act : null;
-
-    private static (DateTime start, DateTime end) GetGranularityDateRange(TagResponse tag, DateTime date)
-    {
-        var dayStart = date.Date;
-
-        return tag.TimeGranularity switch
-        {
-            Domain.Enums.TimeGranularity.Weekly =>
-                (GetStartOfWeek(dayStart), GetStartOfWeek(dayStart).AddDays(7).AddTicks(-1)),
-            Domain.Enums.TimeGranularity.Monthly =>
-                (new DateTime(dayStart.Year, dayStart.Month, 1), new DateTime(dayStart.Year, dayStart.Month, 1).AddMonths(1).AddTicks(-1)),
-            Domain.Enums.TimeGranularity.Yearly =>
-                (new DateTime(dayStart.Year, 1, 1), new DateTime(dayStart.Year + 1, 1, 1).AddTicks(-1)),
-            _ => (dayStart, dayStart.AddDays(1).AddTicks(-1))
+            InputTypeIds.Boolean => item.Notes is "true" or "false",
+            InputTypeIds.String => true,
+            InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
+                decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out _),
+            InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
+                int.TryParse(item.Notes, out var v) && v > 0,
+            _ => false
         };
     }
 
-    private static DateTime GetStartOfWeek(DateTime date)
-    {
-        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+    private static bool IsBooleanInputType(int? inputTypeId) => inputTypeId == InputTypeIds.Boolean;
 
-        return date.AddDays(-diff);
-    }
+    private static DateTime? ParseDateTime(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : DateTime.TryParse(value, out var d) ? d : null;
 
-    private async Task QuickAddWithValueAsync(TagResponse tag, int value)
-    {
-        _inlinePickerValues[tag.Id] = value;
+    private static DateOnly? ParseDateOnly(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : DateOnly.TryParse(value, out var d) ? d : null;
 
-        if (!quickAddInProgress.Add(tag.Id))
-        {
-            return;
-        }
-
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
-
-        try
-        {
-            var existing = GetExistingActivity(tag.Id);
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = value.ToString(),
-                DateStarted = startDate
-            };
-
-            if (existing != null)
-            {
-                await ActivityApi.UpdateCalendarItem(existing.Id, request);
-            }
-            else
-            {
-                await ActivityApi.CreateCalendarItem(request);
-            }
-
-            StateHasChanged();
-            await Task.Delay(300);
-            _inlinePickerValues.Remove(tag.Id);
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details)
-                ? details
-                : "The activity could not be created.";
-        }
-        catch (Exception ex)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            errorMessage = $"Error adding activity: {ex.Message}";
-        }
-        finally
-        {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
-        }
-    }
+    private static TimeOnly? ParseTimeOnly(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : TimeOnly.TryParse(value, out var t) ? t : null;
 }
+
