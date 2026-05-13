@@ -138,28 +138,6 @@ public class TodoItemService : ITodoItemService
                     await LogActivityAsync(item, request.DoneAt, userId);
                 }
             }
-            else if (item.List.ListType == TodoListType.Reminder)
-            {
-                // Reminder items: upsert today's activity so non-repeatable tags are never blocked
-                var todayUtc = request.DoneAt.Date;
-                var existing = await _context.Activities
-                    .FirstOrDefaultAsync(a =>
-                        a.TagId == item.CompletionTagId.Value &&
-                        a.UserId == userId &&
-                        a.DateStarted >= todayUtc &&
-                        a.DateStarted < todayUtc.AddDays(1));
-
-                if (existing != null)
-                {
-                    existing.DateStarted = request.DoneAt;
-                    existing.Description = item.Notes;
-                    _logger.LogInformation("Updated activity {ActivityId} for tag {TagId} on Reminder item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
-                }
-                else
-                {
-                    await LogActivityAsync(item, request.DoneAt, userId);
-                }
-            }
             else
             {
                 await LogActivityAsync(item, request.DoneAt, userId);

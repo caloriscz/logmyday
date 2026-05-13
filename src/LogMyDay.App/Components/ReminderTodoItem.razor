@@ -1,14 +1,26 @@
 @using LogMyDay.Domain.Enums
 
-<div @key="Item.Id" class="rounded-xl border @(IsOverdue ? "border-rose-500/60 dark:border-rose-500/40" : "border-gray-200 dark:border-slate-700") bg-gray-50 dark:bg-slate-800 p-4 flex items-center gap-4 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700/70">
-    @* Square complete button *@
-    <button type="button"
-            class="h-8 w-8 shrink-0 rounded-lg border-2 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-center justify-center text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors focus:outline-hidden disabled:opacity-50"
-            title="Complete"
-            @onclick="() => OnComplete.InvokeAsync(Item)"
-            disabled="@IsBusy">
-        <Icon Name="check" Class="h-4 w-4" />
-    </button>
+<div @key="Item.Id" class="rounded-xl border @(IsOverdue ? "border-rose-500/60 dark:border-rose-500/40" : "border-gray-200 dark:border-slate-700") bg-gray-50 dark:bg-slate-800 p-4 flex items-center gap-4 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700/70 @(IsCompleted ? "opacity-60" : "")">    @* Square complete / reopen button *@
+    @if (IsCompleted)
+    {
+        <button type="button"
+                class="h-8 w-8 shrink-0 rounded-lg border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white hover:border-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-400 transition-colors focus:outline-hidden disabled:opacity-50"
+                title="Re-open"
+                @onclick="() => OnReopen.InvokeAsync(Item)"
+                disabled="@IsBusy">
+            <Icon Name="check" Class="h-4 w-4" />
+        </button>
+    }
+    else
+    {
+        <button type="button"
+                class="h-8 w-8 shrink-0 rounded-lg border-2 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-center justify-center text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors focus:outline-hidden disabled:opacity-50"
+                title="Complete"
+                @onclick="() => OnComplete.InvokeAsync(Item)"
+                disabled="@IsBusy">
+            <Icon Name="check" Class="h-4 w-4" />
+        </button>
+    }
     @* Content *@
     <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
@@ -29,9 +41,9 @@
             </div>
         }
     </div>
-    @* Actions — no delete; icon + label per mockup *@
+    @* Actions *@
     <div class="flex items-center gap-5 shrink-0">
-        @if (Item.RecurrenceType != RecurrenceType.None)
+        @if (!IsCompleted && Item.RecurrenceType != RecurrenceType.None)
         {
             <button type="button"
                     class="inline-flex flex-col items-center gap-0.5 text-gray-400 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors focus:outline-hidden disabled:opacity-50"
@@ -50,14 +62,17 @@
             <Icon Name="pencil" Class="h-5 w-5" />
             <span class="text-xs font-medium uppercase tracking-wide">Edit</span>
         </button>
+
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public TodoItemResponse Item { get; set; } = null!;
     [Parameter] public bool IsOverdue { get; set; }
+    [Parameter] public bool IsCompleted { get; set; }
     [Parameter] public bool IsBusy { get; set; }
     [Parameter] public EventCallback<TodoItemResponse> OnComplete { get; set; }
+    [Parameter] public EventCallback<TodoItemResponse> OnReopen { get; set; }
     [Parameter] public EventCallback<TodoItemResponse> OnSkip { get; set; }
     [Parameter] public EventCallback<TodoItemResponse> OnEdit { get; set; }
 }

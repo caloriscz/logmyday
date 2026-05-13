@@ -62,28 +62,20 @@
         }
     </div>
 
-    @* Completed items — full-width below the grid *@
+    @* Completed items — same grid layout, below a divider *@
     @if (ShowDone && DoneItems.Any())
     {
-        <div class="border-t border-gray-200 dark:border-slate-700 px-4 py-3 space-y-1">
-            @foreach (var item in DoneItems.OrderByDescending(i => i.DoneAt))
-            {
-                <div @key="item.Id" class="flex items-center gap-3 rounded-lg px-2 py-1.5 opacity-60">
-                    <input type="checkbox"
-                           class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
-                           checked="@item.IsDone"
-                           @onchange="() => OnReopenItem.InvokeAsync(item)"
-                           disabled="@IsBusy" />
-                    <span class="flex-1 text-sm line-through text-gray-500 dark:text-slate-400">@item.Title</span>
-                    <button type="button"
-                            class="inline-flex items-center rounded p-1 text-gray-300 hover:text-rose-500 dark:hover:text-rose-400 focus:outline-hidden"
-                            title="Delete item"
-                            @onclick="() => OnDeleteItem.InvokeAsync(item)"
-                            disabled="@IsBusy">
-                        <Icon Name="trash" Class="h-3.5 w-3.5" />
-                    </button>
-                </div>
-            }
+        <div class="border-t border-gray-200 dark:border-slate-700">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4">
+                @foreach (var item in DoneItems.OrderByDescending(i => i.DoneAt))
+                {
+                    <ReminderTodoItem Item="item"
+                                      IsCompleted="true"
+                                      IsBusy="IsBusy"
+                                      OnReopen="OnReopenItem"
+                                      OnEdit="OnEditItem" />
+                }
+            </div>
         </div>
     }
 
