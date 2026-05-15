@@ -1428,12 +1428,12 @@ else
     {
         if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
         {
-            var effectiveInputTypeId = item.CompletionTagInputTypeId
-                ?? _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId)?.InputTypeId;
+            var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+            var effectiveInputTypeId = item.CompletionTagInputTypeId ?? completionTag?.InputTypeId;
 
             if (IsQuickCompleteInputType(effectiveInputTypeId))
             {
-                if (HasValidPrefilledValue(item, effectiveInputTypeId))
+                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue))
                 {
                     try
                     {
@@ -1816,17 +1816,17 @@ else
         InputTypeIds.StarRating or InputTypeIds.StarRating10 or
         InputTypeIds.Score or InputTypeIds.Score10;
 
-    private static bool HasValidPrefilledValue(TodoItemResponse item, int? inputTypeId)
+    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue)
     {
-        if (string.IsNullOrWhiteSpace(item.Notes)) return false;
+        if (string.IsNullOrWhiteSpace(tagDefaultValue)) return false;
         return inputTypeId switch
         {
-            InputTypeIds.Boolean => item.Notes is "true" or "false",
+            InputTypeIds.Boolean => tagDefaultValue is "true" or "false",
             InputTypeIds.String => true,
             InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
-                decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _),
+                decimal.TryParse(tagDefaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _),
             InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
-                int.TryParse(item.Notes, out var v) && v > 0,
+                int.TryParse(tagDefaultValue, out var v) && v > 0,
             _ => false
         };
     }
@@ -1842,37 +1842,31 @@ else
         _quickAllowUnfilled = false;
         _quickError = null;
 
+        var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+        var defaultValue = tag?.DefaultValue;
+
         switch (inputTypeId)
         {
             case InputTypeIds.Boolean:
-                _quickBoolValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+                _quickBoolValue = defaultValue switch { "true" => true, "false" => false, _ => null };
                 break;
             case InputTypeIds.String:
-                _quickStringValue = item.Notes;
+                _quickStringValue = defaultValue;
                 break;
             case InputTypeIds.Integer:
             case InputTypeIds.Decimal:
             case InputTypeIds.Percentage:
-                if (!string.IsNullOrWhiteSpace(item.Notes) &&
-                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+                if (!string.IsNullOrWhiteSpace(defaultValue) &&
+                    decimal.TryParse(defaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
                 {
                     _quickDecimalValue = d;
-                }
-                else
-                {
-                    var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
-                    if (!string.IsNullOrWhiteSpace(tag?.DefaultValue) &&
-                        decimal.TryParse(tag.DefaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var defVal))
-                    {
-                        _quickDecimalValue = defVal;
-                    }
                 }
                 break;
             case InputTypeIds.StarRating:
             case InputTypeIds.StarRating10:
             case InputTypeIds.Score:
             case InputTypeIds.Score10:
-                if (!string.IsNullOrWhiteSpace(item.Notes) && int.TryParse(item.Notes, out var iv))
+                if (!string.IsNullOrWhiteSpace(defaultValue) && int.TryParse(defaultValue, out var iv))
                 {
                     _quickIntValue = iv;
                 }
