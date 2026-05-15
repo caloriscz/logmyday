@@ -1529,24 +1529,7 @@ else
         _quickError = null;
         try
         {
-            var req = new TodoItemRequest
-            {
-                ListId = _quickItem.ListId,
-                Title = _quickItem.Title,
-                Notes = notes,
-                StartDate = _quickItem.StartDate,
-                DueDate = _quickItem.DueDate,
-                NotifyAt = _quickItem.NotifyAt,
-                DisplayOrder = _quickItem.DisplayOrder,
-                RecurrenceType = _quickItem.RecurrenceType,
-                AutoLogMode = _quickItem.AutoLogMode,
-                MonitorDaysBack = _quickItem.MonitorDaysBack,
-                MonitorFromDate = _quickItem.MonitorFromDate,
-                MonitorToDate = _quickItem.MonitorToDate,
-                CompletionTagId = _quickItem.CompletionTagId
-            };
-            await TodoApi.UpdateTodoItem(_quickItem.Id, req);
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();
@@ -1821,7 +1804,7 @@ else
         if (string.IsNullOrWhiteSpace(tagDefaultValue)) return false;
         return inputTypeId switch
         {
-            InputTypeIds.Boolean => tagDefaultValue is "true" or "false",
+            InputTypeIds.Boolean => false,
             InputTypeIds.String => true,
             InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
                 decimal.TryParse(tagDefaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _),

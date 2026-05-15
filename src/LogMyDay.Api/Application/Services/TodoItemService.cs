@@ -130,17 +130,19 @@ public class TodoItemService : ITodoItemService
                 if (existing != null)
                 {
                     existing.DateStarted = request.DoneAt;
-                    existing.Description = item.List.ListType == TodoListType.Reminder ? item.Notes : item.Title;
+                    existing.Description = item.List.ListType == TodoListType.Reminder
+                        ? (request.CompletionValue ?? item.Notes)
+                        : item.Title;
                     _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
                 }
                 else
                 {
-                    await LogActivityAsync(item, request.DoneAt, userId);
+                    await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
                 }
             }
             else
             {
-                await LogActivityAsync(item, request.DoneAt, userId);
+                await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
             }
         }
 
@@ -149,12 +151,14 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
-    private async Task LogActivityAsync(Domain.Entities.TodoItem item, DateTime doneAt, Guid userId)
+    private async Task LogActivityAsync(Domain.Entities.TodoItem item, string? completionValue, DateTime doneAt, Guid userId)
     {
         var activityRequest = new ActivityRequest
         {
             PrimaryTagId = item.CompletionTagId!.Value,
-            Description = item.List.ListType == TodoListType.Reminder ? item.Notes : item.Title,
+            Description = item.List.ListType == TodoListType.Reminder
+                ? (completionValue ?? item.Notes)
+                : item.Title,
             DateStarted = doneAt
         };
 
