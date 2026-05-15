@@ -105,7 +105,6 @@ public static class MauiProgram
 #endif
             builder.Services.AddSingleton<NotificationNavigationService>();
             builder.Services.AddSingleton<NotificationService>();
-            builder.Services.AddSingleton<ISystemNotificationService, SystemNotificationService>();
 
             // Update App registration to include NotificationService dependency
             builder.Services.AddSingleton<App>();

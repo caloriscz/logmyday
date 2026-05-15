@@ -14,7 +14,6 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Pattern> Patterns => Set<Pattern>();
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
-    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Quantity> Quantities => Set<Quantity>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
@@ -38,7 +37,6 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<Pattern>().ToTable("LogMyDay_Patterns");
         modelBuilder.Entity<User>().ToTable("LogMyDay_Users");
         modelBuilder.Entity<PasswordReset>().ToTable("LogMyDay_PasswordResets");
-        modelBuilder.Entity<Notification>().ToTable("LogMyDay_Notifications");
         modelBuilder.Entity<Quantity>().ToTable("LogMyDay_Quantities");
         modelBuilder.Entity<Unit>().ToTable("LogMyDay_Units");
         modelBuilder.Entity<TagOptionList>().ToTable("LogMyDay_TagOptionLists");
@@ -76,29 +74,6 @@ public class LogMyDayDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.Token).HasDatabaseName("IX_LogMyDay_PasswordResets_Token");
-        });
-
-        modelBuilder.Entity<Notification>(entity =>
-        {
-            entity.HasOne(n => n.Tag)
-                .WithMany(t => t.Notifications)
-                .HasForeignKey(n => n.TagId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.Property(n => n.MaxNudges)
-                .HasDefaultValue(3);
-
-            entity.Property(n => n.IsActive).HasDefaultValue(true);
-            entity.Property(n => n.NudgeInterval).HasDefaultValue(new TimeSpan(0, 15, 0));
-            entity.Property(n => n.DeliveriesOnLastDate).HasDefaultValue(0);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(n => n.DateCreated).HasDefaultValueSql("GETUTCDATE()");
-                entity.Property(n => n.LastDeliveryDate).HasColumnType("date");
-                entity.Property(n => n.LastDeliverySentAtUtc).HasColumnType("datetime2");
-                entity.Property(n => n.NextEligibleSendAfterUtc).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<Quantity>(entity =>

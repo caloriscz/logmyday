@@ -538,31 +538,6 @@ public class ActivityService : IActivityService
         return await _activityRepository.AnyAsync(spec);
     }
 
-    public async Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate(DateTime date, Guid userId)
-    {
-        var unfilledTags = await _activityRepository.GetRequiredDailyTagsNotFilledAsync(date, userId);
-
-        return [.. unfilledTags.Select(tag => new TagResponse
-        {
-            Id = tag.Id,
-            Title = tag.Group?.Name != null ? $"{tag.Group.Name}: {tag.TagName}" : tag.TagName,
-            InputTypeId = tag.InputTypeId,
-            TypeId = tag.InputTypeId,
-            IsRequired = tag.IsRequired,
-            IsRepeatable = tag.IsRepeatable,
-            TimeGranularity = tag.TimeGranularity,
-            IsRange = tag.IsRange,
-            UnitId = tag.UnitId,
-            UnitSymbol = tag.Unit != null ? tag.Unit.Symbol : null,
-            MinValue = tag.MinValue,
-            MaxValue = tag.MaxValue,
-            Step = tag.Step,
-            DefaultValue = tag.DefaultValue,
-            OptionListId = tag.OptionListId,
-            OptionListName = tag.OptionList != null ? tag.OptionList.Name : null,
-        })];
-    }
-
     // Private helper methods for refactored pagination
 
     /// <summary>

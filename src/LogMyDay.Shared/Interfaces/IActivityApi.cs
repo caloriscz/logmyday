@@ -62,10 +62,6 @@ public interface IActivityApi
     [Get("/api/activities/period-sum")]
     Task<PeriodSumResponse> GetPeriodSum(int tagId, DateTime dateStarted, int? activityId = null);
 
-    [Get("/api/activities/required-daily-tags-unfilled")]
-    // Legacy endpoint: kept for future experiments with required-tag reminders. (in the future will be replaced by Notifications)
-    Task<List<TagResponse>> GetRequiredDailyTagsNotFilledForDate([Query] string dateString);
-
     [Get("/api/activities/has-activity-for-tag")]
     Task<bool> HasActivityForTag([Query] int tagId, [Query] DateOnly date);
 
@@ -122,23 +118,4 @@ public interface IActivityApi
 
     [Get("/api/input-types")]
     Task<List<InputTypeDto>> GetInputTypesAsync();
-
-    [Get("/api/notifications")]
-    Task<IList<NotificationResponse>> GetNotifications();
-
-    [Get("/api/notifications/tag/{tagId}")]
-    Task<IList<NotificationResponse>> GetNotificationsByTag(int tagId);
-
-    [Post("/api/notifications")]
-    Task<NotificationResponse> CreateNotification([Body] NotificationRequest request);
-
-    [Put("/api/notifications/{id}")]
-    Task<NotificationResponse> UpdateNotification(int id, [Body] NotificationRequest request);
-
-    [Delete("/api/notifications/{id}")]
-    Task DeleteNotification(int id);
-
-    [Post("/api/notifications/{id}/deliveries")]
-    Task<NotificationResponse> RecordNotificationDelivery(int id, [Body] NotificationDeliveryRequest request);
 }
-

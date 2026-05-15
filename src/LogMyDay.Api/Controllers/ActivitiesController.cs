@@ -169,26 +169,6 @@ public class ActivitiesController : BaseApiController
         return Ok(result);
     }
 
-    [HttpGet("required-daily-tags-unfilled")]
-    public async Task<IActionResult> GetRequiredDailyTagsNotFilledForDate([FromQuery] string dateString)
-    {
-        _logger.LogInformation("GetRequiredDailyTagsNotFilledForDate called with dateString: {DateString}", dateString);
-        
-        if (!DateTime.TryParse(dateString, out var date))
-        {
-            _logger.LogWarning("Invalid date format received: {DateString}", dateString);
-
-            return BadRequest("Invalid date format. Please use a valid date string like '2025-08-31'.");
-        }
-        
-        _logger.LogInformation("Parsed date: {ParsedDate}", date);
-        var userId = GetCurrentUserId();
-        var unfilledTags = await _activityService.GetRequiredDailyTagsNotFilledForDate(date, userId);
-        _logger.LogInformation("Returning {Count} unfilled required tags", unfilledTags.Count);
-        
-        return Ok(unfilledTags);
-    }
-
     [HttpGet("has-activity-for-tag")]
     public async Task<IActionResult> HasActivityForTag([FromQuery] int tagId, [FromQuery] DateOnly date)
     {

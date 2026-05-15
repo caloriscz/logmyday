@@ -54,5 +54,4 @@ public class Tag
     [ForeignKey(nameof(GroupId))]
     public TagGroup? Group { get; set; }
 
-    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }
