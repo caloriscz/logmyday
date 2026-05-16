@@ -678,6 +678,14 @@
         _itemEditContext = new EditContext(_itemForm);
         _listEditContext = new EditContext(_listForm);
         await LoadDataAsync();
+
+        // Auto-complete must run here because OnParametersSetAsync fires before
+        // OnInitializedAsync, so _lists is null when parameters are first evaluated.
+        if (AutoComplete && TodoItemId.HasValue)
+        {
+            await AutoCompleteItemAsync(TodoItemId.Value);
+        }
+
         _refreshTimer = new System.Threading.Timer(
             _ => InvokeAsync(async () => { await LoadDataAsync(); StateHasChanged(); }),
             null,
@@ -689,6 +697,7 @@
     {
         _highlightedItemId = TodoItemId;
 
+        // Handles re-navigation to an already-initialized page (lists already loaded).
         if (AutoComplete && _highlightedItemId.HasValue && _lists != null)
         {
             await AutoCompleteItemAsync(_highlightedItemId.Value);
