@@ -43,6 +43,9 @@ public class NotificationService : INotificationManagerService
     public void CancelAlarmsForTag(int tagId)
         => _platformService.CancelAlarmsForTag(tagId);
 
+    public void CancelReminderAlarm(int todoItemId)
+        => _platformService.CancelReminderAlarm(todoItemId);
+
     // Deprecated methods - use SystemNotificationService instead
     public void StartPeriodicNotifications()
     {

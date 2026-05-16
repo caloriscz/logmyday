@@ -12,6 +12,7 @@
 @inject ILogger<Reminders> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject ReminderNotificationScheduler ReminderScheduler
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Reminders" ShowReload="true" OnReload="LoadDataAsync" />
@@ -116,7 +117,8 @@
                                 @foreach (var item in activeItems)
                                 {
                                     var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < effectiveDate;
-                                    <div @key="item.Id" class="rounded-xl border @(isOverdue ? "border-red-400/60" : "border-gray-200 dark:border-gray-700") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3">
+                                    var isHighlighted = _highlightedItemId == item.Id;
+                                    <div @key="item.Id" class="rounded-xl border @(isOverdue ? "border-red-400/60" : "border-gray-200 dark:border-gray-700") @(isHighlighted ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3">
                                         <button type="button"
                                                 class="h-9 w-9 shrink-0 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 flex items-center justify-center text-transparent hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors disabled:opacity-50"
                                                 title="Complete"
@@ -662,6 +664,11 @@
     // Auto-refresh
     private System.Threading.Timer? _refreshTimer;
 
+    // Deep-link highlight from notification tap
+    [SupplyParameterFromQuery]
+    public int? TodoItemId { get; set; }
+    private int? _highlightedItemId;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
@@ -674,6 +681,13 @@
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        _highlightedItemId = TodoItemId;
+
+        return Task.CompletedTask;
     }
 
     public void Dispose() => _refreshTimer?.Dispose();
@@ -691,6 +705,8 @@
             {
                 _allTags = await ActivityApi.GetTags();
             }
+
+            ReminderScheduler.ScheduleAll(_lists);
         }
         catch (ApiException ex)
         {
@@ -750,6 +766,7 @@
                     try
                     {
                         var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        ReminderScheduler.CancelItem(item.Id);
                         UpdateItemInList(updated);
                     }
                     catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -781,6 +798,7 @@
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            ReminderScheduler.CancelItem(item.Id);
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -945,6 +963,7 @@
         try
         {
             await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
+            ReminderScheduler.CancelItem(_quickItem.Id);
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();
@@ -1082,6 +1101,10 @@
             _booleanBoolValue = null;
             _editIntValue = null;
             await LoadDataAsync();
+            if (_lists != null)
+            {
+                ReminderScheduler.ScheduleAll(_lists);
+            }
         }
         catch (ApiException ex)
         {

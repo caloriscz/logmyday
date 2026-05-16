@@ -319,6 +319,11 @@ else
             parameters.Add($"date={payload.LocalDate.Value:yyyy-MM-dd}");
         }
 
+        if (payload.TodoItemId.HasValue)
+        {
+            parameters.Add($"todoItemId={payload.TodoItemId.Value}");
+        }
+
         return parameters.Count > 0 ? "/reminders?" + string.Join("&", parameters) : "/reminders";
     }
 }

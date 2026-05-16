@@ -9,6 +9,7 @@ public interface INotificationManagerService
     void StopPeriodicNotifications();
     void CancelAlarmsForNotification(int notificationId);
     void CancelAlarmsForTag(int tagId);
+    void CancelReminderAlarm(int todoItemId);
 }
 
 public class NotificationEventArgs : EventArgs

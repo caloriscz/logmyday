@@ -104,6 +104,7 @@ public static class MauiProgram
             builder.Services.AddSingleton<INotificationManagerService, LogMyDay.App.Mobile.Platforms.Android.NotificationManagerService>();
 #endif
             builder.Services.AddSingleton<NotificationNavigationService>();
+            builder.Services.AddSingleton<ReminderNotificationScheduler>();
             builder.Services.AddSingleton<NotificationService>();
 
             // Update App registration to include NotificationService dependency

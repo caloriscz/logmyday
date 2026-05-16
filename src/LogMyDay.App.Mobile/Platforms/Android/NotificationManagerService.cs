@@ -25,6 +25,7 @@ public class NotificationManagerService : INotificationManagerService
     public const string TagIdKey = "tag_id";
     public const string TagNameKey = "tag_name";
     public const string LocalDateKey = "local_date";
+    public const string TodoItemIdKey = "todo_item_id";
 
     bool channelInitialized = false;
     bool periodicChannelInitialized = false;
@@ -85,6 +86,10 @@ public class NotificationManagerService : INotificationManagerService
                 {
                     intent.PutExtra(LocalDateKey, payload.LocalDate.Value.ToString("yyyy-MM-dd"));
                 }
+                if (payload.TodoItemId.HasValue)
+                {
+                    intent.PutExtra(TodoItemIdKey, payload.TodoItemId.Value);
+                }
             }
             intent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 
@@ -92,17 +97,19 @@ public class NotificationManagerService : INotificationManagerService
                 ? PendingIntentFlags.CancelCurrent | PendingIntentFlags.Immutable
                 : PendingIntentFlags.CancelCurrent;
 
-            PendingIntent? pendingIntent = PendingIntent.GetBroadcast(Platform.AppContext, pendingIntentId++, intent, pendingIntentFlags);
+            // Use TodoItemId as a deterministic request code when available so alarms
+            // can be cancelled across app restarts without an in-memory lookup.
+            int requestCode = payload?.TodoItemId ?? pendingIntentId++;
+            PendingIntent? pendingIntent = PendingIntent.GetBroadcast(Platform.AppContext, requestCode, intent, pendingIntentFlags);
             if (pendingIntent != null)
             {
                 long triggerTime = GetNotifyTime(notifyTime.Value);
                 AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
                 alarmManager?.Set(AlarmType.RtcWakeup, triggerTime, pendingIntent);
 
-                // Track this alarm so it can be cancelled later.
-                if (payload?.NotificationId is int nid)
+                // Also track in the in-memory map for non-reminder alarms.
+                if (payload?.NotificationId is int nid && !payload.TodoItemId.HasValue)
                 {
-                    var requestCode = pendingIntentId - 1;
                     var tagId = payload.TagId ?? 0;
                     if (!_scheduledAlarms.TryGetValue(nid, out var list))
                     {
@@ -178,6 +185,21 @@ public class NotificationManagerService : INotificationManagerService
         }
     }
 
+    public void CancelReminderAlarm(int todoItemId)
+    {
+        AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
+        var cancelIntent = new Intent(Platform.AppContext, typeof(AlarmHandler));
+        var flags = (Build.VERSION.SdkInt >= BuildVersionCodes.S)
+            ? PendingIntentFlags.NoCreate | PendingIntentFlags.Immutable
+            : PendingIntentFlags.NoCreate;
+        var pending = PendingIntent.GetBroadcast(Platform.AppContext, todoItemId, cancelIntent, flags);
+        if (pending != null)
+        {
+            alarmManager?.Cancel(pending);
+            pending.Cancel();
+        }
+    }
+
     public void Show(string title, string message, NotificationPayload? payload = null)
     {
         System.Diagnostics.Debug.WriteLine($"Android NotificationManagerService.Show called: {title} - {message}");
@@ -216,6 +238,10 @@ public class NotificationManagerService : INotificationManagerService
             if (payload.LocalDate.HasValue)
             {
                 intent.PutExtra(LocalDateKey, payload.LocalDate.Value.ToString("yyyy-MM-dd"));
+            }
+            if (payload.TodoItemId.HasValue)
+            {
+                intent.PutExtra(TodoItemIdKey, payload.TodoItemId.Value);
             }
         }
         intent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
@@ -306,12 +332,23 @@ public class NotificationManagerService : INotificationManagerService
             localDate = parsed;
         }
 
+        int? todoItemId = null;
+        if (intent.HasExtra(TodoItemIdKey))
+        {
+            var raw = intent.GetIntExtra(TodoItemIdKey, -1);
+            if (raw >= 0)
+            {
+                todoItemId = raw;
+            }
+        }
+
         return new NotificationPayload
         {
             NotificationId = notificationId,
             TagId = tagId,
             TagName = string.IsNullOrWhiteSpace(tagName) ? null : tagName,
-            LocalDate = localDate
+            LocalDate = localDate,
+            TodoItemId = todoItemId
         };
     }
 
