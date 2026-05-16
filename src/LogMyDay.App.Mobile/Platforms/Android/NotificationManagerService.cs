@@ -105,7 +105,7 @@ public class NotificationManagerService : INotificationManagerService
             {
                 long triggerTime = GetNotifyTime(notifyTime.Value);
                 AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
-                alarmManager?.Set(AlarmType.RtcWakeup, triggerTime, pendingIntent);
+                ScheduleExactAlarm(alarmManager, triggerTime, pendingIntent);
 
                 // Also track in the in-memory map for non-reminder alarms.
                 if (payload?.NotificationId is int nid && !payload.TodoItemId.HasValue)
@@ -402,6 +402,40 @@ public class NotificationManagerService : INotificationManagerService
 
         // Mark as initialized regardless of API level
         periodicChannelInitialized = true;
+    }
+
+    static void ScheduleExactAlarm(AlarmManager? alarmManager, long triggerTimeMs, PendingIntent pendingIntent)
+    {
+        if (alarmManager == null)
+        {
+            return;
+        }
+
+        // Android 12+ (API 31+): exact alarms require SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM.
+        // Check at runtime — USE_EXACT_ALARM (API 33+) is auto-granted; SCHEDULE_EXACT_ALARM
+        // can be revoked by the user on API 31–32.
+#pragma warning disable CA1416
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.S && !alarmManager.CanScheduleExactAlarms())
+#pragma warning restore CA1416
+        {
+            // Permission not granted — fall back to inexact (better than nothing).
+            alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
+            System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: exact alarm permission not granted, using inexact Set()");
+
+            return;
+        }
+
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
+        {
+            // API 23+: fires even in Doze mode.
+            alarmManager.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
+            System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: SetExactAndAllowWhileIdle scheduled");
+        }
+        else
+        {
+            alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
+            System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: fallback Set() (API < 23)");
+        }
     }
 
     long GetNotifyTime(DateTime notifyTime)
