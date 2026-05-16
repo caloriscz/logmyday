@@ -34,9 +34,19 @@ public class MainActivity : MauiAppCompatActivity
 
             if (title != null && message != null)
             {
-                var service = IPlatformApplication.Current?.Services?.GetService<INotificationManagerService>();
+                var services = IPlatformApplication.Current?.Services;
                 var payload = NotificationManagerService.BuildPayloadFromIntent(intent);
-                service?.ReceiveNotification(title, message, payload);
+
+                services?.GetService<INotificationManagerService>()?.ReceiveNotification(title, message, payload);
+
+                // INotificationManagerService resolves to the Android platform service whose
+                // ReceiveNotification only fires a local event. NotificationService (the wrapper
+                // that calls SetPendingIntent) may not be instantiated yet, so call SetPendingIntent
+                // directly to guarantee navigation always works.
+                if (payload != null)
+                {
+                    services?.GetService<NotificationNavigationService>()?.SetPendingIntent(payload);
+                }
             }
         }
     }
