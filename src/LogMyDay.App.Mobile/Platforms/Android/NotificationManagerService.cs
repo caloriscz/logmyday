@@ -19,6 +19,10 @@ public class NotificationManagerService : INotificationManagerService
     const string periodicChannelName = "LogMyDay Periodic";
     const string periodicChannelDescription = "Periodic notifications from LogMyDay app.";
 
+    const string reminderChannelId = "logmyday_reminders";
+    const string reminderChannelName = "LogMyDay Reminders";
+    const string reminderChannelDescription = "Reminder alarm notifications from LogMyDay app.";
+
     public const string TitleKey = "title";
     public const string MessageKey = "message";
     public const string NotificationIdKey = "notification_id";
@@ -30,6 +34,7 @@ public class NotificationManagerService : INotificationManagerService
 
     bool channelInitialized = false;
     bool periodicChannelInitialized = false;
+    bool reminderChannelInitialized = false;
     int messageId = 0;
     int pendingIntentId = 0;
     static int _notificationCount = 0; // Track periodic notifications
@@ -213,14 +218,21 @@ public class NotificationManagerService : INotificationManagerService
         }
 
         // Ensure notification channel is created
-        bool isPeriodicNotification = title?.Contains("Timer") == true || title?.Contains("Periodic") == true;
-        string notificationChannelId = isPeriodicNotification ? periodicChannelId : channelId;
+        bool isReminderNotification = payload?.TodoItemId.HasValue == true;
+        bool isPeriodicNotification = !isReminderNotification && (title?.Contains("Timer") == true || title?.Contains("Periodic") == true);
+        string notificationChannelId = isReminderNotification ? reminderChannelId
+            : isPeriodicNotification ? periodicChannelId
+            : channelId;
 
-        if (isPeriodicNotification && !periodicChannelInitialized)
+        if (isReminderNotification && !reminderChannelInitialized)
+        {
+            CreateReminderNotificationChannel();
+        }
+        else if (isPeriodicNotification && !periodicChannelInitialized)
         {
             CreatePeriodicNotificationChannel();
         }
-        else if (!isPeriodicNotification && !channelInitialized)
+        else if (!isReminderNotification && !isPeriodicNotification && !channelInitialized)
         {
             CreateNotificationChannel();
         }
@@ -261,26 +273,35 @@ public class NotificationManagerService : INotificationManagerService
         builder.SetContentText(message ?? "Notification");
 
         // Reminder notifications get high priority (heads-up) + vibration + action button.
-        if (payload?.TodoItemId.HasValue == true)
+        if (isReminderNotification)
         {
             builder.SetPriority(NotificationCompat.PriorityHigh);
+            // Vibration is configured on the channel (API 26+); SetVibrate is for API < 26.
             builder.SetVibrate(new long[] { 0, 300, 100, 300 });
 
             // "Mark Done" action — opens the app and auto-completes the item.
-            var doneIntent = new Intent(context, typeof(MainActivity));
-            doneIntent.PutExtra(TitleKey, title ?? string.Empty);
-            doneIntent.PutExtra(MessageKey, message ?? string.Empty);
-            doneIntent.PutExtra(NotificationIdKey, payload.NotificationId);
-            doneIntent.PutExtra(TodoItemIdKey, payload.TodoItemId.Value);
-            doneIntent.PutExtra(AutoCompleteKey, true);
-            doneIntent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
-            var donePendingIntent = PendingIntent.GetActivity(context, pendingIntentId++, doneIntent, pendingIntentFlags);
-            if (donePendingIntent != null)
+            // Wrapped in try-catch: a failure here must not prevent the notification from showing.
+            try
             {
-                builder.AddAction(0, "Mark Done", donePendingIntent);
+                var doneIntent = new Intent(context, typeof(MainActivity));
+                doneIntent.PutExtra(TitleKey, title ?? string.Empty);
+                doneIntent.PutExtra(MessageKey, message ?? string.Empty);
+                doneIntent.PutExtra(NotificationIdKey, payload!.NotificationId);
+                doneIntent.PutExtra(TodoItemIdKey, payload.TodoItemId!.Value);
+                doneIntent.PutExtra(AutoCompleteKey, true);
+                doneIntent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
+                var donePendingIntent = PendingIntent.GetActivity(context, pendingIntentId++, doneIntent, pendingIntentFlags);
+                if (donePendingIntent != null)
+                {
+                    builder.AddAction(0, "Mark Done", donePendingIntent);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Show: failed to create Mark Done action — {ex.Message}");
             }
         }
-        else if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
+        else if (isPeriodicNotification)
         {
             builder.SetPriority(NotificationCompat.PriorityHigh);
             builder.SetVibrate(new long[] { 0, 250, 250, 250 }); // Vibration pattern
@@ -431,6 +452,32 @@ public class NotificationManagerService : INotificationManagerService
 
         // Mark as initialized regardless of API level
         periodicChannelInitialized = true;
+    }
+
+    void CreateReminderNotificationChannel()
+    {
+        // High importance so reminders appear as heads-up banners and are not silenced.
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+        {
+#pragma warning disable CA1416 // Validate platform compatibility
+            var channelNameJava = new Java.Lang.String(reminderChannelName);
+            var channel = new NotificationChannel(reminderChannelId, channelNameJava, NotificationImportance.High)
+            {
+                Description = reminderChannelDescription
+            };
+            channel.EnableVibration(true);
+            channel.SetVibrationPattern(new long[] { 0, 300, 100, 300 });
+            NotificationManager? manager = (NotificationManager?)Platform.AppContext?.GetSystemService(Context.NotificationService);
+            manager?.CreateNotificationChannel(channel);
+#pragma warning restore CA1416
+            System.Diagnostics.Debug.WriteLine("Reminder notification channel created for API 26+");
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("Reminder notification channel not needed for API < 26");
+        }
+
+        reminderChannelInitialized = true;
     }
 
     public void DismissReminderNotification(int todoItemId)
