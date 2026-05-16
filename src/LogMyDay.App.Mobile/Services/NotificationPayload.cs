@@ -13,4 +13,6 @@ public sealed class NotificationPayload
     public DateOnly? LocalDate { get; init; }
 
     public int? TodoItemId { get; init; }
+
+    public bool AutoComplete { get; init; }
 }

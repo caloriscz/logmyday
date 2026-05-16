@@ -664,9 +664,11 @@
     // Auto-refresh
     private System.Threading.Timer? _refreshTimer;
 
-    // Deep-link highlight from notification tap
+    // Deep-link highlight + auto-complete from notification action button
     [SupplyParameterFromQuery]
     public int? TodoItemId { get; set; }
+    [SupplyParameterFromQuery]
+    public bool AutoComplete { get; set; }
     private int? _highlightedItemId;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -683,11 +685,14 @@
             TimeSpan.FromSeconds(30));
     }
 
-    protected override Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync()
     {
         _highlightedItemId = TodoItemId;
 
-        return Task.CompletedTask;
+        if (AutoComplete && _highlightedItemId.HasValue && _lists != null)
+        {
+            await AutoCompleteItemAsync(_highlightedItemId.Value);
+        }
     }
 
     public void Dispose() => _refreshTimer?.Dispose();
@@ -867,6 +872,32 @@
 
                 return;
             }
+        }
+    }
+
+    private async Task AutoCompleteItemAsync(int todoItemId)
+    {
+        foreach (var list in _lists ?? [])
+        {
+            var item = list.Items.FirstOrDefault(i => i.Id == todoItemId && !i.IsDone && !i.IsSkipped);
+            if (item == null)
+            {
+                continue;
+            }
+
+            try
+            {
+                var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                ReminderScheduler.CancelItem(item.Id);
+                ReminderScheduler.DismissItem(item.Id);
+                UpdateItemInList(updated);
+            }
+            catch (ApiException ex)
+            {
+                Logger.LogWarning(ex, "Failed to auto-complete todo item {ItemId} from notification", item.Id);
+            }
+
+            break;
         }
     }
 

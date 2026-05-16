@@ -46,6 +46,9 @@ public class NotificationService : INotificationManagerService
     public void CancelReminderAlarm(int todoItemId)
         => _platformService.CancelReminderAlarm(todoItemId);
 
+    public void DismissReminderNotification(int todoItemId)
+        => _platformService.DismissReminderNotification(todoItemId);
+
     // Deprecated methods - use SystemNotificationService instead
     public void StartPeriodicNotifications()
     {

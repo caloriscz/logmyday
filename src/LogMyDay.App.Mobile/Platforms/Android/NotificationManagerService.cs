@@ -26,6 +26,7 @@ public class NotificationManagerService : INotificationManagerService
     public const string TagNameKey = "tag_name";
     public const string LocalDateKey = "local_date";
     public const string TodoItemIdKey = "todo_item_id";
+    public const string AutoCompleteKey = "auto_complete";
 
     bool channelInitialized = false;
     bool periodicChannelInitialized = false;
@@ -259,8 +260,27 @@ public class NotificationManagerService : INotificationManagerService
         builder.SetContentTitle(title ?? "LogMyDay");
         builder.SetContentText(message ?? "Notification");
 
-        // Make notifications more visible
-        if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
+        // Reminder notifications get high priority (heads-up) + vibration + action button.
+        if (payload?.TodoItemId.HasValue == true)
+        {
+            builder.SetPriority(NotificationCompat.PriorityHigh);
+            builder.SetVibrate(new long[] { 0, 300, 100, 300 });
+
+            // "Mark Done" action — opens the app and auto-completes the item.
+            var doneIntent = new Intent(context, typeof(MainActivity));
+            doneIntent.PutExtra(TitleKey, title ?? string.Empty);
+            doneIntent.PutExtra(MessageKey, message ?? string.Empty);
+            doneIntent.PutExtra(NotificationIdKey, payload.NotificationId);
+            doneIntent.PutExtra(TodoItemIdKey, payload.TodoItemId.Value);
+            doneIntent.PutExtra(AutoCompleteKey, true);
+            doneIntent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
+            var donePendingIntent = PendingIntent.GetActivity(context, pendingIntentId++, doneIntent, pendingIntentFlags);
+            if (donePendingIntent != null)
+            {
+                builder.AddAction(0, "Mark Done", donePendingIntent);
+            }
+        }
+        else if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
         {
             builder.SetPriority(NotificationCompat.PriorityHigh);
             builder.SetVibrate(new long[] { 0, 250, 250, 250 }); // Vibration pattern
@@ -292,12 +312,20 @@ public class NotificationManagerService : INotificationManagerService
 
         var notification = builder.Build();
 
-        // Use different notification IDs to prevent Android from grouping them
-        int notificationId = messageId++;
-        if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
+        // Use a deterministic ID for reminder notifications so they can be dismissed programmatically.
+        int notificationId;
+        if (payload?.TodoItemId.HasValue == true)
+        {
+            notificationId = payload.TodoItemId.Value;
+        }
+        else if (title?.Contains("Timer") == true || title?.Contains("Periodic") == true)
         {
             _notificationCount++;
             notificationId = 2000 + _notificationCount; // Use different range for periodic notifications
+        }
+        else
+        {
+            notificationId = messageId++;
         }
 
         System.Diagnostics.Debug.WriteLine($"Built notification, about to notify with ID: {notificationId}");
@@ -348,7 +376,8 @@ public class NotificationManagerService : INotificationManagerService
             TagId = tagId,
             TagName = string.IsNullOrWhiteSpace(tagName) ? null : tagName,
             LocalDate = localDate,
-            TodoItemId = todoItemId
+            TodoItemId = todoItemId,
+            AutoComplete = intent.GetBooleanExtra(AutoCompleteKey, false)
         };
     }
 
@@ -402,6 +431,11 @@ public class NotificationManagerService : INotificationManagerService
 
         // Mark as initialized regardless of API level
         periodicChannelInitialized = true;
+    }
+
+    public void DismissReminderNotification(int todoItemId)
+    {
+        compatManager?.Cancel(todoItemId);
     }
 
     static void ScheduleExactAlarm(AlarmManager? alarmManager, long triggerTimeMs, PendingIntent pendingIntent)

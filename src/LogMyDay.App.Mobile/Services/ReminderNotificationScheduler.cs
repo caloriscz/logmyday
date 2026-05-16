@@ -56,7 +56,7 @@ public class ReminderNotificationScheduler
             TodoItemId = item.Id
         };
 
-        _notificationService.SendNotification(item.Title, $"{listName} reminder", fireTime.Value, payload);
+        _notificationService.SendNotification(item.Title, $"from {listName}", fireTime.Value, payload);
 
         _logger.LogDebug("Scheduled reminder notification for item {ItemId} '{Title}' at {FireTime:HH:mm} UTC", item.Id, item.Title, fireTime.Value);
     }
@@ -65,6 +65,11 @@ public class ReminderNotificationScheduler
     {
         _notificationService.CancelReminderAlarm(todoItemId);
         _logger.LogDebug("Cancelled reminder notification for item {ItemId}", todoItemId);
+    }
+
+    public void DismissItem(int todoItemId)
+    {
+        _notificationService.DismissReminderNotification(todoItemId);
     }
 
     private static DateTime? CalculateFireTime(TodoItemResponse item)

@@ -324,6 +324,11 @@ else
             parameters.Add($"todoItemId={payload.TodoItemId.Value}");
         }
 
+        if (payload.AutoComplete)
+        {
+            parameters.Add("autoComplete=true");
+        }
+
         return parameters.Count > 0 ? "/reminders?" + string.Join("&", parameters) : "/reminders";
     }
 }
