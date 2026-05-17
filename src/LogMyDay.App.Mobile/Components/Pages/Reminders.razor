@@ -174,9 +174,10 @@
                         {
                             <div class="border-t border-gray-200 dark:border-gray-700">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4">
-                                    @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                    @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
                                     {
-                                        <div @key="item.Id" class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3 opacity-60">
+                                        var isHighlightedDone = _highlightedItemId == item.Id;
+                                        <div @key="item.Id" class="rounded-xl border border-gray-200 dark:border-gray-700 @(isHighlightedDone ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3 opacity-60">
                                             <button type="button"
                                                     class="h-9 w-9 shrink-0 rounded-lg border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white hover:border-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-400 transition-colors disabled:opacity-50"
                                                     title="Re-open"
@@ -683,6 +684,7 @@
         // OnInitializedAsync, so _lists is null when parameters are first evaluated.
         if (AutoComplete && TodoItemId.HasValue)
         {
+            _highlightedItemId = TodoItemId;
             await AutoCompleteItemAsync(TodoItemId.Value);
         }
 
@@ -710,26 +712,45 @@
     private async Task LoadDataAsync()
     {
         _loadError = null;
-        try
+        Exception? lastError = null;
+
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            var dateParam = _selectedDate.ToString("yyyy-MM-dd");
-            var all = await TodoApi.GetTodoLists(dateParam);
-            _lists = all.Where(l => l.ListType == TodoListType.Reminder).ToList();
-            if (_allTags == null)
+            if (attempt > 0)
             {
-                _allTags = await ActivityApi.GetTags();
+                await Task.Delay(1500);
             }
 
-            ReminderScheduler.ScheduleAll(_lists);
+            try
+            {
+                var dateParam = _selectedDate.ToString("yyyy-MM-dd");
+                var all = await TodoApi.GetTodoLists(dateParam);
+                _lists = all.Where(l => l.ListType == TodoListType.Reminder).ToList();
+                if (_allTags == null)
+                {
+                    _allTags = await ActivityApi.GetTags();
+                }
+
+                ReminderScheduler.ScheduleAll(_lists);
+
+                return;
+            }
+            catch (ApiException ex)
+            {
+                Logger.LogWarning(ex, "Failed to load reminder todo lists");
+                _loadError = "Failed to load reminders. Tap reload to try again.";
+
+                return; // API errors (4xx/5xx) are not transient — no retry
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to load reminder todo lists (attempt {Attempt})", attempt + 1);
+                lastError = ex;
+            }
         }
-        catch (ApiException ex)
+
+        if (lastError != null)
         {
-            Logger.LogWarning(ex, "Failed to load reminder todo lists");
-            _loadError = "Failed to load reminders. Tap reload to try again.";
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Failed to load reminder todo lists");
             _loadError = "Failed to load reminders. Tap reload to try again.";
         }
     }
@@ -900,14 +921,23 @@
                 ReminderScheduler.CancelItem(item.Id);
                 ReminderScheduler.DismissItem(item.Id);
                 UpdateItemInList(updated);
+                _showDonePerList.Add(item.ListId);
             }
             catch (ApiException ex)
             {
                 Logger.LogWarning(ex, "Failed to auto-complete todo item {ItemId} from notification", item.Id);
+                _itemErrorPerList[item.ListId] = "Failed to mark done. Please try again.";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to auto-complete todo item {ItemId} from notification — network error", item.Id);
+                _itemErrorPerList[item.ListId] = "Failed to mark done. Please try again.";
             }
 
             break;
         }
+
+        StateHasChanged();
     }
 
     // ── Quick-complete modal ───────────────────────────────────────────────────

@@ -278,6 +278,9 @@ public class NotificationManagerService : INotificationManagerService
             builder.SetPriority(NotificationCompat.PriorityHigh);
             // Vibration is configured on the channel (API 26+); SetVibrate is for API < 26.
             builder.SetVibrate(new long[] { 0, 300, 100, 300 });
+            // Give each reminder its own group key so Android never auto-collapses them.
+            builder.SetGroup("lmd_reminder_" + payload!.TodoItemId!.Value);
+            builder.SetGroupSummary(false);
 
             // "Mark Done" action — opens the app and auto-completes the item.
             // Wrapped in try-catch: a failure here must not prevent the notification from showing.
