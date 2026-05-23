@@ -1,14 +1,18 @@
 /**
  * Todo list browser notification helpers.
  * Called from TodoListsPanel.razor via IJSRuntime.
+ *
+ * Timers are namespaced by `scope` so multiple panel instances on the same
+ * page (e.g., the homepage's Reminder + Basic panels) don't clobber each
+ * other when each one reschedules its own subset of items.
+ *
+ * Each scope also carries a DotNetObjectReference to its owning panel so
+ * the JS timer callback can invoke `LogNotificationFired` for diagnostics.
  */
 
-let _scheduledTimers = [];
+const _timersByScope = {};
+const _dotNetRefByScope = {};
 
-/**
- * Request browser notification permission from the user.
- * Returns the permission state: 'granted', 'denied', or 'default'.
- */
 window.todoNotifications = {
     requestPermission: async function () {
         if (!('Notification' in window)) {
@@ -23,16 +27,22 @@ window.todoNotifications = {
 
     /**
      * Schedule browser notifications for todo items with a NotifyAt time.
-     * Clears any previously scheduled timers first.
+     * Clears any previously scheduled timers within the given scope first;
+     * timers from other scopes are left alone.
      *
+     * @param {string} scope
+     *   Per-panel scope key (typically a Guid). Falls back to 'default' if empty.
+     * @param {object} dotNetRef
+     *   DotNetObjectReference to the owning panel (used for fired-event logging).
      * @param {Array<{id: number, title: string, notifyAtMs: number}>} items
-     *   notifyAtMs: milliseconds from midnight today (local time) when the notification should fire.
-     *   Pass -1 to skip an item.
      */
-    scheduleNotifications: function (items) {
-        // Clear previously scheduled timers
-        _scheduledTimers.forEach(t => clearTimeout(t));
-        _scheduledTimers = [];
+    scheduleNotifications: function (scope, dotNetRef, items) {
+        const key = scope || 'default';
+
+        const existing = _timersByScope[key] || [];
+        existing.forEach(t => clearTimeout(t));
+        _timersByScope[key] = [];
+        _dotNetRefByScope[key] = dotNetRef;
 
         if (Notification.permission !== 'granted' || !items || items.length === 0) {
             return;
@@ -50,11 +60,18 @@ window.todoNotifications = {
             const delay = fireAt.getTime() - now.getTime();
 
             if (delay <= 0) {
-                // Time has already passed today — skip
                 return;
             }
 
             const timer = setTimeout(function () {
+                const ref = _dotNetRefByScope[key];
+                if (ref) {
+                    try {
+                        ref.invokeMethodAsync('LogNotificationFired', item.id, Date.now());
+                    } catch (e) {
+                        // best-effort diagnostic — never block the notification
+                    }
+                }
                 try {
                     new Notification('To-Do: ' + item.title, {
                         body: 'Reminder from LogMyDay',
@@ -65,7 +82,7 @@ window.todoNotifications = {
                 }
             }, delay);
 
-            _scheduledTimers.push(timer);
+            _timersByScope[key].push(timer);
         });
     }
 };

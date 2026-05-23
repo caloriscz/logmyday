@@ -1069,6 +1069,19 @@ else
 
     private System.Threading.Timer? _refreshTimer;
 
+    private readonly string _notificationScope = Guid.NewGuid().ToString();
+    private DotNetObjectReference<TodoListsPanel>? _selfReference;
+
+    [JSInvokable]
+    public Task LogNotificationFired(int itemId, long firedAtMs)
+    {
+        Logger.LogInformation(
+            "[reminder-diag] event=fired itemId={ItemId} surface=web firedAtMs={FiredAtMs} scope={Scope}",
+            itemId, firedAtMs, _notificationScope);
+
+        return Task.CompletedTask;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         _prevSelectedDate = SelectedDate;
@@ -1099,6 +1112,7 @@ else
     public void Dispose()
     {
         _refreshTimer?.Dispose();
+        _selfReference?.Dispose();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1170,7 +1184,7 @@ else
         var today = DateTime.Today;
         var items = _lists
             .SelectMany(l => l.Items)
-            .Where(i => !i.IsDone && i.NotifyAt.HasValue && (i.StartDate == null || i.StartDate.Value.Date <= today))
+            .Where(i => !i.IsDone && !i.IsSkipped && i.NotifyAt.HasValue && (i.StartDate == null || i.StartDate.Value.Date <= today))
             .Select(i => new
             {
                 id = i.Id,
@@ -1179,9 +1193,17 @@ else
             })
             .ToArray();
 
+        foreach (var item in items)
+        {
+            Logger.LogInformation(
+                "[reminder-diag] event=scheduled itemId={ItemId} surface=web scope={Scope} notifyAtMs={NotifyAtMs} title={Title}",
+                item.id, _notificationScope, item.notifyAtMs, item.title);
+        }
+
         try
         {
-            await JS.InvokeVoidAsync("todoNotifications.scheduleNotifications", (object)items);
+            _selfReference ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("todoNotifications.scheduleNotifications", _notificationScope, _selfReference, (object)items);
         }
         catch (Exception ex)
         {
@@ -1372,7 +1394,7 @@ else
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
             else
@@ -1381,7 +1403,7 @@ else
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
 
@@ -1433,11 +1455,11 @@ else
 
             if (IsQuickCompleteInputType(effectiveInputTypeId))
             {
-                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue))
+                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue, item.Notes))
                 {
                     try
                     {
-                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                         UpdateItemInList(updated);
                         _notificationsNeedUpdate = true;
                     }
@@ -1466,7 +1488,7 @@ else
 
         try
         {
-            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
             UpdateItemInList(updated);
             _notificationsNeedUpdate = true;
         }
@@ -1529,7 +1551,7 @@ else
         _quickError = null;
         try
         {
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
+            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();
@@ -1793,21 +1815,28 @@ else
         return TimeOnly.TryParse(value, out var t) ? t : null;
     }
 
+    private DateTime EffectiveDoneAt() =>
+        DateTime.SpecifyKind((SelectedDate?.Date ?? DateTime.Today).AddHours(12), DateTimeKind.Local).ToUniversalTime();
+
     private static bool IsQuickCompleteInputType(int? id) => id is
         InputTypeIds.Boolean or InputTypeIds.String or
         InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage or
         InputTypeIds.StarRating or InputTypeIds.StarRating10 or
         InputTypeIds.Score or InputTypeIds.Score10;
 
-    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue)
+    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue, string? itemNotes = null)
     {
+        if (inputTypeId is InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage)
+        {
+            return decimal.TryParse(itemNotes, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var n) && n != 0;
+        }
+
         if (string.IsNullOrWhiteSpace(tagDefaultValue)) return false;
+
         return inputTypeId switch
         {
             InputTypeIds.Boolean => false,
             InputTypeIds.String => true,
-            InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
-                decimal.TryParse(tagDefaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _),
             InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
                 int.TryParse(tagDefaultValue, out var v) && v > 0,
             _ => false
@@ -1839,8 +1868,8 @@ else
             case InputTypeIds.Integer:
             case InputTypeIds.Decimal:
             case InputTypeIds.Percentage:
-                if (!string.IsNullOrWhiteSpace(defaultValue) &&
-                    decimal.TryParse(defaultValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
+                if (!string.IsNullOrWhiteSpace(item.Notes) &&
+                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d))
                 {
                     _quickDecimalValue = d;
                 }

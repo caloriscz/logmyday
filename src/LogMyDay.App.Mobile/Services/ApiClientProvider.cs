@@ -15,6 +15,7 @@ public interface IApiClientProvider
     ITagGroupApi TagGroup { get; }
     IAiApi Ai { get; }
     ITodoApi Todo { get; }
+    IEventLogApi EventLog { get; }
     void Invalidate();
 }
 
@@ -30,6 +31,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private ITagGroupApi? _tagGroup;
     private IAiApi? _ai;
     private ITodoApi? _todo;
+    private IEventLogApi? _eventLog;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -46,6 +48,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public ITagGroupApi TagGroup => _tagGroup ??= Build<ITagGroupApi>();
     public IAiApi Ai => _ai ??= Build<IAiApi>();
     public ITodoApi Todo => _todo ??= Build<ITodoApi>();
+    public IEventLogApi EventLog => _eventLog ??= Build<IEventLogApi>();
 
     private static readonly RefitSettings SharedRefitSettings = new()
     {
@@ -74,6 +77,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _tagGroup = null;
         _ai = null;
         _todo = null;
+        _eventLog = null;
     }
 
     public void Dispose()

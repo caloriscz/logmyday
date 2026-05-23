@@ -96,6 +96,10 @@ public class NotificationManagerService : INotificationManagerService
                 {
                     intent.PutExtra(TodoItemIdKey, payload.TodoItemId.Value);
                 }
+                if (payload.AutoComplete)
+                {
+                    intent.PutExtra(AutoCompleteKey, true);
+                }
             }
             intent.SetFlags(ActivityFlags.SingleTop | ActivityFlags.ClearTop);
 

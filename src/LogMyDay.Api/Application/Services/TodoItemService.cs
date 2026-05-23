@@ -52,6 +52,7 @@ public class TodoItemService : ITodoItemService
             MonitorFromDate = request.MonitorFromDate,
             MonitorToDate = request.MonitorToDate,
             CompletionTagId = request.CompletionTagId,
+            AllowUnfilled = request.AllowUnfilled,
             DateCreated = DateTime.UtcNow
         };
 
@@ -75,6 +76,10 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
+        var oldNotifyAt = item.NotifyAt;
+        var oldRecurrence = item.RecurrenceType;
+        var oldIsDone = item.IsDone;
+
         item.Title = request.Title;
         item.Notes = request.Notes;
         item.StartDate = request.StartDate;
@@ -87,8 +92,15 @@ public class TodoItemService : ITodoItemService
         item.MonitorFromDate = request.MonitorFromDate;
         item.MonitorToDate = request.MonitorToDate;
         item.CompletionTagId = request.CompletionTagId;
+        item.AllowUnfilled = request.AllowUnfilled;
 
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "[reminder-diag] event=update itemId={ItemId} userId={UserId} oldNotifyAt={OldNotifyAt} newNotifyAt={NewNotifyAt} oldRecurrence={OldRecurrence} newRecurrence={NewRecurrence} oldIsDone={OldIsDone}",
+            item.Id, userId,
+            oldNotifyAt?.ToString("HH:mm") ?? "null", item.NotifyAt?.ToString("HH:mm") ?? "null",
+            oldRecurrence, item.RecurrenceType, oldIsDone);
     }
 
     public async Task Delete(int id, Guid userId)
@@ -113,6 +125,10 @@ public class TodoItemService : ITodoItemService
 
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
+
+        _logger.LogInformation(
+            "[reminder-diag] event=complete itemId={ItemId} userId={UserId} doneAt={DoneAt:o} notifyAt={NotifyAt} recurrence={Recurrence}",
+            item.Id, userId, request.DoneAt, item.NotifyAt?.ToString("HH:mm") ?? "null", item.RecurrenceType);
 
         if (item.CompletionTagId.HasValue)
         {
@@ -257,6 +273,10 @@ public class TodoItemService : ITodoItemService
 
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation(
+            "[reminder-diag] event=skip itemId={ItemId} userId={UserId} skippedAt={SkippedAt:o} recurrence={Recurrence}",
+            item.Id, userId, item.SkippedAt, item.RecurrenceType);
+
         return MapToResponse(item);
     }
 
@@ -334,6 +354,7 @@ public class TodoItemService : ITodoItemService
             MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,
             CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
+            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
+            AllowUnfilled = item.AllowUnfilled
         };
 }

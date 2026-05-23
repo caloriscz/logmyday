@@ -51,4 +51,6 @@ public class TodoItem
     public DateOnly? MonitorFromDate { get; set; }
 
     public DateOnly? MonitorToDate { get; set; }
+
+    public bool AllowUnfilled { get; set; } = false;
 }

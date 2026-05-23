@@ -259,10 +259,13 @@
                                placeholder="Value"
                                @bind="_quickDecimalValue" />
                     }
-                    <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                        <input type="checkbox" class="rounded" @bind="_quickAllowUnfilled" />
-                        Leave unfilled
-                    </label>
+                    @if (_quickItem?.AllowUnfilled == true)
+                    {
+                        <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                            <input type="checkbox" class="rounded" @bind="_quickAllowUnfilled" />
+                            Leave unfilled
+                        </label>
+                    }
                 }
                 else if (_quickInputTypeId == InputTypeIds.StarRating)
                 {
@@ -430,6 +433,15 @@
                                 <option value="@AutoLogMode.Add">Add (accumulate)</option>
                                 <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
                             </InputSelect>
+                        </div>
+                    }
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { InputTypeId: InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage })
+                    {
+                        <div>
+                            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                                <InputCheckbox @bind-Value="_itemForm.AllowUnfilled" class="rounded" />
+                                Allow leaving value unfilled at completion
+                            </label>
                         </div>
                     }
                     <div>
@@ -731,14 +743,22 @@
                     _allTags = await ActivityApi.GetTags();
                 }
 
-                ReminderScheduler.ScheduleAll(_lists);
+                if (_selectedDate.Date == DateTime.Today)
+                {
+                    ReminderScheduler.ScheduleAll(_lists);
+                }
 
                 return;
             }
             catch (ApiException ex)
             {
                 Logger.LogWarning(ex, "Failed to load reminder todo lists");
-                _loadError = "Failed to load reminders. Tap reload to try again.";
+                // Only surface the error when we have nothing to show — otherwise
+                // keep cached data visible and let auto-refresh retry in 30 s.
+                if (_lists == null)
+                {
+                    _loadError = "Failed to load reminders. Tap reload to try again.";
+                }
 
                 return; // API errors (4xx/5xx) are not transient — no retry
             }
@@ -749,7 +769,7 @@
             }
         }
 
-        if (lastError != null)
+        if (lastError != null && _lists == null)
         {
             _loadError = "Failed to load reminders. Tap reload to try again.";
         }
@@ -779,8 +799,9 @@
         if (item.MonitorToDate.HasValue   && effectiveDate.Date > item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).Date)   return true;
         if (item.MonitorDaysBack.HasValue)
         {
-            var windowStart = effectiveDate.AddDays(-item.MonitorDaysBack.Value).Date;
-            if (effectiveDate.Date < windowStart) return true;
+            var today = DateTime.Today;
+            var windowStart = today.AddDays(-item.MonitorDaysBack.Value).Date;
+            return effectiveDate.Date < windowStart || effectiveDate.Date > today;
         }
 
         return false;
@@ -796,11 +817,11 @@
 
             if (IsQuickCompleteInputType(effectiveInputTypeId))
             {
-                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue))
+                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue, item.Notes))
                 {
                     try
                     {
-                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                         ReminderScheduler.CancelItem(item.Id);
                         UpdateItemInList(updated);
                     }
@@ -832,7 +853,7 @@
 
         try
         {
-            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
             ReminderScheduler.CancelItem(item.Id);
             UpdateItemInList(updated);
         }
@@ -966,8 +987,8 @@
             case InputTypeIds.Integer:
             case InputTypeIds.Decimal:
             case InputTypeIds.Percentage:
-                if (!string.IsNullOrWhiteSpace(defaultValue) &&
-                    decimal.TryParse(defaultValue, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+                if (!string.IsNullOrWhiteSpace(item.Notes) &&
+                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
                 {
                     _quickDecimalValue = d;
                 }
@@ -1032,7 +1053,7 @@
         _quickError = null;
         try
         {
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
+            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
             ReminderScheduler.CancelItem(_quickItem.Id);
             _showQuickModal = false;
             _quickItem = null;
@@ -1088,7 +1109,8 @@
             MonitorDaysBack = item.MonitorDaysBack,
             MonitorFromDate = item.MonitorFromDate,
             MonitorToDate = item.MonitorToDate,
-            CompletionTagId = item.CompletionTagId
+            CompletionTagId = item.CompletionTagId,
+            AllowUnfilled = item.AllowUnfilled
         };
         _itemEditContext = new EditContext(_itemForm);
 
@@ -1154,7 +1176,7 @@
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
             else
@@ -1163,18 +1185,15 @@
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
 
             _showItemModal = false;
             _booleanBoolValue = null;
             _editIntValue = null;
+            // LoadDataAsync already invokes ReminderScheduler.ScheduleAll when on today.
             await LoadDataAsync();
-            if (_lists != null)
-            {
-                ReminderScheduler.ScheduleAll(_lists);
-            }
         }
         catch (ApiException ex)
         {
@@ -1285,23 +1304,29 @@
         }
     }
 
-    // ── Static helpers ────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    private DateTime EffectiveDoneAt() =>
+        DateTime.SpecifyKind(_selectedDate.Date.AddHours(12), DateTimeKind.Local).ToUniversalTime();
+
     private static bool IsQuickCompleteInputType(int? id) => id is
         InputTypeIds.Boolean or InputTypeIds.String or
         InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage or
         InputTypeIds.StarRating or InputTypeIds.StarRating10 or
         InputTypeIds.Score or InputTypeIds.Score10;
 
-    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue)
+    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue, string? itemNotes = null)
     {
+        if (inputTypeId is InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage)
+        {
+            return decimal.TryParse(itemNotes, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var n) && n != 0;
+        }
+
         if (string.IsNullOrWhiteSpace(tagDefaultValue)) return false;
 
         return inputTypeId switch
         {
             InputTypeIds.Boolean => false,
             InputTypeIds.String => true,
-            InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage =>
-                decimal.TryParse(tagDefaultValue, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out _),
             InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
                 int.TryParse(tagDefaultValue, out var v) && v > 0,
             _ => false

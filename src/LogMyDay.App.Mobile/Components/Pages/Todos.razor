@@ -3,11 +3,13 @@
 @using LogMyDay.Domain.Enums
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
+@using LogMyDay.App.Mobile.Services
 @using Refit
 @implements IDisposable
 @inject ITodoApi TodoApi
 @inject IActivityApi ActivityApi
 @inject ILogger<Todos> Logger
+@inject ReminderNotificationScheduler ReminderScheduler
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
     <TopBar Title="Todos" ShowReload="true" OnReload="LoadDataAsync" />
@@ -817,6 +819,8 @@
             _lists = listsTask.Result.Where(l => l.ListType == TodoListType.Basic).ToList();
             _allTags = tagsTask.Result;
             _itemErrorPerList.Clear();
+
+            ReminderScheduler.ScheduleAll(_lists);
         }
         catch (ApiException ex)
         {
@@ -1083,6 +1087,7 @@
                     try
                     {
                         var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                        ReminderScheduler.CancelItem(item.Id);
                         UpdateItemInList(updated);
                     }
                     catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -1111,6 +1116,7 @@
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+            ReminderScheduler.CancelItem(item.Id);
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -1248,6 +1254,7 @@
         try
         {
             await TodoApi.DeleteTodoItem(item.Id);
+            ReminderScheduler.CancelItem(item.Id);
             await LoadDataAsync();
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)

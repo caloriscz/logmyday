@@ -24,4 +24,5 @@ public class TodoItemResponse
     public int? CompletionTagId { get; set; }
     public string? CompletionTagName { get; set; }
     public int? CompletionTagInputTypeId { get; set; }
+    public bool AllowUnfilled { get; set; }
 }

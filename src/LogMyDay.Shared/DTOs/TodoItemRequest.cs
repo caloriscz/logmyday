@@ -32,4 +32,6 @@ public class TodoItemRequest
     public DateOnly? MonitorToDate { get; set; }
 
     public int? CompletionTagId { get; set; }
+
+    public bool AllowUnfilled { get; set; }
 }

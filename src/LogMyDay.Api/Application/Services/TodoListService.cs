@@ -150,7 +150,8 @@ public class TodoListService : ITodoListService
             MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,
             CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
+            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
+            AllowUnfilled = item.AllowUnfilled
         };
 
     private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user, DateOnly? date = null)
