@@ -1,4 +1,5 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
@@ -56,6 +57,14 @@ public class ActivitiesController : BaseApiController
             var createdCalendar = await _activityService.Create(calendarRequest, userId);
 
             return Ok(createdCalendar);
+        }
+        catch (TagDayLockedException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Info,
+                $"Activity rejected: tag {ex.TagId} locked for {ex.Date:yyyy-MM-dd}",
+                $"TagId: {calendarRequest.PrimaryTagId}, Date: {calendarRequest.DateStarted:yyyy-MM-dd HH:mm}");
+
+            return Conflict(new { code = "tag-day-locked", tagId = ex.TagId, date = ex.Date.ToString("yyyy-MM-dd") });
         }
         catch (InvalidOperationException ex)
         {

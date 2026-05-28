@@ -7,7 +7,7 @@
 @using LogMyDay.Shared.Preferences
 @using Refit
 @implements IDisposable
-@inject ITodoApi TodoApi
+@inject IReminderApi ReminderApi
 @inject IActivityApi ActivityApi
 @inject ILogger<Reminders> Logger
 @inject IPageTitleService PageTitleService
@@ -53,9 +53,11 @@
                 {
                     var listId = list.Id;
                     var effectiveDate = _selectedDate.Date;
+                    // Reminders don't carry StartDate; tag-day-locked items stay visible (with
+                    // badge) instead of being filtered out so the user understands why they
+                    // can't act on them.
                     var filteredItems = list.Items
-                        .Where(i => !i.IsDone && !i.IsSkipped
-                            && (i.StartDate == null || i.StartDate.Value.Date <= effectiveDate)
+                        .Where(i => !i.IsDone && (!i.IsSkipped || i.IsTagDayLocked)
                             && !IsOutsideMonitoringWindow(i, effectiveDate));
                     var activeItems = filteredItems
                         .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
@@ -116,7 +118,8 @@
                             {
                                 @foreach (var item in activeItems)
                                 {
-                                    var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < effectiveDate;
+                                    // Reminders don't carry DueDate; "overdue" doesn't apply.
+                                    var isOverdue = false;
                                     var isHighlighted = _highlightedItemId == item.Id;
                                     <div @key="item.Id" class="rounded-xl border @(isOverdue ? "border-red-400/60" : "border-gray-200 dark:border-gray-700") @(isHighlighted ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3">
                                         <button type="button"
@@ -424,8 +427,8 @@
                             }
                         </div>
                     }
-                    @* Auto-log mode — only for non-repeatable tags *@
-                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value)?.IsRepeatable == false)
+                    @* Auto-log mode — shown for any tag (lets user choose Add vs Replace, regardless of repeatability) *@
+                    @if (_itemForm.CompletionTagId.HasValue)
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
@@ -631,7 +634,7 @@
 
 @code {
     // ── State ────────────────────────────────────────────────────────────────
-    private List<TodoListResponse>? _lists;
+    private List<ReminderListResponse>? _lists;
     private IList<TagResponse>? _allTags;
     private DateTime _selectedDate = DateTime.Today;
     private string? _loadError;
@@ -645,7 +648,7 @@
     private bool _isEditingItem;
     private int _editingItemId;
     private int _itemModalListId;
-    private TodoItemRequest _itemForm = new() { Title = string.Empty };
+    private ReminderRequest _itemForm = new() { Title = string.Empty };
     private EditContext _itemEditContext = default!;
     private string? _itemModalError;
     private bool? _booleanBoolValue;
@@ -654,7 +657,7 @@
 
     // Quick-complete modal
     private bool _showQuickModal;
-    private TodoItemResponse? _quickItem;
+    private ReminderResponse? _quickItem;
     private int? _quickInputTypeId;
     private bool? _quickBoolValue;
     private string? _quickStringValue;
@@ -667,15 +670,20 @@
     // List modal
     private bool _showListModal;
     private int _editingListId;
-    private TodoListRequest _listForm = new() { Name = string.Empty };
+    private ReminderListRequest _listForm = new() { Name = string.Empty };
     private EditContext _listEditContext = default!;
     private string? _listError;
 
     // Delete list
-    private TodoListResponse? _pendingDeleteList;
+    private ReminderListResponse? _pendingDeleteList;
 
     // Auto-refresh
     private System.Threading.Timer? _refreshTimer;
+
+    // Stale-overwrite guard: every LoadDataAsync captures the current generation;
+    // if a newer load (started after a user action) bumps the generation while we're
+    // mid-flight, our response is discarded instead of overwriting _lists.
+    private int _loadGeneration;
 
     // Deep-link highlight + auto-complete from notification action button
     [SupplyParameterFromQuery]
@@ -701,7 +709,18 @@
         }
 
         _refreshTimer = new System.Threading.Timer(
-            _ => InvokeAsync(async () => { await LoadDataAsync(); StateHasChanged(); }),
+            _ => InvokeAsync(async () =>
+            {
+                // Skip auto-refresh while the user is mid-action or a modal is open —
+                // otherwise a stale GetTodoLists response can overwrite a just-completed item.
+                if (_isBusy || _showItemModal || _showListModal || _showQuickModal || _pendingDeleteList != null)
+                {
+                    return;
+                }
+
+                await LoadDataAsync();
+                StateHasChanged();
+            }),
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
@@ -726,6 +745,11 @@
         _loadError = null;
         Exception? lastError = null;
 
+        // Capture the generation at start. If a newer LoadDataAsync (triggered by a user
+        // action) bumps _loadGeneration while we're awaiting the HTTP response, our
+        // result is discarded so it can't overwrite the post-action authoritative state.
+        var myGeneration = ++_loadGeneration;
+
         for (var attempt = 0; attempt < 2; attempt++)
         {
             if (attempt > 0)
@@ -736,8 +760,14 @@
             try
             {
                 var dateParam = _selectedDate.ToString("yyyy-MM-dd");
-                var all = await TodoApi.GetTodoLists(dateParam);
-                _lists = all.Where(l => l.ListType == TodoListType.Reminder).ToList();
+                var all = await ReminderApi.GetReminderLists(dateParam);
+
+                if (myGeneration != _loadGeneration)
+                {
+                    return; // a newer load started; discard our response
+                }
+
+                _lists = all.ToList();
                 if (_allTags == null)
                 {
                     _allTags = await ActivityApi.GetTags();
@@ -746,6 +776,13 @@
                 if (_selectedDate.Date == DateTime.Today)
                 {
                     ReminderScheduler.ScheduleAll(_lists);
+
+                    // Sweep orphan PendingIntents from older builds (e.g. the removed
+                    // tag-notification path) that the live cancel calls never touch.
+                    // Use the unfiltered API result so Basic-item Ids (scheduled by the
+                    // Todos page) remain in the live set — otherwise we'd cancel them.
+                    var liveIds = all.SelectMany(l => l.Items).Select(i => i.Id).ToHashSet();
+                    ReminderScheduler.SweepGhostAlarms(liveIds);
                 }
 
                 return;
@@ -793,7 +830,7 @@
     }
 
     // ── Monitoring window filter ───────────────────────────────────────────────
-    private static bool IsOutsideMonitoringWindow(TodoItemResponse item, DateTime effectiveDate)
+    private static bool IsOutsideMonitoringWindow(ReminderResponse item, DateTime effectiveDate)
     {
         if (item.MonitorFromDate.HasValue && effectiveDate.Date < item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue).Date) return true;
         if (item.MonitorToDate.HasValue   && effectiveDate.Date > item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).Date)   return true;
@@ -808,9 +845,9 @@
     }
 
     // ── Complete / Reopen / Skip ───────────────────────────────────────────────
-    private async Task CompleteItemAsync(TodoItemResponse item, TodoListResponse list)
+    private async Task CompleteItemAsync(ReminderResponse item, ReminderListResponse list)
     {
-        if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
+        if (item.CompletionTagId.HasValue)
         {
             var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
             var effectiveInputTypeId = item.CompletionTagInputTypeId ?? completionTag?.InputTypeId;
@@ -819,23 +856,30 @@
             {
                 if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue, item.Notes))
                 {
+                    _isBusy = true;
                     try
                     {
-                        var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                        var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
                         ReminderScheduler.CancelItem(item.Id);
                         UpdateItemInList(updated);
                     }
                     catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
                         Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
-                        _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-                        await LoadDataAsync();
+                        _itemErrorPerList[item.ReminderListId] = "Item no longer exists. Reload to refresh.";
                     }
                     catch (ApiException ex)
                     {
                         Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
-                        _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+                        _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
                     }
+                    finally
+                    {
+                        _isBusy = false;
+                    }
+
+                    // Authoritative reload — bumps generation so any in-flight auto-refresh response is discarded.
+                    await LoadDataAsync();
 
                     return;
                 }
@@ -851,68 +895,86 @@
             return;
         }
 
+        _isBusy = true;
         try
         {
-            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
             ReminderScheduler.CancelItem(item.Id);
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
-            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
+            _itemErrorPerList[item.ReminderListId] = "Item no longer exists. Reload to refresh.";
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
-            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+            _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
-    private async Task ReopenItemAsync(TodoItemResponse item)
+    private async Task ReopenItemAsync(ReminderResponse item)
     {
+        _isBusy = true;
         try
         {
-            var updated = await TodoApi.ReopenItem(item.Id);
+            var updated = await ReminderApi.ReopenReminder(item.Id);
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when reopening", item.Id);
-            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
+            _itemErrorPerList[item.ReminderListId] = "Item no longer exists. Reload to refresh.";
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to reopen todo item {ItemId}", item.Id);
-            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+            _itemErrorPerList[item.ReminderListId] = "Failed to update. Please try again.";
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
-    private async Task SkipItemAsync(TodoItemResponse item)
+    private async Task SkipItemAsync(ReminderResponse item)
     {
+        _isBusy = true;
         try
         {
-            var updated = await TodoApi.SkipItem(item.Id, _selectedDate.ToString("yyyy-MM-dd"));
+            var updated = await ReminderApi.SkipReminder(item.Id, _selectedDate.ToString("yyyy-MM-dd"));
             UpdateItemInList(updated);
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when skipping", item.Id);
-            _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
+            _itemErrorPerList[item.ReminderListId] = "Item no longer exists. Reload to refresh.";
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to skip todo item {ItemId}", item.Id);
-            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+            _itemErrorPerList[item.ReminderListId] = "Failed to update. Please try again.";
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
-    private void UpdateItemInList(TodoItemResponse updated)
+    private void UpdateItemInList(ReminderResponse updated)
     {
-        var list = _lists?.FirstOrDefault(l => l.Id == updated.ListId);
+        var list = _lists?.FirstOrDefault(l => l.Id == updated.ReminderListId);
         if (list == null) return;
 
         for (var i = 0; i < list.Items.Count; i++)
@@ -938,21 +1000,21 @@
 
             try
             {
-                var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
+                var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow });
                 ReminderScheduler.CancelItem(item.Id);
                 ReminderScheduler.DismissItem(item.Id);
                 UpdateItemInList(updated);
-                _showDonePerList.Add(item.ListId);
+                _showDonePerList.Add(item.ReminderListId);
             }
             catch (ApiException ex)
             {
                 Logger.LogWarning(ex, "Failed to auto-complete todo item {ItemId} from notification", item.Id);
-                _itemErrorPerList[item.ListId] = "Failed to mark done. Please try again.";
+                _itemErrorPerList[item.ReminderListId] = "Failed to mark done. Please try again.";
             }
             catch (Exception ex)
             {
                 Logger.LogWarning(ex, "Failed to auto-complete todo item {ItemId} from notification — network error", item.Id);
-                _itemErrorPerList[item.ListId] = "Failed to mark done. Please try again.";
+                _itemErrorPerList[item.ReminderListId] = "Failed to mark done. Please try again.";
             }
 
             break;
@@ -962,7 +1024,7 @@
     }
 
     // ── Quick-complete modal ───────────────────────────────────────────────────
-    private void OpenQuickCompleteModal(TodoItemResponse item, int? inputTypeId)
+    private void OpenQuickCompleteModal(ReminderResponse item, int? inputTypeId)
     {
         _quickItem = item;
         _quickInputTypeId = inputTypeId;
@@ -1053,7 +1115,7 @@
         _quickError = null;
         try
         {
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
             ReminderScheduler.CancelItem(_quickItem.Id);
             _showQuickModal = false;
             _quickItem = null;
@@ -1062,12 +1124,56 @@
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to complete todo item via quick modal");
-            _quickError = "Failed to save. Please try again.";
+            _quickError = SurfaceErrorMessage(ex, "Failed to save. Please try again.");
         }
         finally
         {
             _isQuickBusy = false;
         }
+    }
+
+    /// <summary>For 400/409 responses with a server-provided body, surface that message
+    /// instead of a generic "Failed to save" toast — e.g. "Cannot add more. Maximum is 2".
+    /// Handles both plain-string bodies and structured JSON error objects like
+    /// <c>{"code":"tag-day-locked","tagId":23,"date":"2026-05-25"}</c>.</summary>
+    private static string SurfaceErrorMessage(ApiException ex, string fallback)
+    {
+        if ((ex.StatusCode == System.Net.HttpStatusCode.BadRequest
+            || ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            && !string.IsNullOrWhiteSpace(ex.Content))
+        {
+            var content = ex.Content.Trim();
+
+            if (content.StartsWith("{") && content.EndsWith("}"))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("code", out var codeEl) &&
+                        codeEl.GetString() == "tag-day-locked" &&
+                        root.TryGetProperty("date", out var dateEl))
+                    {
+                        return $"This tag is locked for {dateEl.GetString()}. Unlock it first to add another value.";
+                    }
+
+                    if (root.TryGetProperty("message", out var messageEl) &&
+                        !string.IsNullOrWhiteSpace(messageEl.GetString()))
+                    {
+                        return messageEl.GetString()!;
+                    }
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    // Not JSON — fall through to the plain-string handler.
+                }
+            }
+
+            return content.Trim('"');
+        }
+
+        return fallback;
     }
 
     // ── Item create/edit modal ─────────────────────────────────────────────────
@@ -1076,10 +1182,10 @@
         _isEditingItem = false;
         _editingItemId = 0;
         _itemModalListId = listId;
-        _itemForm = new TodoItemRequest
+        _itemForm = new ReminderRequest
         {
             Title = string.Empty,
-            ListId = listId,
+            ReminderListId = listId,
             RecurrenceType = RecurrenceType.None
         };
         _itemEditContext = new EditContext(_itemForm);
@@ -1090,18 +1196,16 @@
         _showItemModal = true;
     }
 
-    private void OpenEditItemModal(TodoItemResponse item)
+    private void OpenEditItemModal(ReminderResponse item)
     {
         _isEditingItem = true;
         _editingItemId = item.Id;
-        _itemModalListId = item.ListId;
-        _itemForm = new TodoItemRequest
+        _itemModalListId = item.ReminderListId;
+        _itemForm = new ReminderRequest
         {
-            ListId = item.ListId,
+            ReminderListId = item.ReminderListId,
             Title = item.Title,
             Notes = item.Notes,
-            StartDate = item.StartDate,
-            DueDate = item.DueDate,
             NotifyAt = item.NotifyAt,
             DisplayOrder = item.DisplayOrder,
             RecurrenceType = item.RecurrenceType,
@@ -1172,20 +1276,20 @@
 
             if (_isEditingItem)
             {
-                await TodoApi.UpdateTodoItem(_editingItemId, _itemForm);
+                await ReminderApi.UpdateReminder(_editingItemId, _itemForm);
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
             else
             {
-                var created = await TodoApi.CreateTodoItem(_itemForm);
+                var created = await ReminderApi.CreateReminder(_itemForm);
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
                 }
             }
 
@@ -1214,7 +1318,7 @@
         _isBusy = true;
         try
         {
-            await TodoApi.DeleteTodoItem(_editingItemId);
+            await ReminderApi.DeleteReminder(_editingItemId);
             _showItemModal = false;
             await LoadDataAsync();
         }
@@ -1230,13 +1334,12 @@
     }
 
     // ── List edit modal ────────────────────────────────────────────────────────
-    private void OpenEditListModal(TodoListResponse list)
+    private void OpenEditListModal(ReminderListResponse list)
     {
         _editingListId = list.Id;
-        _listForm = new TodoListRequest
+        _listForm = new ReminderListRequest
         {
             Name = list.Name,
-            ListType = TodoListType.Reminder,
             ShowOnHomepage = list.ShowOnHomepage
         };
         _listEditContext = new EditContext(_listForm);
@@ -1262,7 +1365,7 @@
         _listError = null;
         try
         {
-            await TodoApi.UpdateTodoList(_editingListId, _listForm);
+            await ReminderApi.UpdateReminderList(_editingListId, _listForm);
             _showListModal = false;
             await LoadDataAsync();
         }
@@ -1280,7 +1383,7 @@
     }
 
     // ── Delete list ───────────────────────────────────────────────────────────
-    private void ConfirmDeleteList(TodoListResponse list) => _pendingDeleteList = list;
+    private void ConfirmDeleteList(ReminderListResponse list) => _pendingDeleteList = list;
 
     private async Task DeleteListConfirmedAsync()
     {
@@ -1288,7 +1391,7 @@
         _isBusy = true;
         try
         {
-            await TodoApi.DeleteTodoList(_pendingDeleteList.Id);
+            await ReminderApi.DeleteReminderList(_pendingDeleteList.Id);
             _pendingDeleteList = null;
             await LoadDataAsync();
         }

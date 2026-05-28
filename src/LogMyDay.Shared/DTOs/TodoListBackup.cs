@@ -6,7 +6,7 @@ public class TodoListBackup
 {
     public string Name { get; set; } = string.Empty;
     public int DisplayOrder { get; set; }
-    public TodoListType ListType { get; set; }
+    public bool ShowOnHomepage { get; set; }
     public DateTime DateCreated { get; set; }
     public List<TodoItemBackup> Items { get; set; } = new();
 }
@@ -20,12 +20,10 @@ public class TodoItemBackup
     public TimeOnly? NotifyAt { get; set; }
     public bool IsDone { get; set; }
     public DateTime? DoneAt { get; set; }
+    public DateTime? SkippedAt { get; set; }
     public int DisplayOrder { get; set; }
     public DateTime DateCreated { get; set; }
     public RecurrenceType RecurrenceType { get; set; }
     public AutoLogMode AutoLogMode { get; set; }
     public string? CompletionTagName { get; set; }
-    public int? MonitorDaysBack { get; set; }
-    public DateOnly? MonitorFromDate { get; set; }
-    public DateOnly? MonitorToDate { get; set; }
 }

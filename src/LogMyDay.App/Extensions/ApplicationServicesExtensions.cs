@@ -31,6 +31,9 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<ITodoListService, TodoListService>();
         services.AddScoped<ITodoItemService, TodoItemService>();
+        services.AddScoped<ITagDayLockService, TagDayLockService>();
+        services.AddScoped<IReminderListService, ReminderListService>();
+        services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IExcelExportService, ExportService>();
         services.AddScoped<IEventLogService, EventLogService>();
         services.AddSingleton<ISettingProtector, SettingProtector>();

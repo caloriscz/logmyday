@@ -1,4 +1,6 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services;
+using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -10,14 +12,17 @@ namespace LogMyDay.Api.Controllers;
 public class TodoItemsController : BaseApiController
 {
     private readonly ITodoItemService _todoItemService;
+    private readonly IEventLogService _eventLogService;
     private readonly ILogger<TodoItemsController> _logger;
 
     public TodoItemsController(
         ITodoItemService todoItemService,
         IAuthService authService,
+        IEventLogService eventLogService,
         ILogger<TodoItemsController> logger) : base(authService)
     {
         _todoItemService = todoItemService;
+        _eventLogService = eventLogService;
         _logger = logger;
     }
 
@@ -103,9 +108,21 @@ public class TodoItemsController : BaseApiController
 
             return NotFound(ex.Message);
         }
+        catch (TagDayLockedException ex)
+        {
+            _logger.LogInformation(ex, "Todo item {ItemId} completion rejected: tag {TagId} locked for {Date}", id, ex.TagId, ex.Date);
+            await _eventLogService.Log(userId, EventLogLevel.Error,
+                $"Reminder completion rejected: tag {ex.TagId} locked for {ex.Date:yyyy-MM-dd}",
+                $"TodoItemId: {id}");
+
+            return Conflict(new { code = "tag-day-locked", tagId = ex.TagId, date = ex.Date.ToString("yyyy-MM-dd") });
+        }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Cannot complete todo item {ItemId} for user {UserId}", id, userId);
+            await _eventLogService.Log(userId, EventLogLevel.Error,
+                $"Reminder completion rejected: {ex.Message}",
+                $"TodoItemId: {id}");
 
             return BadRequest(ex.Message);
         }

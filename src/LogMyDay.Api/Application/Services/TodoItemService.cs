@@ -1,4 +1,3 @@
-using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Enums;
@@ -8,6 +7,11 @@ using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Application.Services;
 
+/// <summary>
+/// Basic todo items only. Reminder items moved to <see cref="ReminderService"/> in the
+/// 2026-05-24 entity split; Reminder-only fields (MonitorDaysBack/From/To, AllowUnfilled)
+/// were dropped from <see cref="Domain.Entities.TodoItem"/>.
+/// </summary>
 public class TodoItemService : ITodoItemService
 {
     private readonly LogMyDayDbContext _context;
@@ -48,11 +52,7 @@ public class TodoItemService : ITodoItemService
             DisplayOrder = request.DisplayOrder,
             RecurrenceType = request.RecurrenceType,
             AutoLogMode = request.AutoLogMode,
-            MonitorDaysBack = request.MonitorDaysBack,
-            MonitorFromDate = request.MonitorFromDate,
-            MonitorToDate = request.MonitorToDate,
             CompletionTagId = request.CompletionTagId,
-            AllowUnfilled = request.AllowUnfilled,
             DateCreated = DateTime.UtcNow
         };
 
@@ -76,10 +76,6 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
-        var oldNotifyAt = item.NotifyAt;
-        var oldRecurrence = item.RecurrenceType;
-        var oldIsDone = item.IsDone;
-
         item.Title = request.Title;
         item.Notes = request.Notes;
         item.StartDate = request.StartDate;
@@ -88,19 +84,9 @@ public class TodoItemService : ITodoItemService
         item.DisplayOrder = request.DisplayOrder;
         item.RecurrenceType = request.RecurrenceType;
         item.AutoLogMode = request.AutoLogMode;
-        item.MonitorDaysBack = request.MonitorDaysBack;
-        item.MonitorFromDate = request.MonitorFromDate;
-        item.MonitorToDate = request.MonitorToDate;
         item.CompletionTagId = request.CompletionTagId;
-        item.AllowUnfilled = request.AllowUnfilled;
 
         await _context.SaveChangesAsync();
-
-        _logger.LogInformation(
-            "[reminder-diag] event=update itemId={ItemId} userId={UserId} oldNotifyAt={OldNotifyAt} newNotifyAt={NewNotifyAt} oldRecurrence={OldRecurrence} newRecurrence={NewRecurrence} oldIsDone={OldIsDone}",
-            item.Id, userId,
-            oldNotifyAt?.ToString("HH:mm") ?? "null", item.NotifyAt?.ToString("HH:mm") ?? "null",
-            oldRecurrence, item.RecurrenceType, oldIsDone);
     }
 
     public async Task Delete(int id, Guid userId)
@@ -126,10 +112,6 @@ public class TodoItemService : ITodoItemService
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
-        _logger.LogInformation(
-            "[reminder-diag] event=complete itemId={ItemId} userId={UserId} doneAt={DoneAt:o} notifyAt={NotifyAt} recurrence={Recurrence}",
-            item.Id, userId, request.DoneAt, item.NotifyAt?.ToString("HH:mm") ?? "null", item.RecurrenceType);
-
         if (item.CompletionTagId.HasValue)
         {
             if (item.AutoLogMode == AutoLogMode.ResetIfExists)
@@ -146,19 +128,17 @@ public class TodoItemService : ITodoItemService
                 if (existing != null)
                 {
                     existing.DateStarted = request.DoneAt;
-                    existing.Description = item.List.ListType == TodoListType.Reminder
-                        ? (request.CompletionValue ?? item.Notes)
-                        : item.Title;
+                    existing.Description = item.Title;
                     _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
                 }
                 else
                 {
-                    await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
+                    await LogActivityAsync(item, request.DoneAt, userId);
                 }
             }
             else
             {
-                await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
+                await LogActivityAsync(item, request.DoneAt, userId);
             }
         }
 
@@ -167,14 +147,12 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
-    private async Task LogActivityAsync(Domain.Entities.TodoItem item, string? completionValue, DateTime doneAt, Guid userId)
+    private async Task LogActivityAsync(Domain.Entities.TodoItem item, DateTime doneAt, Guid userId)
     {
         var activityRequest = new ActivityRequest
         {
             PrimaryTagId = item.CompletionTagId!.Value,
-            Description = item.List.ListType == TodoListType.Reminder
-                ? (completionValue ?? item.Notes)
-                : item.Title,
+            Description = item.Title,
             DateStarted = doneAt
         };
 
@@ -182,46 +160,12 @@ public class TodoItemService : ITodoItemService
         _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", item.CompletionTagId.Value, item.Id);
     }
 
-    private static bool IsNumericInputType(int? inputTypeId) =>
-        inputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
-
-    private static bool IsBooleanInputType(int? inputTypeId) =>
-        inputTypeId == 3;
-
-    private static void ValidateReminderItemValue(TodoListType listType, int? completionTagId, string? notes, int? inputTypeId = null)
-    {
-        if (listType != TodoListType.Reminder || !completionTagId.HasValue)
-        {
-            return;
-        }
-
-        if (IsBooleanInputType(inputTypeId))
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(notes))
-        {
-            throw new InvalidOperationException("Value is required for Reminder list items.");
-        }
-    }
-
+    /// <summary>Window for <c>AutoLogMode.ResetIfExists</c>. Basic items don't carry the
+    /// Reminder-style explicit Monitor* fields, so the window is derived from RecurrenceType
+    /// only: Weekly → current Monday-anchored week; everything else → today.</summary>
     private static (DateTime Start, DateTime End) ComputeMonitoringWindow(Domain.Entities.TodoItem item)
     {
         var todayUtc = DateTime.UtcNow.Date;
-
-        if (item.MonitorDaysBack.HasValue)
-        {
-            return (todayUtc.AddDays(-item.MonitorDaysBack.Value), todayUtc.AddDays(1));
-        }
-
-        if (item.MonitorFromDate.HasValue && item.MonitorToDate.HasValue)
-        {
-            return (
-                item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue),
-                item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).AddDays(1)
-            );
-        }
 
         if (item.RecurrenceType == RecurrenceType.Weekly)
         {
@@ -272,10 +216,6 @@ public class TodoItemService : ITodoItemService
         }
 
         await _context.SaveChangesAsync();
-
-        _logger.LogInformation(
-            "[reminder-diag] event=skip itemId={ItemId} userId={UserId} skippedAt={SkippedAt:o} recurrence={Recurrence}",
-            item.Id, userId, item.SkippedAt, item.RecurrenceType);
 
         return MapToResponse(item);
     }
@@ -349,12 +289,8 @@ public class TodoItemService : ITodoItemService
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
             AutoLogMode = item.AutoLogMode,
-            MonitorDaysBack = item.MonitorDaysBack,
-            MonitorFromDate = item.MonitorFromDate,
-            MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,
             CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
-            AllowUnfilled = item.AllowUnfilled
+            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
         };
 }

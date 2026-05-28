@@ -329,6 +329,108 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Quantities", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AllowUnfilled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AutoLogMode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CompletionTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("DoneAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<int?>("MonitorDaysBack")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("MonitorFromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("MonitorToDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<TimeOnly?>("NotifyAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RecurrenceType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ReminderListId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SkippedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompletionTagId");
+
+                    b.HasIndex("ReminderListId");
+
+                    b.ToTable("LogMyDay_Reminders", (string)null);
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderList", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ShowOnHomepage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_ReminderLists_UserId");
+
+                    b.ToTable("LogMyDay_ReminderLists", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.ScanMapping", b =>
                 {
                     b.Property<int>("Id")
@@ -477,6 +579,45 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Tags", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagDayLock", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("SetAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SetBy")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TagId");
+
+                    b.HasIndex("UserId", "TagId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LogMyDay_TagDayLocks_UserId_TagId_Date");
+
+                    b.ToTable("LogMyDay_TagDayLocks", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagGroup", b =>
                 {
                     b.Property<int>("Id")
@@ -556,9 +697,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("AllowUnfilled")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("AutoLogMode")
                         .HasColumnType("INTEGER");
 
@@ -586,15 +724,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
                     b.Property<int>("ListId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<int?>("MonitorDaysBack")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateOnly?>("MonitorFromDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("MonitorToDate")
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
@@ -638,9 +767,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(0);
-
-                    b.Property<int>("ListType")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -803,6 +929,24 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("BaseUnit");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "CompletionTag")
+                        .WithMany()
+                        .HasForeignKey("CompletionTagId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("LogMyDay.Domain.Entities.ReminderList", "List")
+                        .WithMany("Items")
+                        .HasForeignKey("ReminderListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CompletionTag");
+
+                    b.Navigation("List");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.ScanMapping", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
@@ -850,6 +994,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagDayLock", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
+                        .WithMany()
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tag");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagOption", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.TagOptionList", "OptionList")
@@ -893,6 +1048,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
                 {
                     b.Navigation("Detail");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderList", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagOptionList", b =>

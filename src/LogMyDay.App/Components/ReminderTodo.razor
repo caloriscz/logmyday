@@ -51,7 +51,8 @@
         {
             @foreach (var item in ActiveItems)
             {
-                var isOverdue = item.DueDate.HasValue && item.DueDate.Value.Date < EffectiveDate.Date;
+                // Reminders don't carry DueDate; "overdue" applies to one-shot todos only.
+                var isOverdue = false;
                 <ReminderTodoItem Item="item"
                                   IsOverdue="isOverdue"
                                   IsBusy="IsBusy"
@@ -93,9 +94,9 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public TodoListResponse List { get; set; } = null!;
-    [Parameter, EditorRequired] public List<TodoItemResponse> ActiveItems { get; set; } = [];
-    [Parameter, EditorRequired] public List<TodoItemResponse> DoneItems { get; set; } = [];
+    [Parameter, EditorRequired] public ReminderListResponse List { get; set; } = null!;
+    [Parameter, EditorRequired] public List<ReminderResponse> ActiveItems { get; set; } = [];
+    [Parameter, EditorRequired] public List<ReminderResponse> DoneItems { get; set; } = [];
     [Parameter] public bool ShowDone { get; set; }
     [Parameter] public bool IsBusy { get; set; }
     [Parameter] public DateTime EffectiveDate { get; set; }
@@ -104,10 +105,10 @@
     [Parameter] public EventCallback OnAddItem { get; set; }
     [Parameter] public EventCallback OnEditList { get; set; }
     [Parameter] public EventCallback OnDeleteList { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnCompleteItem { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnSkipItem { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnEditItem { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnReopenItem { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnDeleteItem { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnCompleteItem { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnSkipItem { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnEditItem { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnReopenItem { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnDeleteItem { get; set; }
     [Parameter] public EventCallback OnReload { get; set; }
 }

@@ -7,8 +7,13 @@ public class TodoListResponse
     public int Id { get; set; }
     public required string Name { get; set; }
     public int DisplayOrder { get; set; }
-    public TodoListType ListType { get; set; }
     public bool ShowOnHomepage { get; set; }
     public DateTime DateCreated { get; set; }
     public IList<TodoItemResponse> Items { get; set; } = new List<TodoItemResponse>();
+
+    /// <summary>
+    /// Compatibility shim — Reminder lists were split out into <see cref="ReminderListResponse"/>.
+    /// Always returns Basic. Source-compat for razor markup not yet stripped.
+    /// </summary>
+    public TodoListType ListType => TodoListType.Basic;
 }

@@ -11,7 +11,8 @@ public class TodoListRequest
 
     public int DisplayOrder { get; set; } = 0;
 
-    public TodoListType ListType { get; set; } = TodoListType.Basic;
-
     public bool ShowOnHomepage { get; set; } = false;
+
+    /// <summary>Compat shim — ignored by the server (always Basic). See <see cref="ReminderListRequest"/>.</summary>
+    public TodoListType ListType { get; set; } = TodoListType.Basic;
 }

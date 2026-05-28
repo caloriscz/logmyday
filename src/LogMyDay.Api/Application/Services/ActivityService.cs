@@ -14,12 +14,18 @@ public class ActivityService : IActivityService
     private readonly LogMyDayDbContext _context;
     private readonly IActivityRepository _activityRepository;
     private readonly IEventLogService _eventLogService;
+    private readonly ITagDayLockService _tagDayLockService;
 
-    public ActivityService(LogMyDayDbContext context, IActivityRepository activityRepository, IEventLogService eventLogService)
+    public ActivityService(
+        LogMyDayDbContext context,
+        IActivityRepository activityRepository,
+        IEventLogService eventLogService,
+        ITagDayLockService tagDayLockService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _activityRepository = activityRepository ?? throw new ArgumentNullException(nameof(activityRepository));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
+        _tagDayLockService = tagDayLockService ?? throw new ArgumentNullException(nameof(tagDayLockService));
     }
 
     public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
@@ -29,6 +35,15 @@ public class ActivityService : IActivityService
         if (tag == null)
         {
             throw new ArgumentException("Invalid tag ID");
+        }
+
+        // TagDayLock enforcement: reject any activity for a locked (UserId, TagId, localDate)
+        // triple. The client (web/mobile) catches the 409 and offers an unlock-and-retry prompt.
+        var activityLocalDate = await GetUserLocalDate(userId, calendarRequest.DateStarted);
+        var existingLock = await _tagDayLockService.Find(userId, tag.Id, activityLocalDate);
+        if (existingLock?.IsLocked == true)
+        {
+            throw new TagDayLockedException(tag.Id, activityLocalDate);
         }
 
         var isNumeric = tag.InputTypeId is 1 or 6; // Integer or Decimal
@@ -51,7 +66,7 @@ public class ActivityService : IActivityService
                     if (tag.MaxValue.HasValue && newValue > tag.MaxValue.Value)
                     {
                         throw new InvalidOperationException(
-                            $"Cannot add more. Maximum is {tag.MaxValue.Value}, current value is {currentValue}."
+                            $"Adding step {step} would bring this tag to {newValue}, which exceeds the maximum {tag.MaxValue.Value} (current value {currentValue})."
                         );
                     }
 
@@ -76,7 +91,7 @@ public class ActivityService : IActivityService
                 if (tag.MaxValue.HasValue && double.TryParse(calendarRequest.Description, out var descVal) && descVal > tag.MaxValue.Value)
                 {
                     throw new InvalidOperationException(
-                        $"Cannot add more. Maximum is {tag.MaxValue.Value}, current value is 0."
+                        $"Value {descVal} exceeds the maximum {tag.MaxValue.Value} allowed for this tag."
                     );
                 }
             }
@@ -103,7 +118,7 @@ public class ActivityService : IActivityService
             if (currentSum + newValue > tag.MaxValue.Value)
             {
                 throw new InvalidOperationException(
-                    $"Cannot add more. Maximum is {tag.MaxValue.Value}, current total is {currentSum}."
+                    $"Adding {newValue} would bring the daily total to {currentSum + newValue}, which exceeds the maximum {tag.MaxValue.Value} (current total {currentSum})."
                 );
             }
         }
@@ -136,7 +151,37 @@ public class ActivityService : IActivityService
             : $" of value {reloadedActivity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info, $"Activity '{tagName}'{desc} added");
 
+        // Auto-lock the tag for the day if it's non-repeatable. Skips if any row exists for
+        // the triple — preserves a prior manual unlock so we don't override user choice.
+        if (!tag.IsRepeatable)
+        {
+            await _tagDayLockService.TryAutoLock(userId, tag.Id, activityLocalDate);
+        }
+
         return MapToResponse(reloadedActivity);
+    }
+
+    /// <summary>Convert a UTC (or unspecified) DateTime into the user's local date.
+    /// Falls back to UTC if the user has no TimeZone preference or the ID is invalid.</summary>
+    private async Task<DateOnly> GetUserLocalDate(Guid userId, DateTime dateStarted)
+    {
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
+        TimeZoneInfo tz;
+        try
+        {
+            tz = TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            tz = TimeZoneInfo.Utc;
+        }
+
+        var utc = dateStarted.Kind == DateTimeKind.Utc
+            ? dateStarted
+            : DateTime.SpecifyKind(dateStarted, DateTimeKind.Utc);
+
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, tz));
     }
 
     public async Task<bool> Delete(int id, Guid userId)

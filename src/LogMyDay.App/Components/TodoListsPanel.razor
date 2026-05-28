@@ -84,29 +84,7 @@ else
             var showDoneForThis = _showDonePerList.Contains(listId);
             var showSkippedForThis = _showSkippedPerList.Contains(listId);
 
-            @if (IsReminderHomepageMode)
-            {
-                <ReminderTodo @key="listId"
-                              List="list"
-                              ActiveItems="activeItems"
-                              DoneItems="doneItems"
-                              ShowDone="showDoneForThis"
-                              IsBusy="_isBusy"
-                              EffectiveDate="effectiveDate"
-                              ItemError="@_itemErrorPerList.GetValueOrDefault(listId)"
-                              OnToggleShowDone="() => ToggleShowDone(listId)"
-                              OnAddItem="() => OpenAddItemModal(listId)"
-                              OnEditList="() => OpenEditListModal(list)"
-                              OnDeleteList="() => ConfirmDeleteList(list)"
-                              OnCompleteItem="async item => await CompleteItemAsync(item, list)"
-                              OnSkipItem="SkipItemAsync"
-                              OnEditItem="OpenEditItemModal"
-                              OnReopenItem="ReopenItemAsync"
-                              OnDeleteItem="DeleteItemAsync"
-                              OnReload="LoadDataAsync" />
-            }
-            else
-            {
+            @* Reminder homepage rendering moved to RemindersPanel.razor; this panel only handles Basic todo lists post-Phase-3. *@
             <div @key="listId" class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900" style="min-height: 600px;">
 
                 @* Panel header *@
@@ -675,7 +653,7 @@ else
                                 }
                             </div>
                         }
-                        @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value)?.IsRepeatable == false)
+                        @if (_itemForm.CompletionTagId.HasValue)
                         {
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
@@ -747,7 +725,7 @@ else
                             <option value="@RecurrenceType.Weekly">Weekly</option>
                         </InputSelect>
                     </div>
-                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder && _itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value)?.IsRepeatable == false)
+                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder && _itemForm.CompletionTagId.HasValue)
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
@@ -1072,6 +1050,9 @@ else
     private readonly string _notificationScope = Guid.NewGuid().ToString();
     private DotNetObjectReference<TodoListsPanel>? _selfReference;
 
+    // Stale-overwrite guard — see LoadDataAsync for usage.
+    private int _loadGeneration;
+
     [JSInvokable]
     public Task LogNotificationFired(int itemId, long firedAtMs)
     {
@@ -1131,12 +1112,22 @@ else
 
     private async Task LoadDataAsync()
     {
+        // Stale-overwrite guard: discard our response if a newer load (from a user action)
+        // bumps the generation while we're awaiting.
+        var myGeneration = ++_loadGeneration;
+
         try
         {
             var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
             var listsTask = TodoApi.GetTodoLists(dateParam);
             var tagsTask = ActivityApi.GetTags();
             await Task.WhenAll(listsTask, tagsTask);
+
+            if (myGeneration != _loadGeneration)
+            {
+                return; // a newer load won the race
+            }
+
             _lists = listsTask.Result;
             if (HomepageOnly)
             {
@@ -1457,6 +1448,7 @@ else
             {
                 if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue, item.Notes))
                 {
+                    _isBusy = true;
                     try
                     {
                         var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
@@ -1467,13 +1459,19 @@ else
                     {
                         Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
                         _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-                        await LoadDataAsync();
                     }
                     catch (ApiException ex)
                     {
                         Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
-                        _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+                        _itemErrorPerList[item.ListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
                     }
+                    finally
+                    {
+                        _isBusy = false;
+                    }
+
+                    // Authoritative reload — bumps _loadGeneration so any in-flight refresh response is discarded.
+                    await LoadDataAsync();
                     return;
                 }
 
@@ -1486,6 +1484,7 @@ else
             return;
         }
 
+        _isBusy = true;
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
@@ -1496,13 +1495,18 @@ else
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when completing", item.Id);
             _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to complete todo item {ItemId}", item.Id);
-            _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
+            _itemErrorPerList[item.ListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
     private async Task SaveQuickAsync()
@@ -1559,7 +1563,7 @@ else
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to complete todo item via quick modal");
-            _quickError = "Failed to save. Please try again.";
+            _quickError = SurfaceErrorMessage(ex, "Failed to save. Please try again.");
         }
         finally
         {
@@ -1567,8 +1571,52 @@ else
         }
     }
 
+    /// <summary>For 400/409 responses with a server-provided body, surface that message
+    /// instead of a generic toast. Handles both plain-string bodies and structured JSON
+    /// error objects like <c>{"code":"tag-day-locked","tagId":23,"date":"2026-05-25"}</c>.</summary>
+    private static string SurfaceErrorMessage(ApiException ex, string fallback)
+    {
+        if ((ex.StatusCode == System.Net.HttpStatusCode.BadRequest
+            || ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            && !string.IsNullOrWhiteSpace(ex.Content))
+        {
+            var content = ex.Content.Trim();
+
+            if (content.StartsWith("{") && content.EndsWith("}"))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("code", out var codeEl) &&
+                        codeEl.GetString() == "tag-day-locked" &&
+                        root.TryGetProperty("date", out var dateEl))
+                    {
+                        return $"This tag is locked for {dateEl.GetString()}. Unlock it first to add another value.";
+                    }
+
+                    if (root.TryGetProperty("message", out var messageEl) &&
+                        !string.IsNullOrWhiteSpace(messageEl.GetString()))
+                    {
+                        return messageEl.GetString()!;
+                    }
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    // Not JSON — fall through to the plain-string handler.
+                }
+            }
+
+            return content.Trim('"');
+        }
+
+        return fallback;
+    }
+
     private async Task ReopenItemAsync(TodoItemResponse item)
     {
+        _isBusy = true;
         try
         {
             var updated = await TodoApi.ReopenItem(item.Id);
@@ -1579,17 +1627,23 @@ else
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when reopening", item.Id);
             _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to reopen todo item {ItemId}", item.Id);
             _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
     private async Task SkipItemAsync(TodoItemResponse item)
     {
+        _isBusy = true;
         try
         {
             var updated = await TodoApi.SkipItem(item.Id, SelectedDate?.ToString("yyyy-MM-dd"));
@@ -1599,13 +1653,18 @@ else
         {
             Logger.LogWarning(ex, "Todo item {ItemId} not found when skipping", item.Id);
             _itemErrorPerList[item.ListId] = "Item no longer exists. Reload to refresh.";
-            await LoadDataAsync();
         }
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to skip todo item {ItemId}", item.Id);
             _itemErrorPerList[item.ListId] = "Failed to update. Please try again.";
         }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
     }
 
     private void UpdateItemInList(TodoItemResponse updated)

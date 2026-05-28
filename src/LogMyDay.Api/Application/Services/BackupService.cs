@@ -207,7 +207,7 @@ public class BackupService : IBackupService
                 {
                     Name = l.Name,
                     DisplayOrder = l.DisplayOrder,
-                    ListType = l.ListType,
+                    ShowOnHomepage = l.ShowOnHomepage,
                     DateCreated = l.DateCreated,
                     Items = l.Items.Select(i => new TodoItemBackup
                     {
@@ -218,6 +218,42 @@ public class BackupService : IBackupService
                         NotifyAt = i.NotifyAt,
                         IsDone = i.IsDone,
                         DoneAt = i.DoneAt,
+                        SkippedAt = i.SkippedAt,
+                        DisplayOrder = i.DisplayOrder,
+                        DateCreated = i.DateCreated,
+                        RecurrenceType = i.RecurrenceType,
+                        AutoLogMode = i.AutoLogMode,
+                        CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            // Reminder split (Phase 3) — Reminder items live in separate tables now.
+            var reminderListsQuery = _context.ReminderLists
+                .Include(l => l.Items)
+                    .ThenInclude(i => i.CompletionTag)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                reminderListsQuery = reminderListsQuery.Where(l => l.UserId == userId);
+            }
+
+            var reminderLists = await reminderListsQuery
+                .Select(l => new ReminderListBackup
+                {
+                    Name = l.Name,
+                    DisplayOrder = l.DisplayOrder,
+                    ShowOnHomepage = l.ShowOnHomepage,
+                    DateCreated = l.DateCreated,
+                    Items = l.Items.Select(i => new ReminderBackup
+                    {
+                        Title = i.Title,
+                        Notes = i.Notes,
+                        NotifyAt = i.NotifyAt,
+                        IsDone = i.IsDone,
+                        DoneAt = i.DoneAt,
+                        SkippedAt = i.SkippedAt,
                         DisplayOrder = i.DisplayOrder,
                         DateCreated = i.DateCreated,
                         RecurrenceType = i.RecurrenceType,
@@ -225,7 +261,8 @@ public class BackupService : IBackupService
                         CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null,
                         MonitorDaysBack = i.MonitorDaysBack,
                         MonitorFromDate = i.MonitorFromDate,
-                        MonitorToDate = i.MonitorToDate
+                        MonitorToDate = i.MonitorToDate,
+                        AllowUnfilled = i.AllowUnfilled
                     }).ToList()
                 })
                 .ToListAsync();
@@ -235,7 +272,7 @@ public class BackupService : IBackupService
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.8",
+                    Version = "1.9",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
@@ -246,7 +283,9 @@ public class BackupService : IBackupService
                     TotalActivities = totalActivities,
                     TotalScanMappings = scanMappings.Count,
                     TotalTodoLists = todoLists.Count,
-                    TotalTodoItems = todoLists.Sum(l => l.Items.Count)
+                    TotalTodoItems = todoLists.Sum(l => l.Items.Count),
+                    TotalReminderLists = reminderLists.Count,
+                    TotalReminders = reminderLists.Sum(l => l.Items.Count)
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -257,7 +296,8 @@ public class BackupService : IBackupService
                 Tags = tags,
                 Activities = activities,
                 ScanMappings = scanMappings,
-                TodoLists = todoLists
+                TodoLists = todoLists,
+                ReminderLists = reminderLists
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -311,6 +351,7 @@ public class BackupService : IBackupService
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
                 await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
                 await ImportTodoListsAsync(backupData.TodoLists, result, userId);
+                await ImportReminderListsAsync(backupData.ReminderLists, result, userId);
 
                 await transaction.CommitAsync();
                 result.Message = "Data import completed successfully";
@@ -963,7 +1004,7 @@ public class BackupService : IBackupService
             {
                 Name = list.Name,
                 DisplayOrder = list.DisplayOrder,
-                ListType = list.ListType,
+                ShowOnHomepage = list.ShowOnHomepage,
                 DateCreated = list.DateCreated,
                 UserId = userId ?? Guid.Empty
             };
@@ -990,6 +1031,72 @@ public class BackupService : IBackupService
                     NotifyAt = item.NotifyAt,
                     IsDone = item.IsDone,
                     DoneAt = item.DoneAt,
+                    SkippedAt = item.SkippedAt,
+                    DisplayOrder = item.DisplayOrder,
+                    DateCreated = item.DateCreated,
+                    RecurrenceType = item.RecurrenceType,
+                    AutoLogMode = item.AutoLogMode,
+                    CompletionTagId = completionTagId
+                };
+
+                _context.TodoItems.Add(itemEntity);
+                result.Statistics.TodoItemsImported++;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task ImportReminderListsAsync(List<ReminderListBackup> reminderLists, BackupImportResult result, Guid? userId)
+    {
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        var existingListNames = await _context.ReminderLists
+            .Where(l => userId == null || l.UserId == userId)
+            .Select(l => l.Name)
+            .ToHashSetAsync();
+
+        foreach (var list in reminderLists)
+        {
+            if (existingListNames.Contains(list.Name))
+            {
+                result.Statistics.ReminderListsSkipped++;
+                result.Statistics.RemindersSkipped += list.Items.Count;
+                continue;
+            }
+
+            var listEntity = new ReminderList
+            {
+                Name = list.Name,
+                DisplayOrder = list.DisplayOrder,
+                ShowOnHomepage = list.ShowOnHomepage,
+                DateCreated = list.DateCreated,
+                UserId = userId ?? Guid.Empty
+            };
+
+            _context.ReminderLists.Add(listEntity);
+            await _context.SaveChangesAsync();
+            result.Statistics.ReminderListsImported++;
+
+            foreach (var item in list.Items)
+            {
+                int? completionTagId = null;
+                if (!string.IsNullOrEmpty(item.CompletionTagName) && tagLookup.ContainsKey(item.CompletionTagName))
+                {
+                    completionTagId = tagLookup[item.CompletionTagName];
+                }
+
+                var itemEntity = new Reminder
+                {
+                    ReminderListId = listEntity.Id,
+                    Title = item.Title,
+                    Notes = item.Notes,
+                    NotifyAt = item.NotifyAt,
+                    IsDone = item.IsDone,
+                    DoneAt = item.DoneAt,
+                    SkippedAt = item.SkippedAt,
                     DisplayOrder = item.DisplayOrder,
                     DateCreated = item.DateCreated,
                     RecurrenceType = item.RecurrenceType,
@@ -997,11 +1104,12 @@ public class BackupService : IBackupService
                     CompletionTagId = completionTagId,
                     MonitorDaysBack = item.MonitorDaysBack,
                     MonitorFromDate = item.MonitorFromDate,
-                    MonitorToDate = item.MonitorToDate
+                    MonitorToDate = item.MonitorToDate,
+                    AllowUnfilled = item.AllowUnfilled
                 };
 
-                _context.TodoItems.Add(itemEntity);
-                result.Statistics.TodoItemsImported++;
+                _context.Reminders.Add(itemEntity);
+                result.Statistics.RemindersImported++;
             }
 
             await _context.SaveChangesAsync();

@@ -18,11 +18,14 @@ public class TodoItemResponse
     public DateTime DateCreated { get; set; }
     public RecurrenceType RecurrenceType { get; set; }
     public AutoLogMode AutoLogMode { get; set; }
-    public int? MonitorDaysBack { get; set; }
-    public DateOnly? MonitorFromDate { get; set; }
-    public DateOnly? MonitorToDate { get; set; }
     public int? CompletionTagId { get; set; }
     public string? CompletionTagName { get; set; }
     public int? CompletionTagInputTypeId { get; set; }
+
+    // Compat shims — Reminder-only fields moved to ReminderResponse. These properties
+    // remain as source-compat for razor markup not yet stripped; the server never sets them.
+    public int? MonitorDaysBack { get; set; }
+    public DateOnly? MonitorFromDate { get; set; }
+    public DateOnly? MonitorToDate { get; set; }
     public bool AllowUnfilled { get; set; }
 }

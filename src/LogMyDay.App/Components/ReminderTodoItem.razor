@@ -14,11 +14,11 @@
     else
     {
         <button type="button"
-                class="h-8 w-8 shrink-0 rounded-lg border-2 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-center justify-center text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors focus:outline-hidden disabled:opacity-50"
-                title="Complete"
+                class="h-8 w-8 shrink-0 rounded-lg border-2 @(Item.IsTagDayLocked ? "border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500") flex items-center justify-center transition-colors focus:outline-hidden disabled:opacity-50"
+                title="@(Item.IsTagDayLocked ? "Tag locked for today — unlock first" : "Complete")"
                 @onclick="() => OnComplete.InvokeAsync(Item)"
-                disabled="@IsBusy">
-            <Icon Name="check" Class="h-4 w-4" />
+                disabled="@(IsBusy || Item.IsTagDayLocked)">
+            <Icon Name="@(Item.IsTagDayLocked ? "x" : "check")" Class="h-4 w-4" />
         </button>
     }
     @* Content *@
@@ -32,6 +32,12 @@
             @if (IsOverdue)
             {
                 <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Overdue</span>
+            }
+            @if (Item.IsTagDayLocked)
+            {
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-200" title="@($"Tag '{Item.CompletionTagName}' is locked for the day")">
+                    🔒 Tag locked
+                </span>
             }
         </div>
         @if (Item.RecurrenceType != RecurrenceType.None)
@@ -67,12 +73,12 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public TodoItemResponse Item { get; set; } = null!;
+    [Parameter, EditorRequired] public ReminderResponse Item { get; set; } = null!;
     [Parameter] public bool IsOverdue { get; set; }
     [Parameter] public bool IsCompleted { get; set; }
     [Parameter] public bool IsBusy { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnComplete { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnReopen { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnSkip { get; set; }
-    [Parameter] public EventCallback<TodoItemResponse> OnEdit { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnComplete { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnReopen { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnSkip { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnEdit { get; set; }
 }

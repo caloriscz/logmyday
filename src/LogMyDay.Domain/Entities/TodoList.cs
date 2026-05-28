@@ -1,9 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Domain.Entities;
 
+/// <summary>
+/// Basic todo list. Reminder-type lists were moved to <see cref="ReminderList"/> in
+/// migration <c>20260524_SplitReminderEntity</c>; the <c>ListType</c> discriminator was
+/// dropped together with the Reminder-only fields on <see cref="TodoItem"/>.
+/// </summary>
 public class TodoList
 {
     [Key]
@@ -17,8 +21,6 @@ public class TodoList
     public required string Name { get; set; }
 
     public int DisplayOrder { get; set; } = 0;
-
-    public TodoListType ListType { get; set; } = TodoListType.Basic;
 
     public bool ShowOnHomepage { get; set; } = false;
 

@@ -16,6 +16,8 @@ public interface IApiClientProvider
     IAiApi Ai { get; }
     ITodoApi Todo { get; }
     IEventLogApi EventLog { get; }
+    IReminderApi Reminder { get; }
+    ITagDayLockApi TagDayLock { get; }
     void Invalidate();
 }
 
@@ -32,6 +34,8 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private IAiApi? _ai;
     private ITodoApi? _todo;
     private IEventLogApi? _eventLog;
+    private IReminderApi? _reminder;
+    private ITagDayLockApi? _tagDayLock;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -49,6 +53,8 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IAiApi Ai => _ai ??= Build<IAiApi>();
     public ITodoApi Todo => _todo ??= Build<ITodoApi>();
     public IEventLogApi EventLog => _eventLog ??= Build<IEventLogApi>();
+    public IReminderApi Reminder => _reminder ??= Build<IReminderApi>();
+    public ITagDayLockApi TagDayLock => _tagDayLock ??= Build<ITagDayLockApi>();
 
     private static readonly RefitSettings SharedRefitSettings = new()
     {
@@ -78,6 +84,8 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _ai = null;
         _todo = null;
         _eventLog = null;
+        _reminder = null;
+        _tagDayLock = null;
     }
 
     public void Dispose()

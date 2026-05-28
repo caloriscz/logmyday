@@ -46,11 +46,4 @@ public class TodoItem
     [ForeignKey(nameof(CompletionTagId))]
     public Tag? CompletionTag { get; set; }
 
-    public int? MonitorDaysBack { get; set; }
-
-    public DateOnly? MonitorFromDate { get; set; }
-
-    public DateOnly? MonitorToDate { get; set; }
-
-    public bool AllowUnfilled { get; set; } = false;
 }

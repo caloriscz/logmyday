@@ -1,6 +1,7 @@
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Storage;
 
 namespace LogMyDay.App.Mobile.Services;
 
@@ -22,6 +23,14 @@ public class ReminderNotificationScheduler
     private readonly Dictionary<int, DateTime> _activeAlarms = new();
     private readonly object _lock = new();
 
+    /// <summary>Every TodoItem.Id this device has ever scheduled an alarm for (persistent across
+    /// restarts via <see cref="Preferences"/>). The ghost-alarm sweep walks this set and cancels
+    /// any code that isn't in the current live reminder set — catches orphans left over from
+    /// older builds (e.g., the removed tag-notification path's <c>NudgeInterval=15min</c> alarms).</summary>
+    private readonly HashSet<int> _everScheduledIds = new();
+
+    private const string EverScheduledIdsPrefsKey = "reminder-diag.ever-scheduled-ids";
+
     /// <summary>Singleton accessor so the Android <c>AlarmHandler</c> can post a diagnostic
     /// fire-event from the broadcast receiver (which is constructed by the OS, not DI).</summary>
     public static ReminderNotificationScheduler? Instance { get; private set; }
@@ -35,9 +44,43 @@ public class ReminderNotificationScheduler
         _eventLog = eventLog;
         _logger = logger;
         Instance = this;
+        LoadEverScheduledIds();
     }
 
-    public void ScheduleAll(IList<TodoListResponse> lists)
+    private void LoadEverScheduledIds()
+    {
+        var raw = Preferences.Get(EverScheduledIdsPrefsKey, string.Empty);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        foreach (var part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(part, out var id))
+            {
+                _everScheduledIds.Add(id);
+            }
+        }
+    }
+
+    private void SaveEverScheduledIds()
+    {
+        Preferences.Set(EverScheduledIdsPrefsKey, string.Join(",", _everScheduledIds));
+    }
+
+    private void RememberScheduledId(int id)
+    {
+        lock (_lock)
+        {
+            if (_everScheduledIds.Add(id))
+            {
+                SaveEverScheduledIds();
+            }
+        }
+    }
+
+    public void ScheduleAll(IList<ReminderListResponse> lists)
     {
         // Track how many items share the same base fire time so we can stagger them.
         var seenFireTimes = new Dictionary<DateTime, int>();
@@ -77,7 +120,7 @@ public class ReminderNotificationScheduler
         }
     }
 
-    public void ScheduleItem(TodoItemResponse item, string listName)
+    public void ScheduleItem(ReminderResponse item, string listName)
     {
         if (item.IsDone || item.IsSkipped || !item.NotifyAt.HasValue)
         {
@@ -96,7 +139,7 @@ public class ReminderNotificationScheduler
         ScheduleItemAt(item, listName, fireTime.Value);
     }
 
-    private void ScheduleItemAt(TodoItemResponse item, string listName, DateTime fireTimeUtc)
+    private void ScheduleItemAt(ReminderResponse item, string listName, DateTime fireTimeUtc)
     {
         // Cancel any existing alarm for this item before rescheduling (idempotent at the OS level).
         _notificationService.CancelReminderAlarm(item.Id);
@@ -117,12 +160,57 @@ public class ReminderNotificationScheduler
             _activeAlarms[item.Id] = fireTimeUtc;
         }
 
+        RememberScheduledId(item.Id);
+
         _logger.LogDebug("Scheduled reminder notification for item {ItemId} '{Title}' at {FireTime:HH:mm} UTC", item.Id, item.Title, fireTimeUtc);
 
         if (changed)
         {
             LogDiag($"event=scheduled itemId={item.Id} surface=mobile fireAtUtc={fireTimeUtc:o} notifyAt={item.NotifyAt?.ToString("HH:mm")} title=\"{item.Title}\"");
         }
+    }
+
+    /// <summary>
+    /// Cancel any PendingIntent that was ever scheduled by this device but isn't in the live
+    /// reminder set. Returns the count cancelled. Idempotent — re-running with the same liveIds
+    /// is a no-op after the first call.
+    ///
+    /// This catches alarms scheduled by older builds (e.g., the removed tag-notification path
+    /// with its 15-min nudge interval) that the current cancellation code never touches because
+    /// it only cancels by current TodoItemId. Symptom: notifications firing ~15 min after a
+    /// reminder was checked or deleted.
+    /// </summary>
+    public int SweepGhostAlarms(IReadOnlyCollection<int> liveIds)
+    {
+        int[] ghostIds;
+
+        lock (_lock)
+        {
+            ghostIds = _everScheduledIds.Where(id => !liveIds.Contains(id)).ToArray();
+        }
+
+        if (ghostIds.Length == 0)
+        {
+            return 0;
+        }
+
+        foreach (var id in ghostIds)
+        {
+            _notificationService.CancelReminderAlarm(id);
+            LogDiag($"event=ghost-cancel itemId={id} surface=mobile reason=stale");
+        }
+
+        lock (_lock)
+        {
+            foreach (var id in ghostIds)
+            {
+                _everScheduledIds.Remove(id);
+                _activeAlarms.Remove(id);
+            }
+            SaveEverScheduledIds();
+        }
+
+        return ghostIds.Length;
     }
 
     public void CancelItem(int todoItemId)
@@ -170,27 +258,12 @@ public class ReminderNotificationScheduler
         });
     }
 
-    private static DateTime? CalculateFireTime(TodoItemResponse item)
+    private static DateTime? CalculateFireTime(ReminderResponse item)
     {
         var notifyAt = item.NotifyAt!.Value;
 
-        DateTime localFireTime;
-
-        if (item.DueDate.HasValue)
-        {
-            // Past-due items don't get a notification.
-            if (item.DueDate.Value.Date < DateTime.Today)
-            {
-                return null;
-            }
-
-            localFireTime = item.DueDate.Value.Date + notifyAt.ToTimeSpan();
-        }
-        else
-        {
-            // No due date: fire today at the specified time.
-            localFireTime = DateTime.Today + notifyAt.ToTimeSpan();
-        }
+        // Reminders don't carry DueDate — fire today at the specified time.
+        var localFireTime = DateTime.Today + notifyAt.ToTimeSpan();
 
         var fireTimeUtc = DateTime.SpecifyKind(localFireTime, DateTimeKind.Local).ToUniversalTime();
 

@@ -61,7 +61,6 @@ public class TodoListService : ITodoListService
             UserId = userId,
             Name = request.Name,
             DisplayOrder = request.DisplayOrder,
-            ListType = request.ListType,
             ShowOnHomepage = request.ShowOnHomepage,
             DateCreated = DateTime.UtcNow
         };
@@ -85,7 +84,6 @@ public class TodoListService : ITodoListService
 
         list.Name = request.Name;
         list.DisplayOrder = request.DisplayOrder;
-        list.ListType = request.ListType;
         list.ShowOnHomepage = request.ShowOnHomepage;
 
         await _context.SaveChangesAsync();
@@ -112,18 +110,12 @@ public class TodoListService : ITodoListService
             Id = list.Id,
             Name = list.Name,
             DisplayOrder = list.DisplayOrder,
-            ListType = list.ListType,
             ShowOnHomepage = list.ShowOnHomepage,
             DateCreated = list.DateCreated,
-            Items = (list.ListType == TodoListType.Reminder
-                ? list.Items
-                    .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
-                    .ThenBy(i => i.DisplayOrder)
-                    .ThenBy(i => i.DateCreated)
-                : list.Items
-                    .OrderBy(i => i.DisplayOrder)
-                    .ThenBy(i => i.DueDate)
-                    .ThenBy(i => i.DateCreated))
+            Items = list.Items
+                .OrderBy(i => i.DisplayOrder)
+                .ThenBy(i => i.DueDate)
+                .ThenBy(i => i.DateCreated)
                 .Select(i => MapItemToResponse(i, user, date))
                 .ToList()
         };
@@ -145,13 +137,9 @@ public class TodoListService : ITodoListService
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
             AutoLogMode = item.AutoLogMode,
-            MonitorDaysBack = item.MonitorDaysBack,
-            MonitorFromDate = item.MonitorFromDate,
-            MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,
             CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
-            AllowUnfilled = item.AllowUnfilled
+            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
         };
 
     private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user, DateOnly? date = null)
