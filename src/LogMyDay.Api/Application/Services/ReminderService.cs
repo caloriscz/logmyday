@@ -1,5 +1,7 @@
+using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -20,16 +22,28 @@ public class ReminderService : IReminderService
         _logger = logger;
     }
 
+    public async Task<IList<ReminderResponse>> GetAll(Guid userId, DateOnly? date = null)
+    {
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
+        var reminders = await _context.Reminders
+            .AsNoTracking()
+            .Include(i => i.CompletionTag)
+            .Where(i => i.UserId == userId)
+            .ToListAsync();
+
+        var lockedTagIds = await GetLockedTagIds(userId, date, user);
+
+        return reminders
+            .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
+            .ThenBy(i => i.DisplayOrder)
+            .ThenBy(i => i.DateCreated)
+            .Select(i => MapItemToResponse(i, user, date, lockedTagIds))
+            .ToList();
+    }
+
     public async Task<ReminderResponse> Create(ReminderRequest request, Guid userId)
     {
-        var list = await _context.ReminderLists
-            .FirstOrDefaultAsync(l => l.Id == request.ReminderListId && l.UserId == userId);
-
-        if (list == null)
-        {
-            throw new KeyNotFoundException("Reminder list not found");
-        }
-
         Domain.Entities.Tag? completionTag = null;
         if (request.CompletionTagId.HasValue)
         {
@@ -38,7 +52,7 @@ public class ReminderService : IReminderService
 
         var item = new Domain.Entities.Reminder
         {
-            ReminderListId = request.ReminderListId,
+            UserId = userId,
             Title = request.Title,
             Notes = request.Notes,
             NotifyAt = request.NotifyAt,
@@ -58,15 +72,14 @@ public class ReminderService : IReminderService
 
         item.CompletionTag = completionTag;
 
-        return ReminderListService.MapItemToResponse(item, null);
+        return MapItemToResponse(item, null);
     }
 
     public async Task Update(int id, ReminderRequest request, Guid userId)
     {
         var item = await _context.Reminders
-            .Include(i => i.List)
             .Include(i => i.CompletionTag)
-            .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
+            .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
 
         if (item == null)
         {
@@ -108,9 +121,8 @@ public class ReminderService : IReminderService
     public async Task<ReminderResponse> Complete(int id, ReminderCompleteRequest request, Guid userId)
     {
         var item = await _context.Reminders
-            .Include(i => i.List)
             .Include(i => i.CompletionTag)
-            .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
+            .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
 
         if (item == null)
         {
@@ -156,7 +168,7 @@ public class ReminderService : IReminderService
 
         await _context.SaveChangesAsync();
 
-        return ReminderListService.MapItemToResponse(item, null);
+        return MapItemToResponse(item, null);
     }
 
     private async Task LogActivityAsync(Domain.Entities.Reminder item, string? completionValue, DateTime doneAt, Guid userId)
@@ -205,7 +217,7 @@ public class ReminderService : IReminderService
         item.IsDone = false;
         item.DoneAt = null;
         await _context.SaveChangesAsync();
-        return ReminderListService.MapItemToResponse(item, null);
+        return MapItemToResponse(item, null);
     }
 
     public async Task<ReminderResponse> Skip(int id, Guid userId, DateOnly? date = null)
@@ -215,16 +227,7 @@ public class ReminderService : IReminderService
         if (date.HasValue)
         {
             var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-            TimeZoneInfo tz;
-            try
-            {
-                tz = TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                tz = TimeZoneInfo.Utc;
-            }
-
+            var tz = ResolveTimeZone(user);
             var localMidnight = date.Value.ToDateTime(TimeOnly.MinValue);
             item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, tz);
         }
@@ -239,7 +242,7 @@ public class ReminderService : IReminderService
             "[reminder-diag] event=skip reminderId={ItemId} userId={UserId} skippedAt={SkippedAt:o} recurrence={Recurrence}",
             item.Id, userId, item.SkippedAt, item.RecurrenceType);
 
-        return ReminderListService.MapItemToResponse(item, null);
+        return MapItemToResponse(item, null);
     }
 
     public async Task<ReminderResponse> Unskip(int id, Guid userId)
@@ -247,21 +250,14 @@ public class ReminderService : IReminderService
         var item = await LoadItemForUser(id, userId);
         item.SkippedAt = null;
         await _context.SaveChangesAsync();
-        return ReminderListService.MapItemToResponse(item, null);
+        return MapItemToResponse(item, null);
     }
 
-    public async Task Reorder(int listId, IList<ReminderReorderRequest> items, Guid userId)
+    public async Task Reorder(IList<ReminderReorderRequest> items, Guid userId)
     {
-        var list = await _context.ReminderLists.FirstOrDefaultAsync(l => l.Id == listId && l.UserId == userId);
-
-        if (list == null)
-        {
-            throw new KeyNotFoundException("Reminder list not found");
-        }
-
         var itemIds = items.Select(i => i.Id).ToList();
         var dbItems = await _context.Reminders
-            .Where(i => i.ReminderListId == listId && itemIds.Contains(i.Id))
+            .Where(i => i.UserId == userId && itemIds.Contains(i.Id))
             .ToListAsync();
 
         foreach (var dbItem in dbItems)
@@ -279,8 +275,7 @@ public class ReminderService : IReminderService
     private async Task<Domain.Entities.Reminder> LoadItemForUser(int id, Guid userId)
     {
         var item = await _context.Reminders
-            .Include(i => i.List)
-            .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
+            .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
 
         if (item == null)
         {
@@ -288,5 +283,127 @@ public class ReminderService : IReminderService
         }
 
         return item;
+    }
+
+    private async Task<HashSet<int>> GetLockedTagIds(Guid userId, DateOnly? date, User? user)
+    {
+        var referenceDate = date ?? DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ResolveTimeZone(user)));
+
+        return await _context.TagDayLocks
+            .AsNoTracking()
+            .Where(l => l.UserId == userId && l.Date == referenceDate && l.IsLocked)
+            .Select(l => l.TagId)
+            .ToHashSetAsync();
+    }
+
+    internal static ReminderResponse MapItemToResponse(Domain.Entities.Reminder item, User? user, DateOnly? date = null, HashSet<int>? lockedTagIds = null)
+    {
+        var isTagLocked = item.CompletionTagId.HasValue
+            && lockedTagIds != null
+            && lockedTagIds.Contains(item.CompletionTagId.Value);
+
+        return new ReminderResponse
+        {
+            Id = item.Id,
+            Title = item.Title,
+            Notes = item.Notes,
+            NotifyAt = item.NotifyAt,
+            IsDone = ComputeEffectiveIsDone(item, user, date),
+            DoneAt = item.DoneAt,
+            IsSkipped = isTagLocked || ComputeEffectiveIsSkipped(item, user, date),
+            IsTagDayLocked = isTagLocked,
+            DisplayOrder = item.DisplayOrder,
+            DateCreated = item.DateCreated,
+            RecurrenceType = item.RecurrenceType,
+            AutoLogMode = item.AutoLogMode,
+            MonitorDaysBack = item.MonitorDaysBack,
+            MonitorFromDate = item.MonitorFromDate,
+            MonitorToDate = item.MonitorToDate,
+            CompletionTagId = item.CompletionTagId,
+            CompletionTagName = item.CompletionTag?.TagName,
+            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
+            AllowUnfilled = item.AllowUnfilled
+        };
+    }
+
+    private static bool ComputeEffectiveIsSkipped(Domain.Entities.Reminder item, User? user, DateOnly? date = null)
+    {
+        if (item.SkippedAt == null || item.RecurrenceType == RecurrenceType.None)
+        {
+            return false;
+        }
+
+        var tz = ResolveTimeZone(user);
+        var skippedLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.SkippedAt.Value, tz));
+        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+
+        if (item.RecurrenceType == RecurrenceType.Daily)
+        {
+            return skippedLocalDate == referenceDate;
+        }
+
+        if (item.RecurrenceType == RecurrenceType.Weekly)
+        {
+            var firstDay = ResolveFirstDayOfWeek(user);
+            return GetWeekStart(skippedLocalDate, firstDay) == GetWeekStart(referenceDate, firstDay);
+        }
+
+        return false;
+    }
+
+    private static bool ComputeEffectiveIsDone(Domain.Entities.Reminder item, User? user, DateOnly? date = null)
+    {
+        if (!item.IsDone || item.DoneAt == null || item.RecurrenceType == RecurrenceType.None)
+        {
+            return item.IsDone;
+        }
+
+        var tz = ResolveTimeZone(user);
+        var doneLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.DoneAt.Value, tz));
+        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+
+        if (item.RecurrenceType == RecurrenceType.Daily)
+        {
+            return doneLocalDate == referenceDate;
+        }
+
+        if (item.RecurrenceType == RecurrenceType.Weekly)
+        {
+            var firstDay = ResolveFirstDayOfWeek(user);
+            return GetWeekStart(doneLocalDate, firstDay) == GetWeekStart(referenceDate, firstDay);
+        }
+
+        return item.IsDone;
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(User? user)
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
+    }
+
+    private static DayOfWeek ResolveFirstDayOfWeek(User? user)
+    {
+        try
+        {
+            return new CultureInfo(user?.Culture ?? "en-US").DateTimeFormat.FirstDayOfWeek;
+        }
+        catch (CultureNotFoundException)
+        {
+            return DayOfWeek.Monday;
+        }
+    }
+
+    private static DateOnly GetWeekStart(DateOnly date, DayOfWeek firstDay)
+    {
+        var diff = ((int)date.DayOfWeek - (int)firstDay + 7) % 7;
+        return date.AddDays(-diff);
     }
 }

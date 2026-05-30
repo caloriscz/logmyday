@@ -5,7 +5,6 @@ namespace LogMyDay.Shared.DTOs;
 public class ReminderResponse
 {
     public int Id { get; set; }
-    public int ReminderListId { get; set; }
     public required string Title { get; set; }
     public string? Notes { get; set; }
     public TimeOnly? NotifyAt { get; set; }
@@ -24,9 +23,5 @@ public class ReminderResponse
     public int? CompletionTagInputTypeId { get; set; }
     public bool AllowUnfilled { get; set; }
 
-    /// <summary>True when an active <c>TagDayLock</c> exists for this reminder's
-    /// <see cref="CompletionTagId"/> on the response's reference date. When true,
-    /// <see cref="IsSkipped"/> is also true (lock is sticky for the day, takes
-    /// precedence over recurrence-boundary clearing).</summary>
     public bool IsTagDayLocked { get; set; }
 }

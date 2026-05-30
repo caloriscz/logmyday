@@ -27,6 +27,14 @@ public class RemindersController : BaseApiController
         _logger = logger;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IList<ReminderResponse>>> GetAll([FromQuery] string? date = null)
+    {
+        var userId = GetCurrentUserId();
+        DateOnly? parsedDate = DateOnly.TryParse(date, out var d) ? d : null;
+        return Ok(await _service.GetAll(userId, parsedDate));
+    }
+
     [HttpPost]
     public async Task<ActionResult<ReminderResponse>> Create(ReminderRequest request)
     {
@@ -131,15 +139,11 @@ public class RemindersController : BaseApiController
         catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
     }
 
-    [HttpPatch("/api/reminder-lists/{listId:int}/items/reorder")]
-    public async Task<IActionResult> Reorder(int listId, [FromBody] IList<ReminderReorderRequest> items)
+    [HttpPatch("reorder")]
+    public async Task<IActionResult> Reorder([FromBody] IList<ReminderReorderRequest> items)
     {
         var userId = GetCurrentUserId();
-        try
-        {
-            await _service.Reorder(listId, items, userId);
-            return NoContent();
-        }
-        catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
+        await _service.Reorder(items, userId);
+        return NoContent();
     }
 }

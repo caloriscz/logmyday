@@ -2,15 +2,6 @@ using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Shared.DTOs;
 
-public class ReminderListBackup
-{
-    public string Name { get; set; } = string.Empty;
-    public int DisplayOrder { get; set; }
-    public bool ShowOnHomepage { get; set; }
-    public DateTime DateCreated { get; set; }
-    public List<ReminderBackup> Items { get; set; } = new();
-}
-
 public class ReminderBackup
 {
     public string Title { get; set; } = string.Empty;

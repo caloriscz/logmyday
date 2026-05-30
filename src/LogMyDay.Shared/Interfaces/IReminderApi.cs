@@ -5,17 +5,8 @@ namespace LogMyDay.Shared.Interfaces;
 
 public interface IReminderApi
 {
-    [Get("/api/reminder-lists")]
-    Task<IList<ReminderListResponse>> GetReminderLists([AliasAs("date")] string? date = null);
-
-    [Post("/api/reminder-lists")]
-    Task<ReminderListResponse> CreateReminderList([Body] ReminderListRequest request);
-
-    [Put("/api/reminder-lists/{id}")]
-    Task UpdateReminderList(int id, [Body] ReminderListRequest request);
-
-    [Delete("/api/reminder-lists/{id}")]
-    Task DeleteReminderList(int id);
+    [Get("/api/reminders")]
+    Task<IList<ReminderResponse>> GetReminders([AliasAs("date")] string? date = null);
 
     [Post("/api/reminders")]
     Task<ReminderResponse> CreateReminder([Body] ReminderRequest request);
@@ -38,6 +29,6 @@ public interface IReminderApi
     [Post("/api/reminders/{id}/unskip")]
     Task<ReminderResponse> UnskipReminder(int id);
 
-    [Patch("/api/reminder-lists/{listId}/items/reorder")]
-    Task ReorderReminders(int listId, [Body] IList<ReminderReorderRequest> items);
+    [Patch("/api/reminders/reorder")]
+    Task ReorderReminders([Body] IList<ReminderReorderRequest> items);
 }

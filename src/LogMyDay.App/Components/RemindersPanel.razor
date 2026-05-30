@@ -10,120 +10,106 @@
 @inject IJSRuntime JS
 @inject ILogger<RemindersPanel> Logger
 
-@if (!HomepageOnly || (_lists != null && _lists.Count > 0))
-{
-<div class="mb-4 flex items-center justify-between">
-    <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">@(Title ?? "Reminders")</h2>
-    <div class="flex items-center gap-2">
-        <button type="button"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                @onclick="OpenAddListModal"
-                disabled="@(_lists == null)">
-            <Icon Name="plus" Class="h-4 w-4" />
-            New list
-        </button>
-    </div>
-</div>
-
-@if (_loadError != null)
-{
-    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
-        @_loadError
-    </div>
-}
-else if (_lists == null)
-{
-    <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
-        <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-slate-700 dark:border-t-slate-300"></span>
-        Loading reminders…
-    </div>
-}
-else if (_lists.Count == 0)
-{
-    <div class="py-8 text-center text-sm text-gray-400 dark:text-slate-500">
-        No reminder lists yet.
-        <button type="button" class="underline hover:no-underline" @onclick="OpenAddListModal">Create one</button>
-    </div>
-}
-else
-{
-    <div class="flex flex-col gap-6">
-        @foreach (var list in _lists)
-        {
-            var effectiveDate = SelectedDate?.Date ?? DateTime.Today;
-            var listId = list.Id;
-            // Locked-tag items stay in the active list (with badge) so the user can see WHY
-            // a reminder isn't actionable today; user-driven SkippedAt items still hide.
-            var activeItems = list.Items
-                .Where(i => !i.IsDone && (!i.IsSkipped || i.IsTagDayLocked) && !IsOutsideMonitoringWindow(i, effectiveDate))
-                .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
-                .ThenBy(i => i.DisplayOrder)
-                .ThenBy(i => i.DateCreated)
-                .ToList();
-            var doneItems = list.Items.Where(i => i.IsDone).ToList();
-            var showDoneForThis = _showDonePerList.Contains(listId);
-
-            <ReminderTodo @key="listId"
-                          List="list"
-                          ActiveItems="activeItems"
-                          DoneItems="doneItems"
-                          ShowDone="showDoneForThis"
-                          IsBusy="_isBusy"
-                          EffectiveDate="effectiveDate"
-                          ItemError="@_itemErrorPerList.GetValueOrDefault(listId)"
-                          OnToggleShowDone="() => ToggleShowDone(listId)"
-                          OnAddItem="() => OpenAddItemModal(listId)"
-                          OnEditList="() => OpenEditListModal(list)"
-                          OnDeleteList="() => ConfirmDeleteList(list)"
-                          OnCompleteItem="async item => await CompleteItemAsync(item)"
-                          OnSkipItem="SkipItemAsync"
-                          OnEditItem="OpenEditItemModal"
-                          OnReopenItem="ReopenItemAsync"
-                          OnDeleteItem="DeleteItemAsync"
-                          OnReload="LoadDataAsync" />
-        }
-    </div>
-}
+@{
+    var effectiveDate = SelectedDate?.Date ?? DateTime.Today;
+    var activeItems = _reminders?
+        .Where(i => !i.IsDone && (!i.IsSkipped || i.IsTagDayLocked) && !IsOutsideMonitoringWindow(i, effectiveDate))
+        .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
+        .ThenBy(i => i.DisplayOrder)
+        .ThenBy(i => i.DateCreated)
+        .ToList()
+        ?? new List<ReminderResponse>();
+    var doneItems = _reminders?.Where(i => i.IsDone).ToList() ?? new List<ReminderResponse>();
 }
 
-@* ── List Create/Edit Modal ── *@
-@if (_showListModal)
+@if (!HomepageOnly || (_reminders != null && _reminders.Count > 0))
 {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!_isBusy) CloseListModal(); }">
-        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
-            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(_isEditingList ? "Edit reminder list" : "New reminder list")</h3>
-                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 hover:bg-gray-100 dark:text-slate-400 dark:hover:bg-slate-800" @onclick="CloseListModal" disabled="@_isBusy">
-                    <Icon Name="x" Class="h-5 w-5" />
+    <div class="mb-4 flex items-center justify-between">
+        <div class="flex items-center gap-2 min-w-0">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">@(Title ?? "Reminders")</h2>
+            <span class="shrink-0 text-xs text-gray-500 dark:text-slate-400">@activeItems.Count</span>
+        </div>
+        <div class="flex items-center gap-2">
+            @if (doneItems.Any())
+            {
+                <button type="button"
+                        class="text-xs text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors px-1"
+                        @onclick="() => _showDone = !_showDone">
+                    @(_showDone ? "Hide" : "Show") completed (@doneItems.Count)
                 </button>
-            </div>
-            <EditForm Model="_listForm" OnValidSubmit="SaveListAsync">
-                <DataAnnotationsValidator />
-                <div class="space-y-4 px-6 py-5">
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Name <span class="text-rose-500">*</span></label>
-                        <InputText class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                   @bind-Value="_listForm.Name" maxlength="200" placeholder="e.g. Morning meds" />
-                        <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-rose-600 dark:text-rose-400" />
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="rem-show-hp" class="h-4 w-4 rounded border-gray-300 text-primary-600 cursor-pointer"
-                               checked="@_listForm.ShowOnHomepage"
-                               @onchange="e => _listForm.ShowOnHomepage = (bool)(e.Value ?? false)" />
-                        <label for="rem-show-hp" class="text-sm font-medium text-gray-700 dark:text-slate-300 cursor-pointer">Show on homepage</label>
-                    </div>
-                </div>
-                @if (!string.IsNullOrEmpty(_listError))
-                {
-                    <div class="mx-6 mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">@_listError</div>
-                }
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
-                    <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" @onclick="CloseListModal" disabled="@_isBusy">Cancel</button>
-                    <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-60" disabled="@_isBusy">@(_isEditingList ? "Save changes" : "Create list")</button>
-                </div>
-            </EditForm>
+            }
+            <button type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white shadow-xs transition hover:bg-primary-700 focus:outline-hidden disabled:opacity-60"
+                    @onclick="OpenAddItemModal"
+                    disabled="@(_reminders == null || _isBusy)">
+                <Icon Name="plus" Class="h-4 w-4" />
+                Add reminder
+            </button>
         </div>
     </div>
+
+    @if (_loadError != null)
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+            @_loadError
+        </div>
+    }
+    else if (_reminders == null)
+    {
+        <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600 dark:border-slate-700 dark:border-t-slate-300"></span>
+            Loading reminders…
+        </div>
+    }
+    else
+    {
+        <div class="flex flex-col rounded-xl border border-gray-200 dark:border-slate-700 bg-white shadow-xs dark:bg-slate-900">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4">
+                @if (!activeItems.Any())
+                {
+                    <p class="py-8 text-center text-sm text-gray-400 dark:text-slate-500 col-span-full">No pending reminders.</p>
+                }
+                else
+                {
+                    @foreach (var item in activeItems)
+                    {
+                        <ReminderTodoItem Item="item"
+                                          IsOverdue="false"
+                                          IsBusy="_isBusy"
+                                          OnComplete="CompleteItemAsync"
+                                          OnSkip="SkipItemAsync"
+                                          OnEdit="OpenEditItemModal" />
+                    }
+                }
+            </div>
+
+            @if (_showDone && doneItems.Any())
+            {
+                <div class="border-t border-gray-200 dark:border-slate-700">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4">
+                        @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                        {
+                            <ReminderTodoItem Item="item"
+                                              IsCompleted="true"
+                                              IsBusy="_isBusy"
+                                              OnReopen="ReopenItemAsync"
+                                              OnEdit="OpenEditItemModal" />
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_itemError))
+            {
+                <div class="border-t border-gray-200 px-4 py-2 dark:border-slate-700">
+                    <div class="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        <span class="flex-1">@_itemError</span>
+                        <button type="button" class="shrink-0 font-medium underline hover:no-underline" @onclick="LoadDataAsync">Reload</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 }
 
 @* ── Item Create/Edit Modal ── *@
@@ -284,7 +270,7 @@ else
                 <div class="flex items-center gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
                     @if (_isEditingItem)
                     {
-                        <button type="button" class="rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 dark:border-rose-500/40 dark:bg-slate-800 dark:text-rose-400" @onclick="DeleteEditingItemAsync" disabled="@_isBusy">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 shadow-xs transition-colors hover:bg-rose-50 focus:outline-hidden dark:border-rose-500/40 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-500/10 disabled:opacity-60" @onclick="DeleteEditingItemAsync" disabled="@_isBusy">
                             <Icon Name="trash" Class="h-4 w-4" />
                             Delete
                         </button>
@@ -354,62 +340,31 @@ else
     </div>
 }
 
-@* ── Delete list confirmation ── *@
-@if (_pendingDeleteList != null)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
-        <div class="w-full max-w-sm rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete reminder list</h3>
-            </div>
-            <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
-                Delete <strong>@_pendingDeleteList.Name</strong> and all its reminders? This cannot be undone.
-            </div>
-            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
-                <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" @onclick="() => _pendingDeleteList = null" disabled="@_isBusy">Cancel</button>
-                <button type="button" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60" @onclick="DeleteListConfirmedAsync" disabled="@_isBusy">Delete</button>
-            </div>
-        </div>
-    </div>
-}
-
 @code {
     [Parameter] public bool HomepageOnly { get; set; }
     [Parameter] public string? Title { get; set; }
     [Parameter] public DateTime? SelectedDate { get; set; }
 
     private DateTime? _prevSelectedDate;
-    private IList<ReminderListResponse>? _lists;
+    private IList<ReminderResponse>? _reminders;
     private IList<TagResponse>? _allTags;
     private string? _loadError;
-    private string? _listError;
     private string? _itemModalError;
+    private string? _itemError;
     private bool _isBusy;
+    private bool _showDone;
 
-    private readonly HashSet<int> _showDonePerList = new();
-    private readonly Dictionary<int, string?> _itemErrorPerList = new();
-
-    // Stale-overwrite guard mirrors TodoListsPanel's approach (see auto-refresh-stale-overwrite-race task).
     private int _loadGeneration;
     private System.Threading.Timer? _refreshTimer;
 
-    // List modal state
-    private bool _showListModal;
-    private bool _isEditingList;
-    private int _editingListId;
-    private ReminderListRequest _listForm = new() { Name = string.Empty };
-
-    // Item modal state
     private bool _showItemModal;
     private bool _isEditingItem;
     private int _editingItemId;
-    private int _addItemToListId;
     private bool _monitorUseDaysBack = true;
     private bool? _booleanBoolValue;
     private int? _editIntValue;
     private ReminderRequest _itemForm = new() { Title = string.Empty };
 
-    // Quick-complete modal
     private bool _showQuickModal;
     private ReminderResponse? _quickItem;
     private int? _quickInputTypeId;
@@ -420,8 +375,6 @@ else
     private bool _quickAllowUnfilled;
     private bool _isQuickBusy;
     private string? _quickError;
-
-    private ReminderListResponse? _pendingDeleteList;
 
     private static bool IsOutsideMonitoringWindow(ReminderResponse item, DateTime date)
     {
@@ -449,7 +402,7 @@ else
         _refreshTimer = new System.Threading.Timer(
             async _ => await InvokeAsync(async () =>
             {
-                if (!_showItemModal && !_showListModal && !_isBusy && _pendingDeleteList == null)
+                if (!_showItemModal && !_isBusy)
                 {
                     await LoadDataAsync();
                     StateHasChanged();
@@ -478,96 +431,30 @@ else
         try
         {
             var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
-            var listsTask = ReminderApi.GetReminderLists(dateParam);
+            var remindersTask = ReminderApi.GetReminders(dateParam);
             var tagsTask = ActivityApi.GetTags();
-            await Task.WhenAll(listsTask, tagsTask);
+            await Task.WhenAll(remindersTask, tagsTask);
 
             if (gen != _loadGeneration) return;
 
-            var lists = listsTask.Result;
-            if (HomepageOnly)
-            {
-                lists = lists.Where(l => l.ShowOnHomepage).ToList();
-            }
-            _lists = lists;
+            _reminders = remindersTask.Result;
             _allTags = tagsTask.Result;
-            _itemErrorPerList.Clear();
+            _itemError = null;
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load reminder data");
-            if (_lists == null) { _loadError = "Could not load reminders. Please refresh."; }
+            if (_reminders == null) { _loadError = "Could not load reminders. Please refresh."; }
         }
     }
 
-    private void ToggleShowDone(int listId)
-    {
-        if (!_showDonePerList.Remove(listId)) _showDonePerList.Add(listId);
-    }
-
-    // ── List modal ──
-    private void OpenAddListModal()
-    {
-        _isEditingList = false;
-        _listForm = new ReminderListRequest { Name = string.Empty };
-        _listError = null;
-        _showListModal = true;
-    }
-
-    private void OpenEditListModal(ReminderListResponse list)
-    {
-        _isEditingList = true;
-        _editingListId = list.Id;
-        _listForm = new ReminderListRequest { Name = list.Name, DisplayOrder = list.DisplayOrder, ShowOnHomepage = list.ShowOnHomepage };
-        _listError = null;
-        _showListModal = true;
-    }
-
-    private void CloseListModal() { _showListModal = false; _listError = null; }
-
-    private async Task SaveListAsync()
-    {
-        _isBusy = true;
-        _listError = null;
-        try
-        {
-            if (_isEditingList) await ReminderApi.UpdateReminderList(_editingListId, _listForm);
-            else await ReminderApi.CreateReminderList(_listForm);
-            _showListModal = false;
-            await LoadDataAsync();
-        }
-        catch (ApiException ex)
-        {
-            _listError = SurfaceErrorMessage(ex, "Failed to save. Please try again.");
-        }
-        finally { _isBusy = false; }
-    }
-
-    private void ConfirmDeleteList(ReminderListResponse list) => _pendingDeleteList = list;
-
-    private async Task DeleteListConfirmedAsync()
-    {
-        if (_pendingDeleteList == null) return;
-        _isBusy = true;
-        try
-        {
-            await ReminderApi.DeleteReminderList(_pendingDeleteList.Id);
-            _pendingDeleteList = null;
-            await LoadDataAsync();
-        }
-        catch (ApiException ex) { Logger.LogWarning(ex, "Failed to delete reminder list"); }
-        finally { _isBusy = false; }
-    }
-
-    // ── Item modal ──
-    private void OpenAddItemModal(int listId)
+    private void OpenAddItemModal()
     {
         _isEditingItem = false;
-        _addItemToListId = listId;
         _monitorUseDaysBack = true;
         _booleanBoolValue = null;
         _editIntValue = null;
-        _itemForm = new ReminderRequest { Title = string.Empty, ReminderListId = listId, MonitorDaysBack = 0 };
+        _itemForm = new ReminderRequest { Title = string.Empty, MonitorDaysBack = 0 };
         _itemModalError = null;
         _showItemModal = true;
     }
@@ -579,7 +466,6 @@ else
         _monitorUseDaysBack = item.MonitorFromDate == null;
         _itemForm = new ReminderRequest
         {
-            ReminderListId = item.ReminderListId,
             Title = item.Title,
             Notes = item.Notes,
             NotifyAt = item.NotifyAt,
@@ -659,7 +545,6 @@ else
 
         if (!item.CompletionTagId.HasValue || effectiveInputTypeId == null)
         {
-            // Tagless reminder — complete directly.
             await CompleteDirectAsync(item, null);
             return;
         }
@@ -687,7 +572,7 @@ else
         }
         catch (ApiException ex)
         {
-            _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
+            _itemError = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
         }
         finally { _isBusy = false; }
 
@@ -746,7 +631,7 @@ else
     {
         _isBusy = true;
         try { await ReminderApi.ReopenReminder(item.Id); }
-        catch (ApiException ex) { _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again."); }
+        catch (ApiException ex) { _itemError = SurfaceErrorMessage(ex, "Failed to update. Please try again."); }
         finally { _isBusy = false; }
 
         await LoadDataAsync();
@@ -756,18 +641,10 @@ else
     {
         _isBusy = true;
         try { await ReminderApi.SkipReminder(item.Id, SelectedDate?.ToString("yyyy-MM-dd")); }
-        catch (ApiException ex) { _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to update. Please try again."); }
+        catch (ApiException ex) { _itemError = SurfaceErrorMessage(ex, "Failed to update. Please try again."); }
         finally { _isBusy = false; }
 
         await LoadDataAsync();
-    }
-
-    private async Task DeleteItemAsync(ReminderResponse item)
-    {
-        _isBusy = true;
-        try { await ReminderApi.DeleteReminder(item.Id); await LoadDataAsync(); }
-        catch (ApiException ex) { _itemErrorPerList[item.ReminderListId] = SurfaceErrorMessage(ex, "Failed to delete. Please try again."); }
-        finally { _isBusy = false; }
     }
 
     private void OpenQuickCompleteModal(ReminderResponse item, int? inputTypeId)
@@ -813,7 +690,6 @@ else
         StateHasChanged();
     }
 
-    // Helpers
     private DateTime EffectiveDoneAt() =>
         DateTime.SpecifyKind((SelectedDate?.Date ?? DateTime.Today).AddHours(12), DateTimeKind.Local).ToUniversalTime();
 

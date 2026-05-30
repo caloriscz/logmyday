@@ -151,12 +151,10 @@ public class ActivityService : IActivityService
             : $" of value {reloadedActivity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info, $"Activity '{tagName}'{desc} added");
 
-        // Auto-lock the tag for the day if it's non-repeatable. Skips if any row exists for
-        // the triple — preserves a prior manual unlock so we don't override user choice.
-        if (!tag.IsRepeatable)
-        {
-            await _tagDayLockService.TryAutoLock(userId, tag.Id, activityLocalDate);
-        }
+        // TagDayLock is intentionally user-driven only — no auto-lock here. Non-repeatable
+        // numeric tags accumulate via Step up to MaxValue across multiple activity creates;
+        // an auto-lock after the first one breaks that flow (see 2026-05-29 task). The lock
+        // is a deliberate "I'm done with this tag for today" gesture from the user.
 
         return MapToResponse(reloadedActivity);
     }

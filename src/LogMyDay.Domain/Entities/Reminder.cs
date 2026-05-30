@@ -10,10 +10,7 @@ public class Reminder
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
 
-    public int ReminderListId { get; set; }
-
-    [ForeignKey(nameof(ReminderListId))]
-    public ReminderList List { get; set; } = null!;
+    public Guid UserId { get; set; }
 
     [Required]
     [MaxLength(500)]

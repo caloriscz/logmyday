@@ -5,8 +5,6 @@ namespace LogMyDay.Shared.DTOs;
 
 public class ReminderRequest
 {
-    public int ReminderListId { get; set; }
-
     [Required]
     [MaxLength(500)]
     public required string Title { get; set; }

@@ -14,13 +14,13 @@ public class BackupData
     public List<ActivityBackup> Activities { get; set; } = new();
     public List<ScanMappingBackup> ScanMappings { get; set; } = new();
     public List<TodoListBackup> TodoLists { get; set; } = new();
-    public List<ReminderListBackup> ReminderLists { get; set; } = new();
+    public List<ReminderBackup> Reminders { get; set; } = new();
 }
 
 public class BackupMetadata
 {
     public DateTime ExportDate { get; set; }
-    public string Version { get; set; } = "1.9";  // schema version of the backup file format
+    public string Version { get; set; } = "2.0";  // schema version of the backup file format
     public int TotalTags { get; set; }
     public int TotalActivities { get; set; }
     public int TotalInputTypes { get; set; }
@@ -33,6 +33,5 @@ public class BackupMetadata
     public int TotalScanMappings { get; set; }
     public int TotalTodoLists { get; set; }
     public int TotalTodoItems { get; set; }
-    public int TotalReminderLists { get; set; }
     public int TotalReminders { get; set; }
 }

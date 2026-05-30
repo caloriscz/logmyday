@@ -35,8 +35,6 @@ public class BackupImportStatistics
     public int TodoListsSkipped { get; set; }
     public int TodoItemsImported { get; set; }
     public int TodoItemsSkipped { get; set; }
-    public int ReminderListsImported { get; set; }
-    public int ReminderListsSkipped { get; set; }
     public int RemindersImported { get; set; }
     public int RemindersSkipped { get; set; }
     public int RecordsCleared { get; set; }

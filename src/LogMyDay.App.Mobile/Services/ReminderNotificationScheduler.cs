@@ -80,47 +80,43 @@ public class ReminderNotificationScheduler
         }
     }
 
-    public void ScheduleAll(IList<ReminderListResponse> lists)
+    public void ScheduleAll(IList<ReminderResponse> reminders)
     {
-        // Track how many items share the same base fire time so we can stagger them.
         var seenFireTimes = new Dictionary<DateTime, int>();
 
-        foreach (var list in lists)
+        foreach (var item in reminders.Where(i => i.NotifyAt.HasValue))
         {
-            foreach (var item in list.Items.Where(i => i.NotifyAt.HasValue))
+            if (item.IsDone || item.IsSkipped)
             {
-                if (item.IsDone || item.IsSkipped)
+                _notificationService.CancelReminderAlarm(item.Id);
+
+                bool removed;
+                lock (_lock) { removed = _activeAlarms.Remove(item.Id); }
+
+                if (removed)
                 {
-                    _notificationService.CancelReminderAlarm(item.Id);
-
-                    bool removed;
-                    lock (_lock) { removed = _activeAlarms.Remove(item.Id); }
-
-                    if (removed)
-                    {
-                        LogDiag($"event=cancelled itemId={item.Id} surface=mobile reason={(item.IsDone ? "done" : "skipped")}");
-                    }
-
-                    continue;
+                    LogDiag($"event=cancelled itemId={item.Id} surface=mobile reason={(item.IsDone ? "done" : "skipped")}");
                 }
 
-                var baseFireTime = CalculateFireTime(item);
-                if (baseFireTime == null)
-                {
-                    _logger.LogDebug("Skipping reminder notification for item {ItemId} '{Title}' — past due or fire time already passed", item.Id, item.Title);
-                    continue;
-                }
-
-                var count = seenFireTimes.GetValueOrDefault(baseFireTime.Value, 0);
-                var adjustedFireTime = baseFireTime.Value.AddSeconds(count * 30);
-                seenFireTimes[baseFireTime.Value] = count + 1;
-
-                ScheduleItemAt(item, list.Name, adjustedFireTime);
+                continue;
             }
+
+            var baseFireTime = CalculateFireTime(item);
+            if (baseFireTime == null)
+            {
+                _logger.LogDebug("Skipping reminder notification for item {ItemId} '{Title}' — past due or fire time already passed", item.Id, item.Title);
+                continue;
+            }
+
+            var count = seenFireTimes.GetValueOrDefault(baseFireTime.Value, 0);
+            var adjustedFireTime = baseFireTime.Value.AddSeconds(count * 30);
+            seenFireTimes[baseFireTime.Value] = count + 1;
+
+            ScheduleItemAt(item, adjustedFireTime);
         }
     }
 
-    public void ScheduleItem(ReminderResponse item, string listName)
+    public void ScheduleItem(ReminderResponse item)
     {
         if (item.IsDone || item.IsSkipped || !item.NotifyAt.HasValue)
         {
@@ -136,12 +132,11 @@ public class ReminderNotificationScheduler
             return;
         }
 
-        ScheduleItemAt(item, listName, fireTime.Value);
+        ScheduleItemAt(item, fireTime.Value);
     }
 
-    private void ScheduleItemAt(ReminderResponse item, string listName, DateTime fireTimeUtc)
+    private void ScheduleItemAt(ReminderResponse item, DateTime fireTimeUtc)
     {
-        // Cancel any existing alarm for this item before rescheduling (idempotent at the OS level).
         _notificationService.CancelReminderAlarm(item.Id);
 
         var payload = new NotificationPayload
@@ -151,7 +146,7 @@ public class ReminderNotificationScheduler
             AutoComplete = true
         };
 
-        _notificationService.SendNotification(item.Title, $"from {listName}", fireTimeUtc, payload);
+        _notificationService.SendNotification(item.Title, item.Notes ?? string.Empty, fireTimeUtc, payload);
 
         bool changed;
         lock (_lock)
