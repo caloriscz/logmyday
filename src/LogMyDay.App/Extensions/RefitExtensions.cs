@@ -78,6 +78,21 @@ internal static class RefitExtensions
             .AddHttpMessageHandler<SelfBaseAddressHandler>()
             .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
+        services.AddRefitClient<ITodoApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
+            .AddHttpMessageHandler<SelfBaseAddressHandler>()
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+        services.AddRefitClient<ITagDayLockApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
+            .AddHttpMessageHandler<SelfBaseAddressHandler>()
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
+        services.AddRefitClient<IReminderApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
+            .AddHttpMessageHandler<SelfBaseAddressHandler>()
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
         services.AddScoped<IScanOrchestrator, ScanOrchestrator>();
 
         return services;

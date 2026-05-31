@@ -1,0 +1,84 @@
+@using LogMyDay.Domain.Enums
+
+<div @key="Item.Id" class="rounded-xl border @(IsOverdue ? "border-rose-500/60 dark:border-rose-500/40" : "border-gray-200 dark:border-slate-700") bg-gray-50 dark:bg-slate-800 p-4 flex items-center gap-4 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700/70 @(IsCompleted ? "opacity-60" : "")">    @* Square complete / reopen button *@
+    @if (IsCompleted)
+    {
+        <button type="button"
+                class="h-8 w-8 shrink-0 rounded-lg border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white hover:border-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-400 transition-colors focus:outline-hidden disabled:opacity-50"
+                title="Re-open"
+                @onclick="() => OnReopen.InvokeAsync(Item)"
+                disabled="@IsBusy">
+            <Icon Name="check" Class="h-4 w-4" />
+        </button>
+    }
+    else
+    {
+        <button type="button"
+                class="h-8 w-8 shrink-0 rounded-lg border-2 @(Item.IsTagDayLocked ? "border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-600" : "border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-transparent hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-500") flex items-center justify-center transition-colors focus:outline-hidden disabled:opacity-50"
+                title="@(Item.IsTagDayLocked ? "Tag locked for today — unlock first" : "Complete")"
+                @onclick="() => OnComplete.InvokeAsync(Item)"
+                disabled="@(IsBusy || Item.IsTagDayLocked)">
+            <Icon Name="@(Item.IsTagDayLocked ? "x" : "check")" Class="h-4 w-4" />
+        </button>
+    }
+    @* Content *@
+    <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-gray-900 dark:text-slate-100">@Item.Title</span>
+            @if (!string.IsNullOrWhiteSpace(Item.Notes))
+            {
+                <span class="text-sm text-gray-500 dark:text-slate-400">@Item.Notes</span>
+            }
+            @if (IsOverdue)
+            {
+                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">Overdue</span>
+            }
+            @if (Item.IsTagDayLocked)
+            {
+                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-200" title="@($"Tag '{Item.CompletionTagName}' is locked for the day")">
+                    🔒 Tag locked
+                </span>
+            }
+        </div>
+        @if (Item.RecurrenceType != RecurrenceType.None)
+        {
+            <div class="mt-1.5">
+                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><Icon Name="arrow-repeat" Class="me-1 h-3 w-3" />@Item.RecurrenceType</span>
+            </div>
+        }
+    </div>
+    @* Actions *@
+    <div class="flex items-center gap-5 shrink-0">
+        @if (!IsCompleted && Item.RecurrenceType != RecurrenceType.None)
+        {
+            <button type="button"
+                    class="inline-flex flex-col items-center gap-0.5 text-gray-400 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors focus:outline-hidden disabled:opacity-50"
+                    title="Skip for this period"
+                    @onclick="() => OnSkip.InvokeAsync(Item)"
+                    disabled="@IsBusy">
+                <Icon Name="skip" Class="h-5 w-5" />
+                <span class="text-xs font-medium uppercase tracking-wide">Skip</span>
+            </button>
+        }
+        <button type="button"
+                class="inline-flex flex-col items-center gap-0.5 text-gray-400 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors focus:outline-hidden disabled:opacity-50"
+                title="Edit item"
+                @onclick="() => OnEdit.InvokeAsync(Item)"
+                disabled="@IsBusy">
+            <Icon Name="pencil" Class="h-5 w-5" />
+            <span class="text-xs font-medium uppercase tracking-wide">Edit</span>
+        </button>
+
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ReminderResponse Item { get; set; } = null!;
+    [Parameter] public bool IsOverdue { get; set; }
+    [Parameter] public bool IsCompleted { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnComplete { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnReopen { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnSkip { get; set; }
+    [Parameter] public EventCallback<ReminderResponse> OnEdit { get; set; }
+}

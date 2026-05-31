@@ -33,6 +33,12 @@
                     <Icon Name="calendar" Class="w-4 h-4" />
                     <span>Activities</span>
                 </NavLink>
+                <NavLink href="todos"
+                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                         ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                    <Icon Name="check-square" Class="w-4 h-4" />
+                    <span>Todos</span>
+                </NavLink>
                 
                 <!-- Tags Dropdown -->
                 <div class="relative" @onmouseenter="() => showTagsMenu = true" @onmouseleave="() => showTagsMenu = false">
@@ -245,6 +251,12 @@
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="calendar" Class="w-5 h-5" />
                         <span>Activities</span>
+                    </NavLink>
+                    <NavLink href="todos" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="check-square" Class="w-5 h-5" />
+                        <span>Todos</span>
                     </NavLink>
                     
                     <!-- Tags Section -->

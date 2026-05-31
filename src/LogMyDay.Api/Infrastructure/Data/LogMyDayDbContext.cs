@@ -14,7 +14,6 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Pattern> Patterns => Set<Pattern>();
     public DbSet<User> Users => Set<User>();
     public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
-    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Quantity> Quantities => Set<Quantity>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
@@ -24,6 +23,10 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagGroup> TagGroups => Set<TagGroup>();
     public DbSet<EventLog> EventLogs => Set<EventLog>();
     public DbSet<EventLogDetail> EventLogDetails => Set<EventLogDetail>();
+    public DbSet<TodoList> TodoLists => Set<TodoList>();
+    public DbSet<TodoItem> TodoItems => Set<TodoItem>();
+    public DbSet<TagDayLock> TagDayLocks => Set<TagDayLock>();
+    public DbSet<Reminder> Reminders => Set<Reminder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,7 +39,6 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<Pattern>().ToTable("LogMyDay_Patterns");
         modelBuilder.Entity<User>().ToTable("LogMyDay_Users");
         modelBuilder.Entity<PasswordReset>().ToTable("LogMyDay_PasswordResets");
-        modelBuilder.Entity<Notification>().ToTable("LogMyDay_Notifications");
         modelBuilder.Entity<Quantity>().ToTable("LogMyDay_Quantities");
         modelBuilder.Entity<Unit>().ToTable("LogMyDay_Units");
         modelBuilder.Entity<TagOptionList>().ToTable("LogMyDay_TagOptionLists");
@@ -46,6 +48,10 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagGroup>().ToTable("LogMyDay_TagGroups");
         modelBuilder.Entity<EventLog>().ToTable("LogMyDay_EventLogs");
         modelBuilder.Entity<EventLogDetail>().ToTable("LogMyDay_EventLogDetails");
+        modelBuilder.Entity<TodoList>().ToTable("LogMyDay_TodoLists");
+        modelBuilder.Entity<TodoItem>().ToTable("LogMyDay_TodoItems");
+        modelBuilder.Entity<TagDayLock>().ToTable("LogMyDay_TagDayLocks");
+        modelBuilder.Entity<Reminder>().ToTable("LogMyDay_Reminders");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -72,29 +78,6 @@ public class LogMyDayDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.Token).HasDatabaseName("IX_LogMyDay_PasswordResets_Token");
-        });
-
-        modelBuilder.Entity<Notification>(entity =>
-        {
-            entity.HasOne(n => n.Tag)
-                .WithMany(t => t.Notifications)
-                .HasForeignKey(n => n.TagId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.Property(n => n.MaxNudges)
-                .HasDefaultValue(3);
-
-            entity.Property(n => n.IsActive).HasDefaultValue(true);
-            entity.Property(n => n.NudgeInterval).HasDefaultValue(new TimeSpan(0, 15, 0));
-            entity.Property(n => n.DeliveriesOnLastDate).HasDefaultValue(0);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(n => n.DateCreated).HasDefaultValueSql("GETUTCDATE()");
-                entity.Property(n => n.LastDeliveryDate).HasColumnType("date");
-                entity.Property(n => n.LastDeliverySentAtUtc).HasColumnType("datetime2");
-                entity.Property(n => n.NextEligibleSendAfterUtc).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<Quantity>(entity =>
@@ -159,6 +142,89 @@ public class LogMyDayDbContext : DbContext
                 .HasDatabaseName("IX_LogMyDay_EventLogs_Level");
 
             entity.Property(e => e.Message).HasMaxLength(500).IsRequired();
+        });
+
+        modelBuilder.Entity<TodoList>(entity =>
+        {
+            entity.HasMany(l => l.Items)
+                .WithOne(i => i.List)
+                .HasForeignKey(i => i.ListId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
+
+            entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
+            entity.Property(l => l.DisplayOrder).HasDefaultValue(0);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(l => l.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+            }
+        });
+
+        modelBuilder.Entity<TodoItem>(entity =>
+        {
+            entity.HasOne(i => i.CompletionTag)
+                .WithMany()
+                .HasForeignKey(i => i.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
+            entity.Property(i => i.IsDone).HasDefaultValue(false);
+            entity.Property(i => i.DisplayOrder).HasDefaultValue(0);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(i => i.StartDate).HasColumnType("date");
+                entity.Property(i => i.DueDate).HasColumnType("date");
+                entity.Property(i => i.NotifyAt).HasColumnType("time");
+                entity.Property(i => i.DoneAt).HasColumnType("datetime2");
+            }
+        });
+
+        modelBuilder.Entity<Reminder>(entity =>
+        {
+            entity.HasOne(i => i.CompletionTag)
+                .WithMany()
+                .HasForeignKey(i => i.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(i => i.UserId).HasDatabaseName("IX_LogMyDay_Reminders_UserId");
+            entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
+            entity.Property(i => i.IsDone).HasDefaultValue(false);
+            entity.Property(i => i.DisplayOrder).HasDefaultValue(0);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(i => i.NotifyAt).HasColumnType("time");
+                entity.Property(i => i.DoneAt).HasColumnType("datetime2");
+                entity.Property(i => i.MonitorFromDate).HasColumnType("date");
+                entity.Property(i => i.MonitorToDate).HasColumnType("date");
+            }
+        });
+
+        modelBuilder.Entity<TagDayLock>(entity =>
+        {
+            entity.HasOne(l => l.Tag)
+                .WithMany()
+                .HasForeignKey(l => l.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(l => new { l.UserId, l.TagId, l.Date })
+                .IsUnique()
+                .HasDatabaseName("IX_LogMyDay_TagDayLocks_UserId_TagId_Date");
+
+            entity.Property(l => l.Reason).HasMaxLength(200);
+            entity.Property(l => l.SetBy).HasConversion<int>();
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(l => l.Date).HasColumnType("date");
+                entity.Property(l => l.SetAt).HasColumnType("datetime2");
+                entity.Property(l => l.SetAt).HasDefaultValueSql("GETUTCDATE()");
+            }
         });
 
         modelBuilder.SeedData();

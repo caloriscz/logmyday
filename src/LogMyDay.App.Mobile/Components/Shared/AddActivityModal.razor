@@ -125,11 +125,11 @@
                                     break;
                                 case 10: // Score 0-5
                                     <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Score:</label>
-                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="5" />
+                                    <ScoreRating Value="@integerValue" ValueChanged="v => { integerValue = v; Activity.Description = v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : string.Empty; }" MaxScore="5" />
                                     break;
                                 case 11: // Score 0-10
                                     <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Score:</label>
-                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="10" />
+                                    <ScoreRating Value="@integerValue" ValueChanged="v => { integerValue = v; Activity.Description = v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : string.Empty; }" MaxScore="10" />
                                     break;
                                 default:
                                     <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Description:</label>

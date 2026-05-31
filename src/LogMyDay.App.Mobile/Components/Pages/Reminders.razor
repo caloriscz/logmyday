@@ -1,688 +1,1162 @@
 @page "/reminders"
 @using System.Globalization
-@using System.Net
-@using LogMyDay.Shared.DTOs
 @using LogMyDay.Domain.Constants
-@using LogMyDay.App.Mobile.Components.Shared
-@using LogMyDay.App.Mobile.Services
+@using LogMyDay.Domain.Enums
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Shared.Interfaces
 @using LogMyDay.Shared.Preferences
-@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
-@inject NavigationManager Navigation
+@using Refit
+@implements IDisposable
+@inject IReminderApi ReminderApi
+@inject IActivityApi ActivityApi
+@inject ILogger<Reminders> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
-@inject ISharedDataCache SharedDataCache
-@inject IJSRuntime JSRuntime
-@inject ISystemNotificationService SystemNotificationService
+@inject ReminderNotificationScheduler ReminderScheduler
+
+@{
+    var effectiveDate = _selectedDate.Date;
+    var activeItems = _reminders?
+        .Where(i => !i.IsDone && (!i.IsSkipped || i.IsTagDayLocked)
+            && !IsOutsideMonitoringWindow(i, effectiveDate))
+        .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
+        .ThenBy(i => i.DisplayOrder)
+        .ThenBy(i => i.DateCreated)
+        .ToList()
+        ?? new List<ReminderResponse>();
+    var doneItems = _reminders?.Where(i => i.IsDone).ToList() ?? new List<ReminderResponse>();
+}
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="Reminders" ShowReload="true" OnReload="RefreshReminders" />
-    <RemindersSectionNav RequiredCount="@(unfilledRequiredTags?.Count ?? 0)" />
+    <TopBar Title="Reminders" ShowReload="true" OnReload="LoadDataAsync" />
+    <RemindersSectionNav />
 
-    <div class="max-w-7xl mx-auto px-6 py-4">
-        <!-- Date Navigation -->
+    <div class="px-6 py-4">
+
         <div class="flex items-center justify-center gap-2 mb-6">
-            <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">
-                &lt;
-            </button>
-            <CultureAwareDatePicker Value="@selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="inline-block" Placeholder="Select date" />
-            <button class="btn-secondary" @onclick="NextDay" title="Next Day">
-                &gt;
-            </button>
+            <button class="btn-secondary" @onclick="PreviousDay" title="Previous Day">&lt;</button>
+            <CultureAwareDatePicker Value="@_selectedDate" ValueChanged="@OnDatePickerValueChanged" CssClass="inline-block" Placeholder="Select date" />
+            <button class="btn-secondary" @onclick="NextDay" title="Next Day">&gt;</button>
         </div>
 
-        @if (isLoading)
+        @if (_loadError != null)
         {
-            <div class="text-center">
-                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
-                <p class="mt-2 text-gray-600 dark:text-gray-400">Loading reminders...</p>
+            <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
+                @_loadError
             </div>
         }
-        else if (unfilledRequiredTags?.Any() == true)
+        else if (_reminders == null)
         {
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                @foreach (var tag in unfilledRequiredTags)
-                {
-                    <div @key="tag.Id" class="card border-l-4 border-yellow-500 transition duration-300 @(_dismissingTagIds.Contains(tag.Id) ? "opacity-0 scale-95 pointer-events-none" : "")">
-                        <div class="flex justify-between items-start mb-2">
-                            <h5 class="font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-2">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                @tag.Title
-                            </h5>
-                        </div>
-
-                        @if (tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10)
-                        {
-                            <div class="mb-3">
-                                <StarRating Value="@GetStarPickerValue(tag.Id)"
-                                            ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
-                                            MaxStars="@(tag.TypeId == InputTypeIds.StarRating10 ? 10 : 5)" />
-                            </div>
-                        }
-                        else if (tag.TypeId is InputTypeIds.Score or InputTypeIds.Score10)
-                        {
-                            <div class="mb-3">
-                                <ScoreRating Value="@GetScorePickerValue(tag.Id)"
-                                             ValueChanged="@(async v => await QuickAddWithValueAsync(tag, v))"
-                                             MaxScore="@(tag.TypeId == InputTypeIds.Score10 ? 10 : 5)" />
-                            </div>
-                        }
-                        else if (tag.TypeId == InputTypeIds.Boolean)
-                        {
-                            <div class="mb-3">
-                                <BooleanToggle Value="@GetBoolPickerValue(tag.Id)"
-                                               ValueChanged="@(async v => await QuickAddBoolAsync(tag, v))" />
-                            </div>
-                        }
-                        else if (!string.IsNullOrWhiteSpace(GetDefaultValueLabel(tag)))
-                        {
-                            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                Default: <span class="font-medium text-gray-800 dark:text-gray-200">@GetDefaultValueLabel(tag)</span>
-                            </div>
-                        }
-
-                        @{ var isRatingTag = tag.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 or InputTypeIds.Boolean; }
-                        @if (!isRatingTag)
-                        {
-                        <div class="mt-3 grid gap-2 @(HasDefaultValue(tag) && !isRatingTag ? "grid-cols-2" : "grid-cols-1")">
-                            <button class="px-3 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 active:bg-primary-800 transition-colors flex items-center justify-center gap-1"
-                                    @onclick="@(() => PrepareModalForTag(tag.Id))">
-                                <i class="bi bi-plus-circle"></i>
-                                <span>Add Activity</span>
-                            </button>
-                            @if (HasDefaultValue(tag) && !isRatingTag)
-                            {
-                                <button class="@GetQuickAddButtonClasses(tag)"
-                                        @onclick="@(() => QuickAddDefaultAsync(tag))"
-                                        disabled="@IsQuickAddDisabled(tag)">
-                                    <i class="bi bi-check-circle"></i>
-                                    <span>Use Default</span>
-                                    @if (IsQuickAddInProgress(tag.Id))
-                                    {
-                                        <div class="inline-block animate-spin text-lg">⟳</div>
-                                    }
-                                </button>
-                            }
-                        </div>
-                        }
-                    </div>
-                }
+            <div class="flex items-center justify-center gap-3 py-16 text-gray-500 dark:text-gray-400">
+                <div class="inline-block animate-spin text-2xl text-primary-600">⟳</div>
+                <span class="text-sm">Loading reminders…</span>
             </div>
         }
         else
         {
-            <div class="alert-success">
-                <i class="bi bi-check-circle"></i>
-                Great! All required tags have been filled for @FormatDate(selectedDate).
-            </div>
-        }
+            <div>
+                <div class="flex items-center justify-between py-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">@activeItems.Count @(activeItems.Count == 1 ? "task" : "tasks")</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        @if (doneItems.Any())
+                        {
+                            <button type="button"
+                                    class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-1 transition-colors"
+                                    @onclick="() => _showDone = !_showDone">
+                                @(_showDone ? "Hide" : "Show") done (@doneItems.Count)
+                            </button>
+                        }
+                        <button type="button"
+                                class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
+                                @onclick="OpenAddItemModal"
+                                disabled="@_isBusy">
+                            <i class="bi bi-plus-lg"></i>
+                            Add
+                        </button>
+                    </div>
+                </div>
 
-        @if (!string.IsNullOrEmpty(errorMessage))
-        {
-            <div class="alert-danger mt-4">
-                <i class="bi bi-exclamation-triangle"></i>
-                @errorMessage
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    @if (!activeItems.Any())
+                    {
+                        <p class="col-span-full py-8 text-center text-sm text-gray-400 dark:text-gray-500">No pending reminders.</p>
+                    }
+                    else
+                    {
+                        @foreach (var item in activeItems)
+                        {
+                            var isHighlighted = _highlightedItemId == item.Id;
+                            var isCompleting = _completingItemId == item.Id;
+                            <div @key="item.Id" class="rounded-xl border border-gray-200 dark:border-gray-700 @(isHighlighted ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3">
+                                <button type="button"
+                                        class="h-9 w-9 shrink-0 rounded-lg border-2 flex items-center justify-center transition-colors disabled:opacity-50 @(isCompleting ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-transparent active:border-emerald-500 active:bg-emerald-500 active:text-white")"
+                                        title="Complete"
+                                        @onclick="() => CompleteItemAsync(item)"
+                                        disabled="@_isBusy">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-semibold text-sm text-gray-900 dark:text-gray-100">@item.Title</span>
+                                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                        {
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">@item.Notes</span>
+                                        }
+                                        @if (item.RecurrenceType != RecurrenceType.None)
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
+                                        }
+                                        @if (item.IsTagDayLocked)
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"><i class="bi bi-lock-fill me-1"></i>Tag locked</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 shrink-0">
+                                    @if (item.RecurrenceType != RecurrenceType.None)
+                                    {
+                                        <button type="button"
+                                                class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
+                                                title="Skip"
+                                                @onclick="() => SkipItemAsync(item)"
+                                                disabled="@_isBusy">
+                                            <i class="bi bi-skip-forward text-lg"></i>
+                                            <span class="text-xs uppercase tracking-wide">Skip</span>
+                                        </button>
+                                    }
+                                    <button type="button"
+                                            class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                                            title="Edit"
+                                            @onclick="() => OpenEditItemModal(item)"
+                                            disabled="@_isBusy">
+                                        <i class="bi bi-pencil text-lg"></i>
+                                        <span class="text-xs uppercase tracking-wide">Edit</span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                @if (_showDone && doneItems.Any())
+                {
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        @foreach (var item in doneItems.OrderByDescending(i => i.DoneAt))
+                        {
+                            var isHighlightedDone = _highlightedItemId == item.Id;
+                            <div @key="item.Id" class="rounded-xl border border-gray-200 dark:border-gray-700 @(isHighlightedDone ? "ring-2 ring-blue-500" : "") bg-gray-50 dark:bg-gray-700/50 p-4 flex items-center gap-3 opacity-60">
+                                    <button type="button"
+                                            class="h-9 w-9 shrink-0 rounded-lg border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center text-white hover:border-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-400 transition-colors disabled:opacity-50"
+                                            title="Re-open"
+                                            @onclick="() => ReopenItemAsync(item)"
+                                            disabled="@_isBusy">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                    <div class="flex-1 min-w-0">
+                                        <span class="font-semibold text-sm text-gray-500 dark:text-gray-400 line-through">@item.Title</span>
+                                    </div>
+                                    <button type="button"
+                                            class="flex flex-col items-center gap-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+                                            title="Edit"
+                                            @onclick="() => OpenEditItemModal(item)"
+                                            disabled="@_isBusy">
+                                        <i class="bi bi-pencil text-lg"></i>
+                                        <span class="text-xs uppercase tracking-wide">Edit</span>
+                                    </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_itemError))
+                {
+                    <div class="mt-3 flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/20 px-3 py-2 text-xs text-red-700 dark:text-red-200">
+                        <span class="flex-1">@_itemError</span>
+                        <button type="button" class="shrink-0 font-medium underline hover:no-underline" @onclick="LoadDataAsync">Reload</button>
+                    </div>
+                }
             </div>
         }
     </div>
 </div>
 
-<!-- Add Activity Modal -->
-@if (showAddActivityModal && allTags != null && newActivity != null)
+@* ── Quick-Complete Modal ── *@
+@if (_showQuickModal && _quickItem != null)
 {
-    <AddActivityModal Activity="newActivity"
-                      AvailableTags="allTags"
-                      OptionLists="optionLists"
-                      OptionListLookup="optionListLookup"
-                      DisplayCulture="displayCulture"
-                      DisplayTimeZone="displayTimeZone"
-                      ErrorMessage="@errorMessage"
-                      PreselectedTagId="preselectedTagId"
-                      PreselectedDate="selectedDate"
-                      OnActivityCreated="OnActivityCreated"
-                      OnCanceled="CloseAddActivityModal"
-                      OnError="OnError"
-                      ModalId="addActivityModal" />
+    <div class="fixed inset-0 z-[70] flex items-end justify-center bg-gray-900/70 p-4" @onclick="() => { if (!_isQuickBusy) { _showQuickModal = false; } }">
+        <div class="w-full max-w-sm overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl" @onclick:stopPropagation="true">
+            <div class="px-6 pt-5 pb-1 text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Complete Reminder</p>
+                <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">@_quickItem.Title</h3>
+            </div>
+            <div class="px-6 py-4 space-y-3">
+                @if (_quickInputTypeId == InputTypeIds.Boolean)
+                {
+                    <div class="flex gap-3">
+                        <button type="button"
+                                class="flex-1 min-h-[52px] rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200")"
+                                @onclick="() => _quickBoolValue = true">
+                            <i class="bi bi-check-lg me-1"></i>Yes
+                        </button>
+                        <button type="button"
+                                class="flex-1 min-h-[52px] rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_quickBoolValue == false ? "border-red-500 bg-red-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200")"
+                                @onclick="() => _quickBoolValue = false">
+                            <i class="bi bi-x-lg me-1"></i>No
+                        </button>
+                    </div>
+                }
+                else if (_quickInputTypeId == InputTypeIds.String)
+                {
+                    <textarea class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                              rows="3" placeholder="Enter value…"
+                              @bind="_quickStringValue"></textarea>
+                }
+                else if (_quickInputTypeId == InputTypeIds.Integer || _quickInputTypeId == InputTypeIds.Decimal || _quickInputTypeId == InputTypeIds.Percentage)
+                {
+                    @if (!_quickAllowUnfilled)
+                    {
+                        <input type="number" step="any"
+                               class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                               placeholder="Value"
+                               @bind="_quickDecimalValue" />
+                    }
+                    @if (_quickItem?.AllowUnfilled == true)
+                    {
+                        <label class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                            <input type="checkbox" class="rounded" @bind="_quickAllowUnfilled" />
+                            Leave unfilled
+                        </label>
+                    }
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.StarRating10)
+                {
+                    <StarRating Value="@(_quickIntValue ?? 0)" ValueChanged="v => _quickIntValue = v" MaxStars="10" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="5" />
+                }
+                else if (_quickInputTypeId == InputTypeIds.Score10)
+                {
+                    <ScoreRating Value="@_quickIntValue" ValueChanged="v => _quickIntValue = v" MaxScore="10" />
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(_quickError))
+            {
+                <div class="mx-6 mb-3 rounded-lg border border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/20 px-4 py-2 text-sm text-red-700 dark:text-red-200">
+                    @_quickError
+                </div>
+            }
+            <div class="flex gap-3 border-t border-gray-200 dark:border-gray-700 px-6 py-4" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
+                <button type="button"
+                        class="flex-1 min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="() => { _showQuickModal = false; _quickItem = null; }"
+                        disabled="@_isQuickBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="flex-1 min-h-[48px] rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        @onclick="SaveQuickAsync"
+                        disabled="@_isQuickBusy">
+                    @if (_isQuickBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Item Create/Edit Modal ── *@
+@if (_showItemModal)
+{
+    <div class="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
+        <div class="flex shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100">@(_isEditingItem ? "Edit reminder" : "New reminder")</h3>
+            <button type="button" class="-mr-2 p-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300" @onclick="CloseItemModal" disabled="@_isBusy">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+            <EditForm EditContext="_itemEditContext">
+                <DataAnnotationsValidator />
+                <div class="space-y-5">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Title <span class="text-red-500">*</span></label>
+                        <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                   @bind-Value="_itemForm.Title"
+                                   maxlength="500"
+                                   placeholder="What needs to be done?" />
+                        <ValidationMessage For="@(() => _itemForm.Title)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Select the tag</label>
+                        <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @bind="_itemForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
+                        {
+                            var selTag = _allTags.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value);
+                            @if (selTag != null && !selTag.IsRepeatable && _itemForm.AutoLogMode != AutoLogMode.Add)
+                            {
+                                <p class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                    This tag is not repeatable — completing multiple items on the same day will replace the existing activity.
+                                </p>
+                            }
+                        }
+                    </div>
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { } _editTag && _editTag.InputTypeId.HasValue)
+                    {
+                        var _editTagInputTypeId = _editTag.InputTypeId;
+                        <div>
+                            @if (_editTagInputTypeId == InputTypeIds.Boolean)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <div class="flex gap-3">
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == true ? "border-green-500 bg-green-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-green-50 dark:hover:bg-green-500/10")"
+                                            @onclick="() => _booleanBoolValue = _booleanBoolValue == true ? null : true">
+                                        <i class="bi bi-check-lg me-1"></i>Yes
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == false ? "border-red-500 bg-red-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-500/10")"
+                                            @onclick="() => { _booleanBoolValue = _booleanBoolValue == false ? (bool?)null : false; }">
+                                        <i class="bi bi-x-lg me-1"></i>No
+                                    </button>
+                                    <button type="button"
+                                            class="flex-1 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors @(_booleanBoolValue == null ? "border-primary-500 bg-primary-500 text-white" : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700")"
+                                            @onclick="() => _booleanBoolValue = null">
+                                        Not specified
+                                    </button>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pre-selected answer when completing this reminder.</p>
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Integer || _editTagInputTypeId == InputTypeIds.Decimal || _editTagInputTypeId == InputTypeIds.Percentage)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Pre-filled number (optional)" />
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.String)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <InputText class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                           @bind-Value="_itemForm.Notes"
+                                           placeholder="Pre-filled text (optional)" />
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.StarRating)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="5" />
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.StarRating10)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <StarRating Value="@(_editIntValue ?? 0)" ValueChanged="v => _editIntValue = v" MaxStars="10" />
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Score)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="5" />
+                            }
+                            else if (_editTagInputTypeId == InputTypeIds.Score10)
+                            {
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default value</label>
+                                <ScoreRating Value="@_editIntValue" ValueChanged="v => _editIntValue = v" MaxScore="10" />
+                            }
+                        </div>
+                    }
+                    @if (_itemForm.CompletionTagId.HasValue)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
+                            <InputSelect @bind-Value="_itemForm.AutoLogMode" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
+                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
+                            </InputSelect>
+                        </div>
+                    }
+                    @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { InputTypeId: InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage })
+                    {
+                        <div>
+                            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                                <InputCheckbox @bind-Value="_itemForm.AllowUnfilled" class="rounded" />
+                                Allow leaving value unfilled at completion
+                            </label>
+                        </div>
+                    }
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Remind me at</label>
+                        <input type="time"
+                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                               value="@(_itemForm.NotifyAt?.ToString("HH:mm") ?? "")"
+                               @onchange="e => _itemForm.NotifyAt = ParseTimeOnly(e.Value?.ToString())" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Recurrence</label>
+                        <InputSelect @bind-Value="_itemForm.RecurrenceType" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="@RecurrenceType.None">None (one-time)</option>
+                            <option value="@RecurrenceType.Daily">Daily</option>
+                            <option value="@RecurrenceType.Weekly">Weekly</option>
+                        </InputSelect>
+                    </div>
+                    @if (_itemForm.RecurrenceType != RecurrenceType.None && _itemForm.CompletionTagId.HasValue)
+                    {
+                        <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Activity monitoring window</p>
+                            <div class="flex items-center gap-6">
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@_monitorUseDaysBack"
+                                           @onchange="() => { _monitorUseDaysBack = true; _itemForm.MonitorFromDate = null; _itemForm.MonitorToDate = null; }" />
+                                    Last N days
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                    <input type="radio" class="text-primary-600" checked="@(!_monitorUseDaysBack)"
+                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; _itemForm.MonitorFromDate = DateOnly.FromDateTime(DateTime.Today); }" />
+                                    Date range
+                                </label>
+                            </div>
+                            @if (_monitorUseDaysBack)
+                            {
+                                <div>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">Days back from today (0 = today only)</label>
+                                    <InputNumber @bind-Value="_itemForm.MonitorDaysBack"
+                                                 class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                 min="0" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">From</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorFromDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorFromDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">To</label>
+                                        <input type="date"
+                                               class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                               value="@(_itemForm.MonitorToDate?.ToString("yyyy-MM-dd") ?? "")"
+                                               @onchange="e => _itemForm.MonitorToDate = ParseDateOnly(e.Value?.ToString())" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </EditForm>
+        </div>
+        <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4" style="padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));">
+            @if (!string.IsNullOrEmpty(_itemModalError))
+            {
+                <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/20 dark:text-red-300">
+                    @_itemModalError
+                </div>
+            }
+            <div class="flex items-center justify-end gap-3">
+                @if (_isEditingItem)
+                {
+                    <button type="button"
+                            class="min-h-[48px] rounded-xl border border-red-200 dark:border-red-500/40 bg-white dark:bg-gray-800 px-5 py-3 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
+                            @onclick="DeleteEditingItemAsync" disabled="@_isBusy">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                }
+                <button type="button"
+                        class="min-h-[48px] rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-6 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"
+                        @onclick="CloseItemModal" disabled="@_isBusy">
+                    Cancel
+                </button>
+                <button type="button"
+                        class="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        @onclick="SubmitItemFormAsync" disabled="@_isBusy">
+                    @if (_isBusy) { <div class="inline-block animate-spin text-sm">⟳</div> }
+                    @(_isEditingItem ? "Save changes" : "Add reminder")
+                </button>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
-    [SupplyParameterFromQuery(Name = "tagId")] [Parameter] public int? QueryTagId { get; set; }
-    [SupplyParameterFromQuery(Name = "date")] [Parameter] public string? QueryDate { get; set; }
+    private List<ReminderResponse>? _reminders;
+    private IList<TagResponse>? _allTags;
+    private DateTime _selectedDate = DateTime.Today;
+    private string? _loadError;
+    private string? _itemError;
+    private bool _isBusy;
+    private bool _showDone;
+    private int? _completingItemId;
 
-    private List<TagResponse>? unfilledRequiredTags;
-    private IList<TagResponse>? allTags;
-    private IList<TagOptionListResponse>? optionLists;
-    private Dictionary<int, TagOptionListResponse>? optionListLookup;
-    private DateTime selectedDate = DateTime.Today;
-    private bool isLoading = true;
-    private string? errorMessage;
-    private ActivityRequest newActivity = new();
-    private int? preselectedTagId;
-    private bool showAddActivityModal = false;
-    private bool shouldShowModalAfterRender = false;
-    private readonly HashSet<int> quickAddInProgress = new();
-    private readonly HashSet<int> _dismissingTagIds = new();
-    private readonly Dictionary<int, int> _inlinePickerValues = new();
-    private readonly Dictionary<int, bool> _boolPickerValues = new();
-    private readonly Dictionary<int, ActivityResponse?> existingActivities = new();
+    private bool _showItemModal;
+    private bool _isEditingItem;
+    private int _editingItemId;
+    private ReminderRequest _itemForm = new() { Title = string.Empty };
+    private EditContext _itemEditContext = default!;
+    private string? _itemModalError;
+    private bool? _booleanBoolValue;
+    private int? _editIntValue;
+    private bool _monitorUseDaysBack;
 
-    // User preferences and localization
-    private UserPreferencesSnapshot? userPreferences;
-    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
-    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private bool _showQuickModal;
+    private ReminderResponse? _quickItem;
+    private int? _quickInputTypeId;
+    private bool? _quickBoolValue;
+    private string? _quickStringValue;
+    private decimal? _quickDecimalValue;
+    private int? _quickIntValue;
+    private bool _quickAllowUnfilled;
+    private bool _isQuickBusy;
+    private string? _quickError;
+
+    private System.Threading.Timer? _refreshTimer;
+    private int _loadGeneration;
+
+    [SupplyParameterFromQuery]
+    public int? TodoItemId { get; set; }
+    [SupplyParameterFromQuery]
+    public bool AutoComplete { get; set; }
+    private int? _highlightedItemId;
 
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Reminders");
-        userPreferences = await UserPreferencesService.GetAsync();
-        displayCulture = userPreferences.Culture;
-        displayTimeZone = userPreferences.TimeZone;
+        _itemEditContext = new EditContext(_itemForm);
+        await LoadDataAsync();
 
-        var today = GetTodayInDisplayZone();
-
-        if (!string.IsNullOrWhiteSpace(QueryDate) && DateOnly.TryParse(QueryDate, out var parsedDate))
+        if (AutoComplete && TodoItemId.HasValue)
         {
-            selectedDate = parsedDate.ToDateTime(TimeOnly.MinValue);
-        }
-        else
-        {
-            selectedDate = today;
+            _highlightedItemId = TodoItemId;
+            await AutoCompleteItemAsync(TodoItemId.Value);
         }
 
-        newActivity = new ActivityRequest
-        {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date
-        };
-
-        await LoadRequiredTags();
-    }
-
-    private DateTime GetCurrentDateTimeInDisplayZone()
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
-
-    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
-
-    private async Task LoadRequiredTags()
-    {
-        try
-        {
-            isLoading = true;
-            errorMessage = null;
-            StateHasChanged();
-
-            // Load both unfilled required tags and all tags for the modal
-            var unfilledTask = ActivityApi.GetRequiredDailyTagsNotFilledForDate(selectedDate.ToString("yyyy-MM-dd"));
-            var allTagsTask = SharedDataCache.GetTagsAsync();
-            var optionListsTask = SharedDataCache.GetOptionListsAsync();
-
-            await Task.WhenAll(unfilledTask, allTagsTask, optionListsTask);
-
-            unfilledRequiredTags = await unfilledTask;
-            allTags = await allTagsTask;
-            optionLists = await optionListsTask;
-
-            if (optionLists is not null)
+        _refreshTimer = new System.Threading.Timer(
+            _ => InvokeAsync(async () =>
             {
-                optionListLookup = optionLists.ToDictionary(list => list.Id);
-            }
-
-            existingActivities.Clear();
-            if (unfilledRequiredTags?.Count > 0)
-            {
-                // Only fetch existing activities for multi-day granularities (weekly/monthly/yearly).
-                // Daily/Exact/Hourly tags were confirmed unfilled by the server so their fetches would always return empty.
-                var tagsNeedingFetch = unfilledRequiredTags
-                    .Where(t => t.TimeGranularity is Domain.Enums.TimeGranularity.Weekly
-                                                  or Domain.Enums.TimeGranularity.Monthly
-                                                  or Domain.Enums.TimeGranularity.Yearly)
-                    .ToList();
-
-                if (tagsNeedingFetch.Count > 0)
+                if (_isBusy || _showItemModal || _showQuickModal)
                 {
-                    var activityFetchTasks = tagsNeedingFetch.Select(t =>
-                    {
-                        var (fetchStart, fetchEnd) = GetGranularityDateRange(t, selectedDate);
-                        return ActivityApi.GetActivities(tagId: t.Id, startDate: fetchStart, endDate: fetchEnd, pageSize: 1);
-                    });
-                    var activityResults = await Task.WhenAll(activityFetchTasks);
-                    for (var i = 0; i < tagsNeedingFetch.Count; i++)
-                    {
-                        existingActivities[tagsNeedingFetch[i].Id] = activityResults[i]?.Items?.FirstOrDefault();
-                    }
+                    return;
                 }
+
+                await LoadDataAsync();
+                StateHasChanged();
+            }),
+            null,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(30));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _highlightedItemId = TodoItemId;
+
+        if (AutoComplete && _highlightedItemId.HasValue && _reminders != null)
+        {
+            await AutoCompleteItemAsync(_highlightedItemId.Value);
+        }
+    }
+
+    public void Dispose() => _refreshTimer?.Dispose();
+
+    private async Task LoadDataAsync()
+    {
+        _loadError = null;
+        Exception? lastError = null;
+
+        var myGeneration = ++_loadGeneration;
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            if (attempt > 0)
+            {
+                await Task.Delay(1500);
             }
 
-            // Update new activity with the selected date
-            var today = GetTodayInDisplayZone();
-            newActivity.DateStarted = selectedDate.Date == today ? GetCurrentDateTimeInDisplayZone() : selectedDate.Date;
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-        {
-            // Authentication expired (e.g., password changed)
-            // DynamicAuthHandler will trigger automatic logout and redirect
-            errorMessage = "Your session has expired. Redirecting to login...";
-            unfilledRequiredTags = new List<TagResponse>();
-            allTags = new List<TagResponse>();
-            optionLists = new List<TagOptionListResponse>();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error loading reminders: {ex.Message}";
-            unfilledRequiredTags = new List<TagResponse>();
-            allTags = new List<TagResponse>();
-            optionLists = new List<TagOptionListResponse>();
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task RefreshReminders()
-    {
-        await LoadRequiredTags();
-    }
-
-    private void NavigateToAddActivity(int tagId)
-    {
-        Navigation.NavigateTo($"/calendar?tagId={tagId}&date={selectedDate:yyyy-MM-dd}");
-    }
-
-    private void PrepareModalForTag(int tagId)
-    {
-        preselectedTagId = tagId;
-        var today = GetTodayInDisplayZone();
-        newActivity = new ActivityRequest
-        {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date,
-            PrimaryTagId = tagId
-        };
-        showAddActivityModal = true;
-        shouldShowModalAfterRender = true;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (shouldShowModalAfterRender && showAddActivityModal)
-        {
-            shouldShowModalAfterRender = false;
             try
             {
-                await Task.Delay(50); // Small delay to ensure DOM is ready
-                await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
+                var dateParam = _selectedDate.ToString("yyyy-MM-dd");
+                var all = await ReminderApi.GetReminders(dateParam);
+
+                if (myGeneration != _loadGeneration)
+                {
+                    return;
+                }
+
+                _reminders = all.ToList();
+                if (_allTags == null)
+                {
+                    _allTags = await ActivityApi.GetTags();
+                }
+
+                if (_selectedDate.Date == DateTime.Today)
+                {
+                    ReminderScheduler.ScheduleAll(_reminders);
+
+                    var liveIds = all.Select(i => i.Id).ToHashSet();
+                    ReminderScheduler.SweepGhostAlarms(liveIds);
+                }
+
+                return;
+            }
+            catch (ApiException ex)
+            {
+                Logger.LogWarning(ex, "Failed to load reminders");
+                if (_reminders == null)
+                {
+                    _loadError = "Failed to load reminders. Tap reload to try again.";
+                }
+
+                return;
             }
             catch (Exception ex)
             {
-                // Log but don't throw - modal might still work via Blazor rendering
-                Console.WriteLine($"Error showing modal via JS: {ex.Message}");
+                Logger.LogWarning(ex, "Failed to load reminders (attempt {Attempt})", attempt + 1);
+                lastError = ex;
             }
         }
+
+        if (lastError != null && _reminders == null)
+        {
+            _loadError = "Failed to load reminders. Tap reload to try again.";
+        }
     }
 
-    private async Task CloseAddActivityModal()
-    {
-        // Hide modal via JavaScript first
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("hideModal", "addActivityModal");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error hiding modal via JS: {ex.Message}");
-        }
-
-        showAddActivityModal = false;
-        preselectedTagId = null;
-        errorMessage = null;
-    }
-
-    private async Task OnActivityCreated(ActivityRequest activity)
-    {
-        showAddActivityModal = false;
-
-        if (activity?.PrimaryTagId.HasValue == true)
-        {
-            SystemNotificationService.MarkTagFulfilled(activity.PrimaryTagId.Value, DateOnly.FromDateTime(selectedDate));
-            _dismissingTagIds.Add(activity.PrimaryTagId.Value);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != activity.PrimaryTagId.Value).ToList();
-            _dismissingTagIds.Remove(activity.PrimaryTagId.Value);
-        }
-
-        // Reset the form but keep the date
-        var today = GetTodayInDisplayZone();
-        newActivity = new ActivityRequest
-        {
-            DateStarted = selectedDate.Date == today
-                ? GetCurrentDateTimeInDisplayZone()
-                : selectedDate.Date
-        };
-        preselectedTagId = null;
-        errorMessage = null;
-    }
-
+    private async Task PreviousDay() { _selectedDate = _selectedDate.AddDays(-1); await LoadDataAsync(); }
+    private async Task NextDay()     { _selectedDate = _selectedDate.AddDays(1);  await LoadDataAsync(); }
     private async Task OnDatePickerValueChanged(DateTime? newDate)
     {
-        if (newDate.HasValue)
+        if (newDate.HasValue) { _selectedDate = newDate.Value; await LoadDataAsync(); }
+    }
+
+    private static bool IsOutsideMonitoringWindow(ReminderResponse item, DateTime effectiveDate)
+    {
+        if (item.MonitorFromDate.HasValue && effectiveDate.Date < item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue).Date) return true;
+        if (item.MonitorToDate.HasValue   && effectiveDate.Date > item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).Date)   return true;
+        if (item.MonitorDaysBack.HasValue)
         {
-            selectedDate = newDate.Value;
-            await LoadRequiredTags();
-        }
-    }
-
-    private async Task OnError(string error)
-    {
-        errorMessage = error;
-        await Task.CompletedTask;
-    }
-
-    private async Task PreviousDay()
-    {
-        selectedDate = selectedDate.AddDays(-1);
-        await LoadRequiredTags();
-    }
-
-    private async Task NextDay()
-    {
-        selectedDate = selectedDate.AddDays(1);
-        await LoadRequiredTags();
-    }
-
-    private string FormatDate(DateTime date)
-    {
-        var pattern = userPreferences?.Preferences.LongDatePattern ?? displayCulture.DateTimeFormat.LongDatePattern;
-        return date.ToString(pattern, displayCulture);
-    }
-
-    private bool HasDefaultValue(TagResponse tag)
-        => !string.IsNullOrWhiteSpace(ResolveDefaultValue(tag));
-
-    private bool IsQuickAddDisabled(TagResponse tag)
-        => !HasDefaultValue(tag) || quickAddInProgress.Contains(tag.Id);
-
-    private bool IsQuickAddInProgress(int tagId)
-        => quickAddInProgress.Contains(tagId);
-
-    private string GetQuickAddButtonClasses(TagResponse tag)
-    {
-        var baseClasses = "px-3 py-2 rounded-md transition-colors flex items-center justify-center gap-1";
-
-        if (IsQuickAddDisabled(tag))
-        {
-            return $"{baseClasses} bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50";
+            var today = DateTime.Today;
+            var windowStart = today.AddDays(-item.MonitorDaysBack.Value).Date;
+            return effectiveDate.Date < windowStart || effectiveDate.Date > today;
         }
 
-        return $"{baseClasses} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800";
+        return false;
     }
 
-    private string? GetDefaultValueLabel(TagResponse tag)
+    private async Task CompleteItemAsync(ReminderResponse item)
     {
-        var value = ResolveDefaultValue(tag);
-        if (string.IsNullOrWhiteSpace(value))
+        _completingItemId = item.Id;
+        try
         {
-            return null;
-        }
+        if (item.CompletionTagId.HasValue)
+        {
+            var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+            var effectiveInputTypeId = item.CompletionTagInputTypeId ?? completionTag?.InputTypeId;
 
-        if (tag.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
-        {
-            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
-            if (option is not null)
+            if (IsQuickCompleteInputType(effectiveInputTypeId))
             {
-                return option.DisplayName ?? option.Value;
+                if (HasValidPrefilledValue(effectiveInputTypeId, completionTag?.DefaultValue, item.Notes))
+                {
+                    _isBusy = true;
+                    try
+                    {
+                        var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                        ReminderScheduler.CancelItem(item.Id);
+                        UpdateItem(updated);
+                    }
+                    catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Logger.LogWarning(ex, "Reminder {ItemId} not found when completing", item.Id);
+                        _itemError = "Item no longer exists. Reload to refresh.";
+                    }
+                    catch (ApiException ex)
+                    {
+                        Logger.LogWarning(ex, "Failed to complete reminder {ItemId}", item.Id);
+                        _itemError = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
+                    }
+                    finally
+                    {
+                        _isBusy = false;
+                    }
+
+                    await LoadDataAsync();
+                    return;
+                }
+
+                OpenQuickCompleteModal(item, effectiveInputTypeId);
+                return;
             }
-        }
 
-        return value;
-    }
-
-    private string? ResolveDefaultValue(TagResponse tag)
-    {
-        if (!string.IsNullOrWhiteSpace(tag.DefaultValue))
-        {
-            return tag.DefaultValue;
-        }
-
-        return null;
-    }
-
-    private async Task QuickAddBoolAsync(TagResponse tag, bool value)
-    {
-        _boolPickerValues[tag.Id] = value;
-
-        if (!quickAddInProgress.Add(tag.Id))
-        {
+            OpenEditItemModal(item);
             return;
         }
 
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
+        _isBusy = true;
+        try
+        {
+            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+            ReminderScheduler.CancelItem(item.Id);
+            UpdateItem(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Logger.LogWarning(ex, "Reminder {ItemId} not found when completing", item.Id);
+            _itemError = "Item no longer exists. Reload to refresh.";
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete reminder {ItemId}", item.Id);
+            _itemError = SurfaceErrorMessage(ex, "Failed to update. Please try again.");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
+        }
+        finally
+        {
+            _completingItemId = null;
+        }
+    }
+
+    private async Task ReopenItemAsync(ReminderResponse item)
+    {
+        _isBusy = true;
+        try
+        {
+            var updated = await ReminderApi.ReopenReminder(item.Id);
+            UpdateItem(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            _itemError = "Item no longer exists. Reload to refresh.";
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to reopen reminder {ItemId}", item.Id);
+            _itemError = "Failed to update. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
+    }
+
+    private async Task SkipItemAsync(ReminderResponse item)
+    {
+        _isBusy = true;
+        try
+        {
+            var updated = await ReminderApi.SkipReminder(item.Id, _selectedDate.ToString("yyyy-MM-dd"));
+            UpdateItem(updated);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            _itemError = "Item no longer exists. Reload to refresh.";
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to skip reminder {ItemId}", item.Id);
+            _itemError = "Failed to update. Please try again.";
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await LoadDataAsync();
+    }
+
+    private void UpdateItem(ReminderResponse updated)
+    {
+        if (_reminders == null) return;
+        for (var i = 0; i < _reminders.Count; i++)
+        {
+            if (_reminders[i].Id == updated.Id)
+            {
+                _reminders[i] = updated;
+                return;
+            }
+        }
+    }
+
+    private async Task AutoCompleteItemAsync(int reminderId)
+    {
+        var item = _reminders?.FirstOrDefault(i => i.Id == reminderId && !i.IsDone && !i.IsSkipped);
+        if (item == null) return;
 
         try
         {
-            var existing = GetExistingActivity(tag.Id);
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = value ? "true" : "false",
-                DateStarted = startDate
-            };
+            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow });
+            ReminderScheduler.CancelItem(item.Id);
+            ReminderScheduler.DismissItem(item.Id);
+            UpdateItem(updated);
+            _showDone = true;
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to auto-complete reminder {ItemId} from notification", item.Id);
+            _itemError = "Failed to mark done. Please try again.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to auto-complete reminder {ItemId} from notification — network error", item.Id);
+            _itemError = "Failed to mark done. Please try again.";
+        }
 
-            if (existing != null)
+        StateHasChanged();
+    }
+
+    private void OpenQuickCompleteModal(ReminderResponse item, int? inputTypeId)
+    {
+        _quickItem = item;
+        _quickInputTypeId = inputTypeId;
+        _quickBoolValue = null;
+        _quickStringValue = null;
+        _quickDecimalValue = null;
+        _quickIntValue = null;
+        _quickAllowUnfilled = false;
+        _quickError = null;
+
+        var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+        var defaultValue = tag?.DefaultValue;
+
+        switch (inputTypeId)
+        {
+            case InputTypeIds.Boolean:
+                _quickBoolValue = defaultValue switch { "true" => true, "false" => false, _ => null };
+                break;
+            case InputTypeIds.String:
+                _quickStringValue = defaultValue;
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (!string.IsNullOrWhiteSpace(item.Notes) &&
+                    decimal.TryParse(item.Notes, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+                {
+                    _quickDecimalValue = d;
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                if (!string.IsNullOrWhiteSpace(defaultValue) && int.TryParse(defaultValue, out var iv))
+                {
+                    _quickIntValue = iv;
+                }
+                break;
+        }
+
+        _showQuickModal = true;
+    }
+
+    private async Task SaveQuickAsync()
+    {
+        if (_quickItem == null) return;
+
+        string? notes;
+        switch (_quickInputTypeId)
+        {
+            case InputTypeIds.Boolean:
+                if (!_quickBoolValue.HasValue) { _quickError = "Please select Yes or No."; return; }
+                notes = _quickBoolValue.Value ? "true" : "false";
+                break;
+            case InputTypeIds.String:
+                notes = string.IsNullOrWhiteSpace(_quickStringValue) ? null : _quickStringValue.Trim();
+                break;
+            case InputTypeIds.Integer:
+            case InputTypeIds.Decimal:
+            case InputTypeIds.Percentage:
+                if (_quickAllowUnfilled)
+                {
+                    notes = null;
+                }
+                else if (!_quickDecimalValue.HasValue)
+                {
+                    _quickError = "Please enter a value.";
+                    return;
+                }
+                else
+                {
+                    notes = _quickDecimalValue.Value.ToString("0.#############################", CultureInfo.InvariantCulture);
+                }
+                break;
+            case InputTypeIds.StarRating:
+            case InputTypeIds.StarRating10:
+            case InputTypeIds.Score:
+            case InputTypeIds.Score10:
+                notes = _quickIntValue?.ToString(CultureInfo.InvariantCulture);
+                break;
+            default:
+                notes = null;
+                break;
+        }
+
+        _isQuickBusy = true;
+        _quickError = null;
+        try
+        {
+            await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            ReminderScheduler.CancelItem(_quickItem.Id);
+            _showQuickModal = false;
+            _quickItem = null;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete reminder via quick modal");
+            _quickError = SurfaceErrorMessage(ex, "Failed to save. Please try again.");
+        }
+        finally
+        {
+            _isQuickBusy = false;
+        }
+    }
+
+    private static string SurfaceErrorMessage(ApiException ex, string fallback)
+    {
+        if ((ex.StatusCode == System.Net.HttpStatusCode.BadRequest
+            || ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            && !string.IsNullOrWhiteSpace(ex.Content))
+        {
+            var content = ex.Content.Trim();
+
+            if (content.StartsWith("{") && content.EndsWith("}"))
             {
-                await ActivityApi.UpdateCalendarItem(existing.Id, request);
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("code", out var codeEl) &&
+                        codeEl.GetString() == "tag-day-locked" &&
+                        root.TryGetProperty("date", out var dateEl))
+                    {
+                        return $"This tag is locked for {dateEl.GetString()}. Unlock it first to add another value.";
+                    }
+
+                    if (root.TryGetProperty("message", out var messageEl) &&
+                        !string.IsNullOrWhiteSpace(messageEl.GetString()))
+                    {
+                        return messageEl.GetString()!;
+                    }
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                }
+            }
+
+            return content.Trim('"');
+        }
+
+        return fallback;
+    }
+
+    private void OpenAddItemModal()
+    {
+        _isEditingItem = false;
+        _editingItemId = 0;
+        _itemForm = new ReminderRequest
+        {
+            Title = string.Empty,
+            RecurrenceType = RecurrenceType.None
+        };
+        _itemEditContext = new EditContext(_itemForm);
+        _booleanBoolValue = null;
+        _editIntValue = null;
+        _monitorUseDaysBack = true;
+        _itemModalError = null;
+        _showItemModal = true;
+    }
+
+    private void OpenEditItemModal(ReminderResponse item)
+    {
+        _isEditingItem = true;
+        _editingItemId = item.Id;
+        _itemForm = new ReminderRequest
+        {
+            Title = item.Title,
+            Notes = item.Notes,
+            NotifyAt = item.NotifyAt,
+            DisplayOrder = item.DisplayOrder,
+            RecurrenceType = item.RecurrenceType,
+            AutoLogMode = item.AutoLogMode,
+            MonitorDaysBack = item.MonitorDaysBack,
+            MonitorFromDate = item.MonitorFromDate,
+            MonitorToDate = item.MonitorToDate,
+            CompletionTagId = item.CompletionTagId,
+            AllowUnfilled = item.AllowUnfilled
+        };
+        _itemEditContext = new EditContext(_itemForm);
+
+        var tag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+        if (IsBooleanInputType(tag?.InputTypeId))
+        {
+            _booleanBoolValue = item.Notes switch { "true" => true, "false" => false, _ => null };
+            _itemForm.Notes = null;
+        }
+        else if (tag?.InputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10)
+        {
+            _editIntValue = int.TryParse(item.Notes, out var v) ? v : null;
+            _itemForm.Notes = null;
+        }
+        else
+        {
+            _booleanBoolValue = null;
+            _editIntValue = null;
+        }
+
+        _monitorUseDaysBack = item.MonitorDaysBack.HasValue || (!item.MonitorFromDate.HasValue && !item.MonitorToDate.HasValue);
+        _itemModalError = null;
+        _showItemModal = true;
+    }
+
+    private void CloseItemModal()
+    {
+        _showItemModal = false;
+        _itemModalError = null;
+        _booleanBoolValue = null;
+        _editIntValue = null;
+    }
+
+    private async Task SubmitItemFormAsync()
+    {
+        if (!_itemEditContext.Validate()) return;
+        await SaveItemAsync();
+    }
+
+    private async Task SaveItemAsync()
+    {
+        _isBusy = true;
+        _itemModalError = null;
+        try
+        {
+            var tag = _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId);
+            var isBooleanType = IsBooleanInputType(tag?.InputTypeId);
+            var isStarScoreType = tag?.InputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10;
+
+            if (isBooleanType)
+            {
+                _itemForm.Notes = _booleanBoolValue.HasValue ? (_booleanBoolValue.Value ? "true" : "false") : null;
+            }
+            else if (isStarScoreType)
+            {
+                _itemForm.Notes = _editIntValue?.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (_isEditingItem)
+            {
+                await ReminderApi.UpdateReminder(_editingItemId, _itemForm);
+
+                if (isBooleanType && _booleanBoolValue.HasValue)
+                {
+                    await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                }
             }
             else
             {
-                await ActivityApi.CreateCalendarItem(request);
+                var created = await ReminderApi.CreateReminder(_itemForm);
+
+                if (isBooleanType && _booleanBoolValue.HasValue)
+                {
+                    await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                }
             }
 
-            StateHasChanged();
-            await Task.Delay(300);
-            _boolPickerValues.Remove(tag.Id);
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
+            _showItemModal = false;
+            _booleanBoolValue = null;
+            _editIntValue = null;
+            await LoadDataAsync();
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        catch (ApiException ex)
         {
-            _boolPickerValues.Remove(tag.Id);
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            _boolPickerValues.Remove(tag.Id);
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details) ? details : "The activity could not be created.";
-        }
-        catch (Exception ex)
-        {
-            _boolPickerValues.Remove(tag.Id);
-            errorMessage = $"Error adding activity: {ex.Message}";
+            Logger.LogWarning(ex, "Failed to save reminder");
+            _itemModalError = ex.StatusCode == System.Net.HttpStatusCode.BadRequest && !string.IsNullOrWhiteSpace(ex.Content)
+                ? ex.Content.Trim('"')
+                : "Failed to save. Please try again.";
         }
         finally
         {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
+            _isBusy = false;
         }
     }
 
-    private async Task QuickAddDefaultAsync(TagResponse tag)
+    private async Task DeleteEditingItemAsync()
     {
-        var defaultValue = ResolveDefaultValue(tag);
-        if (string.IsNullOrWhiteSpace(defaultValue))
-        {
-            errorMessage = "No default value is configured for this tag.";
-            return;
-        }
-
-        if (!quickAddInProgress.Add(tag.Id))
-        {
-            return;
-        }
-
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
-
+        if (!_isEditingItem) return;
+        _isBusy = true;
         try
         {
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = defaultValue,
-                DateStarted = startDate
-            };
-
-            await ActivityApi.CreateCalendarItem(request);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
+            await ReminderApi.DeleteReminder(_editingItemId);
+            _showItemModal = false;
+            await LoadDataAsync();
         }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        catch (ApiException ex)
         {
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details)
-                ? details
-                : "The activity could not be created with the default value.";
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Error adding default activity: {ex.Message}";
+            Logger.LogWarning(ex, "Failed to delete reminder {ItemId}", _editingItemId);
+            _itemModalError = "Failed to delete. Please try again.";
         }
         finally
         {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
+            _isBusy = false;
         }
     }
 
-    private int GetStarPickerValue(int tagId) =>
-        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : 0;
+    private DateTime EffectiveDoneAt() =>
+        DateTime.SpecifyKind(_selectedDate.Date.AddHours(12), DateTimeKind.Local).ToUniversalTime();
 
-    private int? GetScorePickerValue(int tagId) =>
-        _inlinePickerValues.TryGetValue(tagId, out var v) ? v : (int?)null;
+    private static bool IsQuickCompleteInputType(int? id) => id is
+        InputTypeIds.Boolean or InputTypeIds.String or
+        InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage or
+        InputTypeIds.StarRating or InputTypeIds.StarRating10 or
+        InputTypeIds.Score or InputTypeIds.Score10;
 
-    private bool? GetBoolPickerValue(int tagId)
+    private static bool HasValidPrefilledValue(int? inputTypeId, string? tagDefaultValue, string? itemNotes = null)
     {
-        if (_boolPickerValues.TryGetValue(tagId, out var v))
+        if (inputTypeId is InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage)
         {
-            return v;
+            return decimal.TryParse(itemNotes, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var n) && n != 0;
         }
 
-        var existing = GetExistingActivity(tagId);
+        if (string.IsNullOrWhiteSpace(tagDefaultValue)) return false;
 
-        return existing != null ? BooleanDisplay.Parse(existing.PrimaryTagValue ?? existing.Description) : null;
-    }
-
-    private ActivityResponse? GetExistingActivity(int tagId)
-        => existingActivities.TryGetValue(tagId, out var act) ? act : null;
-
-    private static (DateTime start, DateTime end) GetGranularityDateRange(TagResponse tag, DateTime date)
-    {
-        var dayStart = date.Date;
-
-        return tag.TimeGranularity switch
+        return inputTypeId switch
         {
-            Domain.Enums.TimeGranularity.Weekly =>
-                (GetStartOfWeek(dayStart), GetStartOfWeek(dayStart).AddDays(7).AddTicks(-1)),
-            Domain.Enums.TimeGranularity.Monthly =>
-                (new DateTime(dayStart.Year, dayStart.Month, 1), new DateTime(dayStart.Year, dayStart.Month, 1).AddMonths(1).AddTicks(-1)),
-            Domain.Enums.TimeGranularity.Yearly =>
-                (new DateTime(dayStart.Year, 1, 1), new DateTime(dayStart.Year + 1, 1, 1).AddTicks(-1)),
-            _ => (dayStart, dayStart.AddDays(1).AddTicks(-1))
+            InputTypeIds.Boolean => false,
+            InputTypeIds.String => true,
+            InputTypeIds.StarRating or InputTypeIds.StarRating10 or InputTypeIds.Score or InputTypeIds.Score10 =>
+                int.TryParse(tagDefaultValue, out var v) && v > 0,
+            _ => false
         };
     }
 
-    private static DateTime GetStartOfWeek(DateTime date)
-    {
-        int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+    private static bool IsBooleanInputType(int? inputTypeId) => inputTypeId == InputTypeIds.Boolean;
 
-        return date.AddDays(-diff);
-    }
+    private static DateOnly? ParseDateOnly(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : DateOnly.TryParse(value, out var d) ? d : null;
 
-    private async Task QuickAddWithValueAsync(TagResponse tag, int value)
-    {
-        _inlinePickerValues[tag.Id] = value;
-
-        if (!quickAddInProgress.Add(tag.Id))
-        {
-            return;
-        }
-
-        var today = GetTodayInDisplayZone();
-        var startDate = selectedDate.Date == today
-            ? GetCurrentDateTimeInDisplayZone()
-            : selectedDate.Date;
-
-        try
-        {
-            var existing = GetExistingActivity(tag.Id);
-            var request = new ActivityRequest
-            {
-                PrimaryTagId = tag.Id,
-                Description = value.ToString(),
-                DateStarted = startDate
-            };
-
-            if (existing != null)
-            {
-                await ActivityApi.UpdateCalendarItem(existing.Id, request);
-            }
-            else
-            {
-                await ActivityApi.CreateCalendarItem(request);
-            }
-
-            StateHasChanged();
-            await Task.Delay(300);
-            _inlinePickerValues.Remove(tag.Id);
-            _dismissingTagIds.Add(tag.Id);
-            StateHasChanged();
-            await Task.Delay(300);
-            unfilledRequiredTags = unfilledRequiredTags?.Where(t => t.Id != tag.Id).ToList();
-            _dismissingTagIds.Remove(tag.Id);
-            SystemNotificationService.MarkTagFulfilled(tag.Id, DateOnly.FromDateTime(selectedDate));
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            errorMessage = "Authentication failed. Please refresh and try again.";
-        }
-        catch (Refit.ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            var details = await ex.GetContentAsAsync<string>();
-            errorMessage = !string.IsNullOrWhiteSpace(details)
-                ? details
-                : "The activity could not be created.";
-        }
-        catch (Exception ex)
-        {
-            _inlinePickerValues.Remove(tag.Id);
-            errorMessage = $"Error adding activity: {ex.Message}";
-        }
-        finally
-        {
-            quickAddInProgress.Remove(tag.Id);
-            StateHasChanged();
-        }
-    }
+    private static TimeOnly? ParseTimeOnly(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : TimeOnly.TryParse(value, out var t) ? t : null;
 }

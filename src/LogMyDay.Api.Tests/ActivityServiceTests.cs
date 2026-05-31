@@ -28,7 +28,8 @@ public class ActivityServiceTests
         
         var repository = new ActivityRepository(context);
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
-        var service = new ActivityService(context, repository, eventLogService);
+        var tagDayLockService = new TagDayLockService(context);
+        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
         var request = new ActivityRequest
         {
             DateStarted = DateTime.UtcNow.AddHours(-1),

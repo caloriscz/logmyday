@@ -81,6 +81,8 @@
   --z-index-100: 100;
 
   --ease-bounce-in: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  --breakpoint-3xl: 120rem;
 }
 
 /*

@@ -142,32 +142,6 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
-            // Export Notifications with user filtering (via Tag)
-            var notificationsQuery = _context.Notifications
-                .Include(n => n.Tag)
-                .AsQueryable();
-            
-            if (userId.HasValue)
-            {
-                notificationsQuery = notificationsQuery.Where(n => n.Tag.UserId == userId);
-            }
-
-            var notifications = await notificationsQuery
-                .Select(n => new NotificationBackup
-                {
-                    TagKey = n.Tag.TagName,
-                    NotificationText = n.NotificationText,
-                    NotBeforeTime = n.NotBeforeTime,
-                    NotAfterTime = n.NotAfterTime,
-                    MaxNudges = n.MaxNudges,
-                    NudgeInterval = n.NudgeInterval,
-                    IsActive = n.IsActive,
-                    DateCreated = n.DateCreated,
-                    LastDeliveryDate = n.LastDeliveryDate,
-                    DeliveriesOnLastDate = n.DeliveriesOnLastDate
-                })
-                .ToListAsync();
-
             // Export Activities with user filtering
             var activitiesQuery = _context.Activities
                 .Include(a => a.Tag)
@@ -217,12 +191,80 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            // Export TodoLists with items and user filtering
+            var todoListsQuery = _context.TodoLists
+                .Include(l => l.Items)
+                    .ThenInclude(i => i.CompletionTag)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                todoListsQuery = todoListsQuery.Where(l => l.UserId == userId);
+            }
+
+            var todoLists = await todoListsQuery
+                .Select(l => new TodoListBackup
+                {
+                    Name = l.Name,
+                    DisplayOrder = l.DisplayOrder,
+                    ShowOnHomepage = l.ShowOnHomepage,
+                    DateCreated = l.DateCreated,
+                    Items = l.Items.Select(i => new TodoItemBackup
+                    {
+                        Title = i.Title,
+                        Notes = i.Notes,
+                        StartDate = i.StartDate,
+                        DueDate = i.DueDate,
+                        NotifyAt = i.NotifyAt,
+                        IsDone = i.IsDone,
+                        DoneAt = i.DoneAt,
+                        SkippedAt = i.SkippedAt,
+                        DisplayOrder = i.DisplayOrder,
+                        DateCreated = i.DateCreated,
+                        RecurrenceType = i.RecurrenceType,
+                        AutoLogMode = i.AutoLogMode,
+                        CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            // Reminders are flat (UserId-scoped) — no list container.
+            var remindersQuery = _context.Reminders
+                .Include(i => i.CompletionTag)
+                .AsQueryable();
+
+            if (userId.HasValue)
+            {
+                remindersQuery = remindersQuery.Where(i => i.UserId == userId);
+            }
+
+            var reminders = await remindersQuery
+                .Select(i => new ReminderBackup
+                {
+                    Title = i.Title,
+                    Notes = i.Notes,
+                    NotifyAt = i.NotifyAt,
+                    IsDone = i.IsDone,
+                    DoneAt = i.DoneAt,
+                    SkippedAt = i.SkippedAt,
+                    DisplayOrder = i.DisplayOrder,
+                    DateCreated = i.DateCreated,
+                    RecurrenceType = i.RecurrenceType,
+                    AutoLogMode = i.AutoLogMode,
+                    CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null,
+                    MonitorDaysBack = i.MonitorDaysBack,
+                    MonitorFromDate = i.MonitorFromDate,
+                    MonitorToDate = i.MonitorToDate,
+                    AllowUnfilled = i.AllowUnfilled
+                })
+                .ToListAsync();
+
             var backupData = new BackupData
             {
                 Metadata = new BackupMetadata
                 {
                     ExportDate = DateTime.UtcNow,
-                    Version = "1.7",
+                    Version = "2.0",
                     TotalInputTypes = inputTypes.Count,
                     TotalPatterns = patterns.Count,
                     TotalUnits = units.Count,
@@ -230,9 +272,11 @@ public class BackupService : IBackupService
                     TotalTagOptions = tagOptions.Count,
                     TotalTagGroups = tagGroups.Count,
                     TotalTags = tags.Count,
-                    TotalNotifications = notifications.Count,
                     TotalActivities = totalActivities,
-                    TotalScanMappings = scanMappings.Count
+                    TotalScanMappings = scanMappings.Count,
+                    TotalTodoLists = todoLists.Count,
+                    TotalTodoItems = todoLists.Sum(l => l.Items.Count),
+                    TotalReminders = reminders.Count
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -241,9 +285,10 @@ public class BackupService : IBackupService
                 TagOptions = tagOptions,
                 TagGroups = tagGroups,
                 Tags = tags,
-                Notifications = notifications,
                 Activities = activities,
-                ScanMappings = scanMappings
+                ScanMappings = scanMappings,
+                TodoLists = todoLists,
+                Reminders = reminders
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -286,7 +331,7 @@ public class BackupService : IBackupService
                 }
 
                 // Import in correct dependency order:
-                // InputTypes -> Patterns -> Units -> TagOptionLists -> TagOptions -> TagGroups -> Tags -> Notifications -> Activities
+                // InputTypes -> Patterns -> Units -> TagOptionLists -> TagOptions -> TagGroups -> Tags -> Activities
                 await ImportInputTypesAsync(backupData.InputTypes, result);
                 await ImportPatternsAsync(backupData.Patterns, result);
                 await ImportUnitsAsync(backupData.Units, result);
@@ -294,9 +339,10 @@ public class BackupService : IBackupService
                 await ImportTagOptionsAsync(backupData.TagOptions, result);
                 await ImportTagGroupsAsync(backupData.TagGroups, result, userId);
                 await ImportTagsAsync(backupData.Tags, result, userId);
-                await ImportNotificationsAsync(backupData.Notifications, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
                 await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
+                await ImportTodoListsAsync(backupData.TodoLists, result, userId);
+                await ImportRemindersAsync(backupData.Reminders, result, userId);
 
                 await transaction.CommitAsync();
                 result.Message = "Data import completed successfully";
@@ -351,19 +397,29 @@ public class BackupService : IBackupService
             _context.ScanMappings.RemoveRange(scanMappingsToDelete);
             recordsCleared += scanMappingsToDelete.Count;
 
-            // 3. Clear notifications (depends on tags)
-            var notificationsQuery = _context.Notifications
-                .Include(n => n.Tag)
+            // 3. Clear todo items (depends on todo lists)
+            var todoItemsQuery = _context.TodoItems
+                .Include(i => i.List)
                 .AsQueryable();
             if (userId.HasValue)
             {
-                notificationsQuery = notificationsQuery.Where(n => n.Tag.UserId == userId);
+                todoItemsQuery = todoItemsQuery.Where(i => i.List.UserId == userId);
             }
-            var notificationsToDelete = await notificationsQuery.ToListAsync();
-            _context.Notifications.RemoveRange(notificationsToDelete);
-            recordsCleared += notificationsToDelete.Count;
+            var todoItemsToDelete = await todoItemsQuery.ToListAsync();
+            _context.TodoItems.RemoveRange(todoItemsToDelete);
+            recordsCleared += todoItemsToDelete.Count;
 
-            // 4. Clear tags (depends on units and option lists)
+            // 4. Clear todo lists
+            var todoListsQuery = _context.TodoLists.AsQueryable();
+            if (userId.HasValue)
+            {
+                todoListsQuery = todoListsQuery.Where(l => l.UserId == userId);
+            }
+            var todoListsToDelete = await todoListsQuery.ToListAsync();
+            _context.TodoLists.RemoveRange(todoListsToDelete);
+            recordsCleared += todoListsToDelete.Count;
+
+            // 5. Clear tags (depends on units and option lists)
             var tagsQuery = _context.Tags.AsQueryable();
             if (userId.HasValue)
             {
@@ -373,7 +429,7 @@ public class BackupService : IBackupService
             _context.Tags.RemoveRange(tagsToDelete);
             recordsCleared += tagsToDelete.Count;
 
-            // 5. Clear tag groups
+            // 7. Clear tag groups
             var tagGroupsQuery = _context.TagGroups.AsQueryable();
             if (userId.HasValue)
             {
@@ -383,7 +439,7 @@ public class BackupService : IBackupService
             _context.TagGroups.RemoveRange(tagGroupsToDelete);
             recordsCleared += tagGroupsToDelete.Count;
 
-            // 6. Clear tag options (depends on tag option lists)
+            // 8. Clear tag options (depends on tag option lists)
             var tagOptionsQuery = _context.TagOptions
                 .Include(to => to.OptionList)
                 .AsQueryable();
@@ -395,7 +451,7 @@ public class BackupService : IBackupService
             _context.TagOptions.RemoveRange(tagOptionsToDelete);
             recordsCleared += tagOptionsToDelete.Count;
 
-            // 5. Clear tag option lists
+            // 9. Clear tag option lists
             var tagOptionListsQuery = _context.TagOptionLists.AsQueryable();
             if (userId.HasValue)
             {
@@ -810,54 +866,6 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
-    private async Task ImportNotificationsAsync(List<NotificationBackup> notifications, BackupImportResult result, Guid? userId)
-    {
-        // Get tag lookup
-        var tagLookup = await _context.Tags
-            .Where(t => userId == null || t.UserId == userId)
-            .ToDictionaryAsync(t => t.TagName, t => t.Id);
-
-        foreach (var notification in notifications)
-        {
-            if (string.IsNullOrEmpty(notification.TagKey) || !tagLookup.ContainsKey(notification.TagKey))
-            {
-                result.Warnings.Add($"Skipping notification for unknown tag '{notification.TagKey}'");
-                result.Statistics.NotificationsSkipped++;
-                continue;
-            }
-
-            // Check if notification already exists for this tag
-            var tagId = tagLookup[notification.TagKey];
-            var existingNotification = await _context.Notifications
-                .FirstOrDefaultAsync(n => n.TagId == tagId);
-
-            if (existingNotification != null)
-            {
-                result.Statistics.NotificationsSkipped++;
-                continue;
-            }
-
-            var entity = new Notification
-            {
-                TagId = tagId,
-                NotificationText = notification.NotificationText,
-                NotBeforeTime = notification.NotBeforeTime,
-                NotAfterTime = notification.NotAfterTime,
-                MaxNudges = notification.MaxNudges,
-                NudgeInterval = notification.NudgeInterval,
-                IsActive = notification.IsActive,
-                DateCreated = notification.DateCreated,
-                LastDeliveryDate = notification.LastDeliveryDate,
-                DeliveriesOnLastDate = notification.DeliveriesOnLastDate
-            };
-
-            _context.Notifications.Add(entity);
-            result.Statistics.NotificationsImported++;
-        }
-
-        await _context.SaveChangesAsync();
-    }
-
     private async Task ImportActivitiesAsync(List<ActivityBackup> activities, BackupImportResult result, Guid? userId)
     {
         // Get tag lookup
@@ -963,6 +971,125 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    private async Task ImportTodoListsAsync(List<TodoListBackup> todoLists, BackupImportResult result, Guid? userId)
+    {
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        var existingListNames = await _context.TodoLists
+            .Where(l => userId == null || l.UserId == userId)
+            .Select(l => l.Name)
+            .ToHashSetAsync();
+
+        foreach (var list in todoLists)
+        {
+            if (existingListNames.Contains(list.Name))
+            {
+                result.Statistics.TodoListsSkipped++;
+                result.Statistics.TodoItemsSkipped += list.Items.Count;
+                continue;
+            }
+
+            var listEntity = new TodoList
+            {
+                Name = list.Name,
+                DisplayOrder = list.DisplayOrder,
+                ShowOnHomepage = list.ShowOnHomepage,
+                DateCreated = list.DateCreated,
+                UserId = userId ?? Guid.Empty
+            };
+
+            _context.TodoLists.Add(listEntity);
+            await _context.SaveChangesAsync();
+            result.Statistics.TodoListsImported++;
+
+            foreach (var item in list.Items)
+            {
+                int? completionTagId = null;
+                if (!string.IsNullOrEmpty(item.CompletionTagName) && tagLookup.ContainsKey(item.CompletionTagName))
+                {
+                    completionTagId = tagLookup[item.CompletionTagName];
+                }
+
+                var itemEntity = new TodoItem
+                {
+                    ListId = listEntity.Id,
+                    Title = item.Title,
+                    Notes = item.Notes,
+                    StartDate = item.StartDate,
+                    DueDate = item.DueDate,
+                    NotifyAt = item.NotifyAt,
+                    IsDone = item.IsDone,
+                    DoneAt = item.DoneAt,
+                    SkippedAt = item.SkippedAt,
+                    DisplayOrder = item.DisplayOrder,
+                    DateCreated = item.DateCreated,
+                    RecurrenceType = item.RecurrenceType,
+                    AutoLogMode = item.AutoLogMode,
+                    CompletionTagId = completionTagId
+                };
+
+                _context.TodoItems.Add(itemEntity);
+                result.Statistics.TodoItemsImported++;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task ImportRemindersAsync(List<ReminderBackup> reminders, BackupImportResult result, Guid? userId)
+    {
+        var tagLookup = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToDictionaryAsync(t => t.TagName, t => t.Id);
+
+        var existingTitles = await _context.Reminders
+            .Where(r => userId == null || r.UserId == userId)
+            .Select(r => r.Title)
+            .ToHashSetAsync();
+
+        foreach (var item in reminders)
+        {
+            if (existingTitles.Contains(item.Title))
+            {
+                result.Statistics.RemindersSkipped++;
+                continue;
+            }
+
+            int? completionTagId = null;
+            if (!string.IsNullOrEmpty(item.CompletionTagName) && tagLookup.ContainsKey(item.CompletionTagName))
+            {
+                completionTagId = tagLookup[item.CompletionTagName];
+            }
+
+            var itemEntity = new Reminder
+            {
+                UserId = userId ?? Guid.Empty,
+                Title = item.Title,
+                Notes = item.Notes,
+                NotifyAt = item.NotifyAt,
+                IsDone = item.IsDone,
+                DoneAt = item.DoneAt,
+                SkippedAt = item.SkippedAt,
+                DisplayOrder = item.DisplayOrder,
+                DateCreated = item.DateCreated,
+                RecurrenceType = item.RecurrenceType,
+                AutoLogMode = item.AutoLogMode,
+                CompletionTagId = completionTagId,
+                MonitorDaysBack = item.MonitorDaysBack,
+                MonitorFromDate = item.MonitorFromDate,
+                MonitorToDate = item.MonitorToDate,
+                AllowUnfilled = item.AllowUnfilled
+            };
+
+            _context.Reminders.Add(itemEntity);
+            result.Statistics.RemindersImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     // NEW: Secure user-scoped backup methods (v2.0)
     
     /// <summary>
@@ -1042,23 +1169,6 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
-            // Export user's notifications
-            var userNotifications = await _context.Notifications
-                .Include(n => n.Tag)
-                .Where(n => n.Tag.UserId == userId)
-                .Select(n => new SecureNotificationBackupDto
-                {
-                    TagKey = n.Tag.TagName,
-                    NotificationText = n.NotificationText,
-                    NotBeforeTime = n.NotBeforeTime,
-                    NotAfterTime = n.NotAfterTime,
-                    MaxNudges = n.MaxNudges,
-                    NudgeInterval = n.NudgeInterval,
-                    IsActive = n.IsActive,
-                    DateCreated = n.DateCreated
-                })
-                .ToListAsync();
-
             // Export user's scan mappings
             var userScanMappings = await _context.ScanMappings
                 .Include(sm => sm.Tag)
@@ -1084,7 +1194,6 @@ public class BackupService : IBackupService
                 TagGroups = userTagGroups,
                 TagOptionLists = userTagOptionLists,
                 TagOptions = userTagOptions,
-                Notifications = userNotifications,
                 ScanMappings = userScanMappings
             };
 
@@ -1244,46 +1353,11 @@ public class BackupService : IBackupService
 
                 await _context.SaveChangesAsync();
 
-                // Step 5: Import notifications
+                // Step 5: Import activities with current user ID
                 var tagLookup = await _context.Tags
                     .Where(t => t.UserId == userId)
                     .ToDictionaryAsync(t => t.TagName, t => t.Id);
 
-                foreach (var notifDto in backup.Notifications)
-                {
-                    if (!tagLookup.TryGetValue(notifDto.TagKey, out var tagId))
-                    {
-                        result.Warnings.Add($"Skipping notification for unknown tag '{notifDto.TagKey}'");
-                        result.Statistics.NotificationsSkipped++;
-                        continue;
-                    }
-
-                    var existingNotif = await _context.Notifications
-                        .FirstOrDefaultAsync(n => n.TagId == tagId);
-
-                    if (existingNotif != null)
-                    {
-                        result.Statistics.NotificationsSkipped++;
-                        continue;
-                    }
-
-                    _context.Notifications.Add(new Notification
-                    {
-                        TagId = tagId,
-                        NotificationText = notifDto.NotificationText,
-                        NotBeforeTime = notifDto.NotBeforeTime,
-                        NotAfterTime = notifDto.NotAfterTime,
-                        MaxNudges = notifDto.MaxNudges,
-                        NudgeInterval = notifDto.NudgeInterval,
-                        IsActive = notifDto.IsActive,
-                        DateCreated = notifDto.DateCreated
-                    });
-                    result.Statistics.NotificationsImported++;
-                }
-
-                await _context.SaveChangesAsync();
-
-                // Step 6: Import activities with current user ID
                 foreach (var activityDto in backup.Activities)
                 {
                     if (!tagLookup.TryGetValue(activityDto.TagName, out var tagId))
@@ -1398,16 +1472,7 @@ public class BackupService : IBackupService
                 _context.ScanMappings.RemoveRange(userScanMappings);
                 recordsCleared += userScanMappings.Count;
 
-                // 3. Clear user's notifications (via tags)
-                var userNotifications = await _context.Notifications
-                    .Include(n => n.Tag)
-                    .Where(n => n.Tag.UserId == userId)
-                    .ToListAsync();
-
-                _context.Notifications.RemoveRange(userNotifications);
-                recordsCleared += userNotifications.Count;
-
-                // 4. Clear user's tags
+                // 3. Clear user's tags
                 var userTags = await _context.Tags
                     .Where(t => t.UserId == userId)
                     .ToListAsync();

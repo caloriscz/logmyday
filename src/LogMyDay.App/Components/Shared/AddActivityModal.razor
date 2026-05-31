@@ -121,11 +121,11 @@
                                     break;
                                 case 10: // Score 0-5
                                     <label class="@LabelCss">Score</label>
-                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="5" />
+                                    <ScoreRating Value="@integerValue" ValueChanged="v => { integerValue = v; Activity.Description = v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : string.Empty; }" MaxScore="5" />
                                     break;
                                 case 11: // Score 0-10
                                     <label class="@LabelCss">Score</label>
-                                    <ScoreRating Value="@integerValue" ValueChanged="OnStarRatingChanged" MaxScore="10" />
+                                    <ScoreRating Value="@integerValue" ValueChanged="v => { integerValue = v; Activity.Description = v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : string.Empty; }" MaxScore="10" />
                                     break;
                                 default:
                                     <label class="@LabelCss">Description</label>

@@ -15,6 +15,23 @@ public class EventLogsController : BaseApiController
         _eventLogService = eventLogService;
     }
 
+    [HttpPost]
+    public async Task<IActionResult> CreateEventLog([FromBody] LogMyDay.Shared.DTOs.EventLogRequest request)
+    {
+        var userId = GetCurrentUserId();
+
+        LogMyDay.Domain.Enums.EventLogLevel level = LogMyDay.Domain.Enums.EventLogLevel.Error;
+        if (!string.IsNullOrEmpty(request.Level) &&
+            Enum.TryParse<LogMyDay.Domain.Enums.EventLogLevel>(request.Level, true, out var parsedLevel))
+        {
+            level = parsedLevel;
+        }
+
+        await _eventLogService.Log(userId, level, request.Message);
+
+        return NoContent();
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetEventLogs(
         [FromQuery] int pageNumber = 1,

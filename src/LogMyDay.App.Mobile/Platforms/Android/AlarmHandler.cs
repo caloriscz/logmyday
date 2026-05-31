@@ -18,6 +18,13 @@ public class AlarmHandler : BroadcastReceiver
             {
                 NotificationManagerService? manager = NotificationManagerService.Instance ?? new NotificationManagerService();
                 var payload = NotificationManagerService.BuildPayloadFromIntent(intent);
+
+                // Best-effort diagnostic — log the fire event before we surface the notification.
+                if (payload?.TodoItemId is int todoItemId)
+                {
+                    ReminderNotificationScheduler.Instance?.LogFired(todoItemId);
+                }
+
                 manager.Show(title, message, payload);
             }
         }

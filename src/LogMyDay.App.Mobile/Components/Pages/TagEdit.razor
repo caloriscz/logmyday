@@ -1,9 +1,7 @@
 @page "/tags/edit/{Id:int}"
 
 @using LogMyDay.Shared.DTOs
-@using LogMyDay.Shared.Notifications
 @using LogMyDay.Domain.Enums
-@using System.Globalization
 @using System.Linq
 @using LogMyDay.App.Mobile.Services
 @using Refit
@@ -190,182 +188,10 @@
                 </EditForm>
             </section>
 
-            <!-- Notifications Section -->
-            <section class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 p-5 space-y-4">
-                <div class="flex items-center justify-between gap-3">
-                    <div>
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Notifications</h2>
-                        <p class="text-xs text-gray-600 dark:text-gray-400">Configure reminders that nudge you when this tag is missing.</p>
-                    </div>
-                    <button type="button"
-                        class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors flex items-center gap-1.5"
-                        @onclick="StartAddNotification">
-                        <i class="bi bi-plus-lg"></i>
-                        Add
-                    </button>
-                </div>
-
-                @if (!string.IsNullOrEmpty(notificationErrorMessage) && !isNotificationModalOpen)
-                {
-                    <div class="rounded-lg border border-rose-200 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-500/20 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
-                        @notificationErrorMessage
-                    </div>
-                }
-
-                @if (notifications.Count == 0)
-                {
-                    <div class="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 px-4 py-6 text-center text-sm text-gray-600 dark:text-gray-400">
-                        No notifications configured yet. Add one to start receiving reminders.
-                    </div>
-                }
-                else
-                {
-                    <div class="space-y-3">
-                        @foreach (var notification in notifications)
-                        {
-                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="flex-1 min-w-0 space-y-1">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            @if (string.IsNullOrWhiteSpace(notification.NotificationText))
-                                            {
-                                                <em class="text-gray-500 dark:text-gray-400">(Default message)</em>
-                                            }
-                                            else
-                                            {
-                                                @notification.NotificationText
-                                            }
-                                        </p>
-                                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
-                                            @if (!string.IsNullOrWhiteSpace(notification.NotBeforeTime) || !string.IsNullOrWhiteSpace(notification.NotAfterTime))
-                                            {
-                                                <span>Time: @(notification.NotBeforeTime ?? "-") – @(notification.NotAfterTime ?? "-")</span>
-                                            }
-                                            <span>Max nudges: @notification.MaxNudges</span>
-                                            @if (notification.NudgeIntervalMinutes.HasValue)
-                                            {
-                                                <span>Interval: @notification.NudgeIntervalMinutes min</span>
-                                            }
-                                            @if (notification.IsActive)
-                                            {
-                                                <span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-200">Active</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:text-gray-300">Inactive</span>
-                                            }
-                                        </div>
-                                    </div>
-                                    <div class="flex gap-2 shrink-0">
-                                        <button type="button"
-                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
-                                            @onclick="() => EditNotification(notification)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button type="button"
-                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 transition-all hover:bg-rose-100 dark:hover:bg-rose-500/20"
-                                            @onclick="async () => await DeleteNotificationAsync(notification.Id)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </section>
         }
     </div>
 </div>
 
-<!-- Notification Modal - Full Screen Overlay -->
-@if (isNotificationModalOpen && editingNotification != null)
-{
-    <div class="fixed inset-0 z-60 bg-white dark:bg-slate-900 flex flex-col" role="dialog" aria-modal="true">
-        <!-- Modal Header -->
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 shrink-0">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                @(!editingNotification.Id.HasValue ? "Add Notification" : "Edit Notification")
-            </h3>
-            <button type="button"
-                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2"
-                @onclick="CancelNotificationEdit">
-                <i class="bi bi-x-lg text-xl"></i>
-            </button>
-        </div>
-
-        <!-- Modal Body -->
-        <div class="flex-1 overflow-y-auto px-5 py-5">
-            <EditForm id="notifForm" Model="editingNotification" OnValidSubmit="SaveNotificationAsync">
-                <DataAnnotationsValidator />
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Notification Text</label>
-                        <InputText @bind-Value="editingNotification.NotificationText" class="@InputCss" placeholder="Optional custom message" />
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Not Before Time</label>
-                            <InputText @bind-Value="editingNotification.NotBeforeTime" class="@InputCss" placeholder="08:00" />
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Supports offsets beyond 24h (e.g., 32:00 = next day 08:00).</p>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Not After Time</label>
-                            <InputText @bind-Value="editingNotification.NotAfterTime" class="@InputCss" placeholder="Optional end" />
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Max Nudges</label>
-                            <InputNumber @bind-Value="editingNotification.MaxNudges" class="@InputCss" min="0" />
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Nudge Interval (min)</label>
-                            <InputNumber @bind-Value="editingNotification.NudgeIntervalMinutes" class="@InputCss" min="0" />
-                        </div>
-                    </div>
-
-                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        <InputCheckbox @bind-Value="editingNotification.IsActive"
-                            class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800" />
-                        Active
-                    </label>
-
-                    @if (!string.IsNullOrEmpty(notificationErrorMessage))
-                    {
-                        <div class="rounded-lg border border-rose-200 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-500/20 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">
-                            @notificationErrorMessage
-                        </div>
-                    }
-                </div>
-            </EditForm>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 shrink-0"
-             style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
-            <div class="flex items-center justify-end gap-3">
-                <button type="button"
-                    class="px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors min-h-[44px]"
-                    @onclick="CancelNotificationEdit" disabled="@isNotificationSaving">
-                    Cancel
-                </button>
-                <button type="submit" form="notifForm"
-                    class="px-5 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-2 min-h-[44px]"
-                    disabled="@isNotificationSaving">
-                    @if (isNotificationSaving)
-                    {
-                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
-                    }
-                    Save Notification
-                </button>
-            </div>
-        </div>
-    </div>
-}
 
 @code {
     [Parameter]
@@ -387,12 +213,6 @@
     private string? errorMessage;
     private bool isLoading = true;
     private bool isSaving;
-
-    private List<NotificationViewModel> notifications = new();
-    private NotificationEditModel? editingNotification;
-    private bool isNotificationModalOpen;
-    private string? notificationErrorMessage;
-    private bool isNotificationSaving;
 
     protected override async Task OnInitializedAsync()
     {
@@ -436,7 +256,6 @@
             PageTitleService.SetTitle(tag.Title);
 
             await LoadSupportingData();
-            await LoadNotifications();
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -487,115 +306,6 @@
         }
     }
 
-    private async Task LoadNotifications()
-    {
-        try
-        {
-            var items = await ActivityApi.GetNotificationsByTag(Id);
-            notifications = items.Select(MapToViewModel).ToList();
-            notificationErrorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            notificationErrorMessage = $"Error loading notifications: {ex.Message}";
-            Logger.LogError(ex, "Error loading notifications for tag {TagId}", Id);
-        }
-    }
-
-    private void StartAddNotification()
-    {
-        editingNotification = new NotificationEditModel
-        {
-            TagId = Id,
-            MaxNudges = 3,
-            NudgeIntervalMinutes = 15,
-            IsActive = true
-        };
-        notificationErrorMessage = null;
-        isNotificationModalOpen = true;
-    }
-
-    private void EditNotification(NotificationViewModel notification)
-    {
-        editingNotification = new NotificationEditModel
-        {
-            Id = notification.Id,
-            TagId = notification.TagId,
-            NotificationText = notification.NotificationText,
-            NotBeforeTime = notification.NotBeforeTime,
-            NotAfterTime = notification.NotAfterTime,
-            MaxNudges = notification.MaxNudges,
-            NudgeIntervalMinutes = notification.NudgeIntervalMinutes,
-            IsActive = notification.IsActive
-        };
-        notificationErrorMessage = null;
-        isNotificationModalOpen = true;
-    }
-
-    private void CancelNotificationEdit()
-    {
-        editingNotification = null;
-        isNotificationModalOpen = false;
-        notificationErrorMessage = null;
-    }
-
-    private async Task SaveNotificationAsync()
-    {
-        if (editingNotification is null)
-        {
-            return;
-        }
-
-        notificationErrorMessage = null;
-
-        if (!TryBuildRequest(editingNotification, out var request, out var error))
-        {
-            notificationErrorMessage = error;
-            return;
-        }
-
-        isNotificationSaving = true;
-
-        try
-        {
-            if (editingNotification.Id.HasValue)
-            {
-                await ActivityApi.UpdateNotification(editingNotification.Id.Value, request);
-            }
-            else
-            {
-                await ActivityApi.CreateNotification(request);
-            }
-
-            await LoadNotifications();
-            CancelNotificationEdit();
-        }
-        catch (Exception ex)
-        {
-            notificationErrorMessage = $"Error saving notification: {ex.Message}";
-            Logger.LogError(ex, "Error saving notification");
-        }
-        finally
-        {
-            isNotificationSaving = false;
-        }
-    }
-
-    private async Task DeleteNotificationAsync(int notificationId)
-    {
-        try
-        {
-            await ActivityApi.DeleteNotification(notificationId);
-            notifications.RemoveAll(n => n.Id == notificationId);
-            notificationErrorMessage = null;
-        }
-        catch (Exception ex)
-        {
-            notificationErrorMessage = $"Error deleting notification: {ex.Message}";
-            Logger.LogError(ex, "Error deleting notification {NotificationId}", notificationId);
-        }
-    }
-
     private async Task HandleValidSubmit()
     {
         isSaving = true;
@@ -626,110 +336,6 @@
         Navigation.NavigateTo("/tags");
     }
 
-    private NotificationViewModel MapToViewModel(NotificationResponse response)
-    {
-        return new NotificationViewModel
-        {
-            Id = response.Id,
-            TagId = response.TagId,
-            NotificationText = response.NotificationText,
-            NotBeforeTime = FormatTimeSpan(response.NotBeforeTime),
-            NotAfterTime = FormatTimeSpan(response.NotAfterTime),
-            MaxNudges = response.MaxNudges,
-            NudgeIntervalMinutes = response.NudgeInterval.HasValue
-                ? (int?)Math.Round(response.NudgeInterval.Value.TotalMinutes)
-                : null,
-            IsActive = response.IsActive,
-            DateCreated = response.DateCreated
-        };
-    }
-
-    private bool TryBuildRequest(NotificationEditModel model, out NotificationRequest request, out string? error)
-    {
-        request = new NotificationRequest
-        {
-            TagId = Id,
-            NotificationText = string.IsNullOrWhiteSpace(model.NotificationText) ? null : model.NotificationText.Trim(),
-            MaxNudges = model.MaxNudges,
-            IsActive = model.IsActive
-        };
-
-        if (!TryParseTime(model.NotBeforeTime, out var notBefore, out error))
-        {
-            return false;
-        }
-
-        if (!TryParseTime(model.NotAfterTime, out var notAfter, out error))
-        {
-            return false;
-        }
-
-        if (model.MaxNudges < 0)
-        {
-            error = "Max nudges must be zero or greater.";
-            return false;
-        }
-
-        if (model.NudgeIntervalMinutes.HasValue)
-        {
-            if (model.NudgeIntervalMinutes.Value < 0)
-            {
-                error = "Nudge interval must be zero or greater.";
-                return false;
-            }
-
-            if (model.NudgeIntervalMinutes.Value > 0 && model.NudgeIntervalMinutes.Value < NotificationScheduleCalculator.MinimumIntervalMinutes)
-            {
-                error = $"Nudge interval must be at least {NotificationScheduleCalculator.MinimumIntervalMinutes} minutes.";
-                return false;
-            }
-        }
-
-        request.NotBeforeTime = notBefore;
-        request.NotAfterTime = notAfter;
-        request.NudgeInterval = model.NudgeIntervalMinutes.HasValue ? TimeSpan.FromMinutes(model.NudgeIntervalMinutes.Value) : null;
-
-        return true;
-    }
-
-    private static bool TryParseTime(string? value, out TimeSpan? time, out string? error)
-    {
-        time = null;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        if (TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed))
-        {
-            time = parsed;
-            return true;
-        }
-
-        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var hoursOnly))
-        {
-            time = TimeSpan.FromHours(hoursOnly);
-            return true;
-        }
-
-        error = "Time values must use HH:mm format or a total hour value (e.g., 32).";
-
-        return false;
-    }
-
-    private static string? FormatTimeSpan(TimeSpan? timeSpan)
-    {
-        if (!timeSpan.HasValue)
-        {
-            return null;
-        }
-
-        var totalHours = (int)Math.Floor(timeSpan.Value.TotalHours);
-        var minutes = Math.Abs(timeSpan.Value.Minutes);
-        return $"{totalHours:D2}:{minutes:D2}";
-    }
 
     private void EnsureValidTypeSelection()
     {
@@ -834,28 +440,4 @@
 
     // ---- View models ----
 
-    private sealed class NotificationViewModel
-    {
-        public int Id { get; set; }
-        public int TagId { get; set; }
-        public string? NotificationText { get; set; }
-        public string? NotBeforeTime { get; set; }
-        public string? NotAfterTime { get; set; }
-        public int MaxNudges { get; set; }
-        public int? NudgeIntervalMinutes { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime DateCreated { get; set; }
-    }
-
-    private sealed class NotificationEditModel
-    {
-        public int? Id { get; set; }
-        public int TagId { get; set; }
-        public string? NotificationText { get; set; }
-        public string? NotBeforeTime { get; set; }
-        public string? NotAfterTime { get; set; }
-        public int MaxNudges { get; set; } = 3;
-        public int? NudgeIntervalMinutes { get; set; } = 15;
-        public bool IsActive { get; set; } = true;
-    }
 }

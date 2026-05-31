@@ -1,0 +1,10 @@
+@page "/todos"
+@using Microsoft.AspNetCore.Authorization
+@using LogMyDay.Domain.Enums
+@attribute [Authorize]
+
+<PageTitle>To-Do Lists</PageTitle>
+
+<div class="mx-auto max-w-screen-2xl px-4 py-6">
+    <TodoListsPanel FilterType="TodoListType.Basic" />
+</div>

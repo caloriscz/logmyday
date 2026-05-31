@@ -75,6 +75,10 @@ public static class MauiProgram
             builder.Services.AddTransient<IAccountApi>(sp => sp.GetRequiredService<IApiClientProvider>().Account);
             builder.Services.AddTransient<IScanMappingApi>(sp => sp.GetRequiredService<IApiClientProvider>().ScanMapping);
             builder.Services.AddTransient<IAiApi>(sp => sp.GetRequiredService<IApiClientProvider>().Ai);
+            builder.Services.AddTransient<ITodoApi>(sp => sp.GetRequiredService<IApiClientProvider>().Todo);
+            builder.Services.AddTransient<IEventLogApi>(sp => sp.GetRequiredService<IApiClientProvider>().EventLog);
+            builder.Services.AddTransient<IReminderApi>(sp => sp.GetRequiredService<IApiClientProvider>().Reminder);
+            builder.Services.AddTransient<ITagDayLockApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagDayLock);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>
@@ -103,8 +107,8 @@ public static class MauiProgram
             builder.Services.AddSingleton<INotificationManagerService, LogMyDay.App.Mobile.Platforms.Android.NotificationManagerService>();
 #endif
             builder.Services.AddSingleton<NotificationNavigationService>();
+            builder.Services.AddSingleton<ReminderNotificationScheduler>();
             builder.Services.AddSingleton<NotificationService>();
-            builder.Services.AddSingleton<ISystemNotificationService, SystemNotificationService>();
 
             // Update App registration to include NotificationService dependency
             builder.Services.AddSingleton<App>();

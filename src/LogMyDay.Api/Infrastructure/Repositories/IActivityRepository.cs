@@ -13,9 +13,4 @@ public interface IActivityRepository : IRepository<Activity>
     /// </summary>
     Task<List<int>> GetAvailableYearsAsync(Guid userId, int? tagId = null);
 
-    /// <summary>
-    /// Gets required daily tags that haven't been filled for a specific date.
-    /// This uses a more complex query pattern combining tags and activities.
-    /// </summary>
-    Task<List<Tag>> GetRequiredDailyTagsNotFilledAsync(DateTime date, Guid userId);
 }

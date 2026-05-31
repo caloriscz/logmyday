@@ -14,6 +14,10 @@ public interface IApiClientProvider
     IScanMappingApi ScanMapping { get; }
     ITagGroupApi TagGroup { get; }
     IAiApi Ai { get; }
+    ITodoApi Todo { get; }
+    IEventLogApi EventLog { get; }
+    IReminderApi Reminder { get; }
+    ITagDayLockApi TagDayLock { get; }
     void Invalidate();
 }
 
@@ -28,6 +32,10 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private IScanMappingApi? _scanMapping;
     private ITagGroupApi? _tagGroup;
     private IAiApi? _ai;
+    private ITodoApi? _todo;
+    private IEventLogApi? _eventLog;
+    private IReminderApi? _reminder;
+    private ITagDayLockApi? _tagDayLock;
 
     public ApiClientProvider(IHttpClientFactory httpClientFactory, IApiContext ctx)
     {
@@ -43,6 +51,10 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IScanMappingApi ScanMapping => _scanMapping ??= Build<IScanMappingApi>();
     public ITagGroupApi TagGroup => _tagGroup ??= Build<ITagGroupApi>();
     public IAiApi Ai => _ai ??= Build<IAiApi>();
+    public ITodoApi Todo => _todo ??= Build<ITodoApi>();
+    public IEventLogApi EventLog => _eventLog ??= Build<IEventLogApi>();
+    public IReminderApi Reminder => _reminder ??= Build<IReminderApi>();
+    public ITagDayLockApi TagDayLock => _tagDayLock ??= Build<ITagDayLockApi>();
 
     private static readonly RefitSettings SharedRefitSettings = new()
     {
@@ -70,6 +82,10 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _scanMapping = null;
         _tagGroup = null;
         _ai = null;
+        _todo = null;
+        _eventLog = null;
+        _reminder = null;
+        _tagDayLock = null;
     }
 
     public void Dispose()

@@ -26,10 +26,13 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IInputTypeService, InputTypeService>();
         services.AddScoped<IUnitService, UnitService>();
         services.AddScoped<ITagOptionListService, TagOptionListService>();
-        services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IScanMappingService, ScanMappingService>();
         services.AddScoped<ITagGroupService, TagGroupService>();
         services.AddScoped<IBackupService, BackupService>();
+        services.AddScoped<ITodoListService, TodoListService>();
+        services.AddScoped<ITodoItemService, TodoItemService>();
+        services.AddScoped<ITagDayLockService, TagDayLockService>();
+        services.AddScoped<IReminderService, ReminderService>();
         services.AddScoped<IExcelExportService, ExportService>();
         services.AddScoped<IEventLogService, EventLogService>();
         services.AddSingleton<ISettingProtector, SettingProtector>();
