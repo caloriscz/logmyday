@@ -1,5 +1,5 @@
+using LogMyDay.App.Mobile.Services.Diagnostics;
 using LogMyDay.Shared.DTOs;
-using LogMyDay.Shared.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Storage;
 
@@ -16,7 +16,7 @@ namespace LogMyDay.App.Mobile.Services;
 public class ReminderNotificationScheduler
 {
     private readonly INotificationManagerService _notificationService;
-    private readonly IEventLogApi _eventLog;
+    private readonly IDiagnosticStore _diag;
     private readonly ILogger<ReminderNotificationScheduler> _logger;
 
     /// <summary>itemId → currently-scheduled fire time (UTC). Source of truth for diag emit.</summary>
@@ -37,11 +37,11 @@ public class ReminderNotificationScheduler
 
     public ReminderNotificationScheduler(
         INotificationManagerService notificationService,
-        IEventLogApi eventLog,
+        IDiagnosticStore diag,
         ILogger<ReminderNotificationScheduler> logger)
     {
         _notificationService = notificationService;
-        _eventLog = eventLog;
+        _diag = diag;
         _logger = logger;
         Instance = this;
         LoadEverScheduledIds();
@@ -80,15 +80,17 @@ public class ReminderNotificationScheduler
         }
     }
 
-    public void ScheduleAll(IList<ReminderResponse> reminders)
+    public void ScheduleAll(IList<ReminderResponse> reminders, string trigger = "app")
     {
         var seenFireTimes = new Dictionary<DateTime, int>();
+        var armed = 0;
 
         foreach (var item in reminders.Where(i => i.NotifyAt.HasValue))
         {
             if (item.IsDone || item.IsSkipped)
             {
                 _notificationService.CancelReminderAlarm(item.Id);
+                ArmedAlarmStore.Remove(item.Id);
 
                 bool removed;
                 lock (_lock) { removed = _activeAlarms.Remove(item.Id); }
@@ -113,7 +115,12 @@ public class ReminderNotificationScheduler
             seenFireTimes[baseFireTime.Value] = count + 1;
 
             ScheduleItemAt(item, adjustedFireTime);
+            armed++;
         }
+
+        // Heartbeat — lets a miss-day be classified: an "armed count=N" row means alarms existed
+        // that day; its absence means nothing was ever scheduled (app never opened / reboot).
+        LogDiag($"event=armed surface=mobile count={armed} trigger={trigger}");
     }
 
     public void ScheduleItem(ReminderResponse item)
@@ -156,6 +163,8 @@ public class ReminderNotificationScheduler
         }
 
         RememberScheduledId(item.Id);
+        // Durable snapshot so a reboot can re-arm this alarm without credentials or network.
+        ArmedAlarmStore.Upsert(new ArmedAlarm(item.Id, fireTimeUtc, item.Title, item.Notes));
 
         _logger.LogDebug("Scheduled reminder notification for item {ItemId} '{Title}' at {FireTime:HH:mm} UTC", item.Id, item.Title, fireTimeUtc);
 
@@ -192,6 +201,7 @@ public class ReminderNotificationScheduler
         foreach (var id in ghostIds)
         {
             _notificationService.CancelReminderAlarm(id);
+            ArmedAlarmStore.Remove(id);
             LogDiag($"event=ghost-cancel itemId={id} surface=mobile reason=stale");
         }
 
@@ -211,6 +221,7 @@ public class ReminderNotificationScheduler
     public void CancelItem(int todoItemId)
     {
         _notificationService.CancelReminderAlarm(todoItemId);
+        ArmedAlarmStore.Remove(todoItemId);
 
         bool removed;
         lock (_lock) { removed = _activeAlarms.Remove(todoItemId); }
@@ -232,25 +243,16 @@ public class ReminderNotificationScheduler
     public void LogFired(int todoItemId)
     {
         lock (_lock) { _activeAlarms.Remove(todoItemId); }
+        ArmedAlarmStore.Remove(todoItemId);
 
         LogDiag($"event=fired itemId={todoItemId} surface=mobile firedAt={DateTime.UtcNow:o}");
     }
 
     private void LogDiag(string body)
     {
-        var message = $"[reminder-diag] {body}";
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _eventLog.LogEvent(new EventLogRequest { Level = "Info", Message = message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to post reminder-diag event: {Message}", message);
-            }
-        });
+        // Local-first, durable, synchronous. The outbox (DiagnosticStore.FlushAsync) syncs to the
+        // server later — so events survive Doze / app-kill that a fire-and-forget HTTP POST loses.
+        _diag.Record("reminder-diag", body);
     }
 
     private static DateTime? CalculateFireTime(ReminderResponse item)

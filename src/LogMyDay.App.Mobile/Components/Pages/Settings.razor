@@ -4,6 +4,7 @@
 @inject AuthenticationService AuthService
 @inject IApiContext ApiContext
 @inject IThemeService ThemeService
+@inject IUserPreferencesService UserPreferencesService
 @inject ILogger<Settings> Logger
 
 <PageTitle>Settings - LogMyDay</PageTitle>
@@ -84,6 +85,27 @@
             </button>
         </div>
 
+        @if (_isAdmin)
+        {
+            <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Admin</h2>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xs overflow-hidden mb-6">
+                <button type="button"
+                        class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                        @onclick="@(() => NavigateTo("/diagnostics"))">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sky-600 dark:text-sky-400">
+                            <i class="bi bi-activity text-2xl"></i>
+                        </span>
+                        <div>
+                            <div class="font-semibold text-gray-900 dark:text-white">Diagnostics</div>
+                            <small class="text-gray-600 dark:text-gray-400">Reminder/alarm diagnostic log, sync &amp; export</small>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-gray-400"></i>
+                </button>
+            </div>
+        }
+
         <!-- Account Settings -->
         <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-2">Account</h2>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xs overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
@@ -142,6 +164,7 @@
 
 @code {
     private bool isLoggingOut;
+    private bool _isAdmin;
     private AppTheme currentTheme = AppTheme.System;
 
     private readonly List<ThemeOption> themeOptions = new()
@@ -160,6 +183,16 @@
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Failed to load theme");
+        }
+
+        try
+        {
+            var prefs = await UserPreferencesService.GetAsync();
+            _isAdmin = prefs.CurrentUser.IsAdmin;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Failed to resolve admin status");
         }
     }
 

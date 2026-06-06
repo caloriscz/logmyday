@@ -5,6 +5,7 @@ using Android.Graphics;
 using Android.OS;
 using AndroidX.Core.App;
 using LogMyDay.App.Mobile.Services;
+using LogMyDay.App.Mobile.Services.Diagnostics;
 using AndroidX.Core.Content;
 
 namespace LogMyDay.App.Mobile.Platforms.Android;
@@ -115,7 +116,14 @@ public class NotificationManagerService : INotificationManagerService
             {
                 long triggerTime = GetNotifyTime(notifyTime.Value);
                 AlarmManager? alarmManager = Platform.AppContext.GetSystemService(Context.AlarmService) as AlarmManager;
-                ScheduleExactAlarm(alarmManager, triggerTime, pendingIntent);
+                var armMode = ScheduleExactAlarm(alarmManager, triggerTime, pendingIntent);
+
+                // Surface exact-vs-inexact into the durable diag store. An "inexact-no-permission"
+                // row explains intermittent misses — inexact alarms are deferred/dropped under Doze.
+                if (payload?.TodoItemId is int armedItemId)
+                {
+                    DiagnosticStore.Instance?.Record("reminder-diag", $"event=alarm-armed itemId={armedItemId} mode={armMode}");
+                }
 
                 // Also track in the in-memory map for non-reminder alarms.
                 if (payload?.NotificationId is int nid && !payload.TodoItemId.HasValue)
@@ -492,11 +500,13 @@ public class NotificationManagerService : INotificationManagerService
         compatManager?.Cancel(todoItemId);
     }
 
-    static void ScheduleExactAlarm(AlarmManager? alarmManager, long triggerTimeMs, PendingIntent pendingIntent)
+    // Returns the mode actually used so the caller can record it: "exact", "inexact-no-permission",
+    // "inexact-old-api", or "no-alarm-manager".
+    static string ScheduleExactAlarm(AlarmManager? alarmManager, long triggerTimeMs, PendingIntent pendingIntent)
     {
         if (alarmManager == null)
         {
-            return;
+            return "no-alarm-manager";
         }
 
         // Android 12+ (API 31+): exact alarms require SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM.
@@ -510,7 +520,7 @@ public class NotificationManagerService : INotificationManagerService
             alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
             System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: exact alarm permission not granted, using inexact Set()");
 
-            return;
+            return "inexact-no-permission";
         }
 
         if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
@@ -518,12 +528,14 @@ public class NotificationManagerService : INotificationManagerService
             // API 23+: fires even in Doze mode.
             alarmManager.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
             System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: SetExactAndAllowWhileIdle scheduled");
+
+            return "exact";
         }
-        else
-        {
-            alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
-            System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: fallback Set() (API < 23)");
-        }
+
+        alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
+        System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: fallback Set() (API < 23)");
+
+        return "inexact-old-api";
     }
 
     long GetNotifyTime(DateTime notifyTime)

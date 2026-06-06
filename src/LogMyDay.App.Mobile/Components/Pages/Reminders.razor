@@ -13,6 +13,7 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject ReminderNotificationScheduler ReminderScheduler
+@inject LogMyDay.App.Mobile.Services.Diagnostics.IDiagnosticStore Diag
 
 @{
     var effectiveDate = _selectedDate.Date;
@@ -104,15 +105,29 @@
                                         {
                                             <span class="text-xs text-gray-500 dark:text-gray-400">@item.Notes</span>
                                         }
-                                        @if (item.RecurrenceType != RecurrenceType.None)
-                                        {
-                                            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
-                                        }
                                         @if (item.IsTagDayLocked)
                                         {
                                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"><i class="bi bi-lock-fill me-1"></i>Tag locked</span>
                                         }
                                     </div>
+                                    @{
+                                        // DEBUG: notification fire-time readout (matches web). Shows today's NotifyAt while
+                                        // still upcoming; blank once passed. Active grid only, so no completed chip appears.
+                                        var debugFireTime = NextFireTimeToday(item);
+                                    }
+                                    @if (item.RecurrenceType != RecurrenceType.None || debugFireTime != null)
+                                    {
+                                        <div class="mt-1 flex items-center gap-2">
+                                            @if (item.RecurrenceType != RecurrenceType.None)
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
+                                            }
+                                            @if (debugFireTime != null)
+                                            {
+                                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300" title="Scheduled notification time (debug)"><i class="bi bi-clock me-1"></i>@debugFireTime.Value.ToString("HH:mm")</span>
+                                            }
+                                        </div>
+                                    }
                                 </div>
                                 <div class="flex items-center gap-3 shrink-0">
                                     @if (item.RecurrenceType != RecurrenceType.None)
@@ -607,10 +622,14 @@
 
                 if (_selectedDate.Date == DateTime.Today)
                 {
-                    ReminderScheduler.ScheduleAll(_reminders);
+                    ReminderScheduler.ScheduleAll(_reminders, "page-load");
 
                     var liveIds = all.Select(i => i.Id).ToHashSet();
                     ReminderScheduler.SweepGhostAlarms(liveIds);
+
+                    // Flush any locally-recorded diag (incl. alarms fired / re-armed while the app
+                    // was closed) to the server now that we have an authenticated session.
+                    _ = Diag.FlushAsync();
                 }
 
                 return;
@@ -1153,6 +1172,23 @@
     }
 
     private static bool IsBooleanInputType(int? inputTypeId) => inputTypeId == InputTypeIds.Boolean;
+
+    // DEBUG aid: today's scheduled notification time while it is still upcoming (matches web panel).
+    // Mirrors ReminderNotificationScheduler.CalculateFireTime — fire today at NotifyAt; null once passed.
+    private static TimeOnly? NextFireTimeToday(ReminderResponse item)
+    {
+        if (item.NotifyAt is not { } notifyAt)
+        {
+            return null;
+        }
+
+        if (DateTime.Today + notifyAt.ToTimeSpan() <= DateTime.Now)
+        {
+            return null;
+        }
+
+        return notifyAt;
+    }
 
     private static DateOnly? ParseDateOnly(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : DateOnly.TryParse(value, out var d) ? d : null;
