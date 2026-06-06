@@ -91,6 +91,9 @@ if (builder.Environment.EnvironmentName != "Test")
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IDatabaseSeeder>();
     await seeder.SeedAsync();
+
+    var reminderDayBackfill = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderDayBackfill>();
+    await reminderDayBackfill.RunAsync();
 }
 
 app.Run();
