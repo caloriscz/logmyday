@@ -1,0 +1,108 @@
+using LogMyDay.Api.Application.Services;
+using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Api.Infrastructure.Repositories;
+using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
+using LogMyDay.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace LogMyDay.Api.Tests;
+
+public class ReminderServiceTests
+{
+    private static (ReminderService service, LogMyDayDbContext context, Guid userId) CreateService(string dbName)
+    {
+        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+            .UseInMemoryDatabase(databaseName: dbName)
+            .Options;
+        var context = new LogMyDayDbContext(options);
+
+        var userId = Guid.NewGuid();
+        context.Users.Add(new User
+        {
+            Id = userId,
+            Email = "t@t",
+            PasswordHash = "x",
+            TimeZone = "UTC",
+            Culture = "en-US"
+        });
+        context.SaveChanges();
+
+        var activityService = new ActivityService(
+            context,
+            new ActivityRepository(context),
+            new EventLogService(context, NullLogger<EventLogService>.Instance),
+            new TagDayLockService(context));
+
+        var service = new ReminderService(context, activityService, NullLogger<ReminderService>.Instance);
+
+        return (service, context, userId);
+    }
+
+    private static async Task<int> AddDailyReminder(LogMyDayDbContext context, Guid userId)
+    {
+        var reminder = new Reminder { UserId = userId, Title = "Pill", RecurrenceType = RecurrenceType.Daily };
+        context.Reminders.Add(reminder);
+        await context.SaveChangesAsync();
+
+        return reminder.Id;
+    }
+
+    [Fact]
+    public async Task Skip_TwoDifferentDays_BothRemainSkippedIndependently()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_TwoDifferentDays_BothRemainSkippedIndependently));
+        var id = await AddDailyReminder(context, userId);
+
+        var dayA = new DateOnly(2026, 6, 1);
+        var dayB = new DateOnly(2026, 6, 3);
+
+        await service.Skip(id, userId, dayA);
+        await service.Skip(id, userId, dayB);
+
+        var onA = (await service.GetAll(userId, dayA)).Single();
+        var onB = (await service.GetAll(userId, dayB)).Single();
+        var onBetween = (await service.GetAll(userId, new DateOnly(2026, 6, 2))).Single();
+
+        Assert.True(onA.IsSkipped);
+        Assert.True(onB.IsSkipped);
+        Assert.False(onBetween.IsSkipped);
+    }
+
+    [Fact]
+    public async Task Complete_Today_DoesNotMarkPastDayDone()
+    {
+        var (service, context, userId) = CreateService(nameof(Complete_Today_DoesNotMarkPastDayDone));
+        var id = await AddDailyReminder(context, userId);
+
+        var today = new DateOnly(2026, 6, 6);
+        var yesterday = new DateOnly(2026, 6, 5);
+
+        await service.Complete(id, new ReminderCompleteRequest
+        {
+            DoneAt = new DateTime(2026, 6, 6, 12, 0, 0, DateTimeKind.Utc)
+        }, userId);
+
+        var onToday = (await service.GetAll(userId, today)).Single();
+        var onYesterday = (await service.GetAll(userId, yesterday)).Single();
+
+        Assert.True(onToday.IsDone);
+        Assert.False(onYesterday.IsDone);
+    }
+
+    [Fact]
+    public async Task SkipUnskipSkip_SameDay_EndsSkipped()
+    {
+        var (service, context, userId) = CreateService(nameof(SkipUnskipSkip_SameDay_EndsSkipped));
+        var id = await AddDailyReminder(context, userId);
+        var day = new DateOnly(2026, 6, 4);
+
+        await service.Skip(id, userId, day);
+        await service.Unskip(id, userId, day);
+        Assert.False((await service.GetAll(userId, day)).Single().IsSkipped);
+
+        await service.Skip(id, userId, day);
+        Assert.True((await service.GetAll(userId, day)).Single().IsSkipped);
+    }
+}

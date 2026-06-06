@@ -34,11 +34,26 @@ public class ReminderService : IReminderService
 
         var lockedTagIds = await GetLockedTagIds(userId, date, user);
 
+        var refDate = ReferenceLocalDate(date, user);
+        var weekStart = GetWeekStart(refDate, ResolveFirstDayOfWeek(user));
+        var reminderIds = reminders.Select(r => r.Id).ToList();
+
+        var dayRows = await _context.ReminderDays
+            .AsNoTracking()
+            .Where(d => reminderIds.Contains(d.ReminderId) && (d.Date == refDate || d.Date == weekStart))
+            .ToListAsync();
+
+        var dayLookup = dayRows.ToDictionary(d => (d.ReminderId, d.Date));
+
         return reminders
             .OrderBy(i => i.NotifyAt ?? TimeOnly.MaxValue)
             .ThenBy(i => i.DisplayOrder)
             .ThenBy(i => i.DateCreated)
-            .Select(i => MapItemToResponse(i, user, date, lockedTagIds))
+            .Select(i =>
+            {
+                dayLookup.TryGetValue((i.Id, PeriodDate(i, refDate, user)), out var day);
+                return MapItemToResponse(i, day, lockedTagIds);
+            })
             .ToList();
     }
 
@@ -72,7 +87,7 @@ public class ReminderService : IReminderService
 
         item.CompletionTag = completionTag;
 
-        return MapItemToResponse(item, null);
+        return MapItemToResponse(item);
     }
 
     public async Task Update(int id, ReminderRequest request, Guid userId)
@@ -129,8 +144,19 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
+        // Legacy scalars kept in sync for rollback safety; the read path uses the day row.
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
+
+        var doneLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(request.DoneAt, ResolveTimeZone(user)));
+        var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, doneLocalDate, user));
+        day.IsDone = true;
+        day.DoneAt = request.DoneAt;
+        day.IsSkipped = false;
+        day.SkippedAt = null;
+        day.CompletionValue = request.CompletionValue;
 
         _logger.LogInformation(
             "[reminder-diag] event=complete reminderId={ItemId} userId={UserId} doneAt={DoneAt:o} notifyAt={NotifyAt} recurrence={Recurrence}",
@@ -168,7 +194,7 @@ public class ReminderService : IReminderService
 
         await _context.SaveChangesAsync();
 
-        return MapItemToResponse(item, null);
+        return MapItemToResponse(item, day);
     }
 
     private async Task LogActivityAsync(Domain.Entities.Reminder item, string? completionValue, DateTime doneAt, Guid userId)
@@ -214,27 +240,45 @@ public class ReminderService : IReminderService
     public async Task<ReminderResponse> Reopen(int id, Guid userId)
     {
         var item = await LoadItemForUser(id, userId);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
         item.IsDone = false;
         item.DoneAt = null;
+
+        var periodDate = PeriodDate(item, ReferenceLocalDate(null, user), user);
+        var day = await _context.ReminderDays
+            .FirstOrDefaultAsync(d => d.ReminderId == id && d.Date == periodDate);
+        if (day != null)
+        {
+            day.IsDone = false;
+            day.DoneAt = null;
+            day.CompletionValue = null;
+        }
+
         await _context.SaveChangesAsync();
-        return MapItemToResponse(item, null);
+
+        return MapItemToResponse(item, day);
     }
 
     public async Task<ReminderResponse> Skip(int id, Guid userId, DateOnly? date = null)
     {
         var item = await LoadItemForUser(id, userId);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
+        var skippedAt = DateTime.UtcNow;
         if (date.HasValue)
         {
-            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-            var tz = ResolveTimeZone(user);
             var localMidnight = date.Value.ToDateTime(TimeOnly.MinValue);
-            item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, tz);
+            item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, ResolveTimeZone(user));
         }
         else
         {
-            item.SkippedAt = DateTime.UtcNow;
+            item.SkippedAt = skippedAt;
         }
+
+        var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, ReferenceLocalDate(date, user), user));
+        day.IsSkipped = true;
+        day.SkippedAt = skippedAt;
 
         await _context.SaveChangesAsync();
 
@@ -242,15 +286,28 @@ public class ReminderService : IReminderService
             "[reminder-diag] event=skip reminderId={ItemId} userId={UserId} skippedAt={SkippedAt:o} recurrence={Recurrence}",
             item.Id, userId, item.SkippedAt, item.RecurrenceType);
 
-        return MapItemToResponse(item, null);
+        return MapItemToResponse(item, day);
     }
 
-    public async Task<ReminderResponse> Unskip(int id, Guid userId)
+    public async Task<ReminderResponse> Unskip(int id, Guid userId, DateOnly? date = null)
     {
         var item = await LoadItemForUser(id, userId);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
         item.SkippedAt = null;
+
+        var periodDate = PeriodDate(item, ReferenceLocalDate(date, user), user);
+        var day = await _context.ReminderDays
+            .FirstOrDefaultAsync(d => d.ReminderId == id && d.Date == periodDate);
+        if (day != null)
+        {
+            day.IsSkipped = false;
+            day.SkippedAt = null;
+        }
+
         await _context.SaveChangesAsync();
-        return MapItemToResponse(item, null);
+
+        return MapItemToResponse(item, day);
     }
 
     public async Task Reorder(IList<ReminderReorderRequest> items, Guid userId)
@@ -285,6 +342,20 @@ public class ReminderService : IReminderService
         return item;
     }
 
+    private async Task<ReminderDay> GetOrCreateDay(int reminderId, Guid userId, DateOnly date)
+    {
+        var day = await _context.ReminderDays
+            .FirstOrDefaultAsync(d => d.ReminderId == reminderId && d.Date == date);
+
+        if (day == null)
+        {
+            day = new ReminderDay { ReminderId = reminderId, UserId = userId, Date = date };
+            _context.ReminderDays.Add(day);
+        }
+
+        return day;
+    }
+
     private async Task<HashSet<int>> GetLockedTagIds(Guid userId, DateOnly? date, User? user)
     {
         var referenceDate = date ?? DateOnly.FromDateTime(
@@ -297,11 +368,18 @@ public class ReminderService : IReminderService
             .ToHashSetAsync();
     }
 
-    internal static ReminderResponse MapItemToResponse(Domain.Entities.Reminder item, User? user, DateOnly? date = null, HashSet<int>? lockedTagIds = null)
+    internal static ReminderResponse MapItemToResponse(Domain.Entities.Reminder item, ReminderDay? day = null, HashSet<int>? lockedTagIds = null)
     {
         var isTagLocked = item.CompletionTagId.HasValue
             && lockedTagIds != null
             && lockedTagIds.Contains(item.CompletionTagId.Value);
+
+        // Non-recurring reminders are one-shot: their done state lives on the reminder itself.
+        // Recurring reminders read this period's state from its ReminderDay row.
+        var isNone = item.RecurrenceType == RecurrenceType.None;
+        var isDone = isNone ? item.IsDone : (day?.IsDone ?? false);
+        var doneAt = isNone ? item.DoneAt : day?.DoneAt;
+        var isSkipped = !isNone && (day?.IsSkipped ?? false);
 
         return new ReminderResponse
         {
@@ -309,9 +387,9 @@ public class ReminderService : IReminderService
             Title = item.Title,
             Notes = item.Notes,
             NotifyAt = item.NotifyAt,
-            IsDone = ComputeEffectiveIsDone(item, user, date),
-            DoneAt = item.DoneAt,
-            IsSkipped = isTagLocked || ComputeEffectiveIsSkipped(item, user, date),
+            IsDone = isDone,
+            DoneAt = doneAt,
+            IsSkipped = isTagLocked || isSkipped,
             IsTagDayLocked = isTagLocked,
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
@@ -327,55 +405,15 @@ public class ReminderService : IReminderService
         };
     }
 
-    private static bool ComputeEffectiveIsSkipped(Domain.Entities.Reminder item, User? user, DateOnly? date = null)
-    {
-        if (item.SkippedAt == null || item.RecurrenceType == RecurrenceType.None)
-        {
-            return false;
-        }
+    private static DateOnly ReferenceLocalDate(DateOnly? date, User? user)
+        => date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ResolveTimeZone(user)));
 
-        var tz = ResolveTimeZone(user);
-        var skippedLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.SkippedAt.Value, tz));
-        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
-
-        if (item.RecurrenceType == RecurrenceType.Daily)
-        {
-            return skippedLocalDate == referenceDate;
-        }
-
-        if (item.RecurrenceType == RecurrenceType.Weekly)
-        {
-            var firstDay = ResolveFirstDayOfWeek(user);
-            return GetWeekStart(skippedLocalDate, firstDay) == GetWeekStart(referenceDate, firstDay);
-        }
-
-        return false;
-    }
-
-    private static bool ComputeEffectiveIsDone(Domain.Entities.Reminder item, User? user, DateOnly? date = null)
-    {
-        if (!item.IsDone || item.DoneAt == null || item.RecurrenceType == RecurrenceType.None)
-        {
-            return item.IsDone;
-        }
-
-        var tz = ResolveTimeZone(user);
-        var doneLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(item.DoneAt.Value, tz));
-        var referenceDate = date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
-
-        if (item.RecurrenceType == RecurrenceType.Daily)
-        {
-            return doneLocalDate == referenceDate;
-        }
-
-        if (item.RecurrenceType == RecurrenceType.Weekly)
-        {
-            var firstDay = ResolveFirstDayOfWeek(user);
-            return GetWeekStart(doneLocalDate, firstDay) == GetWeekStart(referenceDate, firstDay);
-        }
-
-        return item.IsDone;
-    }
+    // The period day a ReminderDay row is keyed by: the calendar day for Daily/None,
+    // the week-start date for Weekly.
+    private static DateOnly PeriodDate(Domain.Entities.Reminder item, DateOnly localDate, User? user)
+        => item.RecurrenceType == RecurrenceType.Weekly
+            ? GetWeekStart(localDate, ResolveFirstDayOfWeek(user))
+            : localDate;
 
     private static TimeZoneInfo ResolveTimeZone(User? user)
     {

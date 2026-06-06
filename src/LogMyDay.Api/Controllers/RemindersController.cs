@@ -129,12 +129,13 @@ public class RemindersController : BaseApiController
     }
 
     [HttpPost("{id:int}/unskip")]
-    public async Task<ActionResult<ReminderResponse>> Unskip(int id)
+    public async Task<ActionResult<ReminderResponse>> Unskip(int id, [FromQuery] string? date = null)
     {
         var userId = GetCurrentUserId();
+        DateOnly? parsedDate = DateOnly.TryParse(date, out var d) ? d : null;
         try
         {
-            return Ok(await _service.Unskip(id, userId));
+            return Ok(await _service.Unskip(id, userId, parsedDate));
         }
         catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
     }
