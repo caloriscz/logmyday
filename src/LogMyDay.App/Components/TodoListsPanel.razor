@@ -10,7 +10,8 @@
 @inject IJSRuntime JS
 @inject ILogger<TodoListsPanel> Logger
 
-@if (!HomepageOnly || (_lists != null && _lists.Count > 0))
+@* Always render so the header + New-list button (and the empty state) stay visible even with no lists. *@
+@if (true)
 {
 <div class="mb-4 flex items-center justify-between">
     <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">@(Title ?? "To-Do Lists")</h2>
@@ -1142,13 +1143,22 @@ else
         }
         catch (ApiException ex)
         {
+            // Only surface the error on the initial load. A transient auto-refresh failure
+            // (e.g. the 30s timer firing without an HttpContext) must not replace good data
+            // with the error banner — keep the stale data and retry on the next cycle.
             Logger.LogWarning(ex, "Failed to load todo data");
-            _loadError = "Could not load to-do lists. Please refresh the page.";
+            if (_lists == null)
+            {
+                _loadError = "Could not load to-do lists. Please refresh the page.";
+            }
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Unexpected error loading todo data");
-            _loadError = "Could not load to-do lists. Please refresh the page.";
+            if (_lists == null)
+            {
+                _loadError = "Could not load to-do lists. Please refresh the page.";
+            }
         }
     }
 

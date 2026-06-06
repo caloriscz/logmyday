@@ -22,7 +22,8 @@
     var doneItems = _reminders?.Where(i => i.IsDone).ToList() ?? new List<ReminderResponse>();
 }
 
-@if (!HomepageOnly || (_reminders != null && _reminders.Count > 0))
+@* Always render so the header + Add button (and the empty state) stay visible even with no reminders. *@
+@if (true)
 {
     <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-2 min-w-0">
@@ -67,7 +68,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 p-4">
                 @if (!activeItems.Any())
                 {
-                    <p class="py-8 text-center text-sm text-gray-400 dark:text-slate-500 col-span-full">No pending reminders.</p>
+                    <p class="py-8 text-center text-sm text-gray-400 dark:text-slate-500 col-span-full">No pending reminders — use “Add reminder” to create one.</p>
                 }
                 else
                 {
