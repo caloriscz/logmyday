@@ -105,4 +105,31 @@ public class ReminderServiceTests
         await service.Skip(id, userId, day);
         Assert.True((await service.GetAll(userId, day)).Single().IsSkipped);
     }
+
+    [Fact]
+    public async Task Write_PrunesRowsOutsideMonitoringWindow_KeepsRecentAndCurrent()
+    {
+        var (service, context, userId) = CreateService(nameof(Write_PrunesRowsOutsideMonitoringWindow_KeepsRecentAndCurrent));
+        var reminder = new Reminder { UserId = userId, Title = "Pill", RecurrenceType = RecurrenceType.Daily, MonitorDaysBack = 7 };
+        context.Reminders.Add(reminder);
+        await context.SaveChangesAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        context.ReminderDays.AddRange(
+            new ReminderDay { ReminderId = reminder.Id, UserId = userId, Date = today.AddDays(-100), IsSkipped = true },
+            new ReminderDay { ReminderId = reminder.Id, UserId = userId, Date = today.AddDays(-3), IsSkipped = true });
+        await context.SaveChangesAsync();
+
+        // Any write action prunes this reminder's aged-out rows.
+        await service.Skip(reminder.Id, userId, today);
+
+        var remaining = context.ReminderDays
+            .Where(d => d.ReminderId == reminder.Id)
+            .Select(d => d.Date)
+            .ToList();
+
+        Assert.DoesNotContain(today.AddDays(-100), remaining); // outside 7-day window
+        Assert.Contains(today.AddDays(-3), remaining);         // within window
+        Assert.Contains(today, remaining);                     // current period kept
+    }
 }

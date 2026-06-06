@@ -192,6 +192,7 @@ public class ReminderService : IReminderService
             }
         }
 
+        await PruneOldDays(item, user);
         await _context.SaveChangesAsync();
 
         return MapItemToResponse(item, day);
@@ -280,6 +281,7 @@ public class ReminderService : IReminderService
         day.IsSkipped = true;
         day.SkippedAt = skippedAt;
 
+        await PruneOldDays(item, user);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation(
@@ -354,6 +356,31 @@ public class ReminderService : IReminderService
         }
 
         return day;
+    }
+
+    // Drop ReminderDay rows that have aged out of the reminder's window: its monitoring window when
+    // set, otherwise 365 days. Never touches the current period's row.
+    private async Task PruneOldDays(Domain.Entities.Reminder item, User? user)
+    {
+        var today = ReferenceLocalDate(null, user);
+        var currentPeriod = PeriodDate(item, today, user);
+
+        var cutoff = item.MonitorDaysBack.HasValue ? today.AddDays(-item.MonitorDaysBack.Value)
+            : item.MonitorFromDate ?? today.AddDays(-365);
+
+        if (cutoff > currentPeriod)
+        {
+            cutoff = currentPeriod;
+        }
+
+        var stale = await _context.ReminderDays
+            .Where(d => d.ReminderId == item.Id && d.Date < cutoff)
+            .ToListAsync();
+
+        if (stale.Count > 0)
+        {
+            _context.ReminderDays.RemoveRange(stale);
+        }
     }
 
     private async Task<HashSet<int>> GetLockedTagIds(Guid userId, DateOnly? date, User? user)
