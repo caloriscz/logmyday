@@ -1,4 +1,5 @@
 using System.Text;
+using LogMyDay.App.Mobile.Services;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -63,7 +64,7 @@ public sealed class DiagnosticStore : IDiagnosticStore
     private const string EnabledPrefsKey = "diag.enabled";
     private const string DbFileName = "diagnostics.db3";
 
-    private readonly IEventLogApi _eventLog;
+    private readonly IApiClientProvider _apiClientProvider;
     private readonly ILogger<DiagnosticStore> _logger;
     private readonly object _lock = new();
     private readonly SQLiteConnection _db;
@@ -74,9 +75,11 @@ public sealed class DiagnosticStore : IDiagnosticStore
 
     public bool Enabled => _enabled;
 
-    public DiagnosticStore(IEventLogApi eventLog, ILogger<DiagnosticStore> logger)
+    public DiagnosticStore(IApiClientProvider apiClientProvider, ILogger<DiagnosticStore> logger)
     {
-        _eventLog = eventLog;
+        // NB: resolve the event-log client lazily in FlushAsync, never here — the API client throws
+        // "API server not configured" before login, and this store is constructed at startup.
+        _apiClientProvider = apiClientProvider;
         _logger = logger;
         _enabled = Preferences.Get(EnabledPrefsKey, false);
 
@@ -132,6 +135,19 @@ public sealed class DiagnosticStore : IDiagnosticStore
             return 0;
         }
 
+        IEventLogApi eventLog;
+        try
+        {
+            eventLog = _apiClientProvider.EventLog;
+        }
+        catch (Exception ex)
+        {
+            // Server not configured yet (pre-login) — nothing to flush to. Retry on a later flush.
+            _logger.LogDebug(ex, "DiagnosticStore.Flush skipped — API client not ready");
+
+            return 0;
+        }
+
         List<DiagEventRow> pending;
         lock (_lock)
         {
@@ -145,7 +161,7 @@ public sealed class DiagnosticStore : IDiagnosticStore
 
             try
             {
-                await _eventLog.LogEvent(new EventLogRequest
+                await eventLog.LogEvent(new EventLogRequest
                 {
                     Level = "Info",
                     Message = $"[{row.Category}] {row.Body}"
