@@ -4,7 +4,7 @@
 window.LogMyDayScanner = {
     _scanner: null,
 
-    start: function (elementId, dotnetRef) {
+    start: function (elementId, token) {
         var self = this;
 
         var config = {
@@ -24,9 +24,13 @@ window.LogMyDayScanner = {
         };
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Guard: dotNetRef may be disposed if user navigated away
-            dotnetRef.invokeMethodAsync('OnScanSuccess', decodedText, decodedResult.result.format.formatName)
-                .catch(function () { /* component was disposed, ignore */ });
+            // Call back into .NET via the native WebView bridge (no IJSRuntime).
+            var format = decodedResult && decodedResult.result && decodedResult.result.format
+                ? decodedResult.result.format.formatName
+                : '';
+            if (window.LmdNative && window.LmdNative.onScan) {
+                window.LmdNative.onScan(token, decodedText, format);
+            }
         }
 
         function doStart() {

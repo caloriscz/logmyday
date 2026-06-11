@@ -99,6 +99,7 @@ public static class MauiProgram
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();
             builder.Services.AddSingleton<IWebViewInterop, WebViewInterop>();
+            builder.Services.AddSingleton<INativeCallbackBridge, NativeCallbackBridge>();
             builder.Services.Add(new ServiceDescriptor(
                 typeof(IThemeService),
                 typeof(ThemeService),
