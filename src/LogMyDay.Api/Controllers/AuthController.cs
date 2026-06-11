@@ -1,5 +1,6 @@
 using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Security;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Preferences;
@@ -19,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAntiforgery _antiforgery;
+    private readonly AuthAttemptTracker _attemptTracker;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -26,13 +28,23 @@ public class AuthController : ControllerBase
         IAuthService authService,
         IPasswordHasher passwordHasher,
         IAntiforgery antiforgery,
+        AuthAttemptTracker attemptTracker,
         ILogger<AuthController> logger)
     {
         _userService = userService;
         _authService = authService;
         _passwordHasher = passwordHasher;
         _antiforgery = antiforgery;
+        _attemptTracker = attemptTracker;
         _logger = logger;
+    }
+
+    // Same identifier shape as BasicAuthHandler so lockout state is shared across both auth schemes.
+    private string BuildAttemptIdentifier(string email)
+    {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return $"{clientIp}:{email}";
     }
 
     [HttpPost("register-first")]
@@ -83,18 +95,28 @@ public class AuthController : ControllerBase
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Login attempt with invalid model state for email: {Email}", request.Email);
-                
+
                 return BadRequest(ModelState);
+            }
+
+            var identifier = BuildAttemptIdentifier(request.Email);
+            if (_attemptTracker.IsBlocked(identifier))
+            {
+                _logger.LogWarning("Login blocked for email {Email} due to too many failed attempts", request.Email);
+
+                return StatusCode(429, "Too many failed attempts. Please try again later.");
             }
 
             var user = await _userService.FindByEmail(request.Email, cancellationToken);
             if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             {
                 _logger.LogWarning("Login attempt with invalid credentials for email: {Email}", request.Email);
-                
+                _attemptTracker.RecordFailedAttempt(identifier);
+
                 return StatusCode(401, "Invalid email or password.");
             }
 
+            _attemptTracker.RecordSuccessfulAttempt(identifier);
             await _authService.SignInAsync(HttpContext, user);
             _logger.LogInformation("User {UserId} ({Email}) signed in successfully with cookie authentication", user.Id, user.Email);
             
@@ -129,23 +151,34 @@ public class AuthController : ControllerBase
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            var identifier = BuildAttemptIdentifier(email);
+            if (_attemptTracker.IsBlocked(identifier))
+            {
+                _logger.LogWarning("Form login blocked for email {Email} due to too many failed attempts", email);
+
+                return Redirect("/login?error=Too many failed attempts. Please try again later.");
+            }
+
             _logger.LogInformation("Looking up user with email: {Email}", email);
             var user = await _userService.FindByEmail(email, cancellationToken);
             if (user == null)
             {
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
+                _attemptTracker.RecordFailedAttempt(identifier);
 
                 return Redirect("/login?error=Invalid email or password");
             }
-            
+
             _logger.LogInformation("User found: {UserId}, verifying password", user.Id);
             if (!_passwordHasher.Verify(password, user.PasswordHash))
             {
                 _logger.LogWarning("Form login attempt with invalid password for email: {Email}", email);
+                _attemptTracker.RecordFailedAttempt(identifier);
 
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            _attemptTracker.RecordSuccessfulAttempt(identifier);
             await _authService.SignInAsync(HttpContext, user, remember);
             
             // Log cookie information
