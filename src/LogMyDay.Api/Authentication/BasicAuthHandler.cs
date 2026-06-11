@@ -92,11 +92,14 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
             // Successful authentication - clear any failed attempts
             _attemptTracker.RecordSuccessfulAttempt(identifier);
 
+            // Mirror the cookie AuthService claim set so the AdminOnly policy (and any other
+            // claim-based check) behaves identically across both authentication schemes.
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Email),
                 new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
+                new Claim("is_admin", user.IsAdmin.ToString().ToLowerInvariant()),
             };
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
