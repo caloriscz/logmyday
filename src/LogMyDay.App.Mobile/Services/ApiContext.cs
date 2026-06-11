@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.App.Mobile.Services;
 
@@ -17,6 +18,13 @@ public interface IApiContext
 
 public class ApiContext : IApiContext
 {
+    private readonly ILogger<ApiContext> _logger;
+
+    public ApiContext(ILogger<ApiContext> logger)
+    {
+        _logger = logger;
+    }
+
     public Uri? Server { get; private set; }
     public string? Username { get; private set; }
     public string? Password { get; private set; }
@@ -28,32 +36,28 @@ public class ApiContext : IApiContext
 
     public void Configure(Uri server, string username, string password)
     {
-        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext.Configure called:");
-        System.Diagnostics.Debug.WriteLine($"   Server: {server}");
-        System.Diagnostics.Debug.WriteLine($"   Username: {username}");
-        System.Diagnostics.Debug.WriteLine($"   Password length: {password?.Length ?? 0}");
-        
         Server = server;
         Username = username;
         Password = password;
         Changed?.Invoke();
-        
-        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext configured. IsConfigured: {IsConfigured}");
+
+        // Never log credentials or credential metadata (e.g. password length).
+        _logger.LogInformation("ApiContext configured for server {Server}. IsConfigured: {IsConfigured}", server, IsConfigured);
     }
 
     public void Clear()
     {
-        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext.Clear called");
         Server = null;
         Username = null;
         Password = null;
         Changed?.Invoke();
-        System.Diagnostics.Debug.WriteLine($"🌐 ApiContext cleared. IsConfigured: {IsConfigured}");
+
+        _logger.LogInformation("ApiContext cleared");
     }
 
     public void NotifyAuthenticationExpired()
     {
-        System.Diagnostics.Debug.WriteLine($"🚨 ApiContext: Authentication expired - notifying subscribers");
+        _logger.LogInformation("ApiContext: authentication expired, notifying subscribers");
         AuthenticationExpired?.Invoke();
     }
 }
