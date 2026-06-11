@@ -1,6 +1,7 @@
 ﻿using ApexCharts;
 using LogMyDay.App.Components;
 using LogMyDay.App.Extensions;
+using LogMyDay.Api.Infrastructure;
 using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 using Serilog;
@@ -53,6 +54,10 @@ services.AddControllers()
     .AddJsonOptions(options => JsonSerializationSettings.Configure(options.JsonSerializerOptions));
 services.AddEndpointsApiExplorer();
 
+// Centralized API error handling — returns ProblemDetails instead of per-action try/catch.
+services.AddProblemDetails();
+services.AddExceptionHandler<GlobalExceptionHandler>();
+
 services.AddDatabase(builder.Configuration, builder.Environment);
 services.AddApplicationServices(builder.Configuration, builder.Environment);
 services.AddRefitClients(builder.Configuration);
@@ -60,9 +65,12 @@ services.AddSwagger();
 
 var app = builder.Build();
 
+// API exceptions are turned into ProblemDetails by GlobalExceptionHandler; anything it does not
+// handle (e.g. Blazor) falls back to the /Error page.
+app.UseExceptionHandler("/Error", createScopeForErrors: true);
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 else

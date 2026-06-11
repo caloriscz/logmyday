@@ -30,32 +30,23 @@ public class UsersController : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetUsers(CancellationToken cancellationToken)
     {
-        try
-        {
-            var users = await _userService.List(cancellationToken);
-            var userDtos = users
-                .Select(u => new UserDto(
-                    u.Id,
-                    u.Email,
-                    u.DisplayName,
-                    u.IsAdmin,
-                    u.CreatedUtc,
-                    u.UpdatedUtc,
-                    u.Culture,
-                    u.TimeZone,
-                    ActivityFilterPreferences.NormalizeDisplayType(u.ActivityDisplayType),
-                    ActivityFilterPreferences.NormalizeActivitySortOrder(u.ActivitySortOrder),
-                    ActivityFilterPreferences.NormalizePeriodSort(u.ActivityPeriodSort)))
-                .ToList();
-            
-            return Ok(userDtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving users");
-            
-            return StatusCode(500, "An error occurred while retrieving users.");
-        }
+        var users = await _userService.List(cancellationToken);
+        var userDtos = users
+            .Select(u => new UserDto(
+                u.Id,
+                u.Email,
+                u.DisplayName,
+                u.IsAdmin,
+                u.CreatedUtc,
+                u.UpdatedUtc,
+                u.Culture,
+                u.TimeZone,
+                ActivityFilterPreferences.NormalizeDisplayType(u.ActivityDisplayType),
+                ActivityFilterPreferences.NormalizeActivitySortOrder(u.ActivitySortOrder),
+                ActivityFilterPreferences.NormalizePeriodSort(u.ActivityPeriodSort)))
+            .ToList();
+
+        return Ok(userDtos);
     }
 
     [HttpPost]
@@ -123,12 +114,6 @@ public class UsersController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating user");
-
-            return StatusCode(500, "An error occurred while creating the user.");
         }
     }
 
@@ -204,12 +189,6 @@ public class UsersController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating user {UserId}", id);
-
-            return StatusCode(500, "An error occurred while updating the user.");
-        }
     }
 
     [HttpDelete("{id}")]
@@ -234,12 +213,6 @@ public class UsersController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting user {UserId}", id);
-            
-            return StatusCode(500, "An error occurred while deleting the user.");
         }
     }
 

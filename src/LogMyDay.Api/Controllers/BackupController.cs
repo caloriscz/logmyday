@@ -29,31 +29,22 @@ public class BackupController : BaseApiController
     [HttpGet("export")]
     public async Task<IActionResult> ExportData([FromQuery] Guid? userId_old = null)
     {
-        try
+        Guid? userId = GetCurrentUserId();
+
+        _logger.LogInformation("Export request received for user: {UserId}", userId?.ToString() ?? "All users");
+
+        var backupData = await _backupService.ExportDataAsync(userId);
+
+        var jsonOptions = new JsonSerializerOptions
         {
-            Guid? userId = GetCurrentUserId();
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
-            _logger.LogInformation("Export request received for user: {UserId}", userId?.ToString() ?? "All users");
+        var jsonContent = JsonSerializer.Serialize(backupData, jsonOptions);
+        var fileName = $"logmyday-backup-{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}.json";
 
-            var backupData = await _backupService.ExportDataAsync(userId);
-
-            var jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            var jsonContent = JsonSerializer.Serialize(backupData, jsonOptions);
-            var fileName = $"logmyday-backup-{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}.json";
-
-            return File(System.Text.Encoding.UTF8.GetBytes(jsonContent), "application/json", fileName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during data export");
-
-            return StatusCode(500, new { message = "Export failed" });
-        }
+        return File(System.Text.Encoding.UTF8.GetBytes(jsonContent), "application/json", fileName);
     }
 
     /// <summary>
@@ -68,65 +59,56 @@ public class BackupController : BaseApiController
         IFormFile file,
         [FromQuery] bool clearExisting = false)
     {
+        // Always use the current authenticated user's ID for security and data ownership
+        var userId = GetCurrentUserId();
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file provided" });
+        }
+
+        if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "File must be a JSON file" });
+        }
+
+        string jsonContent;
+        using (var reader = new StreamReader(file.OpenReadStream()))
+        {
+            jsonContent = await reader.ReadToEndAsync();
+        }
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        BackupData? backupData;
         try
         {
-            // Always use the current authenticated user's ID for security and data ownership
-            var userId = GetCurrentUserId();
-
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest(new { message = "No file provided" });
-            }
-
-            if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest(new { message = "File must be a JSON file" });
-            }
-
-            string jsonContent;
-            using (var reader = new StreamReader(file.OpenReadStream()))
-            {
-                jsonContent = await reader.ReadToEndAsync();
-            }
-
-            var jsonOptions = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            BackupData? backupData;
-            try
-            {
-                backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse JSON backup file");
-
-                return BadRequest(new { message = "Invalid JSON format", error = ex.Message });
-            }
-
-            if (backupData == null)
-            {
-                return BadRequest(new { message = "Backup data is null or invalid" });
-            }
-
-            var result = await _backupService.ImportDataAsync(backupData, clearExisting, userId);
-
-            if (result.Success)
-            {
-                return Ok(result);
-            }
-            else
-            {
-                return BadRequest(result);
-            }
+            backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error during data import");
+            _logger.LogWarning(ex, "Failed to parse JSON backup file");
 
-            return StatusCode(500, new { message = "Import failed" });
+            return BadRequest(new { message = "Invalid JSON format", error = ex.Message });
+        }
+
+        if (backupData == null)
+        {
+            return BadRequest(new { message = "Backup data is null or invalid" });
+        }
+
+        var result = await _backupService.ImportDataAsync(backupData, clearExisting, userId);
+
+        if (result.Success)
+        {
+            return Ok(result);
+        }
+        else
+        {
+            return BadRequest(result);
         }
     }
 
@@ -140,25 +122,16 @@ public class BackupController : BaseApiController
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> ClearData([FromQuery] Guid? userId = null)
     {
-        try
+        _logger.LogInformation("Clear data request received for user: {UserId}", userId?.ToString() ?? "All users");
+
+        var recordsCleared = await _backupService.ClearDataAsync(userId);
+
+        return Ok(new
         {
-            _logger.LogInformation("Clear data request received for user: {UserId}", userId?.ToString() ?? "All users");
-
-            var recordsCleared = await _backupService.ClearDataAsync(userId);
-
-            return Ok(new
-            {
-                message = "Data cleared successfully",
-                recordsCleared,
-                userId = userId?.ToString() ?? "All users"
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during data clearing");
-
-            return StatusCode(500, new { message = "Clear operation failed" });
-        }
+            message = "Data cleared successfully",
+            recordsCleared,
+            userId = userId?.ToString() ?? "All users"
+        });
     }
 
     /// <summary>
@@ -169,57 +142,48 @@ public class BackupController : BaseApiController
     [HttpPost("validate")]
     public async Task<IActionResult> ValidateBackup(IFormFile file)
     {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file provided" });
+        }
+
+        if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "File must be a JSON file" });
+        }
+
+        _logger.LogInformation("Validation request received for file: {FileName}", file.FileName);
+
+        string jsonContent;
+        using (var reader = new StreamReader(file.OpenReadStream()))
+        {
+            jsonContent = await reader.ReadToEndAsync();
+        }
+
+        JsonSerializerOptions jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        BackupData? backupData;
         try
         {
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest(new { message = "No file provided" });
-            }
-
-            if (!file.FileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest(new { message = "File must be a JSON file" });
-            }
-
-            _logger.LogInformation("Validation request received for file: {FileName}", file.FileName);
-
-            string jsonContent;
-            using (var reader = new StreamReader(file.OpenReadStream()))
-            {
-                jsonContent = await reader.ReadToEndAsync();
-            }
-
-            JsonSerializerOptions jsonOptions = new()
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            BackupData? backupData;
-            try
-            {
-                backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to parse JSON backup file during validation");
-
-                return BadRequest(new { message = "Invalid JSON format", error = ex.Message });
-            }
-
-            if (backupData == null)
-            {
-                return BadRequest(new { message = "Backup data is null or invalid" });
-            }
-
-            var validationResult = await _backupService.ValidateBackupData(backupData);
-            return Ok(validationResult);
+            backupData = JsonSerializer.Deserialize<BackupData>(jsonContent, jsonOptions);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error during backup validation");
+            _logger.LogWarning(ex, "Failed to parse JSON backup file during validation");
 
-            return StatusCode(500, new { message = "Validation failed" });
+            return BadRequest(new { message = "Invalid JSON format", error = ex.Message });
         }
+
+        if (backupData == null)
+        {
+            return BadRequest(new { message = "Backup data is null or invalid" });
+        }
+
+        var validationResult = await _backupService.ValidateBackupData(backupData);
+        return Ok(validationResult);
     }
 
     /// <summary>
@@ -248,12 +212,6 @@ public class BackupController : BaseApiController
         catch (UnauthorizedAccessException)
         {
             return Unauthorized();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting backup info");
-
-            return StatusCode(500, new { message = "Failed to get backup info" });
         }
     }
 
