@@ -3,10 +3,12 @@ using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Controllers;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Shared.DTOs;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Security.Claims;
 
 namespace LogMyDay.Api.Tests;
 
@@ -739,9 +741,10 @@ public class BackupControllerTests
     private static readonly string CurrentBackupVersion = new BackupMetadata().Version;
 
     [Fact]
-    public async Task GetBackupInfo_ShouldReturnOk_WithBackupMetadata()
+    public async Task GetBackupInfo_ShouldReturnOk_ScopedToAuthenticatedUser()
     {
         // Arrange
+        var authenticatedUserId = Guid.NewGuid();
         var mockBackupService = new Mock<IBackupService>();
         var mockLogger = new Mock<ILogger<BackupController>>();
         var mockAuthService = new Mock<IAuthService>();
@@ -758,12 +761,16 @@ public class BackupControllerTests
         };
 
         mockBackupService.Setup(s => s.ExportDataAsync(It.IsAny<Guid?>())).ReturnsAsync(backupData);
+        mockAuthService.Setup(a => a.GetUserId(It.IsAny<ClaimsPrincipal>())).Returns(authenticatedUserId);
 
         var controller = new BackupController(
             mockBackupService.Object,
             mockLogger.Object,
             mockAuthService.Object
-        );
+        )
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
 
         // Act
         var result = await controller.GetBackupInfo();
@@ -772,8 +779,72 @@ public class BackupControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
 
-        // Verify the service was called
-        mockBackupService.Verify(s => s.ExportDataAsync(null), Times.Once);
+        // Statistics are always scoped to the authenticated user — never the all-users aggregate (null)
+        mockBackupService.Verify(s => s.ExportDataAsync(authenticatedUserId), Times.Once);
+        mockBackupService.Verify(s => s.ExportDataAsync(null), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetBackupInfo_ShouldScopeToCaller_NotAnotherUser()
+    {
+        // Regression: a caller must never receive another user's (or cross-user aggregate) statistics.
+        // The endpoint no longer accepts a client userId, so the only id reaching the service is the
+        // authenticated caller's, regardless of who the "victim" would be.
+        var callerId = Guid.NewGuid();
+        var victimId = Guid.NewGuid();
+
+        var mockBackupService = new Mock<IBackupService>();
+        var mockLogger = new Mock<ILogger<BackupController>>();
+        var mockAuthService = new Mock<IAuthService>();
+
+        mockBackupService
+            .Setup(s => s.ExportDataAsync(It.IsAny<Guid?>()))
+            .ReturnsAsync(new BackupData { Metadata = new BackupMetadata { Version = CurrentBackupVersion } });
+        mockAuthService.Setup(a => a.GetUserId(It.IsAny<ClaimsPrincipal>())).Returns(callerId);
+
+        var controller = new BackupController(
+            mockBackupService.Object,
+            mockLogger.Object,
+            mockAuthService.Object
+        )
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        // Act
+        await controller.GetBackupInfo();
+
+        // Assert — only the caller's data is ever requested
+        mockBackupService.Verify(s => s.ExportDataAsync(callerId), Times.Once);
+        mockBackupService.Verify(s => s.ExportDataAsync(victimId), Times.Never);
+        mockBackupService.Verify(s => s.ExportDataAsync(null), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetBackupInfo_ShouldReturnUnauthorized_WhenUserIdMissing()
+    {
+        // Arrange
+        var mockBackupService = new Mock<IBackupService>();
+        var mockLogger = new Mock<ILogger<BackupController>>();
+        var mockAuthService = new Mock<IAuthService>();
+
+        mockAuthService.Setup(a => a.GetUserId(It.IsAny<ClaimsPrincipal>())).Returns((Guid?)null);
+
+        var controller = new BackupController(
+            mockBackupService.Object,
+            mockLogger.Object,
+            mockAuthService.Object
+        )
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        // Act
+        var result = await controller.GetBackupInfo();
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+        mockBackupService.Verify(s => s.ExportDataAsync(It.IsAny<Guid?>()), Times.Never);
     }
 
     [Fact]

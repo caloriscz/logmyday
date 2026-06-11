@@ -223,16 +223,18 @@ public class BackupController : BaseApiController
     }
 
     /// <summary>
-    /// Get backup metadata and statistics
+    /// Get backup metadata and statistics for the current authenticated user
     /// </summary>
-    /// <param name="userId">Optional user ID to get statistics for specific user</param>
     /// <returns>Current database statistics</returns>
     [HttpGet("info")]
-    public async Task<IActionResult> GetBackupInfo([FromQuery] Guid? userId = null)
+    public async Task<IActionResult> GetBackupInfo()
     {
         try
         {
-            _logger.LogInformation("Backup info request received for user: {UserId}", userId?.ToString() ?? "All users");
+            // Always scope to the current authenticated user — never trust a client-supplied id
+            var userId = GetCurrentUserId();
+
+            _logger.LogInformation("Backup info request received for user: {UserId}", userId);
 
             var backupData = await _backupService.ExportDataAsync(userId);
 
@@ -240,8 +242,12 @@ public class BackupController : BaseApiController
             {
                 metadata = backupData.Metadata,
                 currentDateTime = DateTime.UtcNow,
-                userId = userId?.ToString() ?? "All users"
+                userId = userId.ToString()
             });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
         }
         catch (Exception ex)
         {
