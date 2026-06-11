@@ -1,5 +1,3 @@
-using Microsoft.JSInterop;
-
 namespace LogMyDay.App.Mobile.Services;
 
 public enum AppTheme
@@ -19,12 +17,6 @@ public interface IThemeService
 public class ThemeService : IThemeService
 {
     private const string ThemePreferenceKey = "app_theme";
-    private readonly IJSRuntime _jsRuntime;
-
-    public ThemeService(IJSRuntime jsRuntime)
-    {
-        _jsRuntime = jsRuntime;
-    }
 
     public Task<AppTheme> GetThemeAsync()
     {

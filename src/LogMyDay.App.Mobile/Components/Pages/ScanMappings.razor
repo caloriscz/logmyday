@@ -6,7 +6,7 @@
 @inject LogMyDay.Shared.Interfaces.IScanMappingApi ScanMappingApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject IPageTitleService PageTitleService
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<ScanMappings> Logger
 
 <PageTitle>Scan Mappings - LogMyDay</PageTitle>
@@ -252,7 +252,7 @@
 
             try
             {
-                await JSRuntime.InvokeVoidAsync("showModal", "scanMappingModal");
+                await WebView.InvokeVoidAsync("showModal", "scanMappingModal");
             }
             catch (Exception ex)
             {
@@ -327,7 +327,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("hideModal", "scanMappingModal");
+            await WebView.InvokeVoidAsync("hideModal", "scanMappingModal");
         }
         catch (Exception ex)
         {

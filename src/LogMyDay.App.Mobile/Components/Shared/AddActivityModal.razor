@@ -7,7 +7,7 @@
 @using Microsoft.JSInterop
 @using Microsoft.Extensions.Logging
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<AddActivityModal> Logger
 
 <!-- Add New Activity Modal - Full Screen Overlay -->
@@ -381,7 +381,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("hideModal", modalId);
+            await WebView.InvokeVoidAsync("hideModal", modalId);
         }
         catch (InvalidOperationException)
         {

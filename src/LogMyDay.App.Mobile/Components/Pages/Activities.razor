@@ -14,7 +14,7 @@
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<Activities> Logger
 @implements IAsyncDisposable
 
@@ -744,7 +744,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("showModal", "addActivityModal");
+            await WebView.InvokeVoidAsync("showModal", "addActivityModal");
         }
         catch (InvalidOperationException)
         {
@@ -756,7 +756,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("hideModal", "addActivityModal");
+            await WebView.InvokeVoidAsync("hideModal", "addActivityModal");
         }
         catch (InvalidOperationException)
         {

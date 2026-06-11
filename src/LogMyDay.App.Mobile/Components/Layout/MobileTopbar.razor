@@ -1,5 +1,5 @@
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 
 <!-- Mobile Topbar -->
 <div class="mobile-topbar">
@@ -47,7 +47,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("eval", "history.back()");
+            await WebView.RunScriptAsync("history.back();");
         }
         catch
         {
