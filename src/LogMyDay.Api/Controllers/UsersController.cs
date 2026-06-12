@@ -125,7 +125,7 @@ public class UsersController : ControllerBase
         {
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("🎯 UsersController.UpdateUser: Invalid model state");
+                _logger.LogWarning("Update user request has invalid model state");
                 return BadRequest(ModelState);
             }
 
