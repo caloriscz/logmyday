@@ -121,6 +121,10 @@ public class AuthController : ControllerBase
 
     [HttpPost("login-form")]
     [EnableRateLimiting("auth")]
+    // Antiforgery is intentionally bypassed: this is the pre-authentication login form, so the
+    // caller has no antiforgery token or session yet. The action only authenticates (sets the auth
+    // cookie) and does nothing else state-changing; brute force is covered by the rate limiter and
+    // progressive lockout.
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LoginForm(
         [FromForm] string email,
