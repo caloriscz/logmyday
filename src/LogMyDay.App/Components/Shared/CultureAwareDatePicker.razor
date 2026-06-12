@@ -7,6 +7,7 @@
 @using LogMyDay.App.Services
 @inject IJSRuntime JSRuntime
 @inject IUserPreferencesService UserPreferencesService
+@inject ILogger<CultureAwareDatePicker> Logger
 @implements IAsyncDisposable
 
 <div class="culture-aware-datepicker-wrapper @(Stretch ? "stretch" : string.Empty)">
@@ -141,7 +142,7 @@
 
             if (userPreferences == null)
             {
-                Console.WriteLine("Warning: Could not load user preferences for CultureAwareDatePicker");
+                Logger.LogWarning("Could not load user preferences for CultureAwareDatePicker");
                 return;
             }
 
@@ -155,7 +156,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error initializing CultureAwareDatePicker: {ex.Message}");
+            Logger.LogError(ex, "Error initializing CultureAwareDatePicker");
         }
     }
 
@@ -407,7 +408,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error parsing date in CultureAwareDatePicker: {ex.Message}");
+            Logger.LogError(ex, "Error parsing date in CultureAwareDatePicker");
         }
     }
 
