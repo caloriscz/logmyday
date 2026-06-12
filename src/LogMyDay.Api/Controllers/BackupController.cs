@@ -22,12 +22,11 @@ public class BackupController : BaseApiController
     }
 
     /// <summary>
-    /// Export all data to JSON format
+    /// Export all data for the current authenticated user to JSON format
     /// </summary>
-    /// <param name="userId">Optional user ID to filter data</param>
     /// <returns>JSON backup file</returns>
     [HttpGet("export")]
-    public async Task<IActionResult> ExportData([FromQuery] Guid? userId_old = null)
+    public async Task<IActionResult> ExportData()
     {
         Guid? userId = GetCurrentUserId();
 
