@@ -31,7 +31,8 @@
       "Default": "Information",
       "Override": {
         "Microsoft.AspNetCore": "Warning",
-        "System": "Warning"
+        "System": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
       }
     },
     "Enrich": [ "FromLogContext" ],
