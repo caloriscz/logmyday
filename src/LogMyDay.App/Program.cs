@@ -69,6 +69,23 @@ var app = builder.Build();
 // handle (e.g. Blazor) falls back to the /Error page.
 app.UseExceptionHandler("/Error", createScopeForErrors: true);
 
+// Fill empty-body error responses on API routes (unmatched route, auth 401/403, rate-limit 429,
+// etc.) with a consistent ProblemDetails. Scoped to /api so Blazor keeps its own error handling.
+// Responses that already carry a body are left untouched by the status-code-pages middleware.
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/api"),
+    apiBranch => apiBranch.UseStatusCodePages(async statusCodeContext =>
+    {
+        var http = statusCodeContext.HttpContext;
+        var problemDetails = http.RequestServices.GetRequiredService<IProblemDetailsService>();
+
+        await problemDetails.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = http,
+            ProblemDetails = { Status = http.Response.StatusCode }
+        });
+    }));
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
