@@ -47,7 +47,7 @@ services.AddHealthChecks();
 services.AddAppAuthentication();
 services.AddAppRateLimiting();
 
-services.AddRazorComponents().AddInteractiveServerComponents();
+services.AddResilientRazorComponents(builder.Configuration, builder.Environment);
 services.AddApexCharts();
 
 services.AddControllers()

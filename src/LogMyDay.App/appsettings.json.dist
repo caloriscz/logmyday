@@ -26,6 +26,13 @@
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "Circuit": {
+    "DisconnectedRetentionMinutes": 10,
+    "ClientTimeoutSeconds": 120,
+    "KeepAliveSeconds": 15,
+    "HandshakeTimeoutSeconds": 30,
+    "MaxRetainedDisconnectedCircuits": 100
+  },
   "Serilog": {
     "MinimumLevel": {
       "Default": "Information",
