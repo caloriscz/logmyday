@@ -27,10 +27,10 @@
     }
   },
   "Circuit": {
-    "DisconnectedRetentionMinutes": 10,
-    "ClientTimeoutSeconds": 120,
-    "KeepAliveSeconds": 15,
-    "HandshakeTimeoutSeconds": 30,
+    "DisconnectedRetentionMinutes": 30,
+    "ClientTimeoutSeconds": 180,
+    "KeepAliveSeconds": 10,
+    "HandshakeTimeoutSeconds": 60,
     "MaxRetainedDisconnectedCircuits": 100
   },
   "Serilog": {
