@@ -7,7 +7,7 @@
              BackgroundColor="LightGray">
 
 
- <blazor:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.exact.html">
+ <blazor:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
         <blazor:BlazorWebView.RootComponents>
   <blazor:RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
     </blazor:BlazorWebView.RootComponents>

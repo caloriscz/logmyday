@@ -4,149 +4,177 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>LogMyDay Mobile</title>
-    <base href="/" />
+
     <link href="css/tailwind.css" rel="stylesheet" />
     <link href="app.css" rel="stylesheet" />
-    <link href="vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet" />
-    
-    <!-- Prevent FOUC - Initialize theme before page render -->
-    <script>
-        (function() {
-            const theme = localStorage.getItem('lmd-theme') || 
-                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            document.documentElement.setAttribute('data-bs-theme', theme);
-            if (theme === 'dark') {
-                document.documentElement.classList.add('dark');
-            }
-        })();
-    </script>
-</head>
-<body>
-    <div id="app">
-        <div>Test 3000</div>
 
-        <div class="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
+    <base href="/" />
+    <link href="vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet" />
+    <!-- Air Datepicker CSS for culture-aware date pickers -->
+    <link rel="stylesheet" href="vendor/air-datepicker/air-datepicker.min.css" />
+    <link rel="icon" href="data:,">
+
+    <style>
+        /* Mobile navigation styles */
+        .mobile-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .mobile-content {
+            flex: 1;
+            padding-bottom: 80px; /* Space for navigation */
+        }
+
+        .mobile-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            background: #ffffff;
+            border-top: 1px solid #dee2e6;
+            padding: 8px 0;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .mobile-nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: none;
+            border: none;
+            padding: 8px 4px;
+            font-size: 12px;
+            color: #6c757d;
+            text-decoration: none;
+            transition: color 0.2s;
+            cursor: pointer;
+        }
+
+            .mobile-nav-item:hover,
+            .mobile-nav-item.active {
+                color: #0d6efd;
+            }
+
+            .mobile-nav-item i {
+                font-size: 20px;
+                margin-bottom: 2px;
+            }
+
+        /* Ensure body has proper padding for fixed navigation */
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom right, #1e293b, #334155, #1e293b);
+            overscroll-behavior: none;
+        }
+
+        html {
+            overscroll-behavior: none;
+            background: #1e293b;
+        }
+
+        /* Error UI styling */
+        #blazor-error-ui {
+            background: lightyellow;
+            bottom: 0;
+            box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+            display: none;
+            left: 0;
+            padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+            position: fixed;
+            width: 100%;
+            z-index: 1000;
+        }
+
+            #blazor-error-ui .dismiss {
+                cursor: pointer;
+                position: absolute;
+                right: 0.75rem;
+                top: 0.5rem;
+            }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 90px; /* Above mobile navigation */
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: #0d6efd;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1001;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+            .fab:hover {
+                background: #0056b3;
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+                transform: scale(1.05);
+            }
+
+            .fab:active {
+                transform: scale(0.95);
+            }
+
+            .fab i {
+                transition: transform 0.2s ease;
+            }
+
+            .fab:hover i {
+                transform: scale(1.1);
+            }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar-safe-area"></div>
+
+    <div id="app">
+        <div class="flex justify-center items-center min-h-screen">
             <div class="text-center p-8">
-                <div class="inline-block spinner mb-4 w-12 h-12 border-4 border-primary-600"></div>
-                <h4 class="text-xl font-semibold mb-3 text-gray-900 dark:text-gray-100">LogMyDay Mobile</h4>
-                <div id="loading-steps">
-                    <p class="text-gray-600 dark:text-gray-400">🔄 <span id="current-step">Initializing Blazor...</span></p>
-                    <div class="w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3 mx-auto">
-                        <div id="progress-bar" class="bg-primary-600 h-2 rounded-full transition-all duration-300" style="width: 10%"></div>
-                    </div>
-                    <small class="text-gray-500 dark:text-gray-500 text-sm">If this takes too long, check the debug console</small>
-                </div>
+                <div class="inline-block spinner mb-4 w-12 h-12 border-4 border-blue-400"></div>
+                <h4 class="text-xl font-semibold mb-3 text-gray-100">LogMyDay Mobile</h4>
+                <p class="text-gray-300">🔄 Initializing...</p>
             </div>
         </div>
     </div>
 
-    <div id="blazor-error-ui" class="hidden">
-        <div class="alert-danger m-4">
-            <h4 class="text-lg font-bold mb-2">🚨 Blazor Error</h4>
-            <p>An unhandled error has occurred. Check the debug console for details.</p>
-            <button class="btn-warning mt-2 reload">Reload App</button>
-            <button class="btn-secondary mt-2 ms-2 dismiss">Dismiss</button>
-        </div>
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
     </div>
-    
+
+    <!-- Scanner vendor libraries (barcode/QR) -->
     <script src="vendor/html5-qrcode/html5-qrcode.min.js"></script>
     <script src="vendor/qrcodejs/qrcode-generator.js"></script>
     <script src="js/scanner.js"></script>
     <script src="js/searchableSelect.js"></script>
-    <script src="js/app.js"></script>
-    <script src="_framework/blazor.webview.js"></script>
+
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <!-- Theme Manager - Must load early to prevent flash -->
+    <script src="js/theme.js"></script>
     <script src="js/refresh-view.js"></script>
-    <script src="js/refresh-view-test.js"></script>
+    <!-- Air Datepicker JS for culture-aware date pickers -->
+    <script src="vendor/air-datepicker/air-datepicker.min.js"></script>
+    <script src="js/air-datepicker-integration.js"></script>
+    <!-- Tailwind Modal Handler -->
     <script src="js/tailwind-modal.js"></script>
-    <script>
-        console.log('LogMyDay Mobile: HTML loaded, waiting for WebView...');
-        
-        // Don't manually start Blazor - let MAUI handle it
-        // Remove any manual Blazor.start() calls
-        
-        let currentStep = 0;
-        const steps = [
-            'Waiting for WebView...',
-            'Loading Blazor Framework...',
-            'Initializing Components...',
-            'Ready!'
-        ];
-        
-        function updateLoadingStep(step) {
-            const stepElement = document.getElementById('current-step');
-            const progressBar = document.getElementById('progress-bar');
-            if (stepElement) {
-                stepElement.textContent = step;
-                console.log('LogMyDay Mobile: ' + step);
-            }
-            if (progressBar) {
-                const progress = Math.min(((currentStep + 1) / steps.length) * 100, 90);
-                progressBar.style.width = progress + '%';
-            }
-        }
-        
-        // Update loading step immediately
-        updateLoadingStep(steps[0]);
-        
-        // Progressive loading feedback
-        const stepInterval = setInterval(() => {
-            if (currentStep < steps.length - 2) { // Stop before "Ready!" 
-                currentStep++;
-                updateLoadingStep(steps[currentStep]);
-            }
-        }, 2000);
-        
-        // Check for Blazor readiness
-        let blazorCheckCount = 0;
-        const blazorCheck = setInterval(() => {
-            blazorCheckCount++;
-            
-            if (window.Blazor && typeof window.Blazor.start === 'function') {
-                console.log('LogMyDay Mobile: Blazor object found and ready!');
-                clearInterval(blazorCheck);
-                clearInterval(stepInterval);
-                
-                updateLoadingStep('✅ Blazor Ready!');
-                const progressBar = document.getElementById('progress-bar');
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                    progressBar.classList.add('bg-success');
-                }
-                
-                // Hide loading after initialization
-                setTimeout(() => {
-                    const loadingSteps = document.getElementById('loading-steps');
-                    if (loadingSteps) {
-                        loadingSteps.style.display = 'none';
-                    }
-                }, 2000);
-                
-            } else if (blazorCheckCount > 50) { // 50 * 300ms = 15 seconds
-                console.error('LogMyDay Mobile: Blazor not ready after 15 seconds');
-                clearInterval(blazorCheck);
-                clearInterval(stepInterval);
-                
-                updateLoadingStep('❌ WebView Error!');
-                
-                document.getElementById('app').innerHTML = `
-                    <div class="alert alert-danger m-3">
-                        <h4>🚨 WebView Communication Error</h4>
-                        <p><strong>Error:</strong> windows.external.receiveMessage is not a function</p>
-                        <p>This is a MAUI Blazor WebView initialization issue.</p>
-                        <details class="mt-2">
-                            <summary>Technical Details</summary>
-                            <ul>
-                                <li>WebView failed to establish communication with Blazor</li>
-                                <li>Platform: ${navigator.platform}</li>
-                                <li>User Agent: ${navigator.userAgent}</li>
-                                <li>Time: ${new Date().toISOString()}</li>
-                                <li>Blazor object: ${window.Blazor ? 'Found' : 'Not Found'}</li>
-                            </ul>
-                        </details>
-                        <button class="btn btn-warning mt-2" onclick="window.location.reload()">🔄 Reload App</button>
-                    </div>`;
-            }
-        }, 300); // Check every 300ms
-    </script>
+
 </body>
+
 </html>
