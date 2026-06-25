@@ -170,8 +170,10 @@
 
             <!-- Right Section: Layout Toggle + Theme Toggle + Account Menu -->
             <div class="flex items-center gap-2">
-                <!-- Layout Toggle -->
-                <LayoutToggle />
+                <!-- Layout Toggle (desktop only; wide layout is not useful on mobile/tablet) -->
+                <div class="hidden lg:flex items-center">
+                    <LayoutToggle />
+                </div>
                 <!-- Theme Toggle -->
                 <ThemeToggle />
                 
