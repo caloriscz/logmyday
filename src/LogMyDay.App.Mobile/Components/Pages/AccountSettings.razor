@@ -7,6 +7,7 @@
 @inject IUserPreferencesService UserPreferencesService
 @inject ILogger<AccountSettings> Logger
 @inject NavigationManager Navigation
+@inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 
 <PageTitle>Account Settings - LogMyDay</PageTitle>
 
@@ -110,6 +111,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Redirect to login if not authenticated
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login", true);
+
+            return;
+        }
+
         await LoadProfileAsync();
     }
 
