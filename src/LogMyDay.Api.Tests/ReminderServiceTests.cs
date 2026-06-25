@@ -35,7 +35,11 @@ public class ReminderServiceTests
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             new TagDayLockService(context));
 
-        var service = new ReminderService(context, activityService, NullLogger<ReminderService>.Instance);
+        var service = new ReminderService(
+            context,
+            activityService,
+            new EventLogService(context, NullLogger<EventLogService>.Instance),
+            NullLogger<ReminderService>.Instance);
 
         return (service, context, userId);
     }
@@ -131,5 +135,21 @@ public class ReminderServiceTests
         Assert.DoesNotContain(today.AddDays(-100), remaining); // outside 7-day window
         Assert.Contains(today.AddDays(-3), remaining);         // within window
         Assert.Contains(today, remaining);                     // current period kept
+    }
+
+    [Fact]
+    public async Task Create_NoneRecurrence_IsCoercedToDaily()
+    {
+        var (service, context, userId) = CreateService(nameof(Create_NoneRecurrence_IsCoercedToDaily));
+
+        var created = await service.Create(new ReminderRequest
+        {
+            Title = "Pill",
+            RecurrenceType = RecurrenceType.None
+        }, userId);
+
+        Assert.Equal(RecurrenceType.Daily, created.RecurrenceType);
+        var stored = await context.Reminders.FindAsync(created.Id);
+        Assert.Equal(RecurrenceType.Daily, stored!.RecurrenceType);
     }
 }

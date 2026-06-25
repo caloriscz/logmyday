@@ -12,11 +12,13 @@ namespace LogMyDay.Api.Application.Services;
 public class TodoListService : ITodoListService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IEventLogService _eventLogService;
     private readonly ILogger<TodoListService> _logger;
 
-    public TodoListService(LogMyDayDbContext context, ILogger<TodoListService> logger)
+    public TodoListService(LogMyDayDbContext context, IEventLogService eventLogService, ILogger<TodoListService> logger)
     {
         _context = context;
+        _eventLogService = eventLogService;
         _logger = logger;
     }
 
@@ -26,8 +28,8 @@ public class TodoListService : ITodoListService
 
         var lists = await _context.TodoLists
             .AsNoTracking()
+            .Include(l => l.CompletionTag)
             .Include(l => l.Items)
-            .ThenInclude(i => i.CompletionTag)
             .Where(l => l.UserId == userId)
             .OrderBy(l => l.DisplayOrder)
             .ThenBy(l => l.DateCreated)
@@ -42,8 +44,8 @@ public class TodoListService : ITodoListService
 
         var list = await _context.TodoLists
             .AsNoTracking()
+            .Include(l => l.CompletionTag)
             .Include(l => l.Items)
-            .ThenInclude(i => i.CompletionTag)
             .FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId);
 
         if (list == null)
@@ -62,6 +64,8 @@ public class TodoListService : ITodoListService
             Name = request.Name,
             DisplayOrder = request.DisplayOrder,
             ShowOnHomepage = request.ShowOnHomepage,
+            CompletionTagId = request.CompletionTagId,
+            AutoLogMode = request.AutoLogMode,
             DateCreated = DateTime.UtcNow
         };
 
@@ -69,6 +73,9 @@ public class TodoListService : ITodoListService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Created todo list {ListId} for user {UserId}", list.Id, userId);
+
+        await _eventLogService.Log(userId, EventLogLevel.Info,
+            $"Todo list '{list.Name}' created (auto-log {list.AutoLogMode}, completionTag {await ResolveTagName(list.CompletionTagId) ?? Describe(list.CompletionTagId)})");
 
         return await GetById(list.Id, userId);
     }
@@ -82,12 +89,48 @@ public class TodoListService : ITodoListService
             throw new KeyNotFoundException("Todo list not found");
         }
 
+        var oldAutoLogMode = list.AutoLogMode;
+        var oldCompletionTagId = list.CompletionTagId;
+        var oldName = list.Name;
+
         list.Name = request.Name;
         list.DisplayOrder = request.DisplayOrder;
         list.ShowOnHomepage = request.ShowOnHomepage;
+        list.CompletionTagId = request.CompletionTagId;
+        list.AutoLogMode = request.AutoLogMode;
 
         await _context.SaveChangesAsync();
+
+        // Audit behaviour-affecting config changes to the (synced) event log.
+        var changes = new List<string>();
+        if (oldAutoLogMode != list.AutoLogMode)
+        {
+            changes.Add($"auto-log {oldAutoLogMode}→{list.AutoLogMode}");
+        }
+        if (oldCompletionTagId != list.CompletionTagId)
+        {
+            var oldTagName = await ResolveTagName(oldCompletionTagId) ?? Describe(oldCompletionTagId);
+            var newTagName = await ResolveTagName(list.CompletionTagId) ?? Describe(list.CompletionTagId);
+            changes.Add($"completionTag {oldTagName}→{newTagName}");
+        }
+        if (!string.Equals(oldName, list.Name, StringComparison.Ordinal))
+        {
+            changes.Add($"name '{oldName}'→'{list.Name}'");
+        }
+
+        if (changes.Count > 0)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Todo list '{list.Name}' settings changed: {string.Join("; ", changes)}");
+        }
     }
+
+    private async Task<string?> ResolveTagName(int? tagId)
+        => tagId.HasValue
+            ? await _context.Tags.AsNoTracking().Where(t => t.Id == tagId.Value).Select(t => t.TagName).FirstOrDefaultAsync()
+            : null;
+
+    private static string Describe(int? value) => value?.ToString() ?? "none";
 
     public async Task Delete(int id, Guid userId)
     {
@@ -112,15 +155,21 @@ public class TodoListService : ITodoListService
             DisplayOrder = list.DisplayOrder,
             ShowOnHomepage = list.ShowOnHomepage,
             DateCreated = list.DateCreated,
+            CompletionTagId = list.CompletionTagId,
+            CompletionTagName = list.CompletionTag?.TagName,
+            CompletionTagInputTypeId = list.CompletionTag?.InputTypeId,
+            AutoLogMode = list.AutoLogMode,
             Items = list.Items
                 .OrderBy(i => i.DisplayOrder)
                 .ThenBy(i => i.DueDate)
                 .ThenBy(i => i.DateCreated)
-                .Select(i => MapItemToResponse(i, user, date))
+                .Select(i => MapItemToResponse(i, list, user, date))
                 .ToList()
         };
 
-    private static TodoItemResponse MapItemToResponse(TodoItem item, User? user, DateOnly? date = null) =>
+    // The item inherits its auto-log tag and mode from the parent list, so the completion UI can
+    // render the right value prompt without the item carrying its own tag.
+    private static TodoItemResponse MapItemToResponse(TodoItem item, TodoList list, User? user, DateOnly? date = null) =>
         new()
         {
             Id = item.Id,
@@ -136,10 +185,10 @@ public class TodoListService : ITodoListService
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
-            AutoLogMode = item.AutoLogMode,
-            CompletionTagId = item.CompletionTagId,
-            CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
+            AutoLogMode = list.AutoLogMode,
+            CompletionTagId = list.CompletionTagId,
+            CompletionTagName = list.CompletionTag?.TagName,
+            CompletionTagInputTypeId = list.CompletionTag?.InputTypeId
         };
 
     private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user, DateOnly? date = null)

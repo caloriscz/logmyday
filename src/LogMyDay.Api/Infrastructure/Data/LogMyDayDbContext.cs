@@ -153,6 +153,11 @@ public class LogMyDayDbContext : DbContext
                 .HasForeignKey(i => i.ListId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(l => l.CompletionTag)
+                .WithMany()
+                .HasForeignKey(l => l.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
 
             entity.Property(l => l.Name).HasMaxLength(200).IsRequired();

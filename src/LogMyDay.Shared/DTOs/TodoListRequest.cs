@@ -13,6 +13,11 @@ public class TodoListRequest
 
     public bool ShowOnHomepage { get; set; } = false;
 
+    /// <summary>Auto-log tag shared by every item in the list; null = no auto-logging.</summary>
+    public int? CompletionTagId { get; set; }
+
+    public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
+
     /// <summary>Compat shim — ignored by the server (always Basic). See <see cref="ReminderListRequest"/>.</summary>
     public TodoListType ListType { get; set; } = TodoListType.Basic;
 }

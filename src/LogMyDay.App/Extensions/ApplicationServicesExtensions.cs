@@ -59,6 +59,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
+        services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
 
         // Email — PasswordResetUrl is now optional; when absent the reset link is built from the
         // incoming request's scheme and host at send time (see MailKitEmailSender).

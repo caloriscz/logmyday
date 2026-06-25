@@ -13,12 +13,14 @@ public class ReminderService : IReminderService
 {
     private readonly LogMyDayDbContext _context;
     private readonly IActivityService _activityService;
+    private readonly IEventLogService _eventLogService;
     private readonly ILogger<ReminderService> _logger;
 
-    public ReminderService(LogMyDayDbContext context, IActivityService activityService, ILogger<ReminderService> logger)
+    public ReminderService(LogMyDayDbContext context, IActivityService activityService, IEventLogService eventLogService, ILogger<ReminderService> logger)
     {
         _context = context;
         _activityService = activityService;
+        _eventLogService = eventLogService;
         _logger = logger;
     }
 
@@ -72,7 +74,7 @@ public class ReminderService : IReminderService
             Notes = request.Notes,
             NotifyAt = request.NotifyAt,
             DisplayOrder = request.DisplayOrder,
-            RecurrenceType = request.RecurrenceType,
+            RecurrenceType = NormalizeRecurrence(request.RecurrenceType),
             AutoLogMode = request.AutoLogMode,
             MonitorDaysBack = request.MonitorDaysBack,
             MonitorFromDate = request.MonitorFromDate,
@@ -86,6 +88,9 @@ public class ReminderService : IReminderService
         await _context.SaveChangesAsync();
 
         item.CompletionTag = completionTag;
+
+        await _eventLogService.Log(userId, EventLogLevel.Info,
+            $"Reminder '{item.Title}' created (auto-log {item.AutoLogMode}, recurrence {item.RecurrenceType}, completionTag {completionTag?.TagName ?? Describe(item.CompletionTagId)}, monitorDaysBack {Describe(item.MonitorDaysBack)})");
 
         return MapItemToResponse(item);
     }
@@ -104,12 +109,18 @@ public class ReminderService : IReminderService
         var oldNotifyAt = item.NotifyAt;
         var oldRecurrence = item.RecurrenceType;
         var oldIsDone = item.IsDone;
+        var oldAutoLogMode = item.AutoLogMode;
+        var oldMonitorDaysBack = item.MonitorDaysBack;
+        var oldMonitorFromDate = item.MonitorFromDate;
+        var oldMonitorToDate = item.MonitorToDate;
+        var oldCompletionTagId = item.CompletionTagId;
+        var oldCompletionTagName = item.CompletionTag?.TagName;
 
         item.Title = request.Title;
         item.Notes = request.Notes;
         item.NotifyAt = request.NotifyAt;
         item.DisplayOrder = request.DisplayOrder;
-        item.RecurrenceType = request.RecurrenceType;
+        item.RecurrenceType = NormalizeRecurrence(request.RecurrenceType);
         item.AutoLogMode = request.AutoLogMode;
         item.MonitorDaysBack = request.MonitorDaysBack;
         item.MonitorFromDate = request.MonitorFromDate;
@@ -124,7 +135,51 @@ public class ReminderService : IReminderService
             item.Id, userId,
             oldNotifyAt?.ToString("HH:mm") ?? "null", item.NotifyAt?.ToString("HH:mm") ?? "null",
             oldRecurrence, item.RecurrenceType, oldIsDone);
+
+        // Audit config changes to the (synced) event log so behaviour-affecting settings —
+        // especially auto-log mode and the monitoring window — are visible after the fact.
+        var changes = new List<string>();
+        if (oldAutoLogMode != item.AutoLogMode)
+        {
+            changes.Add($"auto-log {oldAutoLogMode}→{item.AutoLogMode}");
+        }
+        if (oldRecurrence != item.RecurrenceType)
+        {
+            changes.Add($"recurrence {oldRecurrence}→{item.RecurrenceType}");
+        }
+        if (oldMonitorDaysBack != item.MonitorDaysBack)
+        {
+            changes.Add($"monitorDaysBack {Describe(oldMonitorDaysBack)}→{Describe(item.MonitorDaysBack)}");
+        }
+        if (oldMonitorFromDate != item.MonitorFromDate || oldMonitorToDate != item.MonitorToDate)
+        {
+            changes.Add($"monitorRange {Describe(oldMonitorFromDate)}..{Describe(oldMonitorToDate)}→{Describe(item.MonitorFromDate)}..{Describe(item.MonitorToDate)}");
+        }
+        if (oldNotifyAt != item.NotifyAt)
+        {
+            changes.Add($"notifyAt {oldNotifyAt?.ToString("HH:mm") ?? "none"}→{item.NotifyAt?.ToString("HH:mm") ?? "none"}");
+        }
+        if (oldCompletionTagId != item.CompletionTagId)
+        {
+            var newTagName = await ResolveTagName(item.CompletionTagId);
+            changes.Add($"completionTag {oldCompletionTagName ?? Describe(oldCompletionTagId)}→{newTagName ?? Describe(item.CompletionTagId)}");
+        }
+
+        if (changes.Count > 0)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Reminder '{item.Title}' settings changed: {string.Join("; ", changes)}");
+        }
     }
+
+    private async Task<string?> ResolveTagName(int? tagId)
+        => tagId.HasValue
+            ? await _context.Tags.AsNoTracking().Where(t => t.Id == tagId.Value).Select(t => t.TagName).FirstOrDefaultAsync()
+            : null;
+
+    private static string Describe(int? value) => value?.ToString() ?? "none";
+
+    private static string Describe(DateOnly? value) => value?.ToString("yyyy-MM-dd") ?? "none";
 
     public async Task Delete(int id, Guid userId)
     {
@@ -166,7 +221,11 @@ public class ReminderService : IReminderService
         {
             if (item.AutoLogMode == AutoLogMode.ResetIfExists)
             {
-                var (windowStart, windowEnd) = ComputeMonitoringWindow(item);
+                // De-dup is scoped to the completion's own local day only — NOT the
+                // reminder's monitoring window. Using the monitoring window here meant a
+                // multi-day window (weekly recurrence / MonitorDaysBack) silently
+                // overwrote separate days' activities instead of adding one per day.
+                var (windowStart, windowEnd) = LocalDayWindowUtc(request.DoneAt, user);
 
                 var existing = await _context.Activities
                     .FirstOrDefaultAsync(a =>
@@ -180,6 +239,8 @@ public class ReminderService : IReminderService
                     existing.DateStarted = request.DoneAt;
                     existing.Description = request.CompletionValue ?? item.Notes;
                     _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on reminder {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
+                    await _eventLogService.Log(userId, EventLogLevel.Info,
+                        $"Activity '{item.CompletionTag?.TagName ?? "?"}' updated (same-day re-entry) on '{item.Title}' completion");
                 }
                 else
                 {
@@ -211,31 +272,18 @@ public class ReminderService : IReminderService
         _logger.LogInformation("Auto-logged activity for tag {TagId} on reminder {ItemId} completion", item.CompletionTagId.Value, item.Id);
     }
 
-    private static (DateTime Start, DateTime End) ComputeMonitoringWindow(Domain.Entities.Reminder item)
+    // UTC bounds of the local calendar day that contains <paramref name="doneAtUtc"/>,
+    // in the user's time zone. Used to scope AutoLogMode.ResetIfExists de-duplication to a
+    // single day so re-completing the same day replaces, while separate days each keep their
+    // own activity.
+    private static (DateTime Start, DateTime End) LocalDayWindowUtc(DateTime doneAtUtc, User? user)
     {
-        var todayUtc = DateTime.UtcNow.Date;
+        var tz = ResolveTimeZone(user);
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(doneAtUtc, tz));
+        var startUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(TimeOnly.MinValue), tz);
+        var endUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
 
-        if (item.MonitorDaysBack.HasValue)
-        {
-            return (todayUtc.AddDays(-item.MonitorDaysBack.Value), todayUtc.AddDays(1));
-        }
-
-        if (item.MonitorFromDate.HasValue && item.MonitorToDate.HasValue)
-        {
-            return (
-                item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue),
-                item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).AddDays(1)
-            );
-        }
-
-        if (item.RecurrenceType == RecurrenceType.Weekly)
-        {
-            var daysFromMonday = ((int)todayUtc.DayOfWeek + 6) % 7;
-            var weekStart = todayUtc.AddDays(-daysFromMonday);
-            return (weekStart, weekStart.AddDays(7));
-        }
-
-        return (todayUtc, todayUtc.AddDays(1));
+        return (startUtc, endUtc);
     }
 
     public async Task<ReminderResponse> Reopen(int id, Guid userId)
@@ -434,6 +482,11 @@ public class ReminderService : IReminderService
 
     private static DateOnly ReferenceLocalDate(DateOnly? date, User? user)
         => date ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ResolveTimeZone(user)));
+
+    // Reminders are recurring only (Daily or Weekly). None is a leftover from the shared
+    // Basic/Reminder todo table; coerce it to Daily so no None reminder can be stored.
+    private static RecurrenceType NormalizeRecurrence(RecurrenceType recurrence)
+        => recurrence == RecurrenceType.None ? RecurrenceType.Daily : recurrence;
 
     // The period day a ReminderDay row is keyed by: the calendar day for Daily/None,
     // the week-start date for Weekly.

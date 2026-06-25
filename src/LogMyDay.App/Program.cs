@@ -119,6 +119,9 @@ if (builder.Environment.EnvironmentName != "Test")
 
     var reminderDayBackfill = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderDayBackfill>();
     await reminderDayBackfill.RunAsync();
+
+    var reminderRecurrenceMigration = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderRecurrenceMigration>();
+    await reminderRecurrenceMigration.RunAsync();
 }
 
 app.Run();
