@@ -7,6 +7,7 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject IJSRuntime JS
+@inject ILogger<Statistics> Logger
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Statistics", "Analyze numeric tag statistics and streaks")]
 
@@ -280,7 +281,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading tags: {ex.Message}");
+            Logger.LogError(ex, "Error loading tags");
         }
     }
 
@@ -299,7 +300,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading preferences: {ex.Message}");
+            Logger.LogError(ex, "Error loading preferences");
         }
     }
 
@@ -320,7 +321,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving tag preference: {ex.Message}");
+            Logger.LogError(ex, "Error saving tag preference");
         }
     }
 
@@ -379,7 +380,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading statistics: {ex.Message}");
+            Logger.LogError(ex, "Error loading statistics");
         }
     }
 

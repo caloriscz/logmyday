@@ -4,7 +4,7 @@
 @using Microsoft.JSInterop
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject IPageTitleService PageTitleService
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<QrGenerator> Logger
 
 <PageTitle>QR Generator - LogMyDay</PageTitle>
@@ -199,7 +199,7 @@
 
         try
         {
-            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.generate", qrElementId, generatedUri, 6);
+            await WebView.InvokeVoidAsync("LogMyDayQrGen.generate", qrElementId, generatedUri, 6);
         }
         catch (Exception ex)
         {
@@ -218,7 +218,7 @@
         {
             var tagTitle = tags?.FirstOrDefault(t => t.Id == selectedTagId)?.Title ?? "qrcode";
             var safeFileName = string.Join("_", tagTitle.Split(System.IO.Path.GetInvalidFileNameChars()));
-            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.downloadPng", generatedUri, 10, $"lmd-{safeFileName}.png");
+            await WebView.InvokeVoidAsync("LogMyDayQrGen.downloadPng", generatedUri, 10, $"lmd-{safeFileName}.png");
         }
         catch (Exception ex)
         {
@@ -236,7 +236,7 @@
         try
         {
             var label = displayName ?? tags?.FirstOrDefault(t => t.Id == selectedTagId)?.Title ?? "Tag";
-            await JSRuntime.InvokeVoidAsync("LogMyDayQrGen.printWithLabel", generatedUri, 10, label);
+            await WebView.InvokeVoidAsync("LogMyDayQrGen.printWithLabel", generatedUri, 10, label);
         }
         catch (Exception ex)
         {

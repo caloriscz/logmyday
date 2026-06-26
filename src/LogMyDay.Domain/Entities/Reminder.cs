@@ -46,4 +46,6 @@ public class Reminder
     public DateOnly? MonitorToDate { get; set; }
 
     public bool AllowUnfilled { get; set; } = false;
+
+    public ICollection<ReminderDay> Days { get; set; } = new List<ReminderDay>();
 }

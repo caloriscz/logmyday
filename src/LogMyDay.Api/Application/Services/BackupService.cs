@@ -255,7 +255,16 @@ public class BackupService : IBackupService
                     MonitorDaysBack = i.MonitorDaysBack,
                     MonitorFromDate = i.MonitorFromDate,
                     MonitorToDate = i.MonitorToDate,
-                    AllowUnfilled = i.AllowUnfilled
+                    AllowUnfilled = i.AllowUnfilled,
+                    Days = i.Days.Select(d => new ReminderDayBackup
+                    {
+                        Date = d.Date,
+                        IsDone = d.IsDone,
+                        DoneAt = d.DoneAt,
+                        IsSkipped = d.IsSkipped,
+                        SkippedAt = d.SkippedAt,
+                        CompletionValue = d.CompletionValue
+                    }).ToList()
                 })
                 .ToListAsync();
 
@@ -1080,7 +1089,17 @@ public class BackupService : IBackupService
                 MonitorDaysBack = item.MonitorDaysBack,
                 MonitorFromDate = item.MonitorFromDate,
                 MonitorToDate = item.MonitorToDate,
-                AllowUnfilled = item.AllowUnfilled
+                AllowUnfilled = item.AllowUnfilled,
+                Days = item.Days.Select(d => new ReminderDay
+                {
+                    UserId = userId ?? Guid.Empty,
+                    Date = d.Date,
+                    IsDone = d.IsDone,
+                    DoneAt = d.DoneAt,
+                    IsSkipped = d.IsSkipped,
+                    SkippedAt = d.SkippedAt,
+                    CompletionValue = d.CompletionValue
+                }).ToList()
             };
 
             _context.Reminders.Add(itemEntity);

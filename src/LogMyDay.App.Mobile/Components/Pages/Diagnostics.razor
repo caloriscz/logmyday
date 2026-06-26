@@ -1,0 +1,109 @@
+@page "/diagnostics"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Maui.ApplicationModel.DataTransfer
+@using LogMyDay.App.Mobile.Services
+@using LogMyDay.App.Mobile.Services.Diagnostics
+@inject IDiagnosticStore Diag
+@inject IPageTitleService PageTitleService
+@inject ILogger<Diagnostics> Logger
+
+@attribute [Authorize(Policy = "AdminOnly")]
+
+<div class="container-fluid px-6 py-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
+        <h2 class="mb-0">Diagnostics</h2>
+        <div class="text-muted small">
+            Reminder &amp; alarm diagnostic log (admin only). Auto-syncs to Event Logs; export for offline comparison.
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_status))
+    {
+        <div class="alert @(_isError ? "alert-danger" : "alert-success")" role="alert">@_status</div>
+    }
+
+    <ul class="list-group mb-3">
+        <li class="list-group-item d-flex justify-content-between">
+            <span>Recording enabled</span><span class="fw-semibold">@(Diag.Enabled ? "Yes" : "No")</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+            <span>Pending (un-synced)</span><span class="fw-semibold">@_pending</span>
+        </li>
+    </ul>
+
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary" @onclick="SyncNow" disabled="@_busy">Sync now</button>
+        <button type="button" class="btn btn-secondary" @onclick="ExportShare" disabled="@_busy">Export &amp; share</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Refresh" disabled="@_busy">Refresh</button>
+    </div>
+</div>
+
+@code {
+    private int _pending;
+    private bool _busy;
+    private string? _status;
+    private bool _isError;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Diagnostics");
+        _pending = Diag.PendingCount();
+    }
+
+    private void Refresh()
+    {
+        _pending = Diag.PendingCount();
+    }
+
+    private async Task SyncNow()
+    {
+        _busy = true;
+        _status = null;
+
+        try
+        {
+            var synced = await Diag.FlushAsync();
+            _pending = Diag.PendingCount();
+            _status = $"Synced {synced} event(s); {_pending} still pending.";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Diagnostic sync failed");
+            _status = "Sync failed: " + ex.Message;
+            _isError = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ExportShare()
+    {
+        _busy = true;
+        _status = null;
+
+        try
+        {
+            var path = Diag.ExportToFile();
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "LogMyDay diagnostics",
+                File = new ShareFile(path)
+            });
+            _status = "Export ready.";
+            _isError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Diagnostic export failed");
+            _status = "Export failed: " + ex.Message;
+            _isError = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

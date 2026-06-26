@@ -9,6 +9,12 @@ public class TodoListResponse
     public int DisplayOrder { get; set; }
     public bool ShowOnHomepage { get; set; }
     public DateTime DateCreated { get; set; }
+
+    public int? CompletionTagId { get; set; }
+    public string? CompletionTagName { get; set; }
+    public int? CompletionTagInputTypeId { get; set; }
+    public AutoLogMode AutoLogMode { get; set; }
+
     public IList<TodoItemResponse> Items { get; set; } = new List<TodoItemResponse>();
 
     /// <summary>

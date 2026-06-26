@@ -145,7 +145,7 @@
 
         <!-- Input Area -->
         <div class="mt-4">
-            <form @onsubmit="SendMessage" class="flex gap-3">
+            <form @onsubmit="SendMessage" @onsubmit:preventDefault class="flex gap-3">
                 <input type="text"
                        @bind="_currentMessage"
                        @bind:event="oninput"

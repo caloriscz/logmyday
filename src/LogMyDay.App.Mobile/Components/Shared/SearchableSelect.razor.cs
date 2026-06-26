@@ -2,7 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
+using LogMyDay.App.Mobile.Services;
 using LogMyDay.Shared.Preferences;
 
 namespace LogMyDay.App.Mobile.Components.Shared;
@@ -12,17 +12,20 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
     private const int MaximumResults = 200;
 
     private readonly List<SelectOption> filtered = new();
-    private DotNetObjectReference<SearchableSelectBase>? selfReference;
-    private IJSObjectReference? module;
-    private string? menuElementId;
 
     protected bool isOpen;
     protected string searchText = string.Empty;
     protected ElementReference searchInputRef;
     protected ElementReference menuRef;
 
+    // Deterministic id for the dropdown menu element, used as the outside-click bridge token.
+    protected string MenuElementId => $"{Id}-menu";
+
     [Inject]
-    protected IJSRuntime JSRuntime { get; set; } = default!;
+    protected IWebViewInterop WebView { get; set; } = default!;
+
+    [Inject]
+    protected INativeCallbackBridge Bridge { get; set; } = default!;
 
     [Parameter]
     public IEnumerable<SelectOption> Options { get; set; } = Array.Empty<SelectOption>();
@@ -53,7 +56,6 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        selfReference = DotNetObjectReference.Create(this);
         UpdateFilter();
     }
 
@@ -67,16 +69,11 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
     {
         await base.OnAfterRenderAsync(firstRender);
 
-        module ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/searchableSelect.js");
-
         if (isOpen)
         {
-            menuElementId ??= await module.InvokeAsync<string>("searchableSelect.ensureElementId", menuRef);
-
-            if (module is not null && menuElementId is not null)
-            {
-                await module.InvokeVoidAsync("searchableSelect.registerOutsideClick", selfReference, menuElementId);
-            }
+            // Route the outside-click callback through the native bridge (no IJSRuntime).
+            Bridge.Register(MenuElementId, (_, _) => InvokeAsync(CloseDropdownInternalAsync));
+            await WebView.InvokeVoidAsync("LogMyDaySearchableSelect.registerOutsideClick", MenuElementId);
 
             await searchInputRef.FocusAsync();
         }
@@ -137,7 +134,6 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
         StateHasChanged();
     }
 
-    [JSInvokable]
     public Task CloseDropdownAsync() => CloseDropdownInternalAsync();
 
     protected async Task CloseDropdownInternalAsync()
@@ -187,25 +183,14 @@ public abstract class SearchableSelectBase : InputBase<string>, IAsyncDisposable
         return match?.Label ?? string.Create(CultureInfo.InvariantCulture, $"Unknown ({value})");
     }
 
-    protected ValueTask UnregisterOutsideClickAsync()
+    protected async Task UnregisterOutsideClickAsync()
     {
-        if (module is null || menuElementId is null)
-        {
-            return ValueTask.CompletedTask;
-        }
-
-        return module.InvokeVoidAsync("searchableSelect.unregisterOutsideClick", menuElementId);
+        await WebView.InvokeVoidAsync("LogMyDaySearchableSelect.unregisterOutsideClick", MenuElementId);
+        Bridge.Unregister(MenuElementId);
     }
 
     public async ValueTask DisposeAsync()
     {
         await UnregisterOutsideClickAsync();
-
-        if (module is not null)
-        {
-            await module.DisposeAsync();
-        }
-
-        selfReference?.Dispose();
     }
 }

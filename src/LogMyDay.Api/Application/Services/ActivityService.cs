@@ -1,4 +1,5 @@
 ﻿using LogMyDay.Api.Application.Interfaces;
+using System.Globalization;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Infrastructure.Repositories;
 using LogMyDay.Api.Infrastructure.Specifications;
@@ -59,14 +60,19 @@ public class ActivityService : IActivityService
 
                 if (existing != null)
                 {
-                    var step = tag.Step ?? 1.0;
+                    // Increment by the value the request carries (e.g. a reminder's "Add 20 mg").
+                    // Fall back to the tag's Step only when the request has no numeric value,
+                    // preserving the quick-tap "+Step" behavior.
+                    var increment = double.TryParse(calendarRequest.Description, NumberStyles.Any, CultureInfo.InvariantCulture, out var requested)
+                        ? requested
+                        : tag.Step ?? 1.0;
                     var currentValue = double.TryParse(existing.Description, out var parsed) ? parsed : 0.0;
-                    var newValue = currentValue + step;
+                    var newValue = currentValue + increment;
 
                     if (tag.MaxValue.HasValue && newValue > tag.MaxValue.Value)
                     {
                         throw new InvalidOperationException(
-                            $"Adding step {step} would bring this tag to {newValue}, which exceeds the maximum {tag.MaxValue.Value} (current value {currentValue})."
+                            $"Adding {increment} would bring this tag to {newValue}, which exceeds the maximum {tag.MaxValue.Value} (current value {currentValue})."
                         );
                     }
 

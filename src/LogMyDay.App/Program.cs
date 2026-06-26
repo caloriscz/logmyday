@@ -1,6 +1,7 @@
 ﻿using ApexCharts;
 using LogMyDay.App.Components;
 using LogMyDay.App.Extensions;
+using LogMyDay.Api.Infrastructure;
 using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 using Serilog;
@@ -46,12 +47,16 @@ services.AddHealthChecks();
 services.AddAppAuthentication();
 services.AddAppRateLimiting();
 
-services.AddRazorComponents().AddInteractiveServerComponents();
+services.AddResilientRazorComponents(builder.Configuration, builder.Environment);
 services.AddApexCharts();
 
 services.AddControllers()
     .AddJsonOptions(options => JsonSerializationSettings.Configure(options.JsonSerializerOptions));
 services.AddEndpointsApiExplorer();
+
+// Centralized API error handling — returns ProblemDetails instead of per-action try/catch.
+services.AddProblemDetails();
+services.AddExceptionHandler<GlobalExceptionHandler>();
 
 services.AddDatabase(builder.Configuration, builder.Environment);
 services.AddApplicationServices(builder.Configuration, builder.Environment);
@@ -60,9 +65,29 @@ services.AddSwagger();
 
 var app = builder.Build();
 
+// API exceptions are turned into ProblemDetails by GlobalExceptionHandler; anything it does not
+// handle (e.g. Blazor) falls back to the /Error page.
+app.UseExceptionHandler("/Error", createScopeForErrors: true);
+
+// Fill empty-body error responses on API routes (unmatched route, auth 401/403, rate-limit 429,
+// etc.) with a consistent ProblemDetails. Scoped to /api so Blazor keeps its own error handling.
+// Responses that already carry a body are left untouched by the status-code-pages middleware.
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/api"),
+    apiBranch => apiBranch.UseStatusCodePages(async statusCodeContext =>
+    {
+        var http = statusCodeContext.HttpContext;
+        var problemDetails = http.RequestServices.GetRequiredService<IProblemDetailsService>();
+
+        await problemDetails.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = http,
+            ProblemDetails = { Status = http.Response.StatusCode }
+        });
+    }));
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
 else
@@ -91,6 +116,12 @@ if (builder.Environment.EnvironmentName != "Test")
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IDatabaseSeeder>();
     await seeder.SeedAsync();
+
+    var reminderDayBackfill = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderDayBackfill>();
+    await reminderDayBackfill.RunAsync();
+
+    var reminderRecurrenceMigration = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderRecurrenceMigration>();
+    await reminderRecurrenceMigration.RunAsync();
 }
 
 app.Run();

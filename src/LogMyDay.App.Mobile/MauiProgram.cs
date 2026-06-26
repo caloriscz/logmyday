@@ -1,6 +1,7 @@
 using System.Net.Http;
 using CommunityToolkit.Maui;
 using LogMyDay.App.Mobile.Services;
+using LogMyDay.App.Mobile.Services.Diagnostics;
 using LogMyDay.Shared.Interfaces;
 using LogMyDay.Shared.Scanning;
 using Microsoft.AspNetCore.Components.WebView.Maui;
@@ -97,10 +98,15 @@ public static class MauiProgram
             builder.Services.AddSingleton<ISharedDataCache, SharedDataCache>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();
+            builder.Services.AddSingleton<IWebViewInterop, WebViewInterop>();
+            builder.Services.AddSingleton<INativeCallbackBridge, NativeCallbackBridge>();
             builder.Services.Add(new ServiceDescriptor(
                 typeof(IThemeService),
                 typeof(ThemeService),
                 ServiceLifetime.Singleton));
+
+            // Durable, admin-gated diagnostic store + outbox (must exist before the scheduler).
+            builder.Services.AddSingleton<IDiagnosticStore, DiagnosticStore>();
 
             // Register notification services
 #if ANDROID

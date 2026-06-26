@@ -1,5 +1,5 @@
-@using Microsoft.JSInterop
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
+@inject INativeCallbackBridge Bridge
 @implements IAsyncDisposable
 
 <div class="space-y-3">
@@ -35,7 +35,6 @@
     public EventCallback<ScanEventArgs> OnScanned { get; set; }
 
     private string scannerId = $"scanner-{Guid.NewGuid():N}";
-    private DotNetObjectReference<BarcodeScanner>? dotNetRef;
     private bool isStarting = true;
     private string? errorMessage;
 
@@ -69,9 +68,11 @@
                 }
             }
 
-            dotNetRef?.Dispose();
-            dotNetRef = DotNetObjectReference.Create(this);
-            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.start", scannerId, dotNetRef);
+            // Register the scan callback on the native bridge, keyed by this scanner's id (token).
+            Bridge.Register(scannerId, (decodedText, formatName) =>
+                InvokeAsync(() => OnScanSuccess(decodedText ?? string.Empty, formatName ?? string.Empty)));
+
+            await WebView.InvokeVoidAsync("LogMyDayScanner.start", scannerId, scannerId);
             isStarting = false;
         }
         catch (Exception ex)
@@ -85,20 +86,18 @@
         StateHasChanged();
     }
 
-    [JSInvokable]
-    public async Task OnScanSuccess(string decodedText, string formatName)
+    private async Task OnScanSuccess(string decodedText, string formatName)
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
+            await WebView.InvokeVoidAsync("LogMyDayScanner.stop");
         }
         catch
         {
             // Ignore stop errors
         }
 
-        dotNetRef?.Dispose();
-        dotNetRef = null;
+        Bridge.Unregister(scannerId);
 
         await OnScanned.InvokeAsync(new ScanEventArgs(decodedText, formatName));
         await InvokeAsync(StateHasChanged);
@@ -108,14 +107,14 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("LogMyDayScanner.stop");
+            await WebView.InvokeVoidAsync("LogMyDayScanner.stop");
         }
         catch
         {
             // Ignore during dispose
         }
 
-        dotNetRef?.Dispose();
+        Bridge.Unregister(scannerId);
     }
 
     public record ScanEventArgs(string DecodedText, string FormatName);

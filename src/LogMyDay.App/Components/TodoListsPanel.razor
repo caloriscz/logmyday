@@ -10,7 +10,8 @@
 @inject IJSRuntime JS
 @inject ILogger<TodoListsPanel> Logger
 
-@if (!HomepageOnly || (_lists != null && _lists.Count > 0))
+@* Always render so the header + New-list button (and the empty state) stay visible even with no lists. *@
+@if (true)
 {
 <div class="mb-4 flex items-center justify-between">
     <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100">@(Title ?? "To-Do Lists")</h2>
@@ -486,12 +487,30 @@ else
                         <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-rose-600 dark:text-rose-400" />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">List type</label>
-                        <InputSelect @bind-Value="_listForm.ListType" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                            <option value="@TodoListType.Basic">Basic</option>
-                            <option value="@TodoListType.Reminder">Reminder</option>
-                        </InputSelect>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log tag</label>
+                        <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                @bind="_listForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Completing any item in this list logs an activity to this tag.</p>
                     </div>
+                    @if (_listForm.CompletionTagId.HasValue)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
+                            <InputSelect @bind-Value="_listForm.AutoLogMode" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
+                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
+                            </InputSelect>
+                        </div>
+                    }
                     <div class="flex items-center gap-3">
                         <input type="checkbox" id="chk-show-on-homepage-web"
                                class="h-4 w-4 rounded border-gray-300 text-primary-600 dark:border-slate-600 cursor-pointer"
@@ -673,23 +692,6 @@ else
                                            placeholder="Optional notes" />
                         </div>
                     }
-                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
-                    {
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log tag</label>
-                            <select class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    @bind="_itemForm.CompletionTagId">
-                                <option value="">— None —</option>
-                                @if (_allTags != null)
-                                {
-                                    @foreach (var tag in _allTags)
-                                    {
-                                        <option value="@tag.Id">@tag.Title</option>
-                                    }
-                                }
-                            </select>
-                        </div>
-                    }
                     <div class="grid grid-cols-2 gap-4">
                         @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
                         {
@@ -724,16 +726,6 @@ else
                             <option value="@RecurrenceType.Weekly">Weekly</option>
                         </InputSelect>
                     </div>
-                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder && _itemForm.CompletionTagId.HasValue)
-                    {
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
-                            <InputSelect @bind-Value="_itemForm.AutoLogMode" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
-                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
-                            </InputSelect>
-                        </div>
-                    }
                     @if (_itemForm.RecurrenceType != RecurrenceType.None)
                     {
                         <div class="rounded-lg border border-gray-200 p-4 space-y-3 dark:border-slate-700">
@@ -1142,13 +1134,22 @@ else
         }
         catch (ApiException ex)
         {
+            // Only surface the error on the initial load. A transient auto-refresh failure
+            // (e.g. the 30s timer firing without an HttpContext) must not replace good data
+            // with the error banner — keep the stale data and retry on the next cycle.
             Logger.LogWarning(ex, "Failed to load todo data");
-            _loadError = "Could not load to-do lists. Please refresh the page.";
+            if (_lists == null)
+            {
+                _loadError = "Could not load to-do lists. Please refresh the page.";
+            }
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Unexpected error loading todo data");
-            _loadError = "Could not load to-do lists. Please refresh the page.";
+            if (_lists == null)
+            {
+                _loadError = "Could not load to-do lists. Please refresh the page.";
+            }
         }
     }
 
@@ -1219,8 +1220,9 @@ else
         {
             Name = list.Name,
             DisplayOrder = list.DisplayOrder,
-            ListType = list.ListType,
-            ShowOnHomepage = list.ShowOnHomepage
+            ShowOnHomepage = list.ShowOnHomepage,
+            CompletionTagId = list.CompletionTagId,
+            AutoLogMode = list.AutoLogMode
         };
         _listError = null;
         _showListModal = true;

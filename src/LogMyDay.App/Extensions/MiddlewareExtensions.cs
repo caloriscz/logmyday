@@ -1,40 +1,32 @@
+using System.Diagnostics;
+
 namespace LogMyDay.App.Extensions;
 
 internal static class MiddlewareExtensions
 {
+    private const long SlowRequestThresholdMs = 1000;
+
     internal static IApplicationBuilder UseRequestLogging(this IApplicationBuilder app)
     {
         app.Use(async (context, next) =>
         {
-            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("========== HTTP REQUEST ==========");
-            logger.LogInformation("= Method: {Method}", context.Request.Method);
-            logger.LogInformation("= Path: {Path}", context.Request.Path);
-            logger.LogInformation("= QueryString: {QueryString}", context.Request.QueryString);
-
-            var sensitiveHeaders = new[] { "Authorization", "Cookie", "X-CSRF-Token", "Set-Cookie" };
-            var safeHeaders = context.Request.Headers
-                .Where(h => !sensitiveHeaders.Contains(h.Key, StringComparer.OrdinalIgnoreCase))
-                .Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}");
-            logger.LogInformation("= Headers: {Headers}", string.Join(", ", safeHeaders));
-
-            if (context.Request.HasFormContentType && context.Request.Method == "POST")
-            {
-                logger.LogInformation("= Form Data: [REDACTED - contains sensitive information]");
-            }
-
-            logger.LogInformation("= User Authenticated: {IsAuthenticated}", context.User?.Identity?.IsAuthenticated);
-            logger.LogInformation("= User Name: {UserName}", context.User?.Identity?.Name ?? "null");
+            var startTimestamp = Stopwatch.GetTimestamp();
 
             await next();
 
-            logger.LogInformation("= Response Status: {StatusCode}", context.Response.StatusCode);
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            var elapsedMs = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+            var statusCode = context.Response.StatusCode;
 
-            var safeResponseHeaders = context.Response.Headers
-                .Where(h => !sensitiveHeaders.Contains(h.Key, StringComparer.OrdinalIgnoreCase))
-                .Select(h => $"{h.Key}={string.Join(",", h.Value.ToArray())}");
-            logger.LogInformation("= Response Headers: {ResponseHeaders}", string.Join(", ", safeResponseHeaders));
-            logger.LogInformation("========== HTTP REQUEST END ==========");
+            // Normal traffic stays at Debug to keep the hot path quiet; errors and slow
+            // requests are elevated so they remain observable at the default Information level.
+            var level = statusCode >= 500 ? LogLevel.Error
+                : statusCode >= 400 || elapsedMs >= SlowRequestThresholdMs ? LogLevel.Warning
+                : LogLevel.Debug;
+
+            // Path only — never the query string, which can carry PII.
+            logger.Log(level, "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs:0} ms",
+                context.Request.Method, context.Request.Path, statusCode, elapsedMs);
         });
 
         return app;

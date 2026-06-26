@@ -11,7 +11,7 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject ISharedDataCache SharedDataCache
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<Scan> Logger
 
 <PageTitle>Scan - LogMyDay</PageTitle>
@@ -141,7 +141,7 @@
 
             try
             {
-                await JSRuntime.InvokeVoidAsync("showModal", "scanAddActivityModal");
+                await WebView.InvokeVoidAsync("showModal", "scanAddActivityModal");
             }
             catch (Exception ex)
             {
@@ -281,7 +281,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("hideModal", "scanAddActivityModal");
+            await WebView.InvokeVoidAsync("hideModal", "scanAddActivityModal");
         }
         catch (Exception ex)
         {

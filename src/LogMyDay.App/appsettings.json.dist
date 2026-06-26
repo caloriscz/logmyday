@@ -26,12 +26,20 @@
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "Circuit": {
+    "DisconnectedRetentionMinutes": 30,
+    "ClientTimeoutSeconds": 180,
+    "KeepAliveSeconds": 10,
+    "HandshakeTimeoutSeconds": 60,
+    "MaxRetainedDisconnectedCircuits": 100
+  },
   "Serilog": {
     "MinimumLevel": {
       "Default": "Information",
       "Override": {
         "Microsoft.AspNetCore": "Warning",
-        "System": "Warning"
+        "System": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
       }
     },
     "Enrich": [ "FromLogContext" ],

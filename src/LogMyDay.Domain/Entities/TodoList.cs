@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Domain.Entities;
 
@@ -25,6 +26,15 @@ public class TodoList
     public bool ShowOnHomepage { get; set; } = false;
 
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Auto-log tag shared by every item in this list; null = the list does not auto-log.</summary>
+    public int? CompletionTagId { get; set; }
+
+    [ForeignKey(nameof(CompletionTagId))]
+    public Tag? CompletionTag { get; set; }
+
+    /// <summary>How a completed item's activity is written to <see cref="CompletionTag"/>.</summary>
+    public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
 
     public ICollection<TodoItem> Items { get; set; } = new List<TodoItem>();
 }

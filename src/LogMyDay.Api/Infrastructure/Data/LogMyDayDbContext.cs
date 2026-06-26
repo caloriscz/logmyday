@@ -27,6 +27,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<TagDayLock> TagDayLocks => Set<TagDayLock>();
     public DbSet<Reminder> Reminders => Set<Reminder>();
+    public DbSet<ReminderDay> ReminderDays => Set<ReminderDay>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +53,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TodoItem>().ToTable("LogMyDay_TodoItems");
         modelBuilder.Entity<TagDayLock>().ToTable("LogMyDay_TagDayLocks");
         modelBuilder.Entity<Reminder>().ToTable("LogMyDay_Reminders");
+        modelBuilder.Entity<ReminderDay>().ToTable("LogMyDay_ReminderDays");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -151,6 +153,11 @@ public class LogMyDayDbContext : DbContext
                 .HasForeignKey(i => i.ListId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(l => l.CompletionTag)
+                .WithMany()
+                .HasForeignKey(l => l.CompletionTagId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasIndex(l => l.UserId).HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
 
             entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
@@ -224,6 +231,28 @@ public class LogMyDayDbContext : DbContext
                 entity.Property(l => l.Date).HasColumnType("date");
                 entity.Property(l => l.SetAt).HasColumnType("datetime2");
                 entity.Property(l => l.SetAt).HasDefaultValueSql("GETUTCDATE()");
+            }
+        });
+
+        modelBuilder.Entity<ReminderDay>(entity =>
+        {
+            entity.HasOne(d => d.Reminder)
+                .WithMany(r => r.Days)
+                .HasForeignKey(d => d.ReminderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(d => new { d.ReminderId, d.Date })
+                .IsUnique()
+                .HasDatabaseName("IX_LogMyDay_ReminderDays_ReminderId_Date");
+
+            entity.HasIndex(d => new { d.UserId, d.Date })
+                .HasDatabaseName("IX_LogMyDay_ReminderDays_UserId_Date");
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(d => d.Date).HasColumnType("date");
+                entity.Property(d => d.DoneAt).HasColumnType("datetime2");
+                entity.Property(d => d.SkippedAt).HasColumnType("datetime2");
             }
         });
 

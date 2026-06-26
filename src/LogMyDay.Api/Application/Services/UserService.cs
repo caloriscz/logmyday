@@ -120,35 +120,24 @@ public sealed class UserService : IUserService
 
     public async Task<User> Update(Guid id, string? email, string? displayName, bool? isAdmin, string? culture, string? timeZone, Guid actorId, CancellationToken cancellationToken, string? activityDisplayType = null, string? activitySortOrder = null, string? activityPeriodSort = null)
     {
-        _logger.LogInformation("🔧 UserService.Update: Starting update for user {UserId} by actor {ActorId}", id, actorId);
-        
+        _logger.LogInformation("Updating user {UserId} by actor {ActorId}", id, actorId);
+
         var user = await GetUserAsync(id, cancellationToken);
-        _logger.LogInformation("🔧 UserService.Update: Found user - Id={UserId}, Email={Email}, IsAdmin={IsAdmin}", user.Id, user.Email, user.IsAdmin);
-        
         var actor = await GetUserAsync(actorId, cancellationToken);
-        _logger.LogInformation("🔧 UserService.Update: Found actor - Id={ActorId}, Email={Email}, IsAdmin={IsAdmin}", actor.Id, actor.Email, actor.IsAdmin);
-        
-        _logger.LogInformation("🔧 UserService.Update: Checking authorization - actor.IsAdmin={IsAdmin}, actor.Id={ActorId}, user.Id={UserId}, IsSameUser={IsSame}", 
-            actor.IsAdmin, actor.Id, user.Id, actor.Id == user.Id);
 
         // Admin can update any user, non-admin can only update themselves (limited fields)
         if (!actor.IsAdmin && actor.Id != user.Id)
         {
-            _logger.LogWarning("🔧 UserService.Update: Authorization failed - Non-admin trying to update different user");
+            _logger.LogWarning("User update denied: non-admin actor {ActorId} attempted to update user {UserId}", actor.Id, user.Id);
             throw new UnauthorizedAccessException("You can only update your own profile.");
         }
-
-        _logger.LogInformation("🔧 UserService.Update: Authorization passed - proceeding with update");
 
         // Non-admin users cannot change isAdmin flag
         if (!actor.IsAdmin && isAdmin.HasValue)
         {
-            _logger.LogWarning("🔧 UserService.Update: Non-admin trying to change admin status - isAdmin={IsAdmin}", isAdmin);
+            _logger.LogWarning("User update denied: non-admin actor {ActorId} attempted to change admin status", actor.Id);
             throw new UnauthorizedAccessException("You cannot change admin status.");
         }
-
-        _logger.LogInformation("🔧 UserService.Update: Updating fields - email={HasEmail}, displayName={HasDisplayName}, isAdmin={IsAdmin}, culture={Culture}, timeZone={TimeZone}", 
-            !string.IsNullOrWhiteSpace(email), displayName != null, isAdmin, culture, timeZone);
 
         if (!string.IsNullOrWhiteSpace(email))
         {

@@ -399,6 +399,48 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Reminders", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderDay", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CompletionValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DoneAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDone")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSkipped")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ReminderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SkippedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReminderId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LogMyDay_ReminderDays_ReminderId_Date");
+
+                    b.HasIndex("UserId", "Date")
+                        .HasDatabaseName("IX_LogMyDay_ReminderDays_UserId_Date");
+
+                    b.ToTable("LogMyDay_ReminderDays", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.ScanMapping", b =>
                 {
                     b.Property<int>("Id")
@@ -728,6 +770,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("AutoLogMode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CompletionTagId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("TEXT");
 
@@ -748,6 +796,8 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompletionTagId");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_LogMyDay_TodoLists_UserId");
@@ -907,6 +957,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("CompletionTag");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderDay", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Reminder", "Reminder")
+                        .WithMany("Days")
+                        .HasForeignKey("ReminderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reminder");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.ScanMapping", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Tag", "Tag")
@@ -994,6 +1055,16 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("List");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TodoList", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "CompletionTag")
+                        .WithMany()
+                        .HasForeignKey("CompletionTagId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CompletionTag");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.Unit", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Quantity", "Quantity")
@@ -1008,6 +1079,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
                 {
                     b.Navigation("Detail");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
+                {
+                    b.Navigation("Days");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagOptionList", b =>

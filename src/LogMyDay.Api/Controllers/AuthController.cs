@@ -1,5 +1,6 @@
 using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Security;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Preferences;
@@ -19,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAntiforgery _antiforgery;
+    private readonly AuthAttemptTracker _attemptTracker;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -26,13 +28,23 @@ public class AuthController : ControllerBase
         IAuthService authService,
         IPasswordHasher passwordHasher,
         IAntiforgery antiforgery,
+        AuthAttemptTracker attemptTracker,
         ILogger<AuthController> logger)
     {
         _userService = userService;
         _authService = authService;
         _passwordHasher = passwordHasher;
         _antiforgery = antiforgery;
+        _attemptTracker = attemptTracker;
         _logger = logger;
+    }
+
+    // Same identifier shape as BasicAuthHandler so lockout state is shared across both auth schemes.
+    private string BuildAttemptIdentifier(string email)
+    {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return $"{clientIp}:{email}";
     }
 
     [HttpPost("register-first")]
@@ -64,55 +76,55 @@ public class AuthController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating first admin user");
-            
-            return StatusCode(500, "An error occurred while creating the admin user.");
-        }
     }
 
     [HttpPost("login")]
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login([FromBody] LoginDto request, CancellationToken cancellationToken)
     {
-        try
-        {
-            _logger.LogInformation("Login attempt for email: {Email}", request.Email);
-            
-            if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("Login attempt with invalid model state for email: {Email}", request.Email);
-                
-                return BadRequest(ModelState);
-            }
+        _logger.LogInformation("Login attempt for email: {Email}", request.Email);
 
-            var user = await _userService.FindByEmail(request.Email, cancellationToken);
-            if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
-            {
-                _logger.LogWarning("Login attempt with invalid credentials for email: {Email}", request.Email);
-                
-                return StatusCode(401, "Invalid email or password.");
-            }
-
-            await _authService.SignInAsync(HttpContext, user);
-            _logger.LogInformation("User {UserId} ({Email}) signed in successfully with cookie authentication", user.Id, user.Email);
-            
-            // Log cookie information for debugging
-            var cookieValue = HttpContext.Response.Headers["Set-Cookie"].FirstOrDefault();
-            _logger.LogDebug("Set-Cookie header: {CookieHeader}", cookieValue);
-            
-            return NoContent();
-        }
-        catch (Exception ex)
+        if (!ModelState.IsValid)
         {
-            _logger.LogError(ex, "Error during login for email: {Email}", request.Email);
-            return StatusCode(500, "An error occurred during login.");
+            _logger.LogWarning("Login attempt with invalid model state for email: {Email}", request.Email);
+
+            return BadRequest(ModelState);
         }
+
+        var identifier = BuildAttemptIdentifier(request.Email);
+        if (_attemptTracker.IsBlocked(identifier))
+        {
+            _logger.LogWarning("Login blocked for email {Email} due to too many failed attempts", request.Email);
+
+            return StatusCode(429, "Too many failed attempts. Please try again later.");
+        }
+
+        var user = await _userService.FindByEmail(request.Email, cancellationToken);
+        if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            _logger.LogWarning("Login attempt with invalid credentials for email: {Email}", request.Email);
+            _attemptTracker.RecordFailedAttempt(identifier);
+
+            return StatusCode(401, "Invalid email or password.");
+        }
+
+        _attemptTracker.RecordSuccessfulAttempt(identifier);
+        await _authService.SignInAsync(HttpContext, user);
+        _logger.LogInformation("User {UserId} ({Email}) signed in successfully with cookie authentication", user.Id, user.Email);
+
+        // Log cookie information for debugging
+        var cookieValue = HttpContext.Response.Headers["Set-Cookie"].FirstOrDefault();
+        _logger.LogDebug("Set-Cookie header: {CookieHeader}", cookieValue);
+
+        return NoContent();
     }
 
     [HttpPost("login-form")]
     [EnableRateLimiting("auth")]
+    // Antiforgery is intentionally bypassed: this is the pre-authentication login form, so the
+    // caller has no antiforgery token or session yet. The action only authenticates (sets the auth
+    // cookie) and does nothing else state-changing; brute force is covered by the rate limiter and
+    // progressive lockout.
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LoginForm(
         [FromForm] string email,
@@ -129,23 +141,34 @@ public class AuthController : ControllerBase
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            var identifier = BuildAttemptIdentifier(email);
+            if (_attemptTracker.IsBlocked(identifier))
+            {
+                _logger.LogWarning("Form login blocked for email {Email} due to too many failed attempts", email);
+
+                return Redirect("/login?error=Too many failed attempts. Please try again later.");
+            }
+
             _logger.LogInformation("Looking up user with email: {Email}", email);
             var user = await _userService.FindByEmail(email, cancellationToken);
             if (user == null)
             {
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
+                _attemptTracker.RecordFailedAttempt(identifier);
 
                 return Redirect("/login?error=Invalid email or password");
             }
-            
+
             _logger.LogInformation("User found: {UserId}, verifying password", user.Id);
             if (!_passwordHasher.Verify(password, user.PasswordHash))
             {
                 _logger.LogWarning("Form login attempt with invalid password for email: {Email}", email);
+                _attemptTracker.RecordFailedAttempt(identifier);
 
                 return Redirect("/login?error=Invalid email or password");
             }
 
+            _attemptTracker.RecordSuccessfulAttempt(identifier);
             await _authService.SignInAsync(HttpContext, user, remember);
             
             // Log cookie information
@@ -165,76 +188,51 @@ public class AuthController : ControllerBase
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> Logout()
     {
-        try
-        {
-            var userId = _authService.GetUserId(User);
-            await _authService.SignOut(HttpContext);
-            _logger.LogInformation("User {UserId} logged out", userId);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during logout");
-            return StatusCode(500, "An error occurred during logout.");
-        }
+        var userId = _authService.GetUserId(User);
+        await _authService.SignOut(HttpContext);
+        _logger.LogInformation("User {UserId} logged out", userId);
+
+        return NoContent();
     }
 
     [HttpGet("me")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
-        try
+        var userId = _authService.GetUserId(User);
+        if (userId == null)
         {
-            var userId = _authService.GetUserId(User);
-            if (userId == null)
-            {
-                return Unauthorized();
-            }
-
-            var user = await _userService.Get(userId.Value, cancellationToken);
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            var userDto = new CurrentUserDto(
-                user.Id,
-                user.Email,
-                user.DisplayName,
-                user.IsAdmin,
-                user.Culture,
-                user.TimeZone,
-                ActivityFilterPreferences.NormalizeDisplayType(user.ActivityDisplayType),
-                ActivityFilterPreferences.NormalizeActivitySortOrder(user.ActivitySortOrder),
-                ActivityFilterPreferences.NormalizePeriodSort(user.ActivityPeriodSort));
-            
-            return Ok(userDto);
+            return Unauthorized();
         }
-        catch (Exception ex)
+
+        var user = await _userService.Get(userId.Value, cancellationToken);
+        if (user == null)
         {
-            _logger.LogError(ex, "Error getting current user");
-            
-            return StatusCode(500, "An error occurred while retrieving user information.");
+            return NotFound();
         }
+
+        var userDto = new CurrentUserDto(
+            user.Id,
+            user.Email,
+            user.DisplayName,
+            user.IsAdmin,
+            user.Culture,
+            user.TimeZone,
+            ActivityFilterPreferences.NormalizeDisplayType(user.ActivityDisplayType),
+            ActivityFilterPreferences.NormalizeActivitySortOrder(user.ActivitySortOrder),
+            ActivityFilterPreferences.NormalizePeriodSort(user.ActivityPeriodSort));
+
+        return Ok(userDto);
     }
 
     [HttpGet("csrf")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public IActionResult GetCsrfToken()
     {
-        try
-        {
-            var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
-            var token = new CsrfTokenDto(tokens.RequestToken!);
-            
-            return Ok(token);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating CSRF token");
-         
-            return StatusCode(500, "An error occurred while generating CSRF token.");
-        }
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        var token = new CsrfTokenDto(tokens.RequestToken!);
+
+        return Ok(token);
     }
 
 }

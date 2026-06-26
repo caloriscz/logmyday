@@ -8,7 +8,7 @@
 @inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<Tags> Logger
 @implements IAsyncDisposable
 @inject IPageTitleService PageTitleService
@@ -570,7 +570,7 @@
             // Close the modal after successful submission
             try
             {
-                await JSRuntime.InvokeVoidAsync("hideModal", "addTagModal");
+                await WebView.InvokeVoidAsync("hideModal", "addTagModal");
             }
             catch (InvalidOperationException)
             {
@@ -622,7 +622,7 @@
 
         try
         {
-            await JSRuntime.InvokeVoidAsync("showModal", "editTagModal");
+            await WebView.InvokeVoidAsync("showModal", "editTagModal");
         }
         catch (InvalidOperationException)
         {
@@ -647,7 +647,7 @@
 
             try
             {
-                await JSRuntime.InvokeVoidAsync("hideModal", "editTagModal");
+                await WebView.InvokeVoidAsync("hideModal", "editTagModal");
             }
             catch (InvalidOperationException)
             {

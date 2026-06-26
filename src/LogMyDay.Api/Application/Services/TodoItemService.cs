@@ -16,18 +16,21 @@ public class TodoItemService : ITodoItemService
 {
     private readonly LogMyDayDbContext _context;
     private readonly IActivityService _activityService;
+    private readonly IEventLogService _eventLogService;
     private readonly ILogger<TodoItemService> _logger;
 
-    public TodoItemService(LogMyDayDbContext context, IActivityService activityService, ILogger<TodoItemService> logger)
+    public TodoItemService(LogMyDayDbContext context, IActivityService activityService, IEventLogService eventLogService, ILogger<TodoItemService> logger)
     {
         _context = context;
         _activityService = activityService;
+        _eventLogService = eventLogService;
         _logger = logger;
     }
 
     public async Task<TodoItemResponse> Create(TodoItemRequest request, Guid userId)
     {
         var list = await _context.TodoLists
+            .Include(l => l.CompletionTag)
             .FirstOrDefaultAsync(l => l.Id == request.ListId && l.UserId == userId);
 
         if (list == null)
@@ -35,12 +38,7 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo list not found");
         }
 
-        Domain.Entities.Tag? completionTag = null;
-        if (request.CompletionTagId.HasValue)
-        {
-            completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value);
-        }
-
+        // The auto-log tag/mode live on the list now; the item carries neither.
         var item = new Domain.Entities.TodoItem
         {
             ListId = request.ListId,
@@ -51,15 +49,13 @@ public class TodoItemService : ITodoItemService
             NotifyAt = request.NotifyAt,
             DisplayOrder = request.DisplayOrder,
             RecurrenceType = request.RecurrenceType,
-            AutoLogMode = request.AutoLogMode,
-            CompletionTagId = request.CompletionTagId,
             DateCreated = DateTime.UtcNow
         };
 
         _context.TodoItems.Add(item);
         await _context.SaveChangesAsync();
 
-        item.CompletionTag = completionTag;
+        item.List = list;
 
         return MapToResponse(item);
     }
@@ -68,7 +64,6 @@ public class TodoItemService : ITodoItemService
     {
         var item = await _context.TodoItems
             .Include(i => i.List)
-            .Include(i => i.CompletionTag)
             .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
 
         if (item == null)
@@ -76,6 +71,7 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
+        // Auto-log tag/mode are list-owned; the item request fields for them are ignored.
         item.Title = request.Title;
         item.Notes = request.Notes;
         item.StartDate = request.StartDate;
@@ -83,8 +79,6 @@ public class TodoItemService : ITodoItemService
         item.NotifyAt = request.NotifyAt;
         item.DisplayOrder = request.DisplayOrder;
         item.RecurrenceType = request.RecurrenceType;
-        item.AutoLogMode = request.AutoLogMode;
-        item.CompletionTagId = request.CompletionTagId;
 
         await _context.SaveChangesAsync();
     }
@@ -101,7 +95,7 @@ public class TodoItemService : ITodoItemService
     {
         var item = await _context.TodoItems
             .Include(i => i.List)
-            .Include(i => i.CompletionTag)
+            .ThenInclude(l => l.CompletionTag)
             .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
 
         if (item == null)
@@ -112,15 +106,21 @@ public class TodoItemService : ITodoItemService
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
-        if (item.CompletionTagId.HasValue)
+        // Auto-log against the parent list's tag, in the list's mode.
+        var tagId = item.List.CompletionTagId;
+        if (tagId.HasValue)
         {
-            if (item.AutoLogMode == AutoLogMode.ResetIfExists)
+            if (item.List.AutoLogMode == AutoLogMode.ResetIfExists)
             {
-                var (windowStart, windowEnd) = ComputeMonitoringWindow(item);
+                // De-dup scoped to the completion's own local day only, so each day keeps
+                // its own activity and same-day re-completion replaces. (Previously the
+                // recurrence-derived window could span a whole week and overwrite days.)
+                var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+                var (windowStart, windowEnd) = LocalDayWindowUtc(request.DoneAt, user);
 
                 var existing = await _context.Activities
                     .FirstOrDefaultAsync(a =>
-                        a.TagId == item.CompletionTagId.Value &&
+                        a.TagId == tagId.Value &&
                         a.UserId == userId &&
                         a.DateStarted >= windowStart &&
                         a.DateStarted < windowEnd);
@@ -129,16 +129,18 @@ public class TodoItemService : ITodoItemService
                 {
                     existing.DateStarted = request.DoneAt;
                     existing.Description = item.Title;
-                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
+                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, tagId.Value, id);
+                    await _eventLogService.Log(userId, EventLogLevel.Info,
+                        $"Activity '{item.List.CompletionTag?.TagName ?? "?"}' updated (same-day re-entry) on '{item.Title}' completion");
                 }
                 else
                 {
-                    await LogActivityAsync(item, request.DoneAt, userId);
+                    await LogActivityAsync(item, tagId.Value, request.DoneAt, userId);
                 }
             }
             else
             {
-                await LogActivityAsync(item, request.DoneAt, userId);
+                await LogActivityAsync(item, tagId.Value, request.DoneAt, userId);
             }
         }
 
@@ -147,35 +149,42 @@ public class TodoItemService : ITodoItemService
         return MapToResponse(item);
     }
 
-    private async Task LogActivityAsync(Domain.Entities.TodoItem item, DateTime doneAt, Guid userId)
+    private async Task LogActivityAsync(Domain.Entities.TodoItem item, int tagId, DateTime doneAt, Guid userId)
     {
         var activityRequest = new ActivityRequest
         {
-            PrimaryTagId = item.CompletionTagId!.Value,
+            PrimaryTagId = tagId,
             Description = item.Title,
             DateStarted = doneAt
         };
 
         await _activityService.Create(activityRequest, userId);
-        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", item.CompletionTagId.Value, item.Id);
+        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", tagId, item.Id);
     }
 
-    /// <summary>Window for <c>AutoLogMode.ResetIfExists</c>. Basic items don't carry the
-    /// Reminder-style explicit Monitor* fields, so the window is derived from RecurrenceType
-    /// only: Weekly → current Monday-anchored week; everything else → today.</summary>
-    private static (DateTime Start, DateTime End) ComputeMonitoringWindow(Domain.Entities.TodoItem item)
+    /// <summary>UTC bounds of the local calendar day containing <paramref name="doneAtUtc"/>,
+    /// in the user's time zone. Scopes <c>AutoLogMode.ResetIfExists</c> de-duplication to a
+    /// single day so each day keeps its own activity and same-day re-completion replaces.</summary>
+    private static (DateTime Start, DateTime End) LocalDayWindowUtc(DateTime doneAtUtc, Domain.Entities.User? user)
     {
-        var todayUtc = DateTime.UtcNow.Date;
+        var tz = ResolveTimeZone(user);
+        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(doneAtUtc, tz));
+        var startUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(TimeOnly.MinValue), tz);
+        var endUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
 
-        if (item.RecurrenceType == RecurrenceType.Weekly)
+        return (startUtc, endUtc);
+    }
+
+    private static TimeZoneInfo ResolveTimeZone(Domain.Entities.User? user)
+    {
+        try
         {
-            var daysFromMonday = ((int)todayUtc.DayOfWeek + 6) % 7;
-            var weekStart = todayUtc.AddDays(-daysFromMonday);
-
-            return (weekStart, weekStart.AddDays(7));
+            return TimeZoneInfo.FindSystemTimeZoneById(user?.TimeZone ?? "UTC");
         }
-
-        return (todayUtc, todayUtc.AddDays(1));
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.Utc;
+        }
     }
 
     public async Task<TodoItemResponse> Reopen(int id, Guid userId)
@@ -262,6 +271,7 @@ public class TodoItemService : ITodoItemService
     {
         var item = await _context.TodoItems
             .Include(i => i.List)
+            .ThenInclude(l => l.CompletionTag)
             .FirstOrDefaultAsync(i => i.Id == id && i.List.UserId == userId);
 
         if (item == null)
@@ -272,6 +282,8 @@ public class TodoItemService : ITodoItemService
         return item;
     }
 
+    // Auto-log tag and mode are inherited from the parent list; callers that return this must load
+    // item.List (and List.CompletionTag).
     private static TodoItemResponse MapToResponse(Domain.Entities.TodoItem item) =>
         new()
         {
@@ -288,9 +300,9 @@ public class TodoItemService : ITodoItemService
             DisplayOrder = item.DisplayOrder,
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
-            AutoLogMode = item.AutoLogMode,
-            CompletionTagId = item.CompletionTagId,
-            CompletionTagName = item.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.CompletionTag?.InputTypeId
+            AutoLogMode = item.List?.AutoLogMode ?? AutoLogMode.Add,
+            CompletionTagId = item.List?.CompletionTagId,
+            CompletionTagName = item.List?.CompletionTag?.TagName,
+            CompletionTagInputTypeId = item.List?.CompletionTag?.InputTypeId
         };
 }

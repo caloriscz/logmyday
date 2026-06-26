@@ -11,6 +11,6 @@ public interface IReminderService
     Task<ReminderResponse> Complete(int id, ReminderCompleteRequest request, Guid userId);
     Task<ReminderResponse> Reopen(int id, Guid userId);
     Task<ReminderResponse> Skip(int id, Guid userId, DateOnly? date = null);
-    Task<ReminderResponse> Unskip(int id, Guid userId);
+    Task<ReminderResponse> Unskip(int id, Guid userId, DateOnly? date = null);
     Task Reorder(IList<ReminderReorderRequest> items, Guid userId);
 }

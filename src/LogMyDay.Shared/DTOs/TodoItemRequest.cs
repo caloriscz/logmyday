@@ -23,11 +23,10 @@ public class TodoItemRequest
 
     public RecurrenceType RecurrenceType { get; set; } = RecurrenceType.None;
 
+    // Compat shims — the auto-log tag and mode now live on the list (TodoListRequest); the server
+    // ignores these on items. AllowUnfilled/Monitor* are Reminder-only leftovers, also ignored.
     public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
-
     public int? CompletionTagId { get; set; }
-
-    // Compat shims — ignored by the server (TodoItem no longer has these columns). See ReminderRequest.
     public int? MonitorDaysBack { get; set; }
     public DateOnly? MonitorFromDate { get; set; }
     public DateOnly? MonitorToDate { get; set; }

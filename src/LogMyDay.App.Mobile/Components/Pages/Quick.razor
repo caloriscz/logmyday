@@ -8,7 +8,7 @@
 @inject QuickActivityService QuickActivityService
 @inject IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @implements IAsyncDisposable
 
 <PageTitle>Quick Activities - LogMyDay</PageTitle>
@@ -479,7 +479,7 @@
             // Close the modal
             try
             {
-                await JSRuntime.InvokeVoidAsync("hideModal", "addQuickActivityModal");
+                await WebView.InvokeVoidAsync("hideModal", "addQuickActivityModal");
             }
             catch (InvalidOperationException)
             {
@@ -573,7 +573,7 @@
 
     private async Task<bool> ShowConfirm(string title, string message)
     {
-        return await JSRuntime.InvokeAsync<bool>("confirm", $"{title}\n\n{message}");
+        return await WebView.ConfirmAsync(title, message);
     }
 
     private void ShowSuccess(string message)

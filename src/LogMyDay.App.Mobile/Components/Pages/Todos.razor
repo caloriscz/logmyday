@@ -308,12 +308,30 @@
                         <ValidationMessage For="@(() => _listForm.Name)" class="mt-1 text-xs text-red-600 dark:text-red-400" />
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">List type</label>
-                        <InputSelect @bind-Value="_listForm.ListType" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                            <option value="@TodoListType.Basic">Basic</option>
-                            <option value="@TodoListType.Reminder">Reminder</option>
-                        </InputSelect>
+                        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log tag</label>
+                        <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @bind="_listForm.CompletionTagId">
+                            <option value="">— None —</option>
+                            @if (_allTags != null)
+                            {
+                                @foreach (var tag in _allTags)
+                                {
+                                    <option value="@tag.Id">@tag.Title</option>
+                                }
+                            }
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Completing any item in this list logs an activity to this tag.</p>
                     </div>
+                    @if (_listForm.CompletionTagId.HasValue)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
+                            <InputSelect @bind-Value="_listForm.AutoLogMode" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
+                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
+                            </InputSelect>
+                        </div>
+                    }
                     <div class="flex items-center gap-3">
                         <input type="checkbox" id="chk-show-on-homepage" class="h-5 w-5 rounded border-gray-300 text-primary-600 dark:border-gray-600 cursor-pointer"
                                checked="@_listForm.ShowOnHomepage"
@@ -479,23 +497,6 @@
                                            placeholder="Optional notes" />
                         </div>
                     }
-                    @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
-                    {
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log tag</label>
-                            <select class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    @bind="_itemForm.CompletionTagId">
-                                <option value="">— None —</option>
-                                @if (_allTags != null)
-                                {
-                                    @foreach (var tag in _allTags)
-                                    {
-                                        <option value="@tag.Id">@tag.Title</option>
-                                    }
-                                }
-                            </select>
-                        </div>
-                    }
                     <div class="grid grid-cols-2 gap-4">
                         @if (_currentListForItemModal?.ListType != TodoListType.Reminder)
                         {
@@ -523,16 +524,6 @@
                             <option value="@RecurrenceType.Weekly">Weekly</option>
                         </InputSelect>
                     </div>
-                    @if (_itemForm.CompletionTagId.HasValue)
-                    {
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
-                            <InputSelect @bind-Value="_itemForm.AutoLogMode" class="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                <option value="@AutoLogMode.Add">Add (accumulate)</option>
-                                <option value="@AutoLogMode.ResetIfExists">Replace if exists</option>
-                            </InputSelect>
-                        </div>
-                    }
                     @if (_itemForm.RecurrenceType != RecurrenceType.None && _itemForm.CompletionTagId.HasValue)
                     {
                         <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
@@ -920,8 +911,9 @@
         {
             Name = list.Name,
             DisplayOrder = list.DisplayOrder,
-            ListType = list.ListType,
-            ShowOnHomepage = list.ShowOnHomepage
+            ShowOnHomepage = list.ShowOnHomepage,
+            CompletionTagId = list.CompletionTagId,
+            AutoLogMode = list.AutoLogMode
         };
         _listEditContext = new EditContext(_listForm);
         _listError = null;

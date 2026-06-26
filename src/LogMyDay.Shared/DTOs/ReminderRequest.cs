@@ -15,7 +15,7 @@ public class ReminderRequest
 
     public int DisplayOrder { get; set; } = 0;
 
-    public RecurrenceType RecurrenceType { get; set; } = RecurrenceType.None;
+    public RecurrenceType RecurrenceType { get; set; } = RecurrenceType.Daily;
 
     public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
 

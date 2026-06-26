@@ -52,5 +52,77 @@ public class ActivityServiceTests
         Assert.NotNull(activity);
         Assert.Equal(request.Description, activity.Description);
     }
+
+    [Fact]
+    public async Task Create_NonRepeatableNumeric_SecondCreate_AddsRequestValueNotStep()
+    {
+        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+            .UseInMemoryDatabase(databaseName: nameof(Create_NonRepeatableNumeric_SecondCreate_AddsRequestValueNotStep))
+            .Options;
+        using var context = new LogMyDayDbContext(options);
+
+        // Non-repeatable numeric tag with a Step that differs from the carried value, so a
+        // regression (adding Step instead of the value) is unambiguous: Step 10 vs value 20.
+        var tag = new Tag
+        {
+            TagName = "Zinc",
+            InputTypeId = 1, // Integer
+            IsRepeatable = false,
+            TimeGranularity = TimeGranularity.Daily,
+            Step = 10,
+            IsRequired = false
+        };
+        context.Tags.Add(tag);
+        context.SaveChanges();
+
+        var repository = new ActivityRepository(context);
+        var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
+        var tagDayLockService = new TagDayLockService(context);
+        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
+        var userId = Guid.NewGuid();
+        var when = DateTime.UtcNow;
+
+        // Two completions, each "Add 20".
+        await service.Create(new ActivityRequest { DateStarted = when, Description = "20", PrimaryTagId = tag.Id }, userId);
+        await service.Create(new ActivityRequest { DateStarted = when, Description = "20", PrimaryTagId = tag.Id }, userId);
+
+        var rows = await context.Activities.Where(a => a.TagId == tag.Id && a.UserId == userId).ToListAsync();
+        var single = Assert.Single(rows);
+        Assert.Equal("40", single.Description);
+    }
+
+    [Fact]
+    public async Task Create_NonRepeatableNumeric_SecondCreate_NoValue_FallsBackToStep()
+    {
+        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+            .UseInMemoryDatabase(databaseName: nameof(Create_NonRepeatableNumeric_SecondCreate_NoValue_FallsBackToStep))
+            .Options;
+        using var context = new LogMyDayDbContext(options);
+
+        var tag = new Tag
+        {
+            TagName = "Quick",
+            InputTypeId = 1,
+            IsRepeatable = false,
+            TimeGranularity = TimeGranularity.Daily,
+            Step = 10,
+            IsRequired = false
+        };
+        context.Tags.Add(tag);
+        context.SaveChanges();
+
+        var repository = new ActivityRepository(context);
+        var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
+        var tagDayLockService = new TagDayLockService(context);
+        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
+        var userId = Guid.NewGuid();
+        var when = DateTime.UtcNow;
+
+        await service.Create(new ActivityRequest { DateStarted = when, Description = "5", PrimaryTagId = tag.Id }, userId);
+        await service.Create(new ActivityRequest { DateStarted = when, Description = null, PrimaryTagId = tag.Id }, userId);
+
+        var single = Assert.Single(await context.Activities.Where(a => a.TagId == tag.Id && a.UserId == userId).ToListAsync());
+        Assert.Equal("15", single.Description); // 5 + Step(10)
+    }
 }
 

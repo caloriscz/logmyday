@@ -21,15 +21,17 @@ public sealed class UserPreferencesService : IUserPreferencesService
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
     private readonly IApiClientProvider _apiClientProvider;
+    private readonly Diagnostics.IDiagnosticStore _diag;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private UserPreferencesSnapshot? _cached;
     private DateTime _cacheExpiresUtc = DateTime.MinValue;
 
     public event EventHandler? PreferencesChanged;
 
-    public UserPreferencesService(IApiClientProvider apiClientProvider)
+    public UserPreferencesService(IApiClientProvider apiClientProvider, Diagnostics.IDiagnosticStore diag)
     {
         _apiClientProvider = apiClientProvider;
+        _diag = diag;
     }
 
     public async Task<UserPreferencesSnapshot> GetAsync(CancellationToken cancellationToken = default)
@@ -51,6 +53,9 @@ public sealed class UserPreferencesService : IUserPreferencesService
 
             var authApi = _apiClientProvider.Auth;
             var currentUser = await authApi.GetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
+
+            // Diagnostic store is admin-only; persist the decision so out-of-process receivers inherit it.
+            _diag.SetEnabled(currentUser.IsAdmin);
 
             if (_cached is null || !EqualityComparer<CurrentUserDto>.Default.Equals(_cached.CurrentUser, currentUser))
             {

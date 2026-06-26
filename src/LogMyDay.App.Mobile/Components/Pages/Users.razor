@@ -5,7 +5,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using LogMyDay.App.Mobile.Services
 @inject IUsersApi UsersApi
-@inject IJSRuntime JSRuntime
+@inject IWebViewInterop WebView
 @inject ILogger<Users> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
@@ -594,7 +594,7 @@
             return;
         }
 
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Delete user '{user.Email}'? This action cannot be undone.");
+        var confirmed = await WebView.ConfirmAsync("Delete user", $"Delete user '{user.Email}'? This action cannot be undone.", "Delete", "Cancel");
         if (!confirmed)
         {
             return;
