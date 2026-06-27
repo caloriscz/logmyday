@@ -19,8 +19,6 @@ public class ReminderRequest
 
     public AutoLogMode AutoLogMode { get; set; } = AutoLogMode.Add;
 
-    public int? MonitorDaysBack { get; set; }
-
     public DateOnly? MonitorFromDate { get; set; }
 
     public DateOnly? MonitorToDate { get; set; }

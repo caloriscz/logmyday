@@ -53,6 +53,24 @@ public class ReminderServiceTests
         return reminder.Id;
     }
 
+    private static async Task<int> AddTag(LogMyDayDbContext context, Guid userId, int inputTypeId)
+    {
+        var tag = new Tag { TagName = "T", UserId = userId, InputTypeId = inputTypeId };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        return tag.Id;
+    }
+
+    private static async Task<int> AddDailyReminderWithTag(LogMyDayDbContext context, Guid userId, int tagId)
+    {
+        var reminder = new Reminder { UserId = userId, Title = "Pill", RecurrenceType = RecurrenceType.Daily, CompletionTagId = tagId };
+        context.Reminders.Add(reminder);
+        await context.SaveChangesAsync();
+
+        return reminder.Id;
+    }
+
     [Fact]
     public async Task Skip_TwoDifferentDays_BothRemainSkippedIndependently()
     {
@@ -114,11 +132,11 @@ public class ReminderServiceTests
     public async Task Write_PrunesRowsOutsideMonitoringWindow_KeepsRecentAndCurrent()
     {
         var (service, context, userId) = CreateService(nameof(Write_PrunesRowsOutsideMonitoringWindow_KeepsRecentAndCurrent));
-        var reminder = new Reminder { UserId = userId, Title = "Pill", RecurrenceType = RecurrenceType.Daily, MonitorDaysBack = 7 };
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var reminder = new Reminder { UserId = userId, Title = "Pill", RecurrenceType = RecurrenceType.Daily, MonitorFromDate = today.AddDays(-7) };
         context.Reminders.Add(reminder);
         await context.SaveChangesAsync();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         context.ReminderDays.AddRange(
             new ReminderDay { ReminderId = reminder.Id, UserId = userId, Date = today.AddDays(-100), IsSkipped = true },
             new ReminderDay { ReminderId = reminder.Id, UserId = userId, Date = today.AddDays(-3), IsSkipped = true });
@@ -132,9 +150,73 @@ public class ReminderServiceTests
             .Select(d => d.Date)
             .ToList();
 
-        Assert.DoesNotContain(today.AddDays(-100), remaining); // outside 7-day window
+        Assert.DoesNotContain(today.AddDays(-100), remaining); // before MonitorFromDate
         Assert.Contains(today.AddDays(-3), remaining);         // within window
         Assert.Contains(today, remaining);                     // current period kept
+    }
+
+    [Fact]
+    public async Task Skip_NumericCompletionTag_LogsZeroActivity()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_NumericCompletionTag_LogsZeroActivity));
+        var tagId = await AddTag(context, userId, 1); // Integer
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        var activity = context.Activities.Single(a => a.TagId == tagId && a.UserId == userId);
+        Assert.Equal("0", activity.Description);
+    }
+
+    [Fact]
+    public async Task Skip_BooleanCompletionTag_LogsFalseActivity()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_BooleanCompletionTag_LogsFalseActivity));
+        var tagId = await AddTag(context, userId, 3); // Boolean
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        var activity = context.Activities.Single(a => a.TagId == tagId && a.UserId == userId);
+        Assert.Equal("false", activity.Description);
+    }
+
+    [Fact]
+    public async Task Skip_StringCompletionTag_LogsEmptyActivity()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_StringCompletionTag_LogsEmptyActivity));
+        var tagId = await AddTag(context, userId, 2); // String
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        var activity = context.Activities.Single(a => a.TagId == tagId && a.UserId == userId);
+        Assert.Null(activity.Description);
+    }
+
+    [Fact]
+    public async Task Skip_AddsValueEveryTime_NoDedup()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_AddsValueEveryTime_NoDedup));
+        var tagId = await AddTag(context, userId, 1); // Integer
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+
+        var day = new DateOnly(2026, 6, 10);
+        await service.Skip(id, userId, day);
+        await service.Skip(id, userId, day);
+
+        Assert.Equal(2, context.Activities.Count(a => a.TagId == tagId && a.UserId == userId));
+    }
+
+    [Fact]
+    public async Task Skip_TaglessReminder_LogsNoActivity()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_TaglessReminder_LogsNoActivity));
+        var id = await AddDailyReminder(context, userId);
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        Assert.Empty(context.Activities);
     }
 
     [Fact]

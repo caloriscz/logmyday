@@ -15,7 +15,6 @@ public class ReminderResponse
     public DateTime DateCreated { get; set; }
     public RecurrenceType RecurrenceType { get; set; }
     public AutoLogMode AutoLogMode { get; set; }
-    public int? MonitorDaysBack { get; set; }
     public DateOnly? MonitorFromDate { get; set; }
     public DateOnly? MonitorToDate { get; set; }
     public int? CompletionTagId { get; set; }

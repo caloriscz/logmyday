@@ -39,8 +39,6 @@ public class Reminder
     [ForeignKey(nameof(CompletionTagId))]
     public Tag? CompletionTag { get; set; }
 
-    public int? MonitorDaysBack { get; set; }
-
     public DateOnly? MonitorFromDate { get; set; }
 
     public DateOnly? MonitorToDate { get; set; }
