@@ -41,7 +41,8 @@ public class EventLogsController : BaseApiController
         [FromQuery] DateTime? dateFrom = null,
         [FromQuery] DateTime? dateTo = null,
         [FromQuery] string sortBy = "time",
-        [FromQuery] bool sortDesc = true)
+        [FromQuery] bool sortDesc = true,
+        [FromQuery] LogMyDay.Shared.DTOs.EventLogCategoryFilter category = LogMyDay.Shared.DTOs.EventLogCategoryFilter.All)
     {
         var userId = GetCurrentUserId();
         var isAdmin = User.Claims.Any(c => c.Type == "is_admin" && c.Value == "true");
@@ -52,7 +53,7 @@ public class EventLogsController : BaseApiController
             levelFilter = parsed;
         }
 
-        var result = await _eventLogService.GetPaged(pageNumber, pageSize, userId, isAdmin, levelFilter, message, dateFrom, dateTo, sortBy, sortDesc);
+        var result = await _eventLogService.GetPaged(pageNumber, pageSize, userId, isAdmin, levelFilter, message, dateFrom, dateTo, sortBy, sortDesc, category);
 
         return Ok(result);
     }
@@ -62,7 +63,8 @@ public class EventLogsController : BaseApiController
         [FromQuery] string? level = null,
         [FromQuery] string? message = null,
         [FromQuery] DateTime? dateFrom = null,
-        [FromQuery] DateTime? dateTo = null)
+        [FromQuery] DateTime? dateTo = null,
+        [FromQuery] LogMyDay.Shared.DTOs.EventLogCategoryFilter category = LogMyDay.Shared.DTOs.EventLogCategoryFilter.All)
     {
         var userId = GetCurrentUserId();
 
@@ -72,7 +74,7 @@ public class EventLogsController : BaseApiController
             levelFilter = parsed;
         }
 
-        var count = await _eventLogService.GetCount(userId, levelFilter, message, dateFrom, dateTo);
+        var count = await _eventLogService.GetCount(userId, levelFilter, message, dateFrom, dateTo, category);
 
         return Ok(count);
     }
