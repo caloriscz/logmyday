@@ -227,7 +227,8 @@
             isLoading = true;
             statusMessage = null;
             var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
-            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
+            var (dateFromUtc, dateToUtc) = GetUtcDateRange();
+            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level, _messageFilter, dateFromUtc, dateToUtc, _sortBy, _sortDesc);
         }
         catch (Exception ex)
         {
@@ -239,6 +240,16 @@
         {
             isLoading = false;
         }
+    }
+
+    // Events are stored in UTC but picked and displayed as local dates, so the filter must
+    // cover the whole local From/To days converted to UTC (To is inclusive of its entire day).
+    private (DateTime? FromUtc, DateTime? ToUtc) GetUtcDateRange()
+    {
+        var fromUtc = _dateFrom?.Date.ToUniversalTime();
+        var toUtc = _dateTo?.Date.AddDays(1).AddTicks(-1).ToUniversalTime();
+
+        return (fromUtc, toUtc);
     }
 
     private async Task ApplyFilter()
@@ -277,7 +288,8 @@
         try
         {
             var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
-            var all = await EventLogApi.GetEventLogs(1, 10000, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
+            var (dateFromUtc, dateToUtc) = GetUtcDateRange();
+            var all = await EventLogApi.GetEventLogs(1, 10000, level, _messageFilter, dateFromUtc, dateToUtc, _sortBy, _sortDesc);
             var sb = new System.Text.StringBuilder();
 
             foreach (var item in all.Items)
