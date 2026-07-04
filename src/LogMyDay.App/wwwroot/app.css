@@ -963,3 +963,93 @@ main {
         height: 56px;
     }
 }
+
+/* ====================================================
+   Blazor circuit reconnect toast (#components-reconnect-modal)
+   Replaces the default full-page "Rejoining the server" overlay
+   with a corner toast. While merely reconnecting it stays invisible
+   for a grace period, so sub-second circuit resumes (mobile browser
+   backgrounded between edits) never flash a "loading" overlay.
+   State classes are applied by blazor.web.js; see js/reconnect.js.
+   ==================================================== */
+
+#components-reconnect-modal {
+    display: none;
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 11000; /* above modals and FAB */
+}
+
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-failed {
+    display: block;
+}
+
+/* Rejected triggers an automatic reload from js/reconnect.js — keep hidden */
+
+.lmd-reconnect-toast {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.5rem;
+    background: rgba(15, 23, 42, 0.92); /* slate-900 — readable in both themes */
+    color: #f8fafc;
+    font-size: 0.875rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Grace period: invisible for the first 1.5 s of a reconnect attempt */
+.components-reconnect-show .lmd-reconnect-toast {
+    animation: lmd-reconnect-fade-in 150ms ease-out 1500ms backwards;
+}
+
+@keyframes lmd-reconnect-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.lmd-reconnect-spinner {
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+    border: 2px solid rgba(248, 250, 252, 0.35);
+    border-top-color: #f8fafc;
+    border-radius: 9999px;
+    animation: lmd-reconnect-spin 0.8s linear infinite;
+}
+
+@keyframes lmd-reconnect-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Per-state message + reload button visibility */
+.lmd-reconnect-msg-failed,
+.lmd-reconnect-reload {
+    display: none;
+}
+
+.components-reconnect-failed .lmd-reconnect-msg-retrying,
+.components-reconnect-failed .lmd-reconnect-spinner {
+    display: none;
+}
+
+.components-reconnect-failed .lmd-reconnect-msg-failed {
+    display: inline;
+}
+
+.components-reconnect-failed .lmd-reconnect-reload {
+    display: inline-block;
+    border: 1px solid rgba(248, 250, 252, 0.4);
+    border-radius: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.8125rem;
+    color: #f8fafc;
+    background: transparent;
+    cursor: pointer;
+}
+
+.components-reconnect-failed .lmd-reconnect-reload:hover {
+    background: rgba(248, 250, 252, 0.15);
+}

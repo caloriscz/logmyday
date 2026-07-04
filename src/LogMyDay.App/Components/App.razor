@@ -49,6 +49,19 @@
 
 <body>
     <Routes @rendermode="InteractiveServer" />
+
+    <!-- Custom circuit reconnect UI — replaces the default full-page "Rejoining the server"
+         overlay with a corner toast; state classes are applied by blazor.web.js and the
+         grace-period/appearance rules live in app.css. Started from js/reconnect.js. -->
+    <div id="components-reconnect-modal">
+        <div class="lmd-reconnect-toast" role="status">
+            <span class="lmd-reconnect-spinner" aria-hidden="true"></span>
+            <span class="lmd-reconnect-msg-retrying">Reconnecting…</span>
+            <span class="lmd-reconnect-msg-failed">Connection lost.</span>
+            <button type="button" class="lmd-reconnect-reload" onclick="location.reload()">Reload</button>
+        </div>
+    </div>
+
     <script src="@Assets["vendor/air-datepicker/air-datepicker.min.js"]"></script>
     <script src="@Assets["vendor/html5-qrcode/html5-qrcode.min.js"]"></script>
     <script src="@Assets["vendor/qrcodejs/qrcode-generator.js"]"></script>
@@ -57,7 +70,8 @@
     <script src="@Assets["js/tagPersistence.js"]"></script>
     <script src="@Assets["js/scanner.js"]"></script>
     <script src="@Assets["js/todo-notifications.js"]"></script>
-    <script src="_framework/blazor.web.js"></script>
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script src="@Assets["js/reconnect.js"]"></script>
 </body>
 
 </html>
