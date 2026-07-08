@@ -1,6 +1,64 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## v0.6.0 — 2026‑07‑08
+
+### Added
+
+  - Todo Lists v1 with per-list reminders
+  - Reminders: boolean toggle for required tags, inline star/score pickers (numbered circles for score), per-day reminder state, background notifications with tap-to-reminder navigation and fulfilled-tag suppression
+  - Event Log audit system with per-user event tracking, plus download, delete, filtering, sorting, and category/type filter by message prefix
+  - `lmd` CLI tool
+  - AI assistant in the mobile app with shared quick questions and markdown rendering
+  - Full-width layout toggle next to the theme switcher
+  - Quick-buttons navigation with smart visibility and a tag description field
+
+### Changed
+
+  - Upgraded Tailwind CSS from v3 to v4
+  - Native WebView interop replacing browser JS interop paths
+  - Security and logging hardening
+  - Backup now applies streak compression to backup activities
+  - Reminder scheduling arms the next occurrence and uses `setAlarmClock` so morning alarms fire; monitoring uses a date-range window
+  - Quiet client-side SignalR circuit reconnect; raised the circuit receive-message cap
+
+### Fixed
+
+  - Event Log date filter now covers whole local days converted to UTC
+  - Zero/empty activities are no longer logged
+  - Mobile error handling and database provider guards
+  - Layout constraints restored on nav and error UI; markdown helper in Assistant; wide-layout override for Tailwind v4 breakpoint class names
+  - Resolved high-severity npm vulnerabilities in `src/ui`
+
+## v0.5.0 — 2026‑03‑21
+
+### Added
+
+  - Barcode and QR code scanning
+  - Tag groups
+  - SQLite database support alongside SQL Server
+  - Day navigation and save-and-next-day in activity modals
+
+### Changed
+
+  - Server URL is auto-detected; removed hardcoded `Api:BaseAddress` and password-reset URL
+  - Optimized data loading performance
+
+## v0.4.0 — 2026‑02‑24
+
+### Added
+
+  - AI integration
+
+### Changed
+
+  - v0.4.0 audit refactoring improvements
+
+### Fixed
+
+  - Separate tag selections for Excel and HTML reports
+  - HTML reports now include all data
+
 ## v0.3.0 — 2026‑01‑31
 
 ### Added
