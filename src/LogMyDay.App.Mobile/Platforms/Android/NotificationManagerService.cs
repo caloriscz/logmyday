@@ -500,8 +500,8 @@ public class NotificationManagerService : INotificationManagerService
         compatManager?.Cancel(todoItemId);
     }
 
-    // Returns the mode actually used so the caller can record it: "exact", "inexact-no-permission",
-    // "inexact-old-api", or "no-alarm-manager".
+    // Returns the mode actually used so the caller can record it: "alarmclock",
+    // "inexact-no-permission", or "no-alarm-manager".
     static string ScheduleExactAlarm(AlarmManager? alarmManager, long triggerTimeMs, PendingIntent pendingIntent)
     {
         if (alarmManager == null)
@@ -523,19 +523,15 @@ public class NotificationManagerService : INotificationManagerService
             return "inexact-no-permission";
         }
 
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
-        {
-            // API 23+: fires even in Doze mode.
-            alarmManager.SetExactAndAllowWhileIdle(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
-            System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: SetExactAndAllowWhileIdle scheduled");
+        // SetAlarmClock is treated as a user-facing alarm: exempt from Doze deferral and the
+        // SetExactAndAllowWhileIdle idle rate-limit that dropped morning-cluster reminders. It fires
+        // reliably when armed far ahead (e.g. a 06:00 reminder armed the previous evening). The
+        // showIntent reuses the fire PendingIntent so tapping the system alarm chip delivers it.
+        var info = new AlarmManager.AlarmClockInfo(triggerTimeMs, pendingIntent);
+        alarmManager.SetAlarmClock(info, pendingIntent);
+        System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: SetAlarmClock scheduled");
 
-            return "exact";
-        }
-
-        alarmManager.Set(AlarmType.RtcWakeup, triggerTimeMs, pendingIntent);
-        System.Diagnostics.Debug.WriteLine("ScheduleExactAlarm: fallback Set() (API < 23)");
-
-        return "inexact-old-api";
+        return "alarmclock";
     }
 
     long GetNotifyTime(DateTime notifyTime)

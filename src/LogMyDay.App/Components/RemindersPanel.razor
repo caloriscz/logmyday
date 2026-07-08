@@ -19,7 +19,7 @@
         .ThenBy(i => i.DateCreated)
         .ToList()
         ?? new List<ReminderResponse>();
-    var doneItems = _reminders?.Where(i => i.IsDone).ToList() ?? new List<ReminderResponse>();
+    var doneItems = _reminders?.Where(i => i.IsDone && !IsOutsideMonitoringWindow(i, effectiveDate)).ToList() ?? new List<ReminderResponse>();
 }
 
 @* Always render so the header + Add button (and the empty state) stay visible even with no reminders. *@
@@ -224,42 +224,20 @@
                     {
                         <div class="rounded-lg border border-gray-200 p-4 space-y-3 dark:border-slate-700">
                             <p class="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Activity monitoring window</p>
-                            <div class="flex items-center gap-6">
-                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
-                                    <input type="radio" class="text-primary-600" checked="@_monitorUseDaysBack"
-                                           @onchange="() => { _monitorUseDaysBack = true; _itemForm.MonitorFromDate = null; _itemForm.MonitorToDate = null; }" />
-                                    Last N days
-                                </label>
-                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
-                                    <input type="radio" class="text-primary-600" checked="@(!_monitorUseDaysBack)"
-                                           @onchange="() => { _monitorUseDaysBack = false; _itemForm.MonitorDaysBack = null; _itemForm.MonitorFromDate = DateOnly.FromDateTime(DateTime.Today); }" />
-                                    Date range
-                                </label>
-                            </div>
-                            @if (_monitorUseDaysBack)
-                            {
+                            <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="mb-1 block text-xs text-gray-500 dark:text-slate-400">Days back from today (0 = today only)</label>
-                                    <InputNumber @bind-Value="_itemForm.MonitorDaysBack" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" min="0" />
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-slate-400">From <span class="text-rose-500">*</span></label>
+                                    <input type="date" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                           value="@(_itemForm.MonitorFromDate?.ToString("yyyy-MM-dd") ?? "")"
+                                           @onchange="e => _itemForm.MonitorFromDate = ParseDateOnly(e.Value?.ToString())" />
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label class="mb-1 block text-xs text-gray-500 dark:text-slate-400">From</label>
-                                        <input type="date" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                               value="@(_itemForm.MonitorFromDate?.ToString("yyyy-MM-dd") ?? "")"
-                                               @onchange="e => _itemForm.MonitorFromDate = ParseDateOnly(e.Value?.ToString())" />
-                                    </div>
-                                    <div>
-                                        <label class="mb-1 block text-xs text-gray-500 dark:text-slate-400">To</label>
-                                        <input type="date" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                               value="@(_itemForm.MonitorToDate?.ToString("yyyy-MM-dd") ?? "")"
-                                               @onchange="e => _itemForm.MonitorToDate = ParseDateOnly(e.Value?.ToString())" />
-                                    </div>
+                                <div>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-slate-400">To <span class="font-normal text-gray-400">(optional)</span></label>
+                                    <input type="date" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                           value="@(_itemForm.MonitorToDate?.ToString("yyyy-MM-dd") ?? "")"
+                                           @onchange="e => _itemForm.MonitorToDate = ParseDateOnly(e.Value?.ToString())" />
                                 </div>
-                            }
+                            </div>
                         </div>
                     }
                 </div>
@@ -360,7 +338,6 @@
     private bool _showItemModal;
     private bool _isEditingItem;
     private int _editingItemId;
-    private bool _monitorUseDaysBack = true;
     private bool? _booleanBoolValue;
     private int? _editIntValue;
     private ReminderRequest _itemForm = new() { Title = string.Empty };
@@ -380,16 +357,10 @@
     {
         var d = DateOnly.FromDateTime(date);
 
-        if (item.MonitorDaysBack.HasValue)
+        if (item.MonitorFromDate.HasValue)
         {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var windowStart = today.AddDays(-item.MonitorDaysBack.Value);
-            return d < windowStart || d > today;
-        }
-
-        if (item.MonitorFromDate.HasValue && item.MonitorToDate.HasValue)
-        {
-            return d < item.MonitorFromDate.Value || d > item.MonitorToDate.Value;
+            return d < item.MonitorFromDate.Value
+                || (item.MonitorToDate.HasValue && d > item.MonitorToDate.Value);
         }
 
         return false;
@@ -451,10 +422,9 @@
     private void OpenAddItemModal()
     {
         _isEditingItem = false;
-        _monitorUseDaysBack = true;
         _booleanBoolValue = null;
         _editIntValue = null;
-        _itemForm = new ReminderRequest { Title = string.Empty, MonitorDaysBack = 0 };
+        _itemForm = new ReminderRequest { Title = string.Empty, MonitorFromDate = DateOnly.FromDateTime(DateTime.Today) };
         _itemModalError = null;
         _showItemModal = true;
     }
@@ -463,7 +433,6 @@
     {
         _isEditingItem = true;
         _editingItemId = item.Id;
-        _monitorUseDaysBack = item.MonitorFromDate == null;
         _itemForm = new ReminderRequest
         {
             Title = item.Title,
@@ -472,7 +441,6 @@
             DisplayOrder = item.DisplayOrder,
             RecurrenceType = item.RecurrenceType,
             AutoLogMode = item.AutoLogMode,
-            MonitorDaysBack = item.MonitorDaysBack,
             MonitorFromDate = item.MonitorFromDate,
             MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,

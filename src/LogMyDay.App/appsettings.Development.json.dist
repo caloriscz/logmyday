@@ -31,7 +31,8 @@
     "ClientTimeoutSeconds": 30,
     "KeepAliveSeconds": 15,
     "HandshakeTimeoutSeconds": 15,
-    "MaxRetainedDisconnectedCircuits": 100
+    "MaxRetainedDisconnectedCircuits": 100,
+    "MaximumReceiveMessageSizeKb": 128
   },
   "Serilog": {
     "MinimumLevel": {

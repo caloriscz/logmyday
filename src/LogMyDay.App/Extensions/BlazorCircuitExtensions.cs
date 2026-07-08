@@ -12,6 +12,7 @@ public sealed class CircuitResilienceOptions
     public int KeepAliveSeconds { get; set; }
     public int HandshakeTimeoutSeconds { get; set; }
     public int MaxRetainedDisconnectedCircuits { get; set; }
+    public int MaximumReceiveMessageSizeKb { get; set; }
 }
 
 internal static class BlazorCircuitExtensions
@@ -30,7 +31,8 @@ internal static class BlazorCircuitExtensions
                 ClientTimeoutSeconds = 30,
                 KeepAliveSeconds = 15,
                 HandshakeTimeoutSeconds = 15,
-                MaxRetainedDisconnectedCircuits = 100
+                MaxRetainedDisconnectedCircuits = 100,
+                MaximumReceiveMessageSizeKb = 128
             }
             : new CircuitResilienceOptions
             {
@@ -38,7 +40,8 @@ internal static class BlazorCircuitExtensions
                 ClientTimeoutSeconds = 120,
                 KeepAliveSeconds = 15,
                 HandshakeTimeoutSeconds = 30,
-                MaxRetainedDisconnectedCircuits = 100
+                MaxRetainedDisconnectedCircuits = 100,
+                MaximumReceiveMessageSizeKb = 128
             };
 
         configuration.GetSection("Circuit").Bind(options);
@@ -54,6 +57,9 @@ internal static class BlazorCircuitExtensions
                 hub.ClientTimeoutInterval = TimeSpan.FromSeconds(options.ClientTimeoutSeconds);
                 hub.KeepAliveInterval = TimeSpan.FromSeconds(options.KeepAliveSeconds);
                 hub.HandshakeTimeout = TimeSpan.FromSeconds(options.HandshakeTimeoutSeconds);
+                // A client→server message over this cap closes the circuit outright (framework
+                // default is 32 KB), which the user sees as a full page reload mid-interaction.
+                hub.MaximumReceiveMessageSize = options.MaximumReceiveMessageSizeKb * 1024;
             });
 
         return services;

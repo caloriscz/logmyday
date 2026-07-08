@@ -48,6 +48,18 @@
                 <option value="Error">Error</option>
             </select>
         </div>
+        <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-gray-500 dark:text-slate-400">Type</label>
+            <select @bind="_selectedCategory"
+                    class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                <option value="@EventLogCategoryFilter.All">All Types</option>
+                <option value="@EventLogCategoryFilter.ReminderDiag">Reminder diag</option>
+                <option value="@EventLogCategoryFilter.NoDiagnostics">No diagnostics</option>
+                <option value="@EventLogCategoryFilter.Activity">Activities</option>
+                <option value="@EventLogCategoryFilter.Reminder">Reminders</option>
+                <option value="@EventLogCategoryFilter.TodoList">Todo lists</option>
+            </select>
+        </div>
         <div class="flex flex-col gap-1 flex-1 min-w-40">
             <label class="text-xs font-medium text-gray-500 dark:text-slate-400">Message</label>
             <input type="text" @bind="_messageFilter" placeholder="Contains…"
@@ -192,6 +204,7 @@
     private string? statusMessage;
     private bool statusIsError;
     private string _selectedLevel = "";
+    private EventLogCategoryFilter _selectedCategory = EventLogCategoryFilter.All;
     private string? _messageFilter;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
@@ -227,7 +240,8 @@
             isLoading = true;
             statusMessage = null;
             var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
-            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
+            var (dateFromUtc, dateToUtc) = GetUtcDateRange();
+            pagedResult = await EventLogApi.GetEventLogs(pageNumber, pageSize, level, _messageFilter, dateFromUtc, dateToUtc, _sortBy, _sortDesc, _selectedCategory);
         }
         catch (Exception ex)
         {
@@ -239,6 +253,16 @@
         {
             isLoading = false;
         }
+    }
+
+    // Events are stored in UTC but picked and displayed as local dates, so the filter must
+    // cover the whole local From/To days converted to UTC (To is inclusive of its entire day).
+    private (DateTime? FromUtc, DateTime? ToUtc) GetUtcDateRange()
+    {
+        var fromUtc = _dateFrom?.Date.ToUniversalTime();
+        var toUtc = _dateTo?.Date.AddDays(1).AddTicks(-1).ToUniversalTime();
+
+        return (fromUtc, toUtc);
     }
 
     private async Task ApplyFilter()
@@ -277,7 +301,8 @@
         try
         {
             var level = string.IsNullOrEmpty(_selectedLevel) ? null : _selectedLevel;
-            var all = await EventLogApi.GetEventLogs(1, 10000, level, _messageFilter, _dateFrom, _dateTo, _sortBy, _sortDesc);
+            var (dateFromUtc, dateToUtc) = GetUtcDateRange();
+            var all = await EventLogApi.GetEventLogs(1, 10000, level, _messageFilter, dateFromUtc, dateToUtc, _sortBy, _sortDesc, _selectedCategory);
             var sb = new System.Text.StringBuilder();
 
             foreach (var item in all.Items)

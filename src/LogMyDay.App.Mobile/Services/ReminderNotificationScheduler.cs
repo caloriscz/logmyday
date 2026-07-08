@@ -85,34 +85,17 @@ public class ReminderNotificationScheduler
         var seenFireTimes = new Dictionary<DateTime, int>();
         var armed = 0;
 
+        // Recurring reminders always arm their next occurrence. Being done/skipped TODAY only rolls
+        // the alarm to tomorrow (see CalculateNextFireTime) — it must NOT cancel the alarm, or a
+        // reminder completed today would silently lose tomorrow's notification. Explicit
+        // cancellation happens on completion (CancelItem) and for deleted reminders (SweepGhostAlarms).
         foreach (var item in reminders.Where(i => i.NotifyAt.HasValue))
         {
-            if (item.IsDone || item.IsSkipped)
-            {
-                _notificationService.CancelReminderAlarm(item.Id);
-                ArmedAlarmStore.Remove(item.Id);
+            var baseFireTime = CalculateNextFireTime(item);
 
-                bool removed;
-                lock (_lock) { removed = _activeAlarms.Remove(item.Id); }
-
-                if (removed)
-                {
-                    LogDiag($"event=cancelled itemId={item.Id} surface=mobile reason={(item.IsDone ? "done" : "skipped")}");
-                }
-
-                continue;
-            }
-
-            var baseFireTime = CalculateFireTime(item);
-            if (baseFireTime == null)
-            {
-                _logger.LogDebug("Skipping reminder notification for item {ItemId} '{Title}' — past due or fire time already passed", item.Id, item.Title);
-                continue;
-            }
-
-            var count = seenFireTimes.GetValueOrDefault(baseFireTime.Value, 0);
-            var adjustedFireTime = baseFireTime.Value.AddSeconds(count * 30);
-            seenFireTimes[baseFireTime.Value] = count + 1;
+            var count = seenFireTimes.GetValueOrDefault(baseFireTime, 0);
+            var adjustedFireTime = baseFireTime.AddSeconds(count * 30);
+            seenFireTimes[baseFireTime] = count + 1;
 
             ScheduleItemAt(item, adjustedFireTime);
             armed++;
@@ -125,21 +108,12 @@ public class ReminderNotificationScheduler
 
     public void ScheduleItem(ReminderResponse item)
     {
-        if (item.IsDone || item.IsSkipped || !item.NotifyAt.HasValue)
+        if (!item.NotifyAt.HasValue)
         {
             return;
         }
 
-        var fireTime = CalculateFireTime(item);
-
-        if (fireTime == null)
-        {
-            _logger.LogDebug("Skipping reminder notification for item {ItemId} '{Title}' — past due or fire time already passed", item.Id, item.Title);
-
-            return;
-        }
-
-        ScheduleItemAt(item, fireTime.Value);
+        ScheduleItemAt(item, CalculateNextFireTime(item));
     }
 
     private void ScheduleItemAt(ReminderResponse item, DateTime fireTimeUtc)
@@ -255,21 +229,27 @@ public class ReminderNotificationScheduler
         _diag.Record("reminder-diag", body);
     }
 
-    private static DateTime? CalculateFireTime(ReminderResponse item)
+    /// <summary>
+    /// The next occurrence (UTC) to arm for a recurring reminder. Today's <c>NotifyAt</c> when it is
+    /// still upcoming and today's occurrence is not already done/skipped; otherwise tomorrow's.
+    ///
+    /// Reminders recur daily, so being done/skipped <em>today</em> must roll the alarm forward to
+    /// tomorrow, not cancel it. The morning reminders were missed because the user only ever opens
+    /// the app after their time — so today's occurrence is already past (or completed), and the alarm
+    /// has to target tomorrow. The fire-time server check (<c>AlarmHandler</c>) still suppresses a
+    /// fire if that day's occurrence turns out to be already handled.
+    /// </summary>
+    private static DateTime CalculateNextFireTime(ReminderResponse item)
     {
         var notifyAt = item.NotifyAt!.Value;
 
-        // Reminders don't carry DueDate — fire today at the specified time.
-        var localFireTime = DateTime.Today + notifyAt.ToTimeSpan();
+        var todayFireUtc = DateTime.SpecifyKind(DateTime.Today + notifyAt.ToTimeSpan(), DateTimeKind.Local).ToUniversalTime();
 
-        var fireTimeUtc = DateTime.SpecifyKind(localFireTime, DateTimeKind.Local).ToUniversalTime();
-
-        // Already passed — caller will log and skip.
-        if (fireTimeUtc <= DateTime.UtcNow)
+        if (todayFireUtc > DateTime.UtcNow && !item.IsDone && !item.IsSkipped)
         {
-            return null;
+            return todayFireUtc;
         }
 
-        return fireTimeUtc;
+        return DateTime.SpecifyKind(DateTime.Today.AddDays(1) + notifyAt.ToTimeSpan(), DateTimeKind.Local).ToUniversalTime();
     }
 }

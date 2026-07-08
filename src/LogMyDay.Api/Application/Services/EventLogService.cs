@@ -51,11 +51,13 @@ public class EventLogService : IEventLogService
         }
     }
 
-    public async Task<PagedResult<EventLogResponse>> GetPaged(int pageNumber, int pageSize, Guid userId, bool isAdmin, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null, string sortBy = "time", bool sortDesc = true)
+    public async Task<PagedResult<EventLogResponse>> GetPaged(int pageNumber, int pageSize, Guid userId, bool isAdmin, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null, string sortBy = "time", bool sortDesc = true, EventLogCategoryFilter categoryFilter = EventLogCategoryFilter.All)
     {
         var query = _context.EventLogs
             .AsNoTracking()
             .Where(e => e.UserId == userId);
+
+        query = ApplyCategoryFilter(query, categoryFilter);
 
         if (levelFilter.HasValue)
         {
@@ -114,11 +116,13 @@ public class EventLogService : IEventLogService
         };
     }
 
-    public async Task<int> GetCount(Guid userId, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null)
+    public async Task<int> GetCount(Guid userId, EventLogLevel? levelFilter = null, string? messageFilter = null, DateTime? dateFrom = null, DateTime? dateTo = null, EventLogCategoryFilter categoryFilter = EventLogCategoryFilter.All)
     {
         var query = _context.EventLogs
             .AsNoTracking()
             .Where(e => e.UserId == userId);
+
+        query = ApplyCategoryFilter(query, categoryFilter);
 
         if (levelFilter.HasValue)
         {
@@ -141,6 +145,22 @@ public class EventLogService : IEventLogService
         }
 
         return await query.CountAsync();
+    }
+
+    // Categories are message-prefix conventions, not a database column: synced mobile diagnostics
+    // arrive as "[category] body"; other events use stable "Activity/Reminder/Todo list …"
+    // prefixes. "\" escapes "[" so the pattern stays literal on SQL Server as well as SQLite.
+    private static IQueryable<EventLog> ApplyCategoryFilter(IQueryable<EventLog> query, EventLogCategoryFilter categoryFilter)
+    {
+        return categoryFilter switch
+        {
+            EventLogCategoryFilter.ReminderDiag => query.Where(e => EF.Functions.Like(e.Message, @"\[reminder-diag]%", @"\")),
+            EventLogCategoryFilter.NoDiagnostics => query.Where(e => !EF.Functions.Like(e.Message, @"\[%", @"\")),
+            EventLogCategoryFilter.Activity => query.Where(e => EF.Functions.Like(e.Message, "Activity %")),
+            EventLogCategoryFilter.Reminder => query.Where(e => EF.Functions.Like(e.Message, "Reminder %")),
+            EventLogCategoryFilter.TodoList => query.Where(e => EF.Functions.Like(e.Message, "Todo list %")),
+            _ => query
+        };
     }
 
     public async Task DeleteEvents(Guid userId, int? olderThanDays)

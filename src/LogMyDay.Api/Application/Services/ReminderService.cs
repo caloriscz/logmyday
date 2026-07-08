@@ -1,6 +1,7 @@
 using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
@@ -76,7 +77,6 @@ public class ReminderService : IReminderService
             DisplayOrder = request.DisplayOrder,
             RecurrenceType = NormalizeRecurrence(request.RecurrenceType),
             AutoLogMode = request.AutoLogMode,
-            MonitorDaysBack = request.MonitorDaysBack,
             MonitorFromDate = request.MonitorFromDate,
             MonitorToDate = request.MonitorToDate,
             CompletionTagId = request.CompletionTagId,
@@ -90,7 +90,7 @@ public class ReminderService : IReminderService
         item.CompletionTag = completionTag;
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Reminder '{item.Title}' created (auto-log {item.AutoLogMode}, recurrence {item.RecurrenceType}, completionTag {completionTag?.TagName ?? Describe(item.CompletionTagId)}, monitorDaysBack {Describe(item.MonitorDaysBack)})");
+            $"Reminder '{item.Title}' created (auto-log {item.AutoLogMode}, recurrence {item.RecurrenceType}, completionTag {completionTag?.TagName ?? Describe(item.CompletionTagId)}, monitorRange {Describe(item.MonitorFromDate)}..{Describe(item.MonitorToDate)})");
 
         return MapItemToResponse(item);
     }
@@ -110,7 +110,6 @@ public class ReminderService : IReminderService
         var oldRecurrence = item.RecurrenceType;
         var oldIsDone = item.IsDone;
         var oldAutoLogMode = item.AutoLogMode;
-        var oldMonitorDaysBack = item.MonitorDaysBack;
         var oldMonitorFromDate = item.MonitorFromDate;
         var oldMonitorToDate = item.MonitorToDate;
         var oldCompletionTagId = item.CompletionTagId;
@@ -122,7 +121,6 @@ public class ReminderService : IReminderService
         item.DisplayOrder = request.DisplayOrder;
         item.RecurrenceType = NormalizeRecurrence(request.RecurrenceType);
         item.AutoLogMode = request.AutoLogMode;
-        item.MonitorDaysBack = request.MonitorDaysBack;
         item.MonitorFromDate = request.MonitorFromDate;
         item.MonitorToDate = request.MonitorToDate;
         item.CompletionTagId = request.CompletionTagId;
@@ -146,10 +144,6 @@ public class ReminderService : IReminderService
         if (oldRecurrence != item.RecurrenceType)
         {
             changes.Add($"recurrence {oldRecurrence}→{item.RecurrenceType}");
-        }
-        if (oldMonitorDaysBack != item.MonitorDaysBack)
-        {
-            changes.Add($"monitorDaysBack {Describe(oldMonitorDaysBack)}→{Describe(item.MonitorDaysBack)}");
         }
         if (oldMonitorFromDate != item.MonitorFromDate || oldMonitorToDate != item.MonitorToDate)
         {
@@ -223,8 +217,8 @@ public class ReminderService : IReminderService
             {
                 // De-dup is scoped to the completion's own local day only — NOT the
                 // reminder's monitoring window. Using the monitoring window here meant a
-                // multi-day window (weekly recurrence / MonitorDaysBack) silently
-                // overwrote separate days' activities instead of adding one per day.
+                // multi-day window (e.g. weekly recurrence) silently overwrote separate
+                // days' activities instead of adding one per day.
                 var (windowStart, windowEnd) = LocalDayWindowUtc(request.DoneAt, user);
 
                 var existing = await _context.Activities
@@ -272,6 +266,17 @@ public class ReminderService : IReminderService
         _logger.LogInformation("Auto-logged activity for tag {TagId} on reminder {ItemId} completion", item.CompletionTagId.Value, item.Id);
     }
 
+    // The value a skip records, by the completion tag's input type: an explicit zero for types that
+    // cannot be meaningfully empty, otherwise null (string/date/time/untyped — stored as empty).
+    private static string? ZeroValueForInputType(int? inputTypeId) => inputTypeId switch
+    {
+        InputTypeIds.Boolean => "false",
+        InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage
+            or InputTypeIds.StarRating or InputTypeIds.StarRating10
+            or InputTypeIds.Score or InputTypeIds.Score10 => "0",
+        _ => null
+    };
+
     // UTC bounds of the local calendar day that contains <paramref name="doneAtUtc"/>,
     // in the user's time zone. Used to scope AutoLogMode.ResetIfExists de-duplication to a
     // single day so re-completing the same day replaces, while separate days each keep their
@@ -311,23 +316,53 @@ public class ReminderService : IReminderService
 
     public async Task<ReminderResponse> Skip(int id, Guid userId, DateOnly? date = null)
     {
-        var item = await LoadItemForUser(id, userId);
+        var item = await _context.Reminders
+            .Include(i => i.CompletionTag)
+            .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
+
+        if (item == null)
+        {
+            throw new KeyNotFoundException("Reminder not found");
+        }
+
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var tz = ResolveTimeZone(user);
+        var localDate = ReferenceLocalDate(date, user);
 
         var skippedAt = DateTime.UtcNow;
         if (date.HasValue)
         {
             var localMidnight = date.Value.ToDateTime(TimeOnly.MinValue);
-            item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, ResolveTimeZone(user));
+            item.SkippedAt = TimeZoneInfo.ConvertTimeToUtc(localMidnight, tz);
         }
         else
         {
             item.SkippedAt = skippedAt;
         }
 
-        var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, ReferenceLocalDate(date, user), user));
+        var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, localDate, user));
         day.IsSkipped = true;
         day.SkippedAt = skippedAt;
+
+        // A skip still records a value so the day has an explicit data point instead of a gap:
+        // 0 for numeric/rating types, false for Boolean, empty for string. Always adds — no
+        // dedup — so re-skipping or skipping multiple days just produces multiple zero rows.
+        if (item.CompletionTagId.HasValue)
+        {
+            var zeroValue = ZeroValueForInputType(item.CompletionTag?.InputTypeId);
+            day.CompletionValue = zeroValue;
+
+            var skipDoneAt = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(new TimeOnly(12, 0)), tz);
+            await _activityService.Create(new ActivityRequest
+            {
+                PrimaryTagId = item.CompletionTagId.Value,
+                Description = zeroValue,
+                DateStarted = skipDoneAt
+            }, userId);
+
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Reminder '{item.Title}' skipped — logged '{zeroValue ?? "(empty)"}' to '{item.CompletionTag?.TagName ?? "?"}'");
+        }
 
         await PruneOldDays(item, user);
         await _context.SaveChangesAsync();
@@ -413,8 +448,7 @@ public class ReminderService : IReminderService
         var today = ReferenceLocalDate(null, user);
         var currentPeriod = PeriodDate(item, today, user);
 
-        var cutoff = item.MonitorDaysBack.HasValue ? today.AddDays(-item.MonitorDaysBack.Value)
-            : item.MonitorFromDate ?? today.AddDays(-365);
+        var cutoff = item.MonitorFromDate ?? today.AddDays(-365);
 
         if (cutoff > currentPeriod)
         {
@@ -470,7 +504,6 @@ public class ReminderService : IReminderService
             DateCreated = item.DateCreated,
             RecurrenceType = item.RecurrenceType,
             AutoLogMode = item.AutoLogMode,
-            MonitorDaysBack = item.MonitorDaysBack,
             MonitorFromDate = item.MonitorFromDate,
             MonitorToDate = item.MonitorToDate,
             CompletionTagId = item.CompletionTagId,
