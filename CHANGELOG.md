@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## Unreleased
+
+### Added
+
+  - Color Schemes: define reusable named schemes that map rating, score, percentage and integer values (exact values or ranges) to colors, assign one per tag, and see them applied across Activities, the Insights Calendar and Linear Calendar, and the shared rating displays. Ships direction-aware default colors out of the box (stars and percentage higher = better; scores lower = better) with per-tag overrides.
+
 ## v0.6.0 — 2026‑07‑08
 
 ### Added

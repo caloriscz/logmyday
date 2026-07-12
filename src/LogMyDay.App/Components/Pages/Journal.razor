@@ -10,6 +10,8 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<Journal> Logger
 @inject IUserPreferencesService UserPreferencesService
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Journal", "Read activity journal entries")]
 
@@ -164,7 +166,7 @@
                                         <!-- Description - wraps and continues at same indent -->
                                         <div class="flex-1 min-w-0">
                                             @{ var jrnTag = allTags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            <ActivityValueDisplay TypeId="@jrnTag?.TypeId" Value="@activity.Description" />
+                                            <ActivityValueDisplay TypeId="@jrnTag?.TypeId" Value="@activity.Description" Color="@_schemes.ResolveColor(jrnTag?.TypeId, jrnTag?.ColorSchemeId, activity.Description)" />
                                         </div>
 
                                         <!-- Action Buttons -->
@@ -259,6 +261,7 @@
     private List<int>? availableYears;
     private List<TagResponse>? stringTags;
     private List<TagResponse>? allTags;
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
     private List<ActivityResponse>? activities;
     private List<DateGrouping>? groupedActivities;
     
@@ -320,6 +323,7 @@
             
             // Load all tags and filter for string input type
             allTags = (await ActivityApi.GetTags()).ToList();
+            _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
             stringTags = stringInputType != null 
                 ? allTags.Where(t => t.InputTypeId == stringInputType.Id).ToList()
                 : new List<TagResponse>();

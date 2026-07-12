@@ -1,0 +1,523 @@
+@page "/color-schemes"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.App.Services
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@inject ILogger<ColorSchemes> Logger
+@inject IPageTitleService PageTitleService
+
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("ColorSchemes", "Manage color schemes that map rating values to colors")]
+
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <PageHeader Title="Color Schemes" Subtitle="Map rating, score and percentage values to colors so good and bad are obvious at a glance.">
+        <Actions>
+            <div class="flex items-center gap-3">
+                <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                    <Icon Name="tag" Class="h-4 w-4" />
+                    Tags
+                </a>
+                <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@isBusy">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    New Scheme
+                </button>
+            </div>
+        </Actions>
+    </PageHeader>
+
+    <section class="space-y-4">
+        @if (isLoading)
+        {
+            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading schemes…</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+        else if (schemes.Count == 0)
+        {
+            <EmptyState Message="No color schemes yet. Create one, then assign it to a tag from the tag editor." />
+        }
+        else
+        {
+            <!-- Desktop Table -->
+            <div class="hidden md:block">
+                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead class="bg-gray-50 dark:bg-slate-800">
+                            <tr>
+                                <th scope="col" class="w-24 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300"></th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Name</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Preview</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                            @foreach (var scheme in schemes)
+                            {
+                                <tr class="transition-colors hover:bg-gray-50 focus-within:bg-gray-50 dark:even:bg-slate-800/30 dark:hover:bg-slate-800/60 dark:focus-within:bg-slate-800/60">
+                                    <td class="px-4 py-3">
+                                        <div class="flex">
+                                            <button type="button" class="inline-flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(scheme)" disabled="@isBusy">
+                                                <Icon Name="pencil" Class="h-4 w-4" />
+                                            </button>
+                                            <button type="button" class="inline-flex items-center rounded-md px-2 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(scheme)" disabled="@isBusy">
+                                                <Icon Name="trash" Class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-slate-100">@scheme.Name</td>
+                                    <td class="px-4 py-3">@PreviewStrip(scheme.Entries)</td>
+                                    <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">@(string.IsNullOrWhiteSpace(scheme.Description) ? "—" : scheme.Description)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mobile Cards -->
+            <div class="space-y-3 md:hidden">
+                @foreach (var scheme in schemes)
+                {
+                    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">@scheme.Name</h3>
+                                @if (!string.IsNullOrWhiteSpace(scheme.Description))
+                                {
+                                    <p class="mt-1 text-sm text-gray-600 dark:text-slate-400">@scheme.Description</p>
+                                }
+                                <div class="mt-2">@PreviewStrip(scheme.Entries)</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex justify-end gap-2">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(scheme)" disabled="@isBusy">
+                                <Icon Name="pencil" Class="h-4 w-4" />
+                                <span>Edit</span>
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => ConfirmDelete(scheme)" disabled="@isBusy">
+                                <Icon Name="trash" Class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                Total schemes: @schemes.Count
+            </div>
+        }
+    </section>
+</div>
+
+@* Create/Edit Modal *@
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isBusy) CloseModal(); }">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(isEditing ? "Edit Scheme" : "New Scheme")</h2>
+                    <p class="text-sm text-gray-600 dark:text-slate-400">Assign colors to exact values or ranges.</p>
+                </div>
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                    <Icon Name="close" Class="h-5 w-5" />
+                </button>
+            </div>
+
+            <EditForm Model="formModel" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @formError
+                    </div>
+                }
+
+                <div class="px-6 py-5">
+                    <div class="space-y-5">
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Name <span class="text-rose-500">*</span></label>
+                            <InputText @bind-Value="formModel.Name" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="e.g., Pain 0-10, Mood 1-5" disabled="@isBusy" />
+                            <ValidationMessage For="@(() => formModel.Name)" class="text-xs text-rose-600 dark:text-rose-400" />
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Description</label>
+                            <InputText @bind-Value="formModel.Description" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional description" disabled="@isBusy" />
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Color entries</label>
+                                <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddEntryRow" disabled="@isBusy">
+                                    <Icon Name="plus" Class="h-3.5 w-3.5" />
+                                    Add entry
+                                </button>
+                            </div>
+
+                            @if (formEntries.Count == 0)
+                            {
+                                <p class="text-xs text-gray-500 dark:text-slate-400">No entries — tags using this scheme will show no color until you add at least one.</p>
+                            }
+                            else
+                            {
+                                <div class="mb-2">@PreviewStripRows()</div>
+                                <div class="space-y-2">
+                                    @foreach (var row in formEntries)
+                                    {
+                                        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                                            <select @bind="row.IsRange" class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
+                                                <option value="false">Exact</option>
+                                                <option value="true">Range</option>
+                                            </select>
+
+                                            @if (row.IsRange)
+                                            {
+                                                <input type="number" step="any" @bind="row.From" placeholder="from (min)" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                                <span class="text-xs text-gray-500 dark:text-slate-400">to</span>
+                                                <input type="number" step="any" @bind="row.To" placeholder="to (max)" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                            }
+                                            else
+                                            {
+                                                <input type="number" step="any" @bind="row.Value" placeholder="value" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
+                                            }
+
+                                            <input type="color" @bind="row.Color" class="h-8 w-10 cursor-pointer rounded border border-gray-300 dark:border-slate-700" disabled="@isBusy" title="Pick color" />
+
+                                            <div class="flex items-center gap-1">
+                                                @foreach (var preset in PresetColors)
+                                                {
+                                                    <button type="button" class="h-5 w-5 rounded-full border border-black/10 dark:border-white/20" style="background-color:@preset" @onclick="() => row.Color = preset" title="@preset" disabled="@isBusy"></button>
+                                                }
+                                            </div>
+
+                                            <button type="button" class="ml-auto inline-flex items-center rounded-md px-2 py-1 text-rose-600 transition-all hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => RemoveEntryRow(row)" disabled="@isBusy" title="Remove entry">
+                                                <Icon Name="trash" Class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-slate-400">Entries are matched top to bottom; the first match wins. Leave a range bound empty for open-ended (e.g. from 90 with no max = 90 and above).</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" disabled="@isBusy">
+                        @if (isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="check" Class="h-4 w-4" />
+                            <span>@(isEditing ? "Save Changes" : "Create Scheme")</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (pendingDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete scheme</h3>
+            </div>
+            <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                Delete scheme <strong>@pendingDelete.Name</strong>? Tags using it will fall back to the default colors. This cannot be undone.
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="CancelDelete" disabled="@isBusy">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500" @onclick="DeleteScheme" disabled="@isBusy">
+                    @if (isBusy)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Deleting…</span>
+                    }
+                    else
+                    {
+                        <Icon Name="trash" Class="h-4 w-4" />
+                        <span>Delete</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly string[] PresetColors =
+    {
+        "#ef4444", "#f59e0b", "#eab308", "#22c55e", "#0ea5e9", "#6366f1", "#9ca3af"
+    };
+
+    private readonly List<ColorSchemeResponse> schemes = new();
+    private ColorSchemeRequest formModel = new() { Name = string.Empty };
+    private readonly List<EntryRow> formEntries = new();
+
+    private string? loadError;
+    private string? formError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool isEditing;
+    private int? editingId;
+    private bool showModal;
+    private ColorSchemeResponse? pendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Color Schemes");
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var results = await ColorSchemeApi.GetColorSchemes();
+            schemes.Clear();
+            schemes.AddRange(results.OrderBy(s => s.DisplayOrder ?? int.MaxValue).ThenBy(s => s.Name));
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view color schemes.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load color schemes: {ex.Message}";
+            Logger.LogError(ex, "Failed to load color schemes");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        if (isBusy) return;
+
+        isEditing = false;
+        editingId = null;
+        formModel = new ColorSchemeRequest { Name = string.Empty };
+        formEntries.Clear();
+        formError = null;
+        showModal = true;
+    }
+
+    private void OpenEditModal(ColorSchemeResponse scheme)
+    {
+        if (isBusy) return;
+
+        isEditing = true;
+        editingId = scheme.Id;
+        formModel = new ColorSchemeRequest
+        {
+            Name = scheme.Name,
+            Description = scheme.Description,
+            DisplayOrder = scheme.DisplayOrder
+        };
+
+        formEntries.Clear();
+        foreach (var entry in scheme.Entries.OrderBy(e => e.SortOrder))
+        {
+            var isExact = entry.RangeFrom.HasValue && entry.RangeTo.HasValue && entry.RangeFrom == entry.RangeTo;
+            formEntries.Add(new EntryRow
+            {
+                IsRange = !isExact,
+                Value = isExact ? entry.RangeFrom : null,
+                From = entry.RangeFrom,
+                To = entry.RangeTo,
+                Color = entry.Color
+            });
+        }
+
+        formError = null;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        formError = null;
+    }
+
+    private void AddEntryRow()
+    {
+        formEntries.Add(new EntryRow { Color = PresetColors[3] });
+    }
+
+    private void RemoveEntryRow(EntryRow row)
+    {
+        formEntries.Remove(row);
+    }
+
+    private async Task HandleSubmit()
+    {
+        isBusy = true;
+        formError = null;
+
+        formModel.Entries = formEntries.Select((row, index) => new ColorSchemeEntryRequest
+        {
+            RangeFrom = row.IsRange ? row.From : row.Value,
+            RangeTo = row.IsRange ? row.To : row.Value,
+            Color = row.Color,
+            SortOrder = index
+        }).ToList();
+
+        try
+        {
+            if (isEditing && editingId.HasValue)
+            {
+                await ColorSchemeApi.UpdateColorScheme(editingId.Value, formModel);
+            }
+            else
+            {
+                await ColorSchemeApi.CreateColorScheme(formModel);
+            }
+
+            CloseModal();
+            await LoadDataAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            formError = "You are not authorized to perform this action.";
+        }
+        catch (Exception ex)
+        {
+            formError = $"Failed to save: {ex.Message}";
+            Logger.LogError(ex, "Failed to save color scheme");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void ConfirmDelete(ColorSchemeResponse scheme)
+    {
+        if (isBusy) return;
+
+        pendingDelete = scheme;
+    }
+
+    private void CancelDelete()
+    {
+        pendingDelete = null;
+    }
+
+    private async Task DeleteScheme()
+    {
+        if (pendingDelete is null) return;
+
+        isBusy = true;
+
+        try
+        {
+            await ColorSchemeApi.DeleteColorScheme(pendingDelete.Id);
+            schemes.Remove(pendingDelete);
+            pendingDelete = null;
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to delete color schemes.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to delete scheme: {ex.Message}";
+            Logger.LogError(ex, "Failed to delete color scheme {SchemeId}", pendingDelete?.Id);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private RenderFragment PreviewStrip(IEnumerable<ColorSchemeEntryResponse> entries) => builder =>
+    {
+        var ordered = entries.OrderBy(e => e.SortOrder).ToList();
+        if (ordered.Count == 0)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "text-xs text-gray-400 dark:text-slate-500");
+            builder.AddContent(2, "—");
+            builder.CloseElement();
+            return;
+        }
+
+        builder.OpenElement(3, "span");
+        builder.AddAttribute(4, "class", "inline-flex items-center gap-1");
+        var seq = 5;
+        foreach (var entry in ordered)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "inline-block h-4 w-4 rounded-full border border-black/10 dark:border-white/20");
+            builder.AddAttribute(seq++, "style", $"background-color:{entry.Color}");
+            builder.AddAttribute(seq++, "title", EntryLabel(entry.RangeFrom, entry.RangeTo));
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment PreviewStripRows() => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "inline-flex items-center gap-1");
+        var seq = 2;
+        foreach (var row in formEntries)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "inline-block h-4 w-4 rounded-full border border-black/10 dark:border-white/20");
+            builder.AddAttribute(seq++, "style", $"background-color:{row.Color}");
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private static string EntryLabel(double? from, double? to)
+    {
+        if (from.HasValue && to.HasValue && from == to)
+        {
+            return from.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var fromText = from?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "−∞";
+        var toText = to?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "+∞";
+
+        return $"{fromText}–{toText}";
+    }
+
+    private sealed class EntryRow
+    {
+        public bool IsRange { get; set; }
+        public double? Value { get; set; }
+        public double? From { get; set; }
+        public double? To { get; set; }
+        public string Color { get; set; } = "#22c55e";
+    }
+}

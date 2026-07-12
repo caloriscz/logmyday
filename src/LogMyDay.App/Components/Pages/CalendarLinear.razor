@@ -12,6 +12,8 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject IJSRuntime JSRuntime
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Linear Calendar", "View activities in linear timeline")]
 
@@ -261,7 +263,15 @@
                                     <div class="day-num text-gray-900 dark:text-slate-100">@day</div>
                                     @if (hasValues && dayValues != null)
                                     {
-                                        <div class="day-value text-emerald-600 dark:text-emerald-400" title="@dayValues[0]">@displayValue</div>
+                                        var cellColor = _schemes.ResolveColor(SelectedTag?.TypeId, SelectedTag?.ColorSchemeId, dayValues[0]);
+                                        if (cellColor != null)
+                                        {
+                                            <div class="day-value" style="color:@cellColor" title="@dayValues[0]">@displayValue</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="day-value text-emerald-600 dark:text-emerald-400" title="@dayValues[0]">@displayValue</div>
+                                        }
                                     }
                                 </button>
                             }
@@ -339,11 +349,11 @@
                                     @{ var linTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
                                        if (IsStarRatingTag(linTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var linStars))
                                        {
-                                           <div><StarDisplay Value="@linStars" MaxStars="@GetStarMax(linTag!)" /></div>
+                                           <div><StarDisplay Value="@linStars" MaxStars="@GetStarMax(linTag!)" Color="@_schemes.ResolveColor(linTag?.TypeId, linTag?.ColorSchemeId, activity.PrimaryTagValue ?? activity.Description)" /></div>
                                        }
                                        else if (IsScoreTag(linTag) && int.TryParse(activity.PrimaryTagValue ?? activity.Description, out var linScore))
                                        {
-                                           <div><ScoreDisplay Value="@linScore" MaxScore="@GetStarMax(linTag!)" /></div>
+                                           <div><ScoreDisplay Value="@linScore" MaxScore="@GetStarMax(linTag!)" Color="@_schemes.ResolveColor(linTag?.TypeId, linTag?.ColorSchemeId, activity.PrimaryTagValue ?? activity.Description)" /></div>
                                        }
                                        else if (linTag?.TypeId == InputTypeIds.Boolean)
                                        {
@@ -429,11 +439,13 @@
 
     private IList<TagResponse>? tags;
     private Dictionary<string, List<string>>? activitiesByDate;
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
     private List<ActivityResponse> dayActivities = new();
 
     private int? selectedTagId;
+    private TagResponse? SelectedTag => selectedTagId.HasValue ? tags?.FirstOrDefault(t => t.Id == selectedTagId.Value) : null;
     private string? errorMessage;
     private int currentYear = DateTime.Now.Year;
     private List<int> availableYears = new();
@@ -626,6 +638,7 @@
         try
         {
             tags = await ActivityApi.GetTags();
+            _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
             await EnsureOptionListsLoadedAsync();
         }
         catch (Exception ex)

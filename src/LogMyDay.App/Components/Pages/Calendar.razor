@@ -12,6 +12,8 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject IJSRuntime JSRuntime
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Calendar", "View activities in calendar format")]
 
@@ -127,7 +129,15 @@
                                                             @foreach (var value in dayValues)
                                                             {
                                                                 var inlineText = GetInlineText(value);
-                                                                <span class="@ValueBadgeCss" title="@value">@inlineText</span>
+                                                                var cellColor = _schemes.ResolveColor(SelectedTag?.TypeId, SelectedTag?.ColorSchemeId, value);
+                                                                if (cellColor != null)
+                                                                {
+                                                                    <span class="@ValueBadgeBaseCss" style="background-color:@cellColor" title="@value">@inlineText</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="@ValueBadgeCss" title="@value">@inlineText</span>
+                                                                }
                                                             }
                                                         </div>
                                                     }
@@ -197,7 +207,7 @@
                                 <div class="space-y-1">
                                     <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100">@activity.PrimaryTagName</h4>
                                     @{ var calTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                    <ActivityValueDisplay TypeId="@calTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="">
+                                    <ActivityValueDisplay TypeId="@calTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@_schemes.ResolveColor(calTag?.TypeId, calTag?.ColorSchemeId, activity.PrimaryTagValue ?? activity.Description)" WrapperClass="">
                                         <TextFallback>
                                             @{ var calDisplayValue = FormatActivityValue(activity); }
                                             @if (!string.IsNullOrWhiteSpace(calDisplayValue))
@@ -266,6 +276,7 @@
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
     private const string ValueBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-xs dark:bg-emerald-500/80";
+    private const string ValueBadgeBaseCss = "flex w-full min-h-7 items-center justify-center rounded-md px-2.5 py-1 text-xs font-semibold text-white shadow-xs";
     private const string EmptyBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-200";
     private const string OrderButtonInactive = "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200";
     private const string OrderButtonActive = "inline-flex items-center justify-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white shadow-xs dark:bg-slate-200 dark:text-slate-900";
@@ -275,12 +286,14 @@
     private static readonly string[] DayNames = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
 
     private IList<TagResponse>? tags;
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
     private Dictionary<string, List<string>>? activitiesByDate;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
     private List<ActivityResponse> dayActivities = new();
 
     private int? selectedTagId;
+    private TagResponse? SelectedTag => selectedTagId.HasValue ? tags?.FirstOrDefault(t => t.Id == selectedTagId.Value) : null;
     private string? errorMessage;
     private int currentYear = DateTime.Now.Year;
     private List<int> availableYears = new();
@@ -362,6 +375,7 @@
         try
         {
             tags = await ActivityApi.GetTags();
+            _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
             await EnsureOptionListsLoadedAsync();
         }
         catch (Exception ex)

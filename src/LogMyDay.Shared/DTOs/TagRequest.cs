@@ -19,4 +19,5 @@ public class TagRequest
     public string? DefaultValue { get; set; }
     public int? OptionListId { get; set; }
     public int? GroupId { get; set; }
+    public int? ColorSchemeId { get; set; }
 }

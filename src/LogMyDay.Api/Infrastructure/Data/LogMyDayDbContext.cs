@@ -28,6 +28,8 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagDayLock> TagDayLocks => Set<TagDayLock>();
     public DbSet<Reminder> Reminders => Set<Reminder>();
     public DbSet<ReminderDay> ReminderDays => Set<ReminderDay>();
+    public DbSet<ColorScheme> ColorSchemes => Set<ColorScheme>();
+    public DbSet<ColorSchemeEntry> ColorSchemeEntries => Set<ColorSchemeEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,6 +56,8 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagDayLock>().ToTable("LogMyDay_TagDayLocks");
         modelBuilder.Entity<Reminder>().ToTable("LogMyDay_Reminders");
         modelBuilder.Entity<ReminderDay>().ToTable("LogMyDay_ReminderDays");
+        modelBuilder.Entity<ColorScheme>().ToTable("LogMyDay_ColorSchemes");
+        modelBuilder.Entity<ColorSchemeEntry>().ToTable("LogMyDay_ColorSchemeEntries");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -102,6 +106,7 @@ public class LogMyDayDbContext : DbContext
             entity.HasOne(t => t.Unit).WithMany().HasForeignKey(t => t.UnitId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(t => t.OptionList).WithMany().HasForeignKey(t => t.OptionListId).OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(t => t.Group).WithMany().HasForeignKey(t => t.GroupId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(t => t.ColorScheme).WithMany().HasForeignKey(t => t.ColorSchemeId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TagGroup>(entity =>
@@ -254,6 +259,24 @@ public class LogMyDayDbContext : DbContext
                 entity.Property(d => d.DoneAt).HasColumnType("datetime2");
                 entity.Property(d => d.SkippedAt).HasColumnType("datetime2");
             }
+        });
+
+        modelBuilder.Entity<ColorScheme>(entity =>
+        {
+            entity.HasMany(s => s.Entries)
+                .WithOne(e => e.ColorScheme)
+                .HasForeignKey(e => e.ColorSchemeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(s => s.UserId).HasDatabaseName("IX_LogMyDay_ColorSchemes_UserId");
+            entity.Property(s => s.Name).HasMaxLength(100).IsRequired();
+            entity.Property(s => s.Description).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<ColorSchemeEntry>(entity =>
+        {
+            entity.Property(e => e.Color).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.Label).HasMaxLength(100);
         });
 
         modelBuilder.SeedData();

@@ -28,6 +28,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<ITagOptionListService, TagOptionListService>();
         services.AddScoped<IScanMappingService, ScanMappingService>();
         services.AddScoped<ITagGroupService, TagGroupService>();
+        services.AddScoped<IColorSchemeService, ColorSchemeService>();
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<ITodoListService, TodoListService>();
         services.AddScoped<ITodoItemService, TodoItemService>();

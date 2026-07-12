@@ -8,22 +8,22 @@
 {
     @if (WrapperClass is not null)
     {
-        <div class="@WrapperClass"><StarDisplay Value="@stars" MaxStars="@maxScore" /></div>
+        <div class="@WrapperClass"><StarDisplay Value="@stars" MaxStars="@maxScore" Color="@Color" /></div>
     }
     else
     {
-        <StarDisplay Value="@stars" MaxStars="@maxScore" />
+        <StarDisplay Value="@stars" MaxStars="@maxScore" Color="@Color" />
     }
 }
 else if (TypeId is InputTypeIds.Score or InputTypeIds.Score10 && int.TryParse(Value, out var score))
 {
     @if (WrapperClass is not null)
     {
-        <div class="@WrapperClass"><ScoreDisplay Value="@score" MaxScore="@maxScore" /></div>
+        <div class="@WrapperClass"><ScoreDisplay Value="@score" MaxScore="@maxScore" Color="@Color" /></div>
     }
     else
     {
-        <ScoreDisplay Value="@score" MaxScore="@maxScore" />
+        <ScoreDisplay Value="@score" MaxScore="@maxScore" Color="@Color" />
     }
 }
 else if (TypeId == InputTypeIds.Boolean)
@@ -35,6 +35,17 @@ else if (TypeId == InputTypeIds.Boolean)
     else
     {
         <BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" />
+    }
+}
+else if (TypeId is InputTypeIds.Percentage or InputTypeIds.Integer or InputTypeIds.Decimal && !string.IsNullOrEmpty(Value))
+{
+    @if (WrapperClass is not null)
+    {
+        <div class="@WrapperClass"><NumericBadge Text="@Value" Color="@Color" /></div>
+    }
+    else
+    {
+        <NumericBadge Text="@Value" Color="@Color" />
     }
 }
 else if (TextFallback is not null)
@@ -50,5 +61,9 @@ else if (!string.IsNullOrEmpty(Value))
     [Parameter] public int? TypeId { get; set; }
     [Parameter] public string? Value { get; set; }
     [Parameter] public string? WrapperClass { get; set; }
+
+    /// <summary>Resolved color for this value from the tag's color scheme (see ColorSchemeResolver).</summary>
+    [Parameter] public string? Color { get; set; }
+
     [Parameter] public RenderFragment? TextFallback { get; set; }
 }
