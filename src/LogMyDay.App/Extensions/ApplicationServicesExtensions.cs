@@ -9,6 +9,7 @@ using LogMyDay.Api.Security;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Services;
 using LogMyDay.App.Services.Charts;
+using LogMyDay.App.Services.Insights;
 using LogMyDay.Shared.Serialization;
 using Microsoft.Extensions.AI;
 using OpenAI;
@@ -53,6 +54,10 @@ internal static class ApplicationServicesExtensions
         // Chart services
         services.AddScoped<IChartPreferencesService, ChartPreferencesService>();
         services.AddScoped<IChartDataService, ChartDataService>();
+
+        // Insights services
+        services.AddScoped<IComparisonDataService, ComparisonDataService>();
+        services.AddScoped<IComparisonPreferencesService, ComparisonPreferencesService>();
 
         // Authentication and user services
         services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();

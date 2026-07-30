@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
+  - Insights → Timeline Comparison: a new web view that lays two to five tags out as horizontal timeline rows over the same day columns. The first row is the reference; later rows either follow its dates or sit at a day offset from them, so relationships like coffee today against sleep the following night, or this year against the same period last year, can be read off directly. Each row picks its own aggregation (first value, sum, average, count, maximum), the visible period is 7/14/30/90 days with day, week, month, year and whole-period navigation, and cells reuse the existing tag color schemes.
   - Color Schemes: define reusable named schemes that map rating, score, percentage and integer values (exact values or ranges) to colors, assign one per tag, and see them applied across Activities, the Insights Calendar and Linear Calendar, and the shared rating displays. Ships direction-aware default colors out of the box (stars and percentage higher = better; scores lower = better) with per-tag overrides.
 
 ## v0.6.0 — 2026‑07‑08
