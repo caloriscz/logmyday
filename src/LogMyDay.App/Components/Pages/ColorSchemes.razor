@@ -176,21 +176,33 @@
                                     @foreach (var row in formEntries)
                                     {
                                         <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
-                                            <select @bind="row.IsRange" class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy">
-                                                <option value="false">Exact</option>
-                                                <option value="true">Range</option>
-                                            </select>
+                                            @* Bound through explicit strings rather than @bind on the bool:
+                                               BindConverter.FormatValue(bool) yields a bool, which renders as
+                                               "False"/"True", so lower-case option values never matched and the
+                                               select showed nothing selected. *@
+                                            @* Fixed-width slots, kept in one non-wrapping group, so an Exact row and a
+                                               Range row occupy the same columns. An exact value sits where a range's
+                                               upper bound sits, which lines the colour controls up down one edge
+                                               instead of stepping right on range rows. *@
+                                            <div class="flex shrink-0 items-center gap-2">
+                                                <select value="@(row.IsRange ? RangeMode : ExactMode)" @onchange="e => SetRowMode(row, e.Value?.ToString())" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" aria-label="Entry type">
+                                                    <option value="@ExactMode">Exact</option>
+                                                    <option value="@RangeMode">Range</option>
+                                                </select>
 
-                                            @if (row.IsRange)
-                                            {
-                                                <input type="number" step="any" @bind="row.From" placeholder="from (min)" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
-                                                <span class="text-xs text-gray-500 dark:text-slate-400">to</span>
-                                                <input type="number" step="any" @bind="row.To" placeholder="to (max)" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
-                                            }
-                                            else
-                                            {
-                                                <input type="number" step="any" @bind="row.Value" placeholder="value" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" />
-                                            }
+                                                @if (row.IsRange)
+                                                {
+                                                    <input type="number" step="any" @bind="row.From" placeholder="min" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" aria-label="Range minimum" />
+                                                    <span class="w-6 text-center text-xs text-gray-500 dark:text-slate-400">to</span>
+                                                    <input type="number" step="any" @bind="row.To" placeholder="max" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" aria-label="Range maximum" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="w-24" aria-hidden="true"></span>
+                                                    <span class="w-6" aria-hidden="true"></span>
+                                                    <input type="number" step="any" @bind="row.Value" placeholder="value" class="w-24 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@isBusy" aria-label="Exact value" />
+                                                }
+                                            </div>
 
                                             <input type="color" @bind="row.Color" class="h-8 w-10 cursor-pointer rounded border border-gray-300 dark:border-slate-700" disabled="@isBusy" title="Pick color" />
 
@@ -207,7 +219,12 @@
                                         </div>
                                     }
                                 </div>
-                                <p class="text-xs text-gray-500 dark:text-slate-400">Entries are matched top to bottom; the first match wins. Leave a range bound empty for open-ended (e.g. from 90 with no max = 90 and above).</p>
+                                <ul class="space-y-1 text-xs text-gray-500 dark:text-slate-400">
+                                    <li><span class="font-semibold">Exact</span> takes one number and matches only that value.</li>
+                                    <li><span class="font-semibold">Range</span> takes two separate numbers — a minimum and a maximum. Type <span class="font-mono">1</span> and <span class="font-mono">5</span> in the two boxes rather than <span class="font-mono">1-5</span> in one.</li>
+                                    <li>Leave one range bound empty for open-ended: a minimum of <span class="font-mono">90</span> with no maximum matches 90 and above.</li>
+                                    <li>Entries are matched top to bottom and the first match wins, so put narrower entries above wider ones.</li>
+                                </ul>
                             }
                         </div>
                     </div>
@@ -272,6 +289,9 @@
     {
         "#ef4444", "#f59e0b", "#eab308", "#22c55e", "#0ea5e9", "#6366f1", "#9ca3af"
     };
+
+    private const string ExactMode = "exact";
+    private const string RangeMode = "range";
 
     private readonly List<ColorSchemeResponse> schemes = new();
     private ColorSchemeRequest formModel = new() { Name = string.Empty };
@@ -372,6 +392,32 @@
         formEntries.Add(new EntryRow { Color = PresetColors[3] });
     }
 
+    /// <summary>
+    /// Switches a row between exact and range, carrying the number across so changing your mind does not
+    /// silently discard what you already typed.
+    /// </summary>
+    private static void SetRowMode(EntryRow row, string? mode)
+    {
+        var isRange = mode == RangeMode;
+
+        if (row.IsRange == isRange)
+        {
+            return;
+        }
+
+        if (isRange)
+        {
+            row.From = row.Value;
+            row.To = row.Value;
+        }
+        else
+        {
+            row.Value = row.From ?? row.To;
+        }
+
+        row.IsRange = isRange;
+    }
+
     private void RemoveEntryRow(EntryRow row)
     {
         formEntries.Remove(row);
@@ -379,8 +425,14 @@
 
     private async Task HandleSubmit()
     {
+        formError = ValidateEntries();
+
+        if (formError is not null)
+        {
+            return;
+        }
+
         isBusy = true;
-        formError = null;
 
         formModel.Entries = formEntries.Select((row, index) => new ColorSchemeEntryRequest
         {
@@ -417,6 +469,41 @@
         {
             isBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Rejects entries that carry no usable number. Without this an empty row saves as a pair of nulls,
+    /// which the resolver reads as unbounded on both sides — an entry that silently swallows every value.
+    /// </summary>
+    private string? ValidateEntries()
+    {
+        for (var i = 0; i < formEntries.Count; i++)
+        {
+            var row = formEntries[i];
+            var position = i + 1;
+
+            if (!row.IsRange)
+            {
+                if (!row.Value.HasValue)
+                {
+                    return $"Entry {position}: enter the exact value it should match.";
+                }
+
+                continue;
+            }
+
+            if (!row.From.HasValue && !row.To.HasValue)
+            {
+                return $"Entry {position}: a range needs at least one bound — set a minimum, a maximum, or both.";
+            }
+
+            if (row.From.HasValue && row.To.HasValue && row.From > row.To)
+            {
+                return $"Entry {position}: the minimum ({row.From}) is above the maximum ({row.To}).";
+            }
+        }
+
+        return null;
     }
 
     private void ConfirmDelete(ColorSchemeResponse scheme)
