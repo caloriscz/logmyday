@@ -19,7 +19,9 @@
 
 <div class="min-h-screen bg-gray-50 pb-20 dark:bg-gray-900">
     <div class="bg-linear-to-br from-violet-400 to-fuchsia-500 shadow-lg dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-slate-900/50">
-        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        @* max-w-(--breakpoint-2xl), not max-w-7xl: only the breakpoint forms are relaxed to 100% by the
+           html.layout-wide rule in app.css, so this is what lets the navbar's wide toggle reach this page. *@
+        <div class="mx-auto max-w-(--breakpoint-2xl) px-4 py-6 sm:px-6 lg:px-8">
             <div class="flex items-center gap-3">
                 <button type="button" aria-label="Back to Insights"
                         class="rounded-lg p-2 transition-colors hover:bg-white/10 dark:hover:bg-slate-800/60"
@@ -34,7 +36,7 @@
         </div>
     </div>
 
-    <div class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         <!-- Period controls. Deliberately separate from the per-row offset controls in each row header:
              these move the whole visible window, those move one row relative to the reference row. -->
         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
@@ -235,7 +237,9 @@
     private const string EmptyBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-1 py-1 text-xs font-medium text-amber-700 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-200";
 
     // The sticky column must carry an opaque background, or the scrolling day columns show through it.
-    private const string StickyLabelCss = "sticky left-0 w-64 min-w-64 border-r border-gray-200 bg-white p-3 text-left shadow-[2px_0_4px_rgba(0,0,0,0.04)] dark:border-slate-700 dark:bg-slate-900";
+    // It widens at xl so the row's three selects fit on one line; below that it keeps the narrow stacked
+    // layout that suits phones and tablets. Sticky cells do not auto-size, so each width is explicit.
+    private const string StickyLabelCss = "sticky left-0 w-64 min-w-64 xl:w-[30rem] xl:min-w-[30rem] border-r border-gray-200 bg-white p-3 text-left shadow-[2px_0_4px_rgba(0,0,0,0.04)] dark:border-slate-700 dark:bg-slate-900";
     private const string ColumnHighlightCss = "bg-primary-50 dark:bg-slate-800/60";
 
     private const int MaxRawValuesInTooltip = 10;
