@@ -36,7 +36,9 @@ public class BasicAuthHandlerTests
         var options = new Mock<IOptionsMonitor<AuthenticationSchemeOptions>>();
         options.Setup(o => o.Get(It.IsAny<string>())).Returns(new AuthenticationSchemeOptions());
 
-        var handler = new BasicAuthHandler(options.Object, NullLoggerFactory.Instance, UrlEncoder.Default, userService, hasher, tracker);
+        var verificationCache = new PasswordVerificationCache(new MemoryCache(new MemoryCacheOptions()));
+
+        var handler = new BasicAuthHandler(options.Object, NullLoggerFactory.Instance, UrlEncoder.Default, userService, hasher, tracker, verificationCache);
 
         var context = new DefaultHttpContext();
         var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Email}:{Password}"));

@@ -59,6 +59,7 @@ public static class MauiProgram
             // Dynamic API context & clients with dynamic authentication
             builder.Services.Add(new ServiceDescriptor(typeof(IApiContext), typeof(ApiContext), ServiceLifetime.Singleton));
             builder.Services.AddTransient<DynamicAuthHandler>();
+            builder.Services.AddTransient<TimingDiagnosticHandler>();
             builder.Services.AddHttpClient("dynamic-api")
                 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
                 {
@@ -67,6 +68,9 @@ public static class MauiProgram
                     MaxConnectionsPerServer = 4,
                     EnableMultipleHttp2Connections = true
                 })
+                // Timing first so it is the outermost handler and its stopwatch spans the TLS
+                // handshake as well as the request itself.
+                .AddHttpMessageHandler<TimingDiagnosticHandler>()
                 .AddHttpMessageHandler<DynamicAuthHandler>();
             builder.Services.Add(new ServiceDescriptor(typeof(IApiClientProvider), typeof(ApiClientProvider), ServiceLifetime.Singleton));
             // Adapter so existing pages injecting API interfaces continue to work
