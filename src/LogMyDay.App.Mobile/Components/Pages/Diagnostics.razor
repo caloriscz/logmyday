@@ -23,8 +23,14 @@
     }
 
     <ul class="list-group mb-3">
-        <li class="list-group-item d-flex justify-content-between">
-            <span>Recording enabled</span><span class="fw-semibold">@(Diag.Enabled ? "Yes" : "No")</span>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>Recording enabled</span>
+            <button type="button"
+                    class="btn btn-sm @(Diag.Enabled ? "btn-danger" : "btn-success")"
+                    @onclick="ToggleRecording"
+                    disabled="@_busy">
+                @(Diag.Enabled ? "Turn off" : "Turn on")
+            </button>
         </li>
         <li class="list-group-item d-flex justify-content-between">
             <span>Pending (un-synced)</span><span class="fw-semibold">@_pending</span>
@@ -53,6 +59,18 @@
     private void Refresh()
     {
         _pending = Diag.PendingCount();
+    }
+
+    // Recording is opt-in. Every Reminders load with it on costs a synchronous SQLite write per
+    // armed alarm plus a background flush of up to 200 sequential POSTs, so it is off by default
+    // and only worth enabling while actively investigating a reminder problem.
+    private void ToggleRecording()
+    {
+        Diag.SetEnabled(!Diag.Enabled);
+        _status = Diag.Enabled
+            ? "Recording on. Turn it off again when you are done investigating — it slows the app while active."
+            : "Recording off. Pending events stay stored and can still be exported; turn recording on to sync them.";
+        _isError = false;
     }
 
     private async Task SyncNow()

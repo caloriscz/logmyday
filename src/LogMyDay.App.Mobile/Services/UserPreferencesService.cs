@@ -54,8 +54,13 @@ public sealed class UserPreferencesService : IUserPreferencesService
             var authApi = _apiClientProvider.Auth;
             var currentUser = await authApi.GetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
 
-            // Diagnostic store is admin-only; persist the decision so out-of-process receivers inherit it.
-            _diag.SetEnabled(currentUser.IsAdmin);
+            // The diagnostic store is admin-only, but admin is a precondition, not the switch:
+            // recording is opt-in from the Diagnostics page because it measurably slows the app.
+            // Non-admins are always forced off so a demoted account cannot keep recording.
+            if (!currentUser.IsAdmin)
+            {
+                _diag.SetEnabled(false);
+            }
 
             if (_cached is null || !EqualityComparer<CurrentUserDto>.Default.Equals(_cached.CurrentUser, currentUser))
             {
