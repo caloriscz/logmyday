@@ -1,5 +1,6 @@
 @page "/insights/compare"
 @using System.Globalization
+@using LogMyDay.Domain.Constants
 @using LogMyDay.App.Components.Insights
 @using LogMyDay.App.Services
 @using LogMyDay.App.Services.Insights
@@ -191,24 +192,43 @@
                                     var color = ResolveCellColor(row, cell);
 
                                     <td class="@($"{ColumnWidthCss} border-t border-l border-gray-200 p-1 align-middle dark:border-slate-800 {GetColumnHighlightCss(index)}")">
-                                        @if (cell.State == ComparisonCellState.Value)
+                                        @if (row.Tag is null)
                                         {
-                                            @if (color != null)
-                                            {
-                                                <span class="@ValueBadgeBaseCss" style="background-color:@color" title="@BuildCellTooltip(row, cell)">@GetInlineText(FormatCell(row, cell))</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="@ValueBadgeCss" title="@BuildCellTooltip(row, cell)">@GetInlineText(FormatCell(row, cell))</span>
-                                            }
-                                        }
-                                        else if (cell.State == ComparisonCellState.NotApplicable)
-                                        {
-                                            <span class="@EmptyBadgeCss" title="@BuildCellTooltip(row, cell)">n/a</span>
+                                            @* An unconfigured row has nothing to open, and all its cells are Missing. *@
+                                            <span class="@EmptyBadgeCss" title="@BuildCellTooltip(row, cell)">-</span>
                                         }
                                         else
                                         {
-                                            <span class="@EmptyBadgeCss" title="@BuildCellTooltip(row, cell)">-</span>
+                                            @* The whole cell is the click target, as a day is in Calendar. It opens the row's own
+                                               date — on an offset row that differs from the column date, and it is the one the
+                                               tooltip names. An empty day opens too, so a missed entry can be added in place. *@
+                                            <button type="button" class="@CellButtonCss" title="@BuildCellTooltip(row, cell)"
+                                                    aria-label="@BuildCellAriaLabel(row, cell)" @onclick="() => OpenDayAsync(row, cell)">
+                                                @if (cell.State == ComparisonCellState.Value)
+                                                {
+                                                    @if (color != null)
+                                                    {
+                                                        <span class="@ValueBadgeBaseCss" style="background-color:@color">@GetInlineText(FormatCell(row, cell))</span>
+                                                    }
+                                                    else if (ComparisonAggregator.ShowsBooleanIcon(cell, row.Config.Aggregation, IsBooleanRow(row)))
+                                                    {
+                                                        @* No scheme colour: the same icon Calendar Linear uses, which carries its own green/red. *@
+                                                        <span class="@ValueBadgeCss"><BooleanDisplay Value="@(cell.NumericValue >= 1)" Size="18px" /></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="@ValueBadgeCss">@GetInlineText(FormatCell(row, cell))</span>
+                                                    }
+                                                }
+                                                else if (cell.State == ComparisonCellState.NotApplicable)
+                                                {
+                                                    <span class="@EmptyBadgeCss">n/a</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="@EmptyBadgeCss">-</span>
+                                                }
+                                            </button>
                                         }
                                     </td>
                                 }
@@ -226,7 +246,35 @@
     </div>
 </div>
 
+<DayActivitiesModal @ref="_dayModal"
+                    Tags="_tags"
+                    Schemes="_schemes"
+                    DisplayCulture="displayCulture"
+                    DisplayTimeZone="displayTimeZone"
+                    Preferences="effectivePreferences"
+                    ModalId="timelineDayActivityModal"
+                    OnChanged="Reload" />
+
 @code {
+    private DayActivitiesModal? _dayModal;
+
+    // A bare button around the badge: the badge already draws the box, the button only adds the
+    // hit area and a visible focus ring for keyboard users.
+    private const string CellButtonCss = "block w-full rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900";
+
+    private async Task OpenDayAsync(ComparisonRowResult row, ComparisonCell cell)
+    {
+        if (row.Tag is null || _dayModal is null)
+        {
+            return;
+        }
+
+        await _dayModal.OpenAsync(row.Tag.Id, cell.ActualDate);
+    }
+
+    private string BuildCellAriaLabel(ComparisonRowResult row, ComparisonCell cell)
+        => $"Open {row.Tag?.Title} for {cell.ActualDate.ToString("D", displayCulture)}";
+
     // Copied from Calendar.razor rather than extracted: refactoring Calendar is out of scope here.
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
@@ -488,8 +536,10 @@
 
     private string? FormatCell(ComparisonRowResult row, ComparisonCell cell)
     {
-        return ComparisonAggregator.Format(cell, row.Config.Aggregation, displayCulture);
+        return ComparisonAggregator.Format(cell, row.Config.Aggregation, displayCulture, IsBooleanRow(row));
     }
+
+    private static bool IsBooleanRow(ComparisonRowResult row) => row.Tag?.TypeId == InputTypeIds.Boolean;
 
     /// <summary>
     /// Colours a cell from the tag's own scheme, exactly as Calendar does — note <c>TypeId</c>, and the

@@ -1,4 +1,4 @@
-﻿@page "/calendar"
+@page "/calendar"
 @using System.Collections.Generic
 @using System.Globalization
 @using System.Linq
@@ -165,114 +165,38 @@
     }
 </div>
 
-@if (showDayActivitiesModal && selectedDayForModal.HasValue)
-{
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-gray-900/70" @onclick="CloseDayModal"></div>
-        <div class="relative z-10 w-full max-w-2xl space-y-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">Activities for @FormatModalDate(selectedDayForModal.Value)</h3>
-                    <p class="text-sm text-gray-600 dark:text-slate-300">@GetSelectedTagTitle()</p>
-                </div>
-                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="CloseDayModal" aria-label="Close">
-                    <Icon Name="x" Class="h-4 w-4" />
-                </button>
-            </div>
-            <div class="space-y-3 max-h-[55vh] overflow-y-auto">
-                @if (!string.IsNullOrEmpty(dayModalError))
-                {
-                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
-                        @dayModalError
-                    </div>
-                }
-                else if (isDayModalLoading)
-                {
-                    <div class="flex h-24 items-center justify-center text-sm text-gray-600 dark:text-slate-300">
-                        Loading activities…
-                    </div>
-                }
-                else if (dayActivities.Count == 0)
-                {
-                    <div class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                        No activities recorded for this date.
-                    </div>
-                }
-                else
-                {
-                    @foreach (var activity in dayActivities)
-                    {
-                        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900/60">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="space-y-1">
-                                    <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100">@activity.PrimaryTagName</h4>
-                                    @{ var calTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                    <ActivityValueDisplay TypeId="@calTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@_schemes.ResolveColor(calTag?.TypeId, calTag?.ColorSchemeId, activity.PrimaryTagValue ?? activity.Description)" WrapperClass="">
-                                        <TextFallback>
-                                            @{ var calDisplayValue = FormatActivityValue(activity); }
-                                            @if (!string.IsNullOrWhiteSpace(calDisplayValue))
-                                            {
-                                                <p class="text-sm text-gray-700 dark:text-slate-200">@calDisplayValue</p>
-                                            }
-                                        </TextFallback>
-                                    </ActivityValueDisplay>
-                                    <p class="text-xs text-gray-500 dark:text-slate-400">@FormatActivityTime(activity)</p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => StartEditDayActivity(activity)" aria-label="Edit activity">
-                                        <Icon Name="pencil" Class="w-4 h-4" />
-                                    </button>
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteActivityFromDay(activity.Id)" aria-label="Delete activity">
-                                        <Icon Name="trash" Class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
-            </div>
-            <div class="flex items-center justify-between gap-3 pt-2">
-                <div class="flex items-center gap-1">
-                    <button type="button" @onclick="() => ShiftDayModal(-1)" class="inline-flex items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Previous day" disabled="@isDayModalLoading">
-                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                        <span>-1d</span>
-                    </button>
-                    <button type="button" @onclick="() => ShiftDayModal(1)" class="inline-flex items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Next day" disabled="@isDayModalLoading">
-                        <span>+1d</span>
-                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                    </button>
-                </div>
-                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900" @onclick="StartCreateDayActivity" disabled="@(!selectedTagId.HasValue)">
-                    <Icon Name="plus" Class="h-4 w-4" />
-                    Add Activity
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
-@if (showActivityEditor && tags != null && modalActivity != null)
-{
-    <AddActivityModal
-        Activity="modalActivity"
-        AvailableTags="tags"
-        OptionLists="optionLists"
-        OptionListLookup="optionListLookup"
-        DisplayCulture="displayCulture"
-        DisplayTimeZone="displayTimeZone"
-        ErrorMessage="@activityEditorError"
-        IsEditMode="isEditMode"
-        ActivityId="editingActivityId"
-        PreselectedTagId="@(!isEditMode ? selectedTagId : null)"
-        PreselectedDate="@(!isEditMode ? selectedDayForModal : null)"
-        OnActivityCreated="OnDayActivityCreated"
-        OnActivityUpdated="OnDayActivityUpdated"
-        OnCanceled="CloseActivityEditor"
-        OnError="OnDayModalError"
-        ModalId="calendarDayActivityModal" />
-}
+<DayActivitiesModal @ref="_dayModal"
+                    Tags="tags"
+                    Schemes="_schemes"
+                    OptionLists="optionLists"
+                    OptionListLookup="optionListLookup"
+                    DisplayCulture="displayCulture"
+                    DisplayTimeZone="displayTimeZone"
+                    Preferences="effectivePreferences"
+                    OrderBy="@orderBy"
+                    ModalId="calendarDayActivityModal"
+                    OnChanged="OnDayModalChanged" />
 
 @code {
+    private DayActivitiesModal? _dayModal;
+
+    private async Task OpenDayActivitiesModal(DateTime day)
+    {
+        if (!selectedTagId.HasValue || _dayModal is null)
+        {
+            return;
+        }
+
+        await _dayModal.OpenAsync(selectedTagId.Value, day);
+    }
+
+    private async Task OnDayModalChanged()
+    {
+        if (selectedTagId.HasValue)
+        {
+            await LoadActivitiesForTag(selectedTagId.Value);
+        }
+    }
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
     private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
     private const string ValueBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white shadow-xs dark:bg-emerald-500/80";
@@ -290,7 +214,6 @@
     private Dictionary<string, List<string>>? activitiesByDate;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
-    private List<ActivityResponse> dayActivities = new();
 
     private int? selectedTagId;
     private TagResponse? SelectedTag => selectedTagId.HasValue ? tags?.FirstOrDefault(t => t.Id == selectedTagId.Value) : null;
@@ -300,16 +223,7 @@
     private string orderBy = OrderDescending;
     private bool savedPreferencesLoaded;
 
-    private bool showDayActivitiesModal;
-    private bool isDayModalLoading;
-    private string? dayModalError;
-    private DateTime? selectedDayForModal;
 
-    private bool showActivityEditor;
-    private bool isEditMode;
-    private int? editingActivityId;
-    private ActivityRequest modalActivity = new();
-    private string? activityEditorError;
 
     private CultureInfo displayCulture = CultureInfo.CurrentCulture;
     private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
@@ -405,10 +319,7 @@
 
     private async Task OnTagSelectedAsync()
     {
-        showDayActivitiesModal = false;
-        showActivityEditor = false;
-        dayModalError = null;
-        activityEditorError = null;
+        _dayModal?.Close();
 
         if (selectedTagId.HasValue)
         {
@@ -552,9 +463,9 @@
         {
             currentYear--;
             await LoadActivitiesForYear(selectedTagId.Value);
-            if (showDayActivitiesModal && selectedDayForModal.HasValue)
+            if (_dayModal?.IsOpen == true)
             {
-                await LoadDayActivitiesAsync();
+                await _dayModal.ReloadAsync();
             }
         }
     }
@@ -565,9 +476,9 @@
         {
             currentYear++;
             await LoadActivitiesForYear(selectedTagId.Value);
-            if (showDayActivitiesModal && selectedDayForModal.HasValue)
+            if (_dayModal?.IsOpen == true)
             {
-                await LoadDayActivitiesAsync();
+                await _dayModal.ReloadAsync();
             }
         }
     }
@@ -585,259 +496,11 @@
         if (selectedTagId.HasValue)
         {
             await LoadActivitiesForTag(selectedTagId.Value);
-            if (showDayActivitiesModal && selectedDayForModal.HasValue)
+            if (_dayModal?.IsOpen == true)
             {
-                await LoadDayActivitiesAsync();
+                await _dayModal.ReloadAsync();
             }
         }
-    }
-
-    private async Task OpenDayActivitiesModal(DateTime day)
-    {
-        if (!selectedTagId.HasValue)
-        {
-            return;
-        }
-
-        selectedDayForModal = day;
-        showDayActivitiesModal = true;
-        isDayModalLoading = true;
-        dayModalError = null;
-
-        await EnsureOptionListsLoadedAsync();
-
-        try
-        {
-            await LoadDayActivitiesAsync();
-        }
-        finally
-        {
-            isDayModalLoading = false;
-        }
-    }
-
-    private async Task LoadDayActivitiesAsync()
-    {
-        if (!selectedTagId.HasValue || selectedDayForModal is null)
-        {
-            dayActivities = new List<ActivityResponse>();
-            return;
-        }
-
-        try
-        {
-            var start = selectedDayForModal.Value.Date;
-            var end = start.AddDays(1).AddTicks(-1);
-            var result = await ActivityApi.GetActivities(1, 200, orderBy, selectedTagId, start, end, null);
-
-            dayActivities = string.Equals(orderBy, OrderAscending, StringComparison.OrdinalIgnoreCase)
-                ? result.Items.OrderBy(a => a.DateStarted).ToList()
-                : result.Items.OrderByDescending(a => a.DateStarted).ToList();
-        }
-        catch (Exception ex)
-        {
-            dayModalError = $"Error loading day activities: {ex.Message}";
-            dayActivities = new List<ActivityResponse>();
-        }
-    }
-
-    private async Task ShiftDayModal(int days)
-    {
-        if (selectedDayForModal is null)
-        {
-            return;
-        }
-
-        selectedDayForModal = selectedDayForModal.Value.AddDays(days);
-        isDayModalLoading = true;
-        dayModalError = null;
-
-        try
-        {
-            await LoadDayActivitiesAsync();
-        }
-        finally
-        {
-            isDayModalLoading = false;
-        }
-    }
-
-    private void CloseDayModal()
-    {
-        showDayActivitiesModal = false;
-        isDayModalLoading = false;
-        selectedDayForModal = null;
-        dayModalError = null;
-        dayActivities.Clear();
-
-        showActivityEditor = false;
-        activityEditorError = null;
-    }
-
-    private void StartCreateDayActivity()
-    {
-        if (!selectedTagId.HasValue || selectedDayForModal is null)
-        {
-            return;
-        }
-
-        isEditMode = false;
-        editingActivityId = null;
-        modalActivity = new ActivityRequest
-        {
-            PrimaryTagId = selectedTagId,
-            DateStarted = GetDefaultStartForDate(selectedDayForModal.Value),
-            DateFinished = null,
-            Description = null
-        };
-
-        activityEditorError = null;
-        showActivityEditor = true;
-    }
-
-    private void StartEditDayActivity(ActivityResponse activity)
-    {
-        isEditMode = true;
-        editingActivityId = activity.Id;
-
-        modalActivity = new ActivityRequest
-        {
-            PrimaryTagId = activity.PrimaryTagId,
-            Description = activity.Description,
-            DateStarted = ConvertToDisplayZone(activity.DateStarted),
-            DateFinished = activity.DateFinished.HasValue
-                ? ConvertToDisplayZone(activity.DateFinished.Value)
-                : null
-        };
-
-        activityEditorError = null;
-        showActivityEditor = true;
-    }
-
-    private async Task DeleteActivityFromDay(int activityId)
-    {
-        try
-        {
-            await ActivityApi.Delete(activityId);
-            await RefreshDayModalData();
-        }
-        catch (Exception ex)
-        {
-            dayModalError = $"Error deleting activity: {ex.Message}";
-        }
-    }
-
-    private async Task OnDayActivityCreated(ActivityRequest _)
-    {
-        showActivityEditor = false;
-        activityEditorError = null;
-        await RefreshDayModalData();
-    }
-
-    private async Task OnDayActivityUpdated()
-    {
-        showActivityEditor = false;
-        activityEditorError = null;
-        await RefreshDayModalData();
-    }
-
-    private async Task OnDayModalError(string error)
-    {
-        activityEditorError = error;
-        await Task.CompletedTask;
-    }
-
-    private void CloseActivityEditor()
-    {
-        showActivityEditor = false;
-        activityEditorError = null;
-    }
-
-    private async Task RefreshDayModalData()
-    {
-        if (selectedTagId.HasValue)
-        {
-            await LoadActivitiesForTag(selectedTagId.Value);
-        }
-
-        if (showDayActivitiesModal && selectedDayForModal.HasValue)
-        {
-            await LoadDayActivitiesAsync();
-        }
-    }
-
-    private string FormatModalDate(DateTime date)
-    {
-        return date.ToString("D", displayCulture);
-    }
-
-    private string GetSelectedTagTitle()
-    {
-        if (!selectedTagId.HasValue)
-        {
-            return "No tag selected";
-        }
-
-        var tag = tags?.FirstOrDefault(t => t.Id == selectedTagId.Value);
-        return tag?.Title ?? $"Tag #{selectedTagId.Value}";
-    }
-
-    private string FormatActivityValue(ActivityResponse activity)
-    {
-        var rawValue = activity.PrimaryTagValue ?? activity.Description ?? string.Empty;
-        var tag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId);
-        var valueForDisplay = rawValue;
-
-        if (tag?.OptionListId is int listId && optionListLookup != null && optionListLookup.TryGetValue(listId, out var list))
-        {
-            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, rawValue, StringComparison.OrdinalIgnoreCase));
-            if (option is not null)
-            {
-                valueForDisplay = option.DisplayName ?? option.Value;
-            }
-        }
-        else if (tag?.TypeId == 1 && long.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
-        {
-            valueForDisplay = intValue.ToString(displayCulture);
-        }
-        else if (tag?.TypeId == 6 && decimal.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
-        {
-            valueForDisplay = decimalValue.ToString("0.#############################", displayCulture);
-        }
-
-        if (tag is not null && !string.IsNullOrWhiteSpace(tag.UnitSymbol) && !string.IsNullOrWhiteSpace(valueForDisplay))
-        {
-            valueForDisplay = $"{valueForDisplay} {tag.UnitSymbol}";
-        }
-
-        return valueForDisplay;
-    }
-
-    private string FormatActivityTime(ActivityResponse activity)
-    {
-        var culture = displayCulture;
-        var timePattern = effectivePreferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
-        var datePattern = effectivePreferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
-
-        var startLocal = ConvertToDisplayZone(activity.DateStarted);
-        var startDate = startLocal.ToString(datePattern, culture);
-        var startTime = startLocal.ToString(timePattern, culture);
-
-        if (!activity.DateFinished.HasValue)
-        {
-            return $"{startDate} • {startTime}";
-        }
-
-        var endLocal = ConvertToDisplayZone(activity.DateFinished.Value);
-        var endDate = endLocal.ToString(datePattern, culture);
-        var endTime = endLocal.ToString(timePattern, culture);
-
-        if (startLocal.Date == endLocal.Date)
-        {
-            return $"{startDate} • {startTime} – {endTime}";
-        }
-
-        return $"{startDate} {startTime} – {endDate} {endTime}";
     }
 
     private DateTime GetCurrentDateTimeInDisplayZone()
@@ -863,12 +526,6 @@
         return displayTimeZone.Equals(TimeZoneInfo.Local)
             ? unspecified
             : TimeZoneInfo.ConvertTime(unspecified, TimeZoneInfo.Local, displayTimeZone);
-    }
-
-    private DateTime GetDefaultStartForDate(DateTime date)
-    {
-        var today = GetTodayInDisplayZone();
-        return date.Date == today ? GetCurrentDateTimeInDisplayZone() : date.Date;
     }
 
     private void NavigateToLinearView()

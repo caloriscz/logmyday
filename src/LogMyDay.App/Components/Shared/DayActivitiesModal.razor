@@ -1,0 +1,485 @@
+@using System.Globalization
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Shared.Coloring
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+
+@*
+    The "activities for one day, one tag" dialog shared by Calendar, Calendar Linear and Timeline
+    Comparison. Lists the day's entries with edit and delete, steps a day either way, and opens
+    AddActivityModal with the tag and date preselected. The host decides which tag and which day by
+    calling OpenAsync; this component owns everything after that and raises OnChanged whenever an
+    activity was created, updated or deleted so the host can reload its own view.
+*@
+
+@if (_isOpen && _date.HasValue)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/70" @onclick="Close"></div>
+        <div class="relative z-10 w-full max-w-2xl space-y-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-slate-100">Activities for @_date.Value.ToString("D", DisplayCulture)</h3>
+                    <p class="text-sm text-gray-600 dark:text-slate-300">@TagTitle</p>
+                </div>
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900" @onclick="Close" aria-label="Close">
+                    <Icon Name="x" Class="h-4 w-4" />
+                </button>
+            </div>
+            <div class="space-y-3 max-h-[55vh] overflow-y-auto">
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @_error
+                    </div>
+                }
+                else if (_isLoading)
+                {
+                    <div class="flex h-24 items-center justify-center text-sm text-gray-600 dark:text-slate-300">
+                        Loading activities…
+                    </div>
+                }
+                else if (_activities.Count == 0)
+                {
+                    <div class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        No activities recorded for this date.
+                    </div>
+                }
+                else
+                {
+                    @foreach (var activity in _activities)
+                    {
+                        var tag = FindTag(activity.PrimaryTagId);
+                        var rawValue = activity.PrimaryTagValue ?? activity.Description;
+
+                        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900/60">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="space-y-1">
+                                    <h4 class="text-sm font-semibold text-gray-900 dark:text-slate-100">@activity.PrimaryTagName</h4>
+                                    <ActivityValueDisplay TypeId="@tag?.TypeId" Value="@rawValue" Color="@Schemes.ResolveColor(tag?.TypeId, tag?.ColorSchemeId, rawValue)" WrapperClass="">
+                                        <TextFallback>
+                                            @{ var displayValue = FormatActivityValue(activity, tag); }
+                                            @if (!string.IsNullOrWhiteSpace(displayValue))
+                                            {
+                                                <p class="text-sm text-gray-700 dark:text-slate-200">@displayValue</p>
+                                            }
+                                        </TextFallback>
+                                    </ActivityValueDisplay>
+                                    <p class="text-xs text-gray-500 dark:text-slate-400">@FormatActivityTime(activity)</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => StartEdit(activity)" aria-label="Edit activity">
+                                        <Icon Name="pencil" Class="w-4 h-4" />
+                                    </button>
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteAsync(activity.Id)" aria-label="Delete activity">
+                                        <Icon Name="trash" Class="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="flex items-center justify-between gap-3 pt-2">
+                <div class="flex items-center gap-1">
+                    <button type="button" @onclick="() => ShiftAsync(-1)" class="inline-flex items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Previous day" disabled="@_isLoading">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        <span>-1d</span>
+                    </button>
+                    <button type="button" @onclick="() => ShiftAsync(1)" class="inline-flex items-center gap-1 rounded-sm px-2 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-slate-400 dark:hover:bg-gray-700 dark:hover:text-slate-200" title="Next day" disabled="@_isLoading">
+                        <span>+1d</span>
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-400 dark:focus-visible:ring-offset-slate-900" @onclick="StartCreate">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    Add Activity
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showEditor && Tags != null && _editorActivity != null)
+{
+    <AddActivityModal
+        Activity="_editorActivity"
+        AvailableTags="Tags"
+        OptionLists="_optionLists"
+        OptionListLookup="_optionListLookup"
+        DisplayCulture="DisplayCulture"
+        DisplayTimeZone="DisplayTimeZone"
+        ErrorMessage="@_editorError"
+        IsEditMode="_isEditMode"
+        ActivityId="_editingActivityId"
+        PreselectedTagId="@(!_isEditMode ? _tagId : null)"
+        PreselectedDate="@(!_isEditMode ? _date : null)"
+        OnActivityCreated="OnEditorCreated"
+        OnActivityUpdated="OnEditorUpdated"
+        OnCanceled="CloseEditor"
+        OnError="OnEditorError"
+        ModalId="@ModalId" />
+}
+
+@code {
+    private const string OrderAscending = "asc";
+
+    /// <summary>All the user's tags — for titles, input types, and the editor's tag picker.</summary>
+    [Parameter] public IList<TagResponse>? Tags { get; set; }
+
+    [Parameter] public ColorSchemeIndex Schemes { get; set; } = ColorSchemeIndex.Empty;
+
+    /// <summary>
+    /// Option lists, when the host already has them loaded. Left null, the dialog fetches them itself
+    /// on first open so a host that never needs them elsewhere doesn't have to.
+    /// </summary>
+    [Parameter] public IList<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public Dictionary<int, TagOptionListResponse>? OptionListLookup { get; set; }
+
+    [Parameter] public CultureInfo DisplayCulture { get; set; } = CultureInfo.CurrentCulture;
+    [Parameter] public TimeZoneInfo DisplayTimeZone { get; set; } = TimeZoneInfo.Local;
+    [Parameter] public EffectivePreferences? Preferences { get; set; }
+
+    /// <summary>"asc" lists oldest first; anything else newest first. Mirrors the host's own ordering.</summary>
+    [Parameter] public string OrderBy { get; set; } = "desc";
+
+    /// <summary>Distinct per host so two dialogs on one page can't collide.</summary>
+    [Parameter] public string ModalId { get; set; } = "dayActivitiesModal";
+
+    /// <summary>Raised after any create, update or delete, so the host can refresh what it shows.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool _isOpen;
+    private bool _isLoading;
+    private string? _error;
+    private int? _tagId;
+    private DateTime? _date;
+    private List<ActivityResponse> _activities = new();
+
+    private bool _showEditor;
+    private bool _isEditMode;
+    private int? _editingActivityId;
+    private ActivityRequest? _editorActivity;
+    private string? _editorError;
+
+    private IList<TagOptionListResponse>? _optionLists;
+    private Dictionary<int, TagOptionListResponse>? _optionListLookup;
+
+    public bool IsOpen => _isOpen;
+
+    private string TagTitle => FindTag(_tagId)?.Title ?? (_tagId is int id ? $"Tag #{id}" : "No tag selected");
+
+    /// <summary>Opens the dialog for one tag on one day and loads that day's activities.</summary>
+    public async Task OpenAsync(int tagId, DateTime date)
+    {
+        _tagId = tagId;
+        _date = date.Date;
+        _isOpen = true;
+        _isLoading = true;
+        _error = null;
+
+        await EnsureOptionListsAsync();
+
+        try
+        {
+            await LoadAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>Re-fetches the open day, e.g. after the host changed the sort order it passes in.</summary>
+    public async Task ReloadAsync()
+    {
+        if (!_isOpen || _date is null)
+        {
+            return;
+        }
+
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            await LoadAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _isOpen = false;
+        _isLoading = false;
+        _date = null;
+        _error = null;
+        _activities.Clear();
+
+        _showEditor = false;
+        _editorError = null;
+        _editorActivity = null;
+
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_tagId is null || _date is null)
+        {
+            _activities = new List<ActivityResponse>();
+
+            return;
+        }
+
+        try
+        {
+            var start = _date.Value;
+            var end = start.AddDays(1).AddTicks(-1);
+            var result = await ActivityApi.GetActivities(1, 200, OrderBy, _tagId, start, end, null);
+
+            _activities = string.Equals(OrderBy, OrderAscending, StringComparison.OrdinalIgnoreCase)
+                ? result.Items.OrderBy(a => a.DateStarted).ToList()
+                : result.Items.OrderByDescending(a => a.DateStarted).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error loading day activities: {ex.Message}";
+            _activities = new List<ActivityResponse>();
+        }
+    }
+
+    private async Task ShiftAsync(int days)
+    {
+        if (_date is null)
+        {
+            return;
+        }
+
+        _date = _date.Value.AddDays(days);
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            await LoadAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task EnsureOptionListsAsync()
+    {
+        // Prefer whatever the host already loaded; only fetch when it gave us nothing.
+        if (OptionLists != null && OptionListLookup != null)
+        {
+            _optionLists = OptionLists;
+            _optionListLookup = OptionListLookup;
+
+            return;
+        }
+
+        if (_optionLists != null && _optionListLookup != null)
+        {
+            return;
+        }
+
+        try
+        {
+            _optionLists = await ActivityApi.GetTagOptionListsAsync();
+            _optionListLookup = _optionLists?.ToDictionary(list => list.Id) ?? new Dictionary<int, TagOptionListResponse>();
+        }
+        catch
+        {
+            _optionLists ??= new List<TagOptionListResponse>();
+            _optionListLookup ??= new Dictionary<int, TagOptionListResponse>();
+        }
+    }
+
+    // --- Editor ---
+
+    private void StartCreate()
+    {
+        if (_tagId is null || _date is null)
+        {
+            return;
+        }
+
+        _isEditMode = false;
+        _editingActivityId = null;
+        _editorActivity = new ActivityRequest
+        {
+            PrimaryTagId = _tagId,
+            DateStarted = GetDefaultStartForDate(_date.Value),
+            DateFinished = null,
+            Description = null
+        };
+
+        _editorError = null;
+        _showEditor = true;
+    }
+
+    private void StartEdit(ActivityResponse activity)
+    {
+        _isEditMode = true;
+        _editingActivityId = activity.Id;
+        _editorActivity = new ActivityRequest
+        {
+            PrimaryTagId = activity.PrimaryTagId,
+            Description = activity.Description,
+            DateStarted = ConvertToDisplayZone(activity.DateStarted),
+            DateFinished = activity.DateFinished.HasValue
+                ? ConvertToDisplayZone(activity.DateFinished.Value)
+                : null
+        };
+
+        _editorError = null;
+        _showEditor = true;
+    }
+
+    private async Task DeleteAsync(int activityId)
+    {
+        try
+        {
+            await ActivityApi.Delete(activityId);
+            await ReloadAndNotifyAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error deleting activity: {ex.Message}";
+        }
+    }
+
+    private async Task OnEditorCreated(ActivityRequest _)
+    {
+        CloseEditor();
+        await ReloadAndNotifyAsync();
+    }
+
+    private async Task OnEditorUpdated()
+    {
+        CloseEditor();
+        await ReloadAndNotifyAsync();
+    }
+
+    private Task OnEditorError(string error)
+    {
+        _editorError = error;
+
+        return Task.CompletedTask;
+    }
+
+    private void CloseEditor()
+    {
+        _showEditor = false;
+        _editorError = null;
+    }
+
+    private async Task ReloadAndNotifyAsync()
+    {
+        if (_isOpen && _date.HasValue)
+        {
+            await LoadAsync();
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+
+    // --- Formatting ---
+
+    private TagResponse? FindTag(int? tagId) => tagId is int id ? Tags?.FirstOrDefault(t => t.Id == id) : null;
+
+    private string FormatActivityValue(ActivityResponse activity, TagResponse? tag)
+    {
+        var rawValue = activity.PrimaryTagValue ?? activity.Description ?? string.Empty;
+        var valueForDisplay = rawValue;
+
+        if (tag?.OptionListId is int listId && _optionListLookup != null && _optionListLookup.TryGetValue(listId, out var list))
+        {
+            var option = list.Options.FirstOrDefault(o => string.Equals(o.Value, rawValue, StringComparison.OrdinalIgnoreCase));
+            if (option is not null)
+            {
+                valueForDisplay = option.DisplayName ?? option.Value;
+            }
+        }
+        else if (tag?.TypeId == InputTypeIds.Integer && long.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intValue))
+        {
+            valueForDisplay = intValue.ToString(DisplayCulture);
+        }
+        else if (tag?.TypeId == InputTypeIds.Decimal && decimal.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+        {
+            valueForDisplay = decimalValue.ToString("0.#############################", DisplayCulture);
+        }
+
+        if (tag is not null && !string.IsNullOrWhiteSpace(tag.UnitSymbol) && !string.IsNullOrWhiteSpace(valueForDisplay))
+        {
+            valueForDisplay = $"{valueForDisplay} {tag.UnitSymbol}";
+        }
+
+        return valueForDisplay;
+    }
+
+    private string FormatActivityTime(ActivityResponse activity)
+    {
+        var culture = DisplayCulture;
+        var timePattern = Preferences?.ShortTimePattern ?? culture.DateTimeFormat.ShortTimePattern;
+        var datePattern = Preferences?.ShortDatePattern ?? culture.DateTimeFormat.ShortDatePattern;
+
+        var startLocal = ConvertToDisplayZone(activity.DateStarted);
+        var startDate = startLocal.ToString(datePattern, culture);
+        var startTime = startLocal.ToString(timePattern, culture);
+
+        if (!activity.DateFinished.HasValue)
+        {
+            return $"{startDate} • {startTime}";
+        }
+
+        var endLocal = ConvertToDisplayZone(activity.DateFinished.Value);
+        var endDate = endLocal.ToString(datePattern, culture);
+        var endTime = endLocal.ToString(timePattern, culture);
+
+        if (startLocal.Date == endLocal.Date)
+        {
+            return $"{startDate} • {startTime} – {endTime}";
+        }
+
+        return $"{startDate} {startTime} – {endDate} {endTime}";
+    }
+
+    private DateTime ConvertToDisplayZone(DateTime dateTime)
+    {
+        if (dateTime.Kind == DateTimeKind.Utc)
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(dateTime, DisplayTimeZone);
+        }
+
+        if (dateTime.Kind == DateTimeKind.Local)
+        {
+            return DisplayTimeZone.Equals(TimeZoneInfo.Local)
+                ? dateTime
+                : TimeZoneInfo.ConvertTime(dateTime, TimeZoneInfo.Local, DisplayTimeZone);
+        }
+
+        var unspecified = DateTime.SpecifyKind(dateTime, DateTimeKind.Local);
+
+        return DisplayTimeZone.Equals(TimeZoneInfo.Local)
+            ? unspecified
+            : TimeZoneInfo.ConvertTime(unspecified, TimeZoneInfo.Local, DisplayTimeZone);
+    }
+
+    private DateTime GetDefaultStartForDate(DateTime date)
+    {
+        var nowInZone = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, DisplayTimeZone);
+
+        return date.Date == nowInZone.Date ? nowInZone : date.Date;
+    }
+}
