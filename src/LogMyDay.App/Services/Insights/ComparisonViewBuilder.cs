@@ -1,3 +1,4 @@
+using LogMyDay.Domain.Constants;
 using LogMyDay.Shared.DTOs;
 
 namespace LogMyDay.App.Services.Insights;
@@ -32,7 +33,7 @@ public static class ComparisonViewBuilder
 
             var tag = config.TagId is int tagId && tagsById.TryGetValue(tagId, out var found) ? found : null;
 
-            results.Add(new ComparisonRowResult(index, config, tag, BuildCells(timeline, config, data)));
+            results.Add(new ComparisonRowResult(index, config, tag, BuildCells(timeline, config, tag, data)));
         }
 
         return new ComparisonView(timeline, results);
@@ -41,10 +42,12 @@ public static class ComparisonViewBuilder
     private static IReadOnlyList<ComparisonCell> BuildCells(
         ComparisonTimeline timeline,
         ComparisonRowConfig config,
+        TagResponse? tag,
         ComparisonDataSet data)
     {
         var dates = ComparisonTimelineCalculator.BuildRowDates(timeline.Columns, config.EffectiveOffsetDays);
         var cells = new ComparisonCell[dates.Count];
+        var isBoolean = tag?.TypeId == InputTypeIds.Boolean;
 
         for (var i = 0; i < dates.Count; i++)
         {
@@ -52,7 +55,7 @@ public static class ComparisonViewBuilder
             // reflow the grid.
             var values = config.TagId is int tagId ? data.GetValues(tagId, dates[i]) : null;
 
-            cells[i] = ComparisonAggregator.Aggregate(dates[i], values, config.Aggregation);
+            cells[i] = ComparisonAggregator.Aggregate(dates[i], values, config.Aggregation, isBoolean);
         }
 
         return cells;
