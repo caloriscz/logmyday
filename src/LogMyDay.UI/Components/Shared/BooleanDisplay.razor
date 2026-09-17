@@ -1,27 +1,41 @@
 @using Microsoft.AspNetCore.Components
 
+@*
+    A colour scheme assigned to the tag can override the fixed green/red: the stroke and glyph take
+    the scheme colour, and the disc becomes a translucent wash of it so the icon keeps its shape
+    language whatever the hue. Without a scheme the classic true=green / false=red stands.
+*@
 @if (Value == true)
 {
-    <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"
+    <svg viewBox="0 0 24 24" fill="none" stroke="@(Color ?? TrueStroke)" stroke-width="2.5"
          style="width: @Size; height: @Size; display: inline-block; vertical-align: middle; flex-shrink: 0;"
          title="True" aria-label="True">
-        <circle cx="12" cy="12" r="10" stroke="#16a34a" stroke-width="1.5" fill="#dcfce7"/>
+        <circle cx="12" cy="12" r="10" stroke="@(Color ?? TrueStroke)" stroke-width="1.5" fill="@(Color ?? TrueFill)" fill-opacity="@(Color is null ? "1" : WashOpacity)"/>
         <path stroke-linecap="round" stroke-linejoin="round" d="M7 13l3 3 7-7"/>
     </svg>
 }
 else if (Value == false)
 {
-    <svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"
+    <svg viewBox="0 0 24 24" fill="none" stroke="@(Color ?? FalseStroke)" stroke-width="2.5"
          style="width: @Size; height: @Size; display: inline-block; vertical-align: middle; flex-shrink: 0;"
          title="False" aria-label="False">
-        <circle cx="12" cy="12" r="10" stroke="#dc2626" stroke-width="1.5" fill="#fee2e2"/>
+        <circle cx="12" cy="12" r="10" stroke="@(Color ?? FalseStroke)" stroke-width="1.5" fill="@(Color ?? FalseFill)" fill-opacity="@(Color is null ? "1" : WashOpacity)"/>
         <path stroke-linecap="round" stroke-linejoin="round" d="M8 8l8 8M16 8l-8 8"/>
     </svg>
 }
 
 @code {
+    private const string TrueStroke = "#16a34a";
+    private const string TrueFill = "#dcfce7";
+    private const string FalseStroke = "#dc2626";
+    private const string FalseFill = "#fee2e2";
+    private const string WashOpacity = "0.18";
+
     [Parameter] public bool? Value { get; set; }
     [Parameter] public string Size { get; set; } = "20px";
+
+    /// <summary>Scheme colour for this value, when the tag has one. Null keeps the built-in green/red.</summary>
+    [Parameter] public string? Color { get; set; }
 
     public static bool? Parse(string? description)
     {

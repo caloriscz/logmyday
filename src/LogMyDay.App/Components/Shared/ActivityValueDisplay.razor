@@ -30,11 +30,11 @@ else if (TypeId == InputTypeIds.Boolean)
 {
     @if (WrapperClass is not null)
     {
-        <div class="@WrapperClass"><BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" /></div>
+        <div class="@WrapperClass"><BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" Color="@Color" /></div>
     }
     else
     {
-        <BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" />
+        <BooleanDisplay Value="@BooleanDisplay.Parse(Value ?? string.Empty)" Color="@Color" />
     }
 }
 else if (TypeId is InputTypeIds.Percentage or InputTypeIds.Integer or InputTypeIds.Decimal && !string.IsNullOrEmpty(Value))

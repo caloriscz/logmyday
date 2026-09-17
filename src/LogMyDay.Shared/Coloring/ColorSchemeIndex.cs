@@ -1,4 +1,5 @@
 using System.Globalization;
+using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Helpers;
 using LogMyDay.Shared.DTOs;
 
@@ -28,7 +29,7 @@ public sealed class ColorSchemeIndex
             return null;
         }
 
-        if (!double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var number))
+        if (!TryReadValue(typeId, value, out var number))
         {
             return null;
         }
@@ -40,5 +41,23 @@ public sealed class ColorSchemeIndex
         }
 
         return ColorSchemeResolver.Resolve(typeId, entries, number);
+    }
+
+    /// <summary>
+    /// A Boolean tag stores "true"/"false"; its scheme is written against 1 and 0. Reading the
+    /// words here means every surface that hands the raw activity value to this index colours
+    /// booleans the same way, rather than only the ones that pre-convert. The mapping is by tag
+    /// type, so a String tag holding the word "true" still resolves to nothing.
+    /// </summary>
+    private static bool TryReadValue(int typeId, string? value, out double number)
+    {
+        if (typeId == InputTypeIds.Boolean && bool.TryParse(value, out var flag))
+        {
+            number = flag ? 1 : 0;
+
+            return true;
+        }
+
+        return double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out number);
     }
 }
