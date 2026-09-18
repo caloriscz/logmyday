@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LogMyDay.Api\LogMyDay.Api.csproj" />
+    <ProjectReference Include="..\LogMyDay.Mcp\LogMyDay.Mcp.csproj" />
     <ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
     <ProjectReference Include="..\LogMyDay.Domain\LogMyDay.Domain.csproj" />
   </ItemGroup>
