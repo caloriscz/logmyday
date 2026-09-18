@@ -51,6 +51,8 @@ public static class McpServiceCollectionExtensions
             .WithTools<InputTypeTools>(McpJson.Options)
             .WithTools<ReminderTools>(McpJson.Options)
             .WithTools<TodoTools>(McpJson.Options)
+            .WithTools<DayLockTools>(McpJson.Options)
+            .WithTools<ScanMappingTools>(McpJson.Options)
             .WithResources<LogMyDayResources>();
 
         return services;

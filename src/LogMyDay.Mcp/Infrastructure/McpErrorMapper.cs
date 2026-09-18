@@ -51,7 +51,8 @@ public static class McpErrorMapper
 
             // "X is in use by one or more tags" is the services' way of refusing a delete that a
             // Restrict FK would otherwise turn into a database error.
-            case InvalidOperationException ex when ex.Message.Contains("in use", StringComparison.OrdinalIgnoreCase):
+            case InvalidOperationException ex when ex.Message.Contains("in use", StringComparison.OrdinalIgnoreCase)
+                                                    || ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase):
                 return Error(Conflict, ex.Message);
 
             case InvalidOperationException ex:
