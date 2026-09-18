@@ -173,7 +173,7 @@ public class McpTagToolsTests : IClassFixture<CustomWebApplicationFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-            var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.TestUserEmail);
+            var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
             db.Activities.AddRange(
                 new Activity { TagId = id, UserId = user.Id, DateStarted = new DateTime(2026, 1, 1), Description = "1" },
                 new Activity { TagId = id, UserId = user.Id, DateStarted = new DateTime(2026, 1, 2), Description = "2" },
@@ -220,7 +220,7 @@ public class McpTagToolsTests : IClassFixture<CustomWebApplicationFactory>
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-        var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.TestUserEmail);
+        var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
 
         // The arguments travel in the detail row, sentinel included.
         var rows = await db.EventLogs.Include(e => e.Detail)

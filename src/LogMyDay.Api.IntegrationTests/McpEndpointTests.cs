@@ -136,7 +136,7 @@ public class McpEndpointTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("2.2.0", info.GetProperty("sdkVersion").GetString());
         Assert.Equal("streamable-http", info.GetProperty("transport").GetString());
         Assert.Equal("ReadWrite", info.GetProperty("keyScope").GetString());
-        Assert.Equal(CustomWebApplicationFactory.TestUserEmail, info.GetProperty("user").GetProperty("email").GetString());
+        Assert.Equal(CustomWebApplicationFactory.McpUserEmail, info.GetProperty("user").GetProperty("email").GetString());
         Assert.False(string.IsNullOrEmpty(info.GetProperty("user").GetProperty("timeZone").GetString()));
         Assert.True(info.GetProperty("inputTypes").GetArrayLength() > 0);
         Assert.Contains("Daily", info.GetProperty("enums").GetProperty("timeGranularity").EnumerateArray().Select(e => e.GetString()));

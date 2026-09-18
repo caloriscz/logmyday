@@ -15,7 +15,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public const string TestUserEmail = "test@example.com";
     public const string TestUserPassword = "Integration-Test-Pa55";
 
-    /// <summary>Known API-key tokens for the test user; the seeded rows hold their hashes.</summary>
+    /// <summary>
+    /// The MCP tests act as their own user, so what they log never changes the counts other tests
+    /// assert on the seeded user; the known tokens' hashes are seeded as that user's keys.
+    /// </summary>
+    public const string McpUserEmail = "mcp@example.com";
     public const string ReadWriteKeyToken = "lmd_IntegrationTestReadWriteKey0000000000000000";
     public const string ReadOnlyKeyToken = "lmd_IntegrationTestReadOnlyKey00000000000000000";
 
@@ -64,9 +68,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         };
         db.Users.Add(testUser);
 
+        var mcpUser = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = McpUserEmail,
+            PasswordHash = "not-used"
+        };
+        db.Users.Add(mcpUser);
         db.ApiKeys.AddRange(
-            SeededKey(testUser.Id, "rw", ReadWriteKeyToken, ApiKeyScope.ReadWrite),
-            SeededKey(testUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly));
+            SeededKey(mcpUser.Id, "rw", ReadWriteKeyToken, ApiKeyScope.ReadWrite),
+            SeededKey(mcpUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly));
 
         var tag1 = new Tag
         {

@@ -23,6 +23,7 @@ public static class McpServiceCollectionExtensions
     {
         services.AddScoped<McpUserContext>();
         services.AddScoped<TagLookup>();
+        services.AddScoped<UserClock>();
         services.AddSingleton<DestructiveBudget>();
 
         services.AddMcpServer(options =>
@@ -40,7 +41,8 @@ public static class McpServiceCollectionExtensions
             .AddAuthorizationFilters()
             .WithRequestFilters(filters => filters.AddCallToolFilter(McpToolFilters.AuditAndMapErrors))
             .WithTools<ServerInfoTools>(McpJson.Options)
-            .WithTools<TagTools>(McpJson.Options);
+            .WithTools<TagTools>(McpJson.Options)
+            .WithTools<ActivityTools>(McpJson.Options);
 
         return services;
     }
