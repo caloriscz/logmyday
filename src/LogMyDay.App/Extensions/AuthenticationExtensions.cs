@@ -25,6 +25,13 @@ internal static class AuthenticationExtensions
                         return "basic";
                     }
 
+                    // Only our own token shape. Any other bearer value falls through to the cookie
+                    // scheme and fails there, exactly as it did before keys existed.
+                    if (authHeader?.StartsWith(ApiKeyAuthDefaults.BearerTokenPrefix, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        return ApiKeyAuthDefaults.SchemeName;
+                    }
+
                     return "lmd-cookie";
                 };
             })
@@ -83,7 +90,8 @@ internal static class AuthenticationExtensions
                     return Task.CompletedTask;
                 };
             })
-            .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { });
+            .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { })
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>(ApiKeyAuthDefaults.SchemeName, _ => { });
 
         services.AddSingleton<LogMyDay.Api.Authentication.AuthAttemptTracker>();
         services.AddSingleton<LogMyDay.Api.Authentication.PasswordVerificationCache>();
@@ -92,6 +100,23 @@ internal static class AuthenticationExtensions
         {
             options.AddPolicy("AdminOnly", policy =>
                 policy.RequireAuthenticatedUser()
+                      .RequireClaim("is_admin", "true"));
+
+            // MCP policies. All three insist the request was authenticated by an API key, so a
+            // browser session can never drive the MCP endpoint (see McpPolicies for why).
+            options.AddPolicy(McpPolicies.Read, policy =>
+                policy.RequireAuthenticatedUser()
+                      .RequireClaim(ApiKeyAuthDefaults.AuthSourceClaim, ApiKeyAuthDefaults.AuthSourceValue));
+
+            options.AddPolicy(McpPolicies.Write, policy =>
+                policy.RequireAuthenticatedUser()
+                      .RequireClaim(ApiKeyAuthDefaults.AuthSourceClaim, ApiKeyAuthDefaults.AuthSourceValue)
+                      .RequireClaim(ApiKeyAuthDefaults.ScopeClaim, ApiKeyAuthDefaults.ScopeWrite));
+
+            options.AddPolicy(McpPolicies.Admin, policy =>
+                policy.RequireAuthenticatedUser()
+                      .RequireClaim(ApiKeyAuthDefaults.AuthSourceClaim, ApiKeyAuthDefaults.AuthSourceValue)
+                      .RequireClaim(ApiKeyAuthDefaults.ScopeClaim, ApiKeyAuthDefaults.ScopeWrite)
                       .RequireClaim("is_admin", "true"));
         });
 
