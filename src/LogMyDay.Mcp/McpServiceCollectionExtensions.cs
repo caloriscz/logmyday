@@ -53,6 +53,7 @@ public static class McpServiceCollectionExtensions
             .WithTools<TodoTools>(McpJson.Options)
             .WithTools<DayLockTools>(McpJson.Options)
             .WithTools<ScanMappingTools>(McpJson.Options)
+            .WithTools<AnalyticsTools>(McpJson.Options)
             .WithResources<LogMyDayResources>();
 
         return services;
