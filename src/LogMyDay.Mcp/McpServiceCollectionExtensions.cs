@@ -1,4 +1,5 @@
 using LogMyDay.Mcp.Infrastructure;
+using LogMyDay.Mcp.Resources;
 using LogMyDay.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.AspNetCore;
@@ -47,7 +48,8 @@ public static class McpServiceCollectionExtensions
             .WithTools<OptionListTools>(McpJson.Options)
             .WithTools<UnitTools>(McpJson.Options)
             .WithTools<ColorSchemeTools>(McpJson.Options)
-            .WithTools<InputTypeTools>(McpJson.Options);
+            .WithTools<InputTypeTools>(McpJson.Options)
+            .WithResources<LogMyDayResources>();
 
         return services;
     }
