@@ -1,4 +1,5 @@
 using LogMyDay.Mcp.Infrastructure;
+using LogMyDay.Mcp.Prompts;
 using LogMyDay.Mcp.Resources;
 using LogMyDay.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,7 +55,8 @@ public static class McpServiceCollectionExtensions
             .WithTools<DayLockTools>(McpJson.Options)
             .WithTools<ScanMappingTools>(McpJson.Options)
             .WithTools<AnalyticsTools>(McpJson.Options)
-            .WithResources<LogMyDayResources>();
+            .WithResources<LogMyDayResources>()
+            .WithPrompts<LogMyDayPrompts>(McpJson.Options);
 
         return services;
     }
