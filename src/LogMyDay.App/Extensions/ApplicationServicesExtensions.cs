@@ -25,6 +25,7 @@ internal static class ApplicationServicesExtensions
     {
         // Core services
         services.AddScoped<IActivityService, ActivityService>();
+        services.AddScoped<IActivitySummaryService, ActivitySummaryService>();
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IInputTypeService, InputTypeService>();
         services.AddScoped<IUnitService, UnitService>();
