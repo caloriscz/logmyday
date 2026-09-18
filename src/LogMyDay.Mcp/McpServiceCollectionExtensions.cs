@@ -56,6 +56,7 @@ public static class McpServiceCollectionExtensions
             .WithTools<ScanMappingTools>(McpJson.Options)
             .WithTools<AnalyticsTools>(McpJson.Options)
             .WithTools<EventLogTools>(McpJson.Options)
+            .WithTools<BackupTools>(McpJson.Options)
             .WithResources<LogMyDayResources>()
             .WithPrompts<LogMyDayPrompts>(McpJson.Options);
 

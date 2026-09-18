@@ -22,6 +22,7 @@ public static class McpErrorMapper
     public const string Conflict = "conflict";
     public const string ConfirmationRequired = "confirmation-required";
     public const string Forbidden = "forbidden";
+    public const string TooLarge = "too-large";
     public const string Unexpected = "error";
 
     public static CallToolResult ToResult(Exception exception, ILogger logger)
@@ -44,6 +45,9 @@ public static class McpErrorMapper
 
             case UnauthorizedAccessException ex:
                 return Error(Forbidden, ex.Message);
+
+            case PayloadTooLargeException ex:
+                return Error(TooLarge, ex.Message, new { bytes = ex.Bytes, limit = ex.Limit, hint = ex.Hint });
 
             // The services throw these with messages written for the UI, so they are safe to relay.
             case ArgumentException ex:
@@ -109,4 +113,16 @@ public sealed class ConfirmationRequiredException : Exception
 
     /// <summary>What the call would do, in words the agent should relay before confirming.</summary>
     public string? Impact { get; }
+}
+
+/// <summary>
+/// Thrown by a tool whose inline result would exceed its cap; the mapper turns it into
+/// <c>too-large</c> with the size, the limit and where to get the data instead.
+/// </summary>
+public sealed class PayloadTooLargeException(long bytes, long limit, string hint)
+    : Exception($"The result is {bytes:N0} bytes, over this tool's {limit:N0}-byte limit. {hint}")
+{
+    public long Bytes { get; } = bytes;
+    public long Limit { get; } = limit;
+    public string Hint { get; } = hint;
 }

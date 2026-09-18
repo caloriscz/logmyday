@@ -6,6 +6,7 @@ using LogMyDay.Domain.Enums;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LogMyDay.Api.IntegrationTests;
@@ -47,6 +48,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddDbContext<LogMyDayDbContext>(options =>
             {
                 options.UseInMemoryDatabase("IntegrationTestDb");
+                // Services that wrap work in a transaction (backup restore) must still run here.
+                options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             });
 
             // Build service provider and seed data
