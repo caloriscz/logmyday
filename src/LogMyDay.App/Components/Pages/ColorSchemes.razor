@@ -126,7 +126,7 @@
             <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(isEditing ? "Edit Scheme" : "New Scheme")</h2>
-                    <p class="text-sm text-gray-600 dark:text-slate-400">Assign colors to exact values or ranges.</p>
+                    <p class="text-sm text-gray-600 dark:text-slate-400">@(isYesNo ? "Pick a color for Yes and a color for No." : "Assign colors to exact values or ranges.")</p>
                 </div>
                 <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
                     <Icon Name="close" Class="h-5 w-5" />
@@ -156,16 +156,54 @@
                             <InputText @bind-Value="formModel.Description" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional description" disabled="@isBusy" />
                         </div>
 
+                        <div class="space-y-2">
+                            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Scheme type</label>
+                            @* The user never sees that Yes is stored as 1 and No as 0; this choice hides it. *@
+                            <div class="flex flex-wrap gap-4" role="radiogroup" aria-label="Scheme type">
+                                <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-slate-200">
+                                    <input type="radio" name="scheme-kind" checked="@(!isYesNo)" @onchange="() => SetYesNo(false)" class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isBusy" />
+                                    <span><span class="font-medium">Normal</span> <span class="text-gray-500 dark:text-slate-400">— numbers, ratings, scores</span></span>
+                                </label>
+                                <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-slate-200">
+                                    <input type="radio" name="scheme-kind" checked="@isYesNo" @onchange="() => SetYesNo(true)" class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@isBusy" />
+                                    <span><span class="font-medium">Yes / No</span> <span class="text-gray-500 dark:text-slate-400">— one color for each answer</span></span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Color entries</label>
-                                <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddEntryRow" disabled="@isBusy">
-                                    <Icon Name="plus" Class="h-3.5 w-3.5" />
-                                    Add entry
-                                </button>
+                                @if (!isYesNo)
+                                {
+                                    <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddEntryRow" disabled="@isBusy">
+                                        <Icon Name="plus" Class="h-3.5 w-3.5" />
+                                        Add entry
+                                    </button>
+                                }
                             </div>
 
-                            @if (formEntries.Count == 0)
+                            @if (isYesNo)
+                            {
+                                @* Two fixed rows. Only the colour is editable; the answer each row stands for is its label. *@
+                                <div class="mb-2">@PreviewStripRows()</div>
+                                <div class="space-y-2">
+                                    @foreach (var row in formEntries)
+                                    {
+                                        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                                            <span class="w-16 text-sm font-semibold text-gray-800 dark:text-slate-100">@row.Label</span>
+                                            <input type="color" @bind="row.Color" class="h-8 w-10 cursor-pointer rounded border border-gray-300 dark:border-slate-700" disabled="@isBusy" title="Pick color" aria-label="@($"Color for {row.Label}")" />
+                                            <div class="flex items-center gap-1">
+                                                @foreach (var preset in PresetColors)
+                                                {
+                                                    <button type="button" class="h-5 w-5 rounded-full border border-black/10 dark:border-white/20" style="background-color:@preset" @onclick="() => row.Color = preset" title="@preset" disabled="@isBusy"></button>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (formEntries.Count == 0)
                             {
                                 <p class="text-xs text-gray-500 dark:text-slate-400">No entries — tags using this scheme will show no color until you add at least one.</p>
                             }
@@ -224,7 +262,7 @@
                                     <li><span class="font-semibold">Range</span> takes two separate numbers — a minimum and a maximum. Type <span class="font-mono">1</span> and <span class="font-mono">5</span> in the two boxes rather than <span class="font-mono">1-5</span> in one.</li>
                                     <li>Leave one range bound empty for open-ended: a minimum of <span class="font-mono">90</span> with no maximum matches 90 and above.</li>
                                     <li>Entries are matched top to bottom and the first match wins, so put narrower entries above wider ones.</li>
-                                    <li>For a <span class="font-semibold">Yes/No</span> tag, <span class="font-mono">1</span> is true and <span class="font-mono">0</span> is false — two Exact entries colour each answer.</li>
+                                    <li>Coloring a Yes/No tag? Switch the scheme type above instead of typing numbers.</li>
                                 </ul>
                             }
                         </div>
@@ -294,6 +332,18 @@
     private const string ExactMode = "exact";
     private const string RangeMode = "range";
 
+    // Yes/No schemes are ordinary Exact 1 / Exact 0 entries underneath — the resolver reads a Boolean
+    // tag's "true"/"false" as 1/0 — carrying "Yes"/"No" as their labels. Nothing else in the model
+    // changes, so an old scheme built by hand from 1 and 0 reopens as Yes/No too.
+    private const string YesLabel = "Yes";
+    private const string NoLabel = "No";
+    private const double YesValue = 1;
+    private const double NoValue = 0;
+    private const string YesDefaultColor = "#22c55e";
+    private const string NoDefaultColor = "#ef4444";
+
+    private bool isYesNo;
+
     private readonly List<ColorSchemeResponse> schemes = new();
     private ColorSchemeRequest formModel = new() { Name = string.Empty };
     private readonly List<EntryRow> formEntries = new();
@@ -347,6 +397,7 @@
         editingId = null;
         formModel = new ColorSchemeRequest { Name = string.Empty };
         formEntries.Clear();
+        isYesNo = false;
         formError = null;
         showModal = true;
     }
@@ -374,12 +425,66 @@
                 Value = isExact ? entry.RangeFrom : null,
                 From = entry.RangeFrom,
                 To = entry.RangeTo,
-                Color = entry.Color
+                Color = entry.Color,
+                Label = entry.Label
             });
+        }
+
+        isYesNo = LooksLikeYesNo(formEntries);
+        if (isYesNo)
+        {
+            ApplyYesNoLayout();
         }
 
         formError = null;
         showModal = true;
+    }
+
+    /// <summary>Exactly two exact entries, one for 1 and one for 0, in any order — a Yes/No scheme.</summary>
+    private static bool LooksLikeYesNo(List<EntryRow> rows)
+    {
+        return rows.Count == 2
+            && rows.All(r => !r.IsRange && r.Value.HasValue)
+            && rows.Any(r => r.Value == YesValue)
+            && rows.Any(r => r.Value == NoValue);
+    }
+
+    private void SetYesNo(bool yesNo)
+    {
+        if (isYesNo == yesNo)
+        {
+            return;
+        }
+
+        isYesNo = yesNo;
+        formError = null;
+
+        if (yesNo)
+        {
+            ApplyYesNoLayout();
+        }
+        else
+        {
+            // Back to Normal: the two rows stay as plain, editable Exact 1 / Exact 0 entries.
+            foreach (var row in formEntries)
+            {
+                row.Label = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Replaces the rows with the fixed Yes and No pair, keeping a colour already chosen for 1 or 0 so
+    /// switching type doesn't throw away work.
+    /// </summary>
+    private void ApplyYesNoLayout()
+    {
+        var yesColor = formEntries.FirstOrDefault(r => !r.IsRange && r.Value == YesValue)?.Color ?? YesDefaultColor;
+        var noColor = formEntries.FirstOrDefault(r => !r.IsRange && r.Value == NoValue)?.Color ?? NoDefaultColor;
+
+        formEntries.Clear();
+        formEntries.Add(new EntryRow { Value = YesValue, Label = YesLabel, Color = yesColor });
+        formEntries.Add(new EntryRow { Value = NoValue, Label = NoLabel, Color = noColor });
     }
 
     private void CloseModal()
@@ -440,7 +545,8 @@
             RangeFrom = row.IsRange ? row.From : row.Value,
             RangeTo = row.IsRange ? row.To : row.Value,
             Color = row.Color,
-            SortOrder = index
+            SortOrder = index,
+            Label = isYesNo ? row.Label : null
         }).ToList();
 
         try
@@ -478,6 +584,11 @@
     /// </summary>
     private string? ValidateEntries()
     {
+        if (isYesNo)
+        {
+            return null;
+        }
+
         for (var i = 0; i < formEntries.Count; i++)
         {
             var row = formEntries[i];
@@ -566,7 +677,7 @@
             builder.OpenElement(seq++, "span");
             builder.AddAttribute(seq++, "class", "inline-block h-4 w-4 rounded-full border border-black/10 dark:border-white/20");
             builder.AddAttribute(seq++, "style", $"background-color:{entry.Color}");
-            builder.AddAttribute(seq++, "title", EntryLabel(entry.RangeFrom, entry.RangeTo));
+            builder.AddAttribute(seq++, "title", entry.Label ?? EntryLabel(entry.RangeFrom, entry.RangeTo));
             builder.CloseElement();
         }
         builder.CloseElement();
@@ -607,5 +718,6 @@
         public double? From { get; set; }
         public double? To { get; set; }
         public string Color { get; set; } = "#22c55e";
+        public string? Label { get; set; }
     }
 }
