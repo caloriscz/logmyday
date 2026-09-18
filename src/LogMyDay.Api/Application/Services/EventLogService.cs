@@ -148,7 +148,7 @@ public class EventLogService : IEventLogService
     }
 
     // Categories are message-prefix conventions, not a database column: synced mobile diagnostics
-    // arrive as "[category] body"; other events use stable "Activity/Reminder/Todo list …"
+    // arrive as "[category] body"; other events use stable "Activity/Reminder/Todo list/MCP …"
     // prefixes. "\" escapes "[" so the pattern stays literal on SQL Server as well as SQLite.
     private static IQueryable<EventLog> ApplyCategoryFilter(IQueryable<EventLog> query, EventLogCategoryFilter categoryFilter)
     {
@@ -159,6 +159,9 @@ public class EventLogService : IEventLogService
             EventLogCategoryFilter.Activity => query.Where(e => EF.Functions.Like(e.Message, "Activity %")),
             EventLogCategoryFilter.Reminder => query.Where(e => EF.Functions.Like(e.Message, "Reminder %")),
             EventLogCategoryFilter.TodoList => query.Where(e => EF.Functions.Like(e.Message, "Todo list %")),
+            // Audit rows the MCP call filter writes: "MCP <tool> via <key prefix>: <outcome>".
+            // Agent-authored events use "Agent: " and are deliberately not matched here.
+            EventLogCategoryFilter.Mcp => query.Where(e => EF.Functions.Like(e.Message, "MCP %")),
             _ => query
         };
     }
