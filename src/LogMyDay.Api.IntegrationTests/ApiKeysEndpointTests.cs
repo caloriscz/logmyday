@@ -136,6 +136,15 @@ public class ApiKeysEndpointTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public void RefitClient_ForTheBlazorUi_Resolves()
+    {
+        // The Profile page's ApiKeysPanel injects this; a broken registration would only surface at render.
+        using var scope = _factory.Services.CreateScope();
+
+        Assert.NotNull(scope.ServiceProvider.GetService<LogMyDay.Shared.Interfaces.IApiKeysApi>());
+    }
+
+    [Fact]
     public async Task Revoke_UnknownId_Is404()
     {
         var response = await BasicClient().DeleteAsync("/api/account/api-keys/999999");
