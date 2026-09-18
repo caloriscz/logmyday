@@ -1,4 +1,4 @@
-﻿namespace LogMyDay.Api.Infrastructure.Data;
+namespace LogMyDay.Api.Infrastructure.Data;
 
 using LogMyDay.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +30,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<ReminderDay> ReminderDays => Set<ReminderDay>();
     public DbSet<ColorScheme> ColorSchemes => Set<ColorScheme>();
     public DbSet<ColorSchemeEntry> ColorSchemeEntries => Set<ColorSchemeEntry>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<ReminderDay>().ToTable("LogMyDay_ReminderDays");
         modelBuilder.Entity<ColorScheme>().ToTable("LogMyDay_ColorSchemes");
         modelBuilder.Entity<ColorSchemeEntry>().ToTable("LogMyDay_ColorSchemeEntries");
+        modelBuilder.Entity<ApiKey>().ToTable("LogMyDay_ApiKeys");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -271,6 +273,32 @@ public class LogMyDayDbContext : DbContext
             entity.HasIndex(s => s.UserId).HasDatabaseName("IX_LogMyDay_ColorSchemes_UserId");
             entity.Property(s => s.Name).HasMaxLength(100).IsRequired();
             entity.Property(s => s.Description).HasMaxLength(500);
+        });
+
+        // Configure ApiKey entity. Prefix is indexed but not unique: it is a lookup hint and the
+        // hash decides; UserId serves the owner's key list. Deleting a user takes their keys.
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.HasOne(k => k.User)
+                .WithMany()
+                .HasForeignKey(k => k.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(k => k.Prefix).HasDatabaseName("IX_LogMyDay_ApiKeys_Prefix");
+            entity.HasIndex(k => k.UserId).HasDatabaseName("IX_LogMyDay_ApiKeys_UserId");
+
+            entity.Property(k => k.Name).HasMaxLength(100).IsRequired();
+            entity.Property(k => k.Prefix).HasMaxLength(16).IsRequired();
+            entity.Property(k => k.KeyHash).HasMaxLength(64).IsRequired();
+            entity.Property(k => k.Scope).HasConversion<int>();
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(k => k.CreatedUtc).HasColumnType("datetime2");
+                entity.Property(k => k.ExpiresUtc).HasColumnType("datetime2");
+                entity.Property(k => k.RevokedUtc).HasColumnType("datetime2");
+                entity.Property(k => k.LastUsedUtc).HasColumnType("datetime2");
+            }
         });
 
         modelBuilder.Entity<ColorSchemeEntry>(entity =>
