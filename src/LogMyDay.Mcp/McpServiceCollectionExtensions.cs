@@ -58,6 +58,8 @@ public static class McpServiceCollectionExtensions
             .WithTools<EventLogTools>(McpJson.Options)
             .WithTools<BackupTools>(McpJson.Options)
             .WithTools<ExportTools>(McpJson.Options)
+            .WithTools<UserTools>(McpJson.Options)
+            .WithTools<AdminTools>(McpJson.Options)
             .WithResources<LogMyDayResources>()
             .WithPrompts<LogMyDayPrompts>(McpJson.Options);
 

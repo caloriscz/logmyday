@@ -24,6 +24,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public const string ReadWriteKeyToken = "lmd_IntegrationTestReadWriteKey0000000000000000";
     public const string ReadOnlyKeyToken = "lmd_IntegrationTestReadOnlyKey00000000000000000";
 
+    /// <summary>An admin user with a read-write key, for the admin_* tools.</summary>
+    public const string AdminUserEmail = "mcp-admin@example.com";
+    public const string AdminKeyToken = "lmd_IntegrationTestAdminKey00000000000000000000";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Test");
@@ -78,9 +82,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             PasswordHash = "not-used"
         };
         db.Users.Add(mcpUser);
+        var adminUser = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = AdminUserEmail,
+            PasswordHash = "not-used",
+            IsAdmin = true
+        };
+        db.Users.Add(adminUser);
         db.ApiKeys.AddRange(
             SeededKey(mcpUser.Id, "rw", ReadWriteKeyToken, ApiKeyScope.ReadWrite),
-            SeededKey(mcpUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly));
+            SeededKey(mcpUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly),
+            SeededKey(adminUser.Id, "admin", AdminKeyToken, ApiKeyScope.ReadWrite));
 
         var tag1 = new Tag
         {
