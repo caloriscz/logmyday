@@ -54,4 +54,9 @@ public class Tag
     [ForeignKey(nameof(GroupId))]
     public TagGroup? Group { get; set; }
 
+    public int? ColorSchemeId { get; set; }
+
+    [ForeignKey(nameof(ColorSchemeId))]
+    public ColorScheme? ColorScheme { get; set; }
+
 }

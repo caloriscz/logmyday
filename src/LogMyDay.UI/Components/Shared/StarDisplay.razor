@@ -6,8 +6,8 @@
         var isFilled = i <= Value;
         var size = MaxStars > 6 ? "14px" : "18px";
         <svg viewBox="0 0 24 24" style="width: @size; height: @size; flex-shrink: 0;"
-             fill="@(isFilled ? "#f59e0b" : "none")"
-             stroke="@(isFilled ? "#d97706" : "#9ca3af")"
+             fill="@(isFilled ? FillColor : "none")"
+             stroke="@(isFilled ? StrokeColor : "#9ca3af")"
              stroke-width="@(isFilled ? "0.5" : "1.5")">
             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
         </svg>
@@ -17,4 +17,10 @@
 @code {
     [Parameter] public int Value { get; set; }
     [Parameter] public int MaxStars { get; set; } = 5;
+
+    /// <summary>Explicit color from the tag's color scheme; when null the default amber applies.</summary>
+    [Parameter] public string? Color { get; set; }
+
+    private string FillColor => Color ?? "#f59e0b";
+    private string StrokeColor => Color ?? "#d97706";
 }

@@ -1,4 +1,6 @@
 @using Microsoft.AspNetCore.Components
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Helpers
 
 <div style="display: flex; align-items: center; gap: 3px; flex-wrap: wrap;" role="radiogroup" aria-label="Score">
     @for (int i = 0; i <= MaxScore; i++)
@@ -6,7 +8,7 @@
         var scoreValue = i;
         var isSelected = Value == scoreValue;
         var isHovered = _hoverValue == scoreValue;
-        var color = GetScoreColor(scoreValue, MaxScore);
+        var color = ScoreColor(scoreValue);
         var size = MaxScore > 6 ? "26px" : "38px";
         var fontSize = MaxScore > 6 ? "0.65rem" : "0.8rem";
         <button type="button"
@@ -55,27 +57,7 @@
         await ValueChanged.InvokeAsync(null);
     }
 
-    private static string GetScoreColor(int value, int max)
-    {
-        if (max == 0) return "#22c55e";
-        var ratio = (double)value / max;
-        if (ratio <= 0.5)
-        {
-            // green → yellow
-            var t = ratio * 2;
-            var r = (int)(0x22 + (0xea - 0x22) * t);
-            var g = (int)(0xc5 + (0xb3 - 0xc5) * t);
-            var b = (int)(0x5e + (0x08 - 0x5e) * t);
-            return $"#{r:x2}{g:x2}{b:x2}";
-        }
-        else
-        {
-            // yellow → red
-            var t = (ratio - 0.5) * 2;
-            var r = (int)(0xea + (0xef - 0xea) * t);
-            var g = (int)(0xb3 + (0x44 - 0xb3) * t);
-            var b = (int)(0x08 + (0x44 - 0x08) * t);
-            return $"#{r:x2}{g:x2}{b:x2}";
-        }
-    }
+    // Score circles use the built-in direction-aware default (scores read lower = better).
+    private string ScoreColor(int value) =>
+        DefaultColorSchemes.Resolve(MaxScore > 5 ? InputTypeIds.Score10 : InputTypeIds.Score, value) ?? "#6b7280";
 }

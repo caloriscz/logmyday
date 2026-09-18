@@ -48,6 +48,72 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Activities", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ColorScheme", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DisplayOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_ColorSchemes_UserId");
+
+                    b.ToTable("LogMyDay_ColorSchemes", (string)null);
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ColorSchemeEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ColorSchemeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("RangeFrom")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("RangeTo")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ColorSchemeId");
+
+                    b.ToTable("LogMyDay_ColorSchemeEntries", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
                 {
                     b.Property<int>("Id")
@@ -522,6 +588,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ColorSchemeId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("DefaultValue")
                         .HasColumnType("TEXT");
 
@@ -572,6 +641,8 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ColorSchemeId");
 
                     b.HasIndex("GroupId");
 
@@ -901,6 +972,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ColorSchemeEntry", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.ColorScheme", "ColorScheme")
+                        .WithMany("Entries")
+                        .HasForeignKey("ColorSchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ColorScheme");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.User", "User")
@@ -978,6 +1060,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.Tag", b =>
                 {
+                    b.HasOne("LogMyDay.Domain.Entities.ColorScheme", "ColorScheme")
+                        .WithMany()
+                        .HasForeignKey("ColorSchemeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("LogMyDay.Domain.Entities.TagGroup", "Group")
                         .WithMany()
                         .HasForeignKey("GroupId")
@@ -1000,6 +1087,8 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ColorScheme");
 
                     b.Navigation("Group");
 
@@ -1071,6 +1160,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Quantity");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ColorScheme", b =>
+                {
+                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>

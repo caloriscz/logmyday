@@ -15,6 +15,8 @@
 @inject ILogger<Activities> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Activities", "Browse and manage all logged activities")]
 
@@ -166,11 +168,11 @@
                                             }
                                             else if (IsStarRatingTag(dailyTag) || IsScoreTag(dailyTag))
                                             {
-                                                <ActivityValueDisplay TypeId="@dailyTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                                <ActivityValueDisplay TypeId="@dailyTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" Color="@TagColor(dailyTag, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" />
                                             }
                                             else
                                             {
-                                                <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                <ActivityValueDisplay TypeId="@dailyTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@TagColor(dailyTag, activity.PrimaryTagValue ?? activity.Description)">
                                                     <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
                                                 </ActivityValueDisplay>
                                             }
@@ -196,11 +198,11 @@
                                     @{ var dailyCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
                                     @if (IsStarRatingTag(dailyCardTag) || IsScoreTag(dailyCardTag))
                                     {
-                                        <ActivityValueDisplay TypeId="@dailyCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                        <ActivityValueDisplay TypeId="@dailyCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" Color="@TagColor(dailyCardTag, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" WrapperClass="mt-1" />
                                     }
                                     else
                                     {
-                                        <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                        <ActivityValueDisplay TypeId="@dailyCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@TagColor(dailyCardTag, activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
                                             <TextFallback>
                                                 @{ var dailyCardDisplayValue = GetActivityDisplayValue(activity); }
                                                 @if (!string.IsNullOrWhiteSpace(dailyCardDisplayValue))
@@ -325,11 +327,11 @@
                                                 }
                                                 else if (IsStarRatingTag(groupTag) || IsScoreTag(groupTag))
                                                 {
-                                                    <ActivityValueDisplay TypeId="@groupTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                                    <ActivityValueDisplay TypeId="@groupTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" Color="@TagColor(groupTag, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" />
                                                 }
                                                 else
                                                 {
-                                                    <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)">
+                                                    <ActivityValueDisplay TypeId="@groupTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@TagColor(groupTag, activity.PrimaryTagValue ?? activity.Description)">
                                                         <TextFallback>@GetActivityDisplayValue(activity)</TextFallback>
                                                     </ActivityValueDisplay>
                                                 }
@@ -355,11 +357,11 @@
                                         @{ var groupCardTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
                                         @if (IsStarRatingTag(groupCardTag) || IsScoreTag(groupCardTag))
                                         {
-                                            <ActivityValueDisplay TypeId="@groupCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" WrapperClass="mt-1" />
+                                            <ActivityValueDisplay TypeId="@groupCardTag!.TypeId" Value="@GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture)" Color="@TagColor(groupCardTag, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" WrapperClass="mt-1" />
                                         }
                                         else
                                         {
-                                            <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
+                                            <ActivityValueDisplay TypeId="@groupCardTag?.TypeId" Value="@(activity.PrimaryTagValue ?? activity.Description)" Color="@TagColor(groupCardTag, activity.PrimaryTagValue ?? activity.Description)" WrapperClass="mt-1">
                                                 <TextFallback>
                                                     @{ var groupCardDisplayValue = GetActivityDisplayValue(activity); }
                                                     @if (!string.IsNullOrWhiteSpace(groupCardDisplayValue))
@@ -481,6 +483,7 @@
 @code {
     private PagedResult<ActivityResponse>? pagedResult;
     private IList<TagResponse>? tags;
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
     private IList<TagOptionListResponse>? optionLists;
     private Dictionary<int, TagOptionListResponse>? optionListLookup;
     private ActivityRequest newActivity = new();
@@ -573,6 +576,7 @@
 
             // Always refresh tags and option lists to ensure we have latest data
             tags = await ActivityApi.GetTags();
+            _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
             optionLists = await ActivityApi.GetTagOptionListsAsync();
             
             if (optionLists is not null)
@@ -1204,6 +1208,9 @@
     }
 
     private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private string? TagColor(TagResponse? tag, string? value) =>
+        _schemes.ResolveColor(tag?.TypeId, tag?.ColorSchemeId, value);
 
     private static bool IsStarRatingTag(TagResponse? tag) =>
         tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;

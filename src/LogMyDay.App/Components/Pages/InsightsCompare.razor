@@ -1,0 +1,612 @@
+@page "/insights/compare"
+@using System.Globalization
+@using LogMyDay.Domain.Constants
+@using LogMyDay.App.Components.Insights
+@using LogMyDay.App.Services
+@using LogMyDay.App.Services.Insights
+@using LogMyDay.Shared.Coloring
+@using LogMyDay.Shared.Preferences
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@inject IComparisonDataService ComparisonData
+@inject IComparisonPreferencesService PreferencesStore
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+@inject NavigationManager Navigation
+
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Timeline Comparison", "Compare tags side by side across days with optional day offsets")]
+
+<PageTitle>Timeline Comparison - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 pb-20 dark:bg-gray-900">
+    <div class="bg-linear-to-br from-violet-400 to-fuchsia-500 shadow-lg dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:shadow-slate-900/50">
+        @* max-w-(--breakpoint-2xl), not max-w-7xl: only the breakpoint forms are relaxed to 100% by the
+           html.layout-wide rule in app.css, so this is what lets the navbar's wide toggle reach this page. *@
+        <div class="mx-auto max-w-(--breakpoint-2xl) px-4 py-6 sm:px-6 lg:px-8">
+            <div class="flex items-center gap-3">
+                <button type="button" aria-label="Back to Insights"
+                        class="rounded-lg p-2 transition-colors hover:bg-white/10 dark:hover:bg-slate-800/60"
+                        @onclick="NavigateBack">
+                    <Icon Name="arrow-left" Class="h-6 w-6 text-white" />
+                </button>
+                <div>
+                    <h1 class="text-2xl font-bold text-white md:text-3xl">Timeline Comparison</h1>
+                    <p class="mt-1 text-sm text-white/80">Compare metrics day by day, with optional offsets between rows.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Period controls. Deliberately separate from the per-row offset controls in each row header:
+             these move the whole visible window, those move one row relative to the reference row. -->
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div class="space-y-2">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Columns</span>
+                    <div class="inline-flex items-center gap-1 rounded-full bg-gray-100 p-0.5 dark:bg-slate-800">
+                        @foreach (var option in ComparisonConstants.ColumnCountOptions)
+                        {
+                            var count = option;
+                            <button type="button" class="@GetPillClass(_columnCount == count)"
+                                    aria-label="Show @count days" aria-pressed="@(_columnCount == count)"
+                                    @onclick="() => SetColumnCount(count)">@count d</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Visible period</span>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button type="button" class="@NavButtonCss" aria-label="Previous year" title="Previous year"
+                                @onclick="() => Navigate(ComparisonStep.Year, -1)">« Y</button>
+                        <button type="button" class="@NavButtonCss" aria-label="Previous month" title="Previous month"
+                                @onclick="() => Navigate(ComparisonStep.Month, -1)">‹ M</button>
+                        <button type="button" class="@NavButtonCss" aria-label="Previous week" title="Previous week"
+                                @onclick="() => Navigate(ComparisonStep.Week, -1)">‹ W</button>
+                        <button type="button" class="@NavButtonCss" aria-label="Previous period" title="Previous full period"
+                                @onclick="() => Navigate(ComparisonStep.Window, -1)">
+                            <Icon Name="chevron-double-left" Class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="@NavButtonCss" aria-label="Previous day" title="Previous day"
+                                @onclick="() => Navigate(ComparisonStep.Day, -1)">
+                            <Icon Name="chevron-left" Class="h-4 w-4" />
+                        </button>
+
+                        <button type="button" class="@NavButtonCss" aria-label="Back to today" title="Back to today"
+                                disabled="@(!CanGoForward)" @onclick="ResetPeriod">Today</button>
+
+                        <button type="button" class="@NavButtonCss" aria-label="Next day" title="Next day"
+                                disabled="@(!CanGoForward)" @onclick="() => Navigate(ComparisonStep.Day, 1)">
+                            <Icon Name="chevron-right" Class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="@NavButtonCss" aria-label="Next period" title="Next full period"
+                                disabled="@(!CanGoForward)" @onclick="() => Navigate(ComparisonStep.Window, 1)">
+                            <Icon Name="chevron-double-right" Class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="@NavButtonCss" aria-label="Next week" title="Next week"
+                                disabled="@(!CanGoForward)" @onclick="() => Navigate(ComparisonStep.Week, 1)">W ›</button>
+                        <button type="button" class="@NavButtonCss" aria-label="Next month" title="Next month"
+                                disabled="@(!CanGoForward)" @onclick="() => Navigate(ComparisonStep.Month, 1)">M ›</button>
+                        <button type="button" class="@NavButtonCss" aria-label="Next year" title="Next year"
+                                disabled="@(!CanGoForward)" @onclick="() => Navigate(ComparisonStep.Year, 1)">Y »</button>
+                    </div>
+                </div>
+
+                <div class="space-y-2 lg:text-right">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Showing</span>
+                    <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">@RangeLabel</p>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @_errorMessage
+            </div>
+        }
+
+        @if (_isTruncated)
+        {
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-xs dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-200">
+                One of the selected metrics returned the maximum number of entries, so some values in this range may be missing.
+            </div>
+        }
+
+        @if (_view is null)
+        {
+            <EmptyState Message="Loading comparison..." />
+        }
+        else
+        {
+            @if (_view.Rows.Count(r => r.Tag is not null) < ComparisonConstants.MinRows)
+            {
+                <div class="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-center text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    Pick a metric in at least two rows to compare them.
+                </div>
+            }
+
+            @* Single horizontal scroller for the whole grid. Do NOT give any element between this div and
+               the sticky cells an overflow other than visible — an overflow-hidden added here (for rounded
+               corners, say) silently stops position: sticky from working on the label column. *@
+            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
+                <table class="border-separate border-spacing-0 text-sm">
+                    <caption class="sr-only">
+                        Metrics as rows and days as columns. Rows after the first may be offset by a number of days;
+                        each cell's title states the date that cell actually represents.
+                    </caption>
+                    <thead>
+                        <tr>
+                            <th scope="col" class="@($"{StickyLabelCss} z-30 border-b")">
+                                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Metric</span>
+                            </th>
+                            @for (var c = 0; c < _view.Timeline.Columns.Count; c++)
+                            {
+                                var index = c;
+                                var date = _view.Timeline.Columns[index];
+                                var isToday = date == GetTodayInDisplayZone();
+
+                                <th scope="col" class="@($"{ColumnWidthCss} border-b border-l border-gray-200 p-0 align-bottom dark:border-slate-800 {GetColumnHighlightCss(index)}")">
+                                    <button type="button"
+                                            class="flex w-full flex-col items-center gap-0.5 px-0.5 py-2 transition-colors hover:bg-primary-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:hover:bg-slate-800/60 dark:focus-visible:ring-offset-slate-900"
+                                            title="@FormatFullDate(date)"
+                                            aria-label="@($"Select {FormatFullDate(date)}")"
+                                            @onclick="() => ToggleColumn(index)">
+                                        @if (date.Day == 1 || index == 0)
+                                        {
+                                            <span class="text-[10px] font-semibold uppercase text-primary-600 dark:text-primary-400">@date.ToString("MMM", displayCulture)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-[10px] text-transparent">&nbsp;</span>
+                                        }
+                                        <span class="text-[10px] uppercase text-gray-500 dark:text-slate-400">@date.ToString("ddd", displayCulture)</span>
+                                        <span class="@(isToday ? "rounded-full bg-primary-600 px-1.5 text-xs font-bold text-white" : "text-xs font-semibold text-gray-900 dark:text-slate-100")">@date.Day</span>
+                                    </button>
+                                </th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _view.Rows)
+                        {
+                            var rowIndex = row.Index;
+
+                            <tr>
+                                <th scope="row" class="@($"{StickyLabelCss} z-20 border-t align-top")">
+                                    @* Render from row.Config, never from _rows[rowIndex]. A mutation such as
+                                       removing a row shortens _rows before Reload's first await, and Blazor
+                                       renders at that await while _view still holds the old row count — so
+                                       indexing the live list here would throw and take down the circuit. *@
+                                    <ComparisonRowControls Index="rowIndex" Config="row.Config" Tags="_sortedTags"
+                                                           CanRemove="rowIndex > 0 && _view.Rows.Count > ComparisonConstants.MinRows"
+                                                           SelectClass="@InputCss"
+                                                           ConfigChanged="config => OnRowChanged(rowIndex, config)"
+                                                           Removed="() => RemoveRow(rowIndex)" />
+                                </th>
+                                @for (var c = 0; c < row.Cells.Count; c++)
+                                {
+                                    var index = c;
+                                    var cell = row.Cells[index];
+                                    var color = ResolveCellColor(row, cell);
+
+                                    <td class="@($"{ColumnWidthCss} border-t border-l border-gray-200 p-1 align-middle dark:border-slate-800 {GetColumnHighlightCss(index)}")">
+                                        @if (row.Tag is null)
+                                        {
+                                            @* An unconfigured row has nothing to open, and all its cells are Missing. *@
+                                            <span class="@EmptyBadgeCss" title="@BuildCellTooltip(row, cell)">-</span>
+                                        }
+                                        else
+                                        {
+                                            @* The whole cell is the click target, as a day is in Calendar. It opens the row's own
+                                               date — on an offset row that differs from the column date, and it is the one the
+                                               tooltip names. An empty day opens too, so a missed entry can be added in place. *@
+                                            <button type="button" class="@CellButtonCss" title="@BuildCellTooltip(row, cell)"
+                                                    aria-label="@BuildCellAriaLabel(row, cell)" @onclick="() => OpenDayAsync(row, cell)">
+                                                @if (cell.State == ComparisonCellState.Value)
+                                                {
+                                                    @if (color != null)
+                                                    {
+                                                        <span class="@ValueBadgeBaseCss" style="background-color:@color">@GetInlineText(FormatCell(row, cell))</span>
+                                                    }
+                                                    else if (ComparisonAggregator.ShowsBooleanIcon(cell, row.Config.Aggregation, IsBooleanRow(row)))
+                                                    {
+                                                        @* No scheme colour: the same icon Calendar Linear uses, which carries its own green/red. *@
+                                                        <span class="@ValueBadgeCss"><BooleanDisplay Value="@(cell.NumericValue >= 1)" Size="18px" /></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="@ValueBadgeCss">@GetInlineText(FormatCell(row, cell))</span>
+                                                    }
+                                                }
+                                                else if (cell.State == ComparisonCellState.NotApplicable)
+                                                {
+                                                    <span class="@EmptyBadgeCss">n/a</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="@EmptyBadgeCss">-</span>
+                                                }
+                                            </button>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <button type="button" class="@NavButtonCss" disabled="@(_rows.Count >= ComparisonConstants.MaxRows)"
+                    @onclick="AddRow">
+                <Icon Name="plus" Class="mr-1 h-4 w-4" /> Add metric
+            </button>
+        }
+    </div>
+</div>
+
+<DayActivitiesModal @ref="_dayModal"
+                    Tags="_tags"
+                    Schemes="_schemes"
+                    DisplayCulture="displayCulture"
+                    DisplayTimeZone="displayTimeZone"
+                    Preferences="effectivePreferences"
+                    ModalId="timelineDayActivityModal"
+                    OnChanged="Reload" />
+
+@code {
+    private DayActivitiesModal? _dayModal;
+
+    // A bare button around the badge: the badge already draws the box, the button only adds the
+    // hit area and a visible focus ring for keyboard users.
+    private const string CellButtonCss = "block w-full rounded-md focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900";
+
+    private async Task OpenDayAsync(ComparisonRowResult row, ComparisonCell cell)
+    {
+        if (row.Tag is null || _dayModal is null)
+        {
+            return;
+        }
+
+        await _dayModal.OpenAsync(row.Tag.Id, cell.ActualDate);
+    }
+
+    private string BuildCellAriaLabel(ComparisonRowResult row, ComparisonCell cell)
+        => $"Open {row.Tag?.Title} for {cell.ActualDate.ToString("D", displayCulture)}";
+
+    // Copied from Calendar.razor rather than extracted: refactoring Calendar is out of scope here.
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string NavButtonCss = "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60";
+    private const string PillActive = "inline-flex items-center justify-center rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white shadow-xs dark:bg-slate-200 dark:text-slate-900";
+    private const string PillInactive = "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200";
+    private const string ValueBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md bg-emerald-500 px-1 py-1 text-xs font-semibold text-white shadow-xs dark:bg-emerald-500/80";
+    private const string ValueBadgeBaseCss = "flex w-full min-h-7 items-center justify-center rounded-md px-1 py-1 text-xs font-semibold text-white shadow-xs";
+    private const string EmptyBadgeCss = "flex w-full min-h-7 items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-1 py-1 text-xs font-medium text-amber-700 dark:border-amber-400/60 dark:bg-amber-500/10 dark:text-amber-200";
+
+    // The sticky column must carry an opaque background, or the scrolling day columns show through it.
+    // It widens at xl so the row's three selects fit on one line; below that it keeps the narrow stacked
+    // layout that suits phones and tablets. Sticky cells do not auto-size, so each width is explicit.
+    private const string StickyLabelCss = "sticky left-0 w-64 min-w-64 xl:w-[30rem] xl:min-w-[30rem] border-r border-gray-200 bg-white p-3 text-left shadow-[2px_0_4px_rgba(0,0,0,0.04)] dark:border-slate-700 dark:bg-slate-900";
+    private const string ColumnHighlightCss = "bg-primary-50 dark:bg-slate-800/60";
+
+    private const int MaxRawValuesInTooltip = 10;
+
+    private AnchorPosition _anchor;
+    private int _columnCount = ComparisonConstants.DefaultColumnCount;
+    private List<ComparisonRowConfig> _rows =
+    [
+        ComparisonRowConfig.Anchor(),
+        ComparisonRowConfig.Comparison()
+    ];
+    private bool _savedPreferencesLoaded;
+
+    private IList<TagResponse>? _tags;
+    private IList<TagResponse>? _sortedTags;
+    private Dictionary<int, TagResponse> _tagsById = new();
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
+    private ComparisonView? _view;
+    private int? _selectedColumnIndex;
+    private string? _errorMessage;
+    private bool _isTruncated;
+
+    private CultureInfo displayCulture = CultureInfo.CurrentCulture;
+    private TimeZoneInfo displayTimeZone = TimeZoneInfo.Local;
+    private EffectivePreferences? effectivePreferences;
+
+    private bool CanGoForward => ComparisonTimelineCalculator.CanNavigateForward(_anchor, GetTodayInDisplayZone());
+
+    private string RangeLabel =>
+        _view is null
+            ? string.Empty
+            : $"{FormatDate(_view.Timeline.Start)} – {FormatDate(_view.Timeline.End)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Timeline Comparison");
+        await LoadPreferences();
+        _anchor = ComparisonTimelineCalculator.ResetToToday(GetTodayInDisplayZone());
+        await LoadTags();
+        await Reload();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // localStorage is only reachable once the circuit is live, so the stored setup is applied after
+        // the first render rather than during initialization (the Calendar idiom).
+        if (_savedPreferencesLoaded || _tags is null)
+        {
+            return;
+        }
+
+        _savedPreferencesLoaded = true;
+
+        var stored = await PreferencesStore.Load(_tags.Select(t => t.Id));
+
+        if (ReferenceEquals(stored, ComparisonPreferences.Default))
+        {
+            return;
+        }
+
+        _columnCount = stored.ColumnCount;
+        _rows = stored.Rows.ToList();
+        await Reload();
+        StateHasChanged();
+    }
+
+    private async Task LoadPreferences()
+    {
+        try
+        {
+            var preferences = await UserPreferencesService.GetAsync();
+            displayCulture = preferences.Culture;
+            displayTimeZone = preferences.TimeZone;
+            effectivePreferences = preferences.Preferences;
+        }
+        catch
+        {
+            // Preferences are a display concern only — fall back to the server defaults.
+            displayCulture = CultureInfo.CurrentCulture;
+            displayTimeZone = TimeZoneInfo.Local;
+            effectivePreferences = null;
+        }
+    }
+
+    private async Task LoadTags()
+    {
+        try
+        {
+            _tags = await ActivityApi.GetTags();
+            _sortedTags = _tags.OrderBy(t => t.Title).ToList();
+            _tagsById = _tags.ToDictionary(t => t.Id);
+            _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading metrics: {ex.Message}";
+        }
+    }
+
+    private async Task Reload()
+    {
+        var timeline = ComparisonTimelineCalculator.BuildTimeline(_anchor, _columnCount);
+        var range = ComparisonTimelineCalculator.GetRequiredRange(
+            timeline.Columns,
+            _rows.Select(r => r.EffectiveOffsetDays));
+        var tagIds = _rows.Where(r => r.TagId.HasValue).Select(r => r.TagId!.Value).ToList();
+
+        try
+        {
+            var data = await ComparisonData.LoadDailyValues(tagIds, range.Start, range.End);
+            _isTruncated = data.IsTruncated;
+            _view = ComparisonViewBuilder.Build(timeline, _rows, _tagsById, data);
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading comparison data: {ex.Message}";
+            _view = ComparisonViewBuilder.Build(timeline, _rows, _tagsById, ComparisonDataSet.Empty);
+        }
+    }
+
+    private async Task Navigate(ComparisonStep step, int direction)
+    {
+        if (direction > 0 && !CanGoForward)
+        {
+            return;
+        }
+
+        _anchor = ComparisonTimelineCalculator.Navigate(_anchor, step, direction, _columnCount);
+
+        // Never overshoot today: a month or year jump forward can land past it in one step.
+        var today = GetTodayInDisplayZone();
+
+        if (_anchor.Resolve() > today)
+        {
+            _anchor = ComparisonTimelineCalculator.ResetToToday(today);
+        }
+
+        await Reload();
+    }
+
+    private async Task ResetPeriod()
+    {
+        _anchor = ComparisonTimelineCalculator.ResetToToday(GetTodayInDisplayZone());
+        await Reload();
+    }
+
+    private async Task SetColumnCount(int columnCount)
+    {
+        if (_columnCount == columnCount)
+        {
+            return;
+        }
+
+        _columnCount = columnCount;
+        _selectedColumnIndex = null;
+        await Reload();
+        await SavePreferences();
+    }
+
+    private async Task OnRowChanged(int index, ComparisonRowConfig config)
+    {
+        // A click queued against an already-removed row would otherwise index past the end and take the
+        // circuit down with it.
+        if (index < 0 || index >= _rows.Count)
+        {
+            return;
+        }
+
+        _rows[index] = config;
+        await Reload();
+        await SavePreferences();
+    }
+
+    private async Task AddRow()
+    {
+        if (_rows.Count >= ComparisonConstants.MaxRows)
+        {
+            return;
+        }
+
+        _rows.Add(ComparisonRowConfig.Comparison());
+        await Reload();
+        await SavePreferences();
+    }
+
+    private async Task RemoveRow(int index)
+    {
+        if (_rows.Count <= ComparisonConstants.MinRows || index <= 0 || index >= _rows.Count)
+        {
+            return;
+        }
+
+        _rows.RemoveAt(index);
+        _selectedColumnIndex = null;
+        await Reload();
+        await SavePreferences();
+    }
+
+    private Task SavePreferences()
+    {
+        return PreferencesStore.Save(new ComparisonPreferences(_columnCount, _rows.ToList()));
+    }
+
+    private string GetPillClass(bool isActive) => isActive ? PillActive : PillInactive;
+
+    private void ToggleColumn(int index)
+    {
+        _selectedColumnIndex = _selectedColumnIndex == index ? null : index;
+    }
+
+    private string GetColumnHighlightCss(int index)
+    {
+        return _selectedColumnIndex == index ? ColumnHighlightCss : string.Empty;
+    }
+
+    /// <summary>
+    /// Literal Tailwind classes per preset — Tailwind v4 scans source for complete class strings, so an
+    /// interpolated width like <c>w-{n}</c> would produce no CSS at all.
+    /// </summary>
+    private string ColumnWidthCss => _columnCount switch
+    {
+        7 => "w-20 min-w-20",
+        14 => "w-16 min-w-16",
+        30 => "w-12 min-w-12",
+        _ => "w-9 min-w-9"
+    };
+
+    private int MaxInlineCharacters => _columnCount switch
+    {
+        7 => 6,
+        14 => 6,
+        30 => 4,
+        _ => 3
+    };
+
+    private string GetInlineText(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "-";
+        }
+
+        return value.Length <= MaxInlineCharacters ? value : value[..MaxInlineCharacters];
+    }
+
+    private string? FormatCell(ComparisonRowResult row, ComparisonCell cell)
+    {
+        return ComparisonAggregator.Format(cell, row.Config.Aggregation, displayCulture, IsBooleanRow(row));
+    }
+
+    private static bool IsBooleanRow(ComparisonRowResult row) => row.Tag?.TypeId == InputTypeIds.Boolean;
+
+    /// <summary>
+    /// Colours a cell from the tag's own scheme, exactly as Calendar does — note <c>TypeId</c>, and the
+    /// invariant <c>ColorKey</c> rather than the culture-formatted display text. Sum and Count are left
+    /// uncoloured because their magnitudes fall outside the tag's configured scale.
+    /// </summary>
+    private string? ResolveCellColor(ComparisonRowResult row, ComparisonCell cell)
+    {
+        if (cell.State != ComparisonCellState.Value || !ComparisonAggregator.PreservesScale(row.Config.Aggregation))
+        {
+            return null;
+        }
+
+        return _schemes.ResolveColor(row.Tag?.TypeId, row.Tag?.ColorSchemeId, cell.ColorKey);
+    }
+
+    /// <summary>
+    /// Names the row's own date, not the column's. On an offset row those differ, and stating it is what
+    /// makes the row self-explanatory.
+    /// </summary>
+    private string BuildCellTooltip(ComparisonRowResult row, ComparisonCell cell)
+    {
+        var name = row.Tag?.Title ?? "No metric";
+        var offset = row.Config.EffectiveOffsetDays == 0
+            ? string.Empty
+            : $" ({ComparisonRowControls.FormatOffset(row.Config.EffectiveOffsetDays)})";
+        var header = $"{name} — {FormatFullDate(cell.ActualDate)}{offset}";
+
+        if (cell.RawValues.Count == 0)
+        {
+            return $"{header}\nNo entry";
+        }
+
+        var shown = cell.RawValues.Take(MaxRawValuesInTooltip);
+        var values = string.Join(", ", shown);
+
+        if (cell.RawValues.Count > MaxRawValuesInTooltip)
+        {
+            values += ", …";
+        }
+
+        return $"{header}\n{values}";
+    }
+
+    private string FormatFullDate(DateTime date)
+    {
+        return $"{date.ToString("ddd", displayCulture)} {FormatDate(date)}";
+    }
+
+    private string FormatDate(DateTime date)
+    {
+        var pattern = effectivePreferences?.ShortDatePattern;
+
+        return string.IsNullOrWhiteSpace(pattern)
+            ? date.ToString("d", displayCulture)
+            : date.ToString(pattern, displayCulture);
+    }
+
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/insights");
+    }
+
+    // Copied from Calendar.razor — there is no shared client-side date helper, and introducing one
+    // would mean touching every Insights page.
+    private DateTime GetCurrentDateTimeInDisplayZone()
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, displayTimeZone);
+
+    private DateTime GetTodayInDisplayZone() => GetCurrentDateTimeInDisplayZone().Date;
+}

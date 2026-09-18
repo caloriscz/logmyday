@@ -9,6 +9,7 @@
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
 @inject NavigationManager Navigation
 @inject ILogger<TagEdit> Logger
 @inject IPageTitleService PageTitleService
@@ -62,6 +63,18 @@
                                 <option value="@group.Id">@group.Name</option>
                             }
                         </InputSelect>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Color scheme (optional)</label>
+                        <InputSelect @bind-Value="editTag.ColorSchemeId" class="@InputCss" TValue="int?" disabled="@isSaving">
+                            <option value="">(Default colors)</option>
+                            @foreach (var scheme in availableColorSchemes)
+                            {
+                                <option value="@scheme.Id">@scheme.Name</option>
+                            }
+                        </InputSelect>
+                        <p class="text-xs text-gray-500 dark:text-slate-400">Overrides the built-in colors for this tag's values. <a href="/color-schemes" class="text-primary-600 hover:underline dark:text-primary-400">Manage schemes</a>.</p>
                     </div>
 
                     <div class="space-y-2">
@@ -208,6 +221,7 @@
     private List<UnitResponse> availableUnits = new();
     private List<TagOptionListResponse> availableOptionLists = new();
     private List<TagGroupResponse> availableGroups = new();
+    private List<ColorSchemeResponse> availableColorSchemes = new();
     private string? tagTitle;
     private string? errorMessage;
     private bool isLoading = true;
@@ -241,7 +255,8 @@
                 Step = tag.Step,
                 DefaultValue = tag.DefaultValue,
                 OptionListId = tag.OptionListId,
-                GroupId = tag.GroupId
+                GroupId = tag.GroupId,
+                ColorSchemeId = tag.ColorSchemeId
             };
 
             EnsureValidTypeSelection();
@@ -274,6 +289,18 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load tag groups");
+        }
+
+        try
+        {
+            availableColorSchemes = (await ColorSchemeApi.GetColorSchemes())
+                .OrderBy(s => s.DisplayOrder ?? int.MaxValue)
+                .ThenBy(s => s.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load color schemes");
         }
 
         try

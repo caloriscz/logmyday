@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Components
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Helpers
 
-<span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem; font-weight: 700; color: #ffffff; background: @GetScoreColor(Value, MaxScore);" title="Score: @Value / @MaxScore">
+<span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem; font-weight: 700; color: #ffffff; background: @Background;" title="Score: @Value / @MaxScore">
     @Value
 </span>
 
@@ -8,25 +10,10 @@
     [Parameter] public int Value { get; set; }
     [Parameter] public int MaxScore { get; set; } = 5;
 
-    private static string GetScoreColor(int value, int max)
-    {
-        if (max == 0) return "#22c55e";
-        var ratio = (double)value / max;
-        if (ratio <= 0.5)
-        {
-            var t = ratio * 2;
-            var r = (int)(0x22 + (0xea - 0x22) * t);
-            var g = (int)(0xc5 + (0xb3 - 0xc5) * t);
-            var b = (int)(0x5e + (0x08 - 0x5e) * t);
-            return $"#{r:x2}{g:x2}{b:x2}";
-        }
-        else
-        {
-            var t = (ratio - 0.5) * 2;
-            var r = (int)(0xea + (0xef - 0xea) * t);
-            var g = (int)(0xb3 + (0x44 - 0xb3) * t);
-            var b = (int)(0x08 + (0x44 - 0x08) * t);
-            return $"#{r:x2}{g:x2}{b:x2}";
-        }
-    }
+    /// <summary>Explicit color from the tag's color scheme; when null the built-in default applies.</summary>
+    [Parameter] public string? Color { get; set; }
+
+    private string Background => Color
+        ?? DefaultColorSchemes.Resolve(MaxScore > 5 ? InputTypeIds.Score10 : InputTypeIds.Score, Value)
+        ?? "#6b7280";
 }

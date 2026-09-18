@@ -1,0 +1,228 @@
+@using LogMyDay.App.Services.Insights
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Shared.DTOs
+
+<div class="space-y-2">
+    <div class="flex items-center justify-between gap-2">
+        @if (Index == 0)
+        {
+            <span class="@ReferenceBadgeCss">Reference</span>
+        }
+        else
+        {
+            <span class="text-xs font-medium text-gray-500 dark:text-slate-400">Row @(Index + 1)</span>
+        }
+
+        @if (CanRemove)
+        {
+            <button type="button" class="@IconButtonCss" title="Remove this row" aria-label="Remove row @(Index + 1)"
+                    @onclick="() => Removed.InvokeAsync()">
+                <Icon Name="x" Class="h-3.5 w-3.5" />
+            </button>
+        }
+    </div>
+
+    @* Group, metric and aggregation stack on narrow screens and sit on one line from xl up, where the
+       sticky column is wide enough. The three selects share the row evenly via flex-1 on each. *@
+    <div class="flex flex-col gap-2 xl:flex-row xl:items-center">
+        @* xl:contents dissolves the tag picker's own wrapper at xl, so its group and metric selects become
+           direct children of this flex row and all three selects share the width evenly. *@
+        <GroupedTagSelect Tags="Tags" Value="Config.TagId" ValueChanged="OnTagChanged"
+                          SelectClass="@RowSelectClass" ContainerClass="flex flex-col gap-1 xl:contents"
+                          GroupPlaceholder="(All groups)" ShowAllGroupsOption="true" TagPlaceholder="-- Metric --" />
+
+        @* A Yes/No tag has one sensible reading — the day's answer — so it gets no aggregation choice. *@
+        @if (!IsYesNoTag)
+        {
+            <select class="@RowSelectClass" value="@Config.Aggregation" @onchange="OnAggregationChanged"
+                    aria-label="Aggregation for row @(Index + 1)">
+                @foreach (var mode in AggregationModes)
+                {
+                    <option value="@mode">@Label(mode)</option>
+                }
+            </select>
+        }
+    </div>
+
+    @if (Index > 0)
+    {
+        @* Row alignment. Kept visually distinct from the period navigation above the grid: these
+           buttons move one row relative to the reference row, not the whole visible window. *@
+        @* Stacked on narrow screens; from xl the mode pills, the offset readout, the stepper and the
+           quick buttons all sit on one line. *@
+        <div class="space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-800/50 xl:flex xl:flex-wrap xl:items-center xl:gap-2 xl:space-y-0">
+            <div class="flex items-center gap-1">
+                <button type="button" class="@GetModeButtonClass(RowSyncMode.Synchronized)"
+                        aria-pressed="@(Config.SyncMode == RowSyncMode.Synchronized)"
+                        aria-label="Synchronize row @(Index + 1) to the reference dates"
+                        @onclick="() => SetSyncMode(RowSyncMode.Synchronized)">Sync</button>
+                <button type="button" class="@GetModeButtonClass(RowSyncMode.Offset)"
+                        aria-pressed="@(Config.SyncMode == RowSyncMode.Offset)"
+                        aria-label="Offset row @(Index + 1) from the reference dates"
+                        @onclick="() => SetSyncMode(RowSyncMode.Offset)">Offset</button>
+                @* ml-auto pins the readout right on its own line; on the single-line desktop layout it
+                   just follows the pills. *@
+                <span class="ml-auto font-mono text-xs font-semibold text-gray-700 xl:ml-1 dark:text-slate-200"
+                      title="Days this row is shifted relative to the reference row">@FormatOffset(Config.EffectiveOffsetDays)</span>
+            </div>
+
+            @if (Config.SyncMode == RowSyncMode.Offset)
+            {
+                <div class="flex items-center gap-1">
+                    <button type="button" class="@StepButtonCss" title="One day earlier"
+                            aria-label="Shift row @(Index + 1) one day earlier" @onclick="() => ShiftOffset(-1)">
+                        <Icon Name="chevron-left" Class="h-3.5 w-3.5" />
+                    </button>
+                    <input type="number" class="@OffsetInputCss xl:w-16" value="@Config.OffsetDays"
+                           @onchange="OnOffsetTyped" min="@(-ComparisonConstants.MaxOffsetDays)"
+                           max="@ComparisonConstants.MaxOffsetDays"
+                           aria-label="Day offset for row @(Index + 1)" />
+                    <button type="button" class="@StepButtonCss" title="One day later"
+                            aria-label="Shift row @(Index + 1) one day later" @onclick="() => ShiftOffset(1)">
+                        <Icon Name="chevron-right" Class="h-3.5 w-3.5" />
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-1">
+                    <button type="button" class="@QuickButtonCss" @onclick="() => SetOffset(-7)">−7 d</button>
+                    <button type="button" class="@QuickButtonCss" @onclick="() => SetOffset(1)">+1 d</button>
+                    <button type="button" class="@QuickButtonCss" title="Roughly one year — 365 days, so it drifts a day across a leap year"
+                            @onclick="() => SetOffset(-365)">−365 d</button>
+                    <button type="button" class="@QuickButtonCss" title="Back to offset 0 and synchronized"
+                            @onclick="ResetOffset">Reset</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const string ReferenceBadgeCss = "inline-flex items-center rounded-full bg-gray-900 px-2 py-0.5 text-xs font-medium text-white dark:bg-slate-200 dark:text-slate-900";
+    private const string IconButtonCss = "inline-flex items-center justify-center rounded-md p-1 text-gray-400 transition-colors hover:bg-rose-50 hover:text-rose-600 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-400";
+    private const string StepButtonCss = "inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-1.5 py-1 text-gray-700 shadow-xs transition-colors hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600";
+    private const string QuickButtonCss = "inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600";
+    private const string OffsetInputCss = "w-full min-w-0 rounded-md border border-gray-300 bg-white px-1.5 py-1 text-center text-xs text-gray-900 shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100";
+    private const string ModeButtonActive = "inline-flex items-center justify-center rounded-md bg-gray-900 px-2 py-0.5 text-[11px] font-medium text-white dark:bg-slate-200 dark:text-slate-900";
+    private const string ModeButtonInactive = "inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[11px] font-medium text-gray-600 transition-colors hover:bg-gray-200 dark:text-slate-400 dark:hover:bg-slate-700";
+
+    private static readonly ComparisonAggregation[] AggregationModes =
+    [
+        ComparisonAggregation.First,
+        ComparisonAggregation.Sum,
+        ComparisonAggregation.Average,
+        ComparisonAggregation.Count,
+        ComparisonAggregation.Max
+    ];
+
+    [Parameter, EditorRequired] public int Index { get; set; }
+    [Parameter, EditorRequired] public ComparisonRowConfig Config { get; set; } = ComparisonRowConfig.Anchor();
+    [Parameter] public IList<TagResponse>? Tags { get; set; }
+    [Parameter] public bool CanRemove { get; set; }
+    [Parameter] public string? SelectClass { get; set; }
+    [Parameter] public EventCallback<ComparisonRowConfig> ConfigChanged { get; set; }
+    [Parameter] public EventCallback Removed { get; set; }
+
+    /// <summary>
+    /// The shared select styling plus the flex sizing the one-line desktop layout needs. min-w-0 lets a
+    /// select shrink below its content width, without which three of them overflow the sticky column.
+    /// </summary>
+    private string RowSelectClass => $"{SelectClass} xl:flex-1 xl:min-w-0";
+
+    /// <summary>Signed day offset as the spec words it: <c>−1 d</c>, <c>0 d</c>, <c>+7 d</c>.</summary>
+    public static string FormatOffset(int days)
+    {
+        if (days == 0)
+        {
+            return "0 d";
+        }
+
+        return days > 0 ? $"+{days} d" : $"−{Math.Abs(days)} d";
+    }
+
+    private static string Label(ComparisonAggregation mode)
+    {
+        return mode switch
+        {
+            ComparisonAggregation.First => "First value",
+            ComparisonAggregation.Sum => "Sum",
+            ComparisonAggregation.Average => "Average",
+            ComparisonAggregation.Count => "Count",
+            ComparisonAggregation.Max => "Maximum",
+            _ => mode.ToString()
+        };
+    }
+
+    private string GetModeButtonClass(RowSyncMode mode)
+    {
+        return Config.SyncMode == mode ? ModeButtonActive : ModeButtonInactive;
+    }
+
+    private bool IsYesNoTag => SelectedTag?.TypeId == InputTypeIds.Boolean;
+
+    private TagResponse? SelectedTag => Config.TagId is int id ? Tags?.FirstOrDefault(t => t.Id == id) : null;
+
+    private Task OnTagChanged(int? tagId)
+    {
+        var next = Config with { TagId = tagId };
+
+        // Moving onto a Yes/No tag drops whatever aggregation the row had, so the stored config stays
+        // honest about what the row actually shows.
+        if (tagId is int id && Tags?.FirstOrDefault(t => t.Id == id)?.TypeId == InputTypeIds.Boolean)
+        {
+            next = next with { Aggregation = ComparisonAggregation.First };
+        }
+
+        return ConfigChanged.InvokeAsync(next);
+    }
+
+    private Task OnAggregationChanged(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<ComparisonAggregation>(e.Value?.ToString(), out var mode))
+        {
+            return Task.CompletedTask;
+        }
+
+        return ConfigChanged.InvokeAsync(Config with { Aggregation = mode });
+    }
+
+    private Task SetSyncMode(RowSyncMode mode)
+    {
+        if (Config.SyncMode == mode)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Switching to Sync keeps OffsetDays, so toggling back restores the offset instead of losing it.
+        return ConfigChanged.InvokeAsync(Config with { SyncMode = mode });
+    }
+
+    private Task SetOffset(int days)
+    {
+        return ConfigChanged.InvokeAsync(Config with { SyncMode = RowSyncMode.Offset, OffsetDays = Clamp(days) });
+    }
+
+    private Task ShiftOffset(int delta)
+    {
+        return SetOffset(Config.OffsetDays + delta);
+    }
+
+    private Task ResetOffset()
+    {
+        return ConfigChanged.InvokeAsync(Config with { SyncMode = RowSyncMode.Synchronized, OffsetDays = 0 });
+    }
+
+    private Task OnOffsetTyped(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var days))
+        {
+            return Task.CompletedTask;
+        }
+
+        return SetOffset(days);
+    }
+
+    private static int Clamp(int days)
+    {
+        return Math.Clamp(days, -ComparisonConstants.MaxOffsetDays, ComparisonConstants.MaxOffsetDays);
+    }
+}

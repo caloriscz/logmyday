@@ -16,6 +16,8 @@
 @inject NavigationManager Navigation
 @inject IWebViewInterop WebView
 @inject ILogger<Activities> Logger
+@inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@using LogMyDay.Shared.Coloring
 @implements IAsyncDisposable
 
 <PageTitle>Activities - LogMyDay</PageTitle>
@@ -104,7 +106,7 @@
                         @{ var mobTag1 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
                         @if (IsStarRatingTag(mobTag1))
                         {
-                            <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag1!)" /></div>
+                            <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag1!)" Color="@TagColor(mobTag1, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                             <div class="mb-2">
                                 <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag1!)"
                                     ShowValue="false" Disabled="@IsSaving(activity.Id)"
@@ -113,7 +115,7 @@
                         }
                         else if (IsScoreTag(mobTag1))
                         {
-                            <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag1!)" /></div>
+                            <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag1!)" Color="@TagColor(mobTag1, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                             <div class="mb-2">
                                 <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag1!)"
                                     ShowValue="false" Disabled="@IsSaving(activity.Id)"
@@ -178,7 +180,7 @@
                             @{ var mobTag2 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
                             @if (IsStarRatingTag(mobTag2))
                             {
-                                <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag2!)" /></div>
+                                <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag2!)" Color="@TagColor(mobTag2, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                                 <div class="mb-2">
                                     <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag2!)"
                                         ShowValue="false" Disabled="@IsSaving(activity.Id)"
@@ -187,7 +189,7 @@
                             }
                             else if (IsScoreTag(mobTag2))
                             {
-                                <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag2!)" /></div>
+                                <div class="mb-2"><ScoreDisplay Value="@GetIntegerValue(activity)" MaxScore="@GetStarMax(mobTag2!)" Color="@TagColor(mobTag2, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                                 <div class="mb-2">
                                     <IntegerStepper Value="@GetIntegerValue(activity)" Step="1" Min="0" Max="@GetStarMax(mobTag2!)"
                                         ShowValue="false" Disabled="@IsSaving(activity.Id)"
@@ -344,6 +346,7 @@
 
     private PagedResult<LogMyDay.Shared.DTOs.ActivityResponse>? pagedResult;
     private IList<LogMyDay.Shared.DTOs.TagResponse>? tags;
+    private ColorSchemeIndex _schemes = ColorSchemeIndex.Empty;
     private IList<LogMyDay.Shared.DTOs.TagOptionListResponse>? optionLists;
     private Dictionary<int, LogMyDay.Shared.DTOs.TagOptionListResponse>? optionListLookup;
     private LogMyDay.Shared.DTOs.ActivityRequest newActivity = new();
@@ -473,6 +476,15 @@
             // Await the parallel tag/option-list fetches
             tags = await tagsTask;
             optionLists = await optionListsTask;
+
+            try
+            {
+                _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to load color schemes; falling back to default colors");
+            }
 
             if (optionLists is not null && optionLists.Count > 0)
             {
@@ -951,6 +963,9 @@
     }
 
     private bool IsSaving(int id) => _savingIds.Contains(id);
+
+    private string? TagColor(TagResponse? tag, string? value) =>
+        _schemes.ResolveColor(tag?.TypeId, tag?.ColorSchemeId, value);
 
     private static bool IsStarRatingTag(TagResponse? tag) =>
         tag?.TypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10;

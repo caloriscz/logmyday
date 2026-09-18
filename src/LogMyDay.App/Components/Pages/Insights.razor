@@ -72,6 +72,18 @@
                 <p class="text-sm text-gray-600 dark:text-slate-300">Interactive line charts for visualizing numeric tag trends over time.</p>
             </div>
         </div>
+
+        <!-- Timeline Comparison Card -->
+        <div class="group cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+             @onclick="() => NavigateToCompare()">
+            <div class="relative h-32 overflow-hidden bg-linear-to-br from-violet-400 to-fuchsia-500">
+                <div class="absolute inset-0 bg-black/10"></div>
+            </div>
+            <div class="p-5 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">Timeline Comparison</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-300">Compare two or more tags across the same days, with optional day offsets between rows.</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -104,5 +116,10 @@
     private void NavigateToCharts()
     {
         Navigation.NavigateTo("/charts");
+    }
+
+    private void NavigateToCompare()
+    {
+        Navigation.NavigateTo("/insights/compare");
     }
 }
