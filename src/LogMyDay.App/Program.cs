@@ -1,4 +1,4 @@
-﻿using ApexCharts;
+using ApexCharts;
 using LogMyDay.App.Components;
 using LogMyDay.App.Extensions;
 using LogMyDay.Api.Infrastructure;
@@ -97,7 +97,6 @@ else
 
 app.UseHttpsRedirection();
 app.UseRequestLogging();
-app.UseRateLimiter();
 app.UseSecurityHeaders();
 
 app.MapStaticAssets();
@@ -105,6 +104,9 @@ app.UseRouting();
 app.UseAntiforgery();
 
 app.UseAuthentication();
+// After authentication so per-user policies (the MCP endpoint's per-key budget) can see the
+// principal; the keyless "api"/"auth"/"ai" policies behave exactly as before.
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
