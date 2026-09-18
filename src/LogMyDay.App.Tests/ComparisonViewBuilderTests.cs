@@ -7,6 +7,7 @@ public class ComparisonViewBuilderTests
 {
     private const int CoffeeTagId = 1;
     private const int SleepTagId = 2;
+    private const int AlcoholTagId = 3;
 
     private static readonly DateTime AnchorEnd = new(2026, 3, 26);
 
@@ -20,7 +21,8 @@ public class ComparisonViewBuilderTests
         return new Dictionary<int, TagResponse>
         {
             [CoffeeTagId] = new() { Id = CoffeeTagId, Title = "Coffee", TypeId = 1, InputTypeId = 1 },
-            [SleepTagId] = new() { Id = SleepTagId, Title = "Sleep", TypeId = 6, InputTypeId = 6 }
+            [SleepTagId] = new() { Id = SleepTagId, Title = "Sleep", TypeId = 6, InputTypeId = 6 },
+            [AlcoholTagId] = new() { Id = AlcoholTagId, Title = "Alcohol", TypeId = 3, InputTypeId = 3 }
         };
     }
 
@@ -36,6 +38,35 @@ public class ComparisonViewBuilderTests
         }
 
         return new ComparisonDataSet(byTag, false);
+    }
+
+    // --- Yes/No rows ---
+
+    [Theory]
+    [InlineData(ComparisonAggregation.Sum)]
+    [InlineData(ComparisonAggregation.Count)]
+    [InlineData(ComparisonAggregation.Average)]
+    [InlineData(ComparisonAggregation.Max)]
+    public void Build_YesNoRow_AlwaysUsesFirst(ComparisonAggregation stored)
+    {
+        // A mode saved before Yes/No rows lost their aggregation choice must not leave the row
+        // uncoloured or showing a meaningless "Sum" of 0/1.
+        var rows = new[] { new ComparisonRowConfig(AlcoholTagId, RowSyncMode.Synchronized, 0, stored) };
+
+        var view = ComparisonViewBuilder.Build(Timeline(), rows, Tags(), DataSet((AlcoholTagId, AnchorEnd, new[] { "true" })));
+
+        Assert.Equal(ComparisonAggregation.First, view.Rows[0].Config.Aggregation);
+        Assert.Equal(1, view.Rows[0].Cells[^1].NumericValue);
+    }
+
+    [Fact]
+    public void Build_NumericRow_KeepsStoredAggregation()
+    {
+        var rows = new[] { new ComparisonRowConfig(CoffeeTagId, RowSyncMode.Synchronized, 0, ComparisonAggregation.Sum) };
+
+        var view = ComparisonViewBuilder.Build(Timeline(), rows, Tags(), DataSet());
+
+        Assert.Equal(ComparisonAggregation.Sum, view.Rows[0].Config.Aggregation);
     }
 
     // --- Alignment ---

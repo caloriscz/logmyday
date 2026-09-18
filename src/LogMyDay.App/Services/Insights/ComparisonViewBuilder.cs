@@ -33,6 +33,15 @@ public static class ComparisonViewBuilder
 
             var tag = config.TagId is int tagId && tagsById.TryGetValue(tagId, out var found) ? found : null;
 
+            // A Yes/No row shows the day's answer and nothing else. The other modes still compute, but a
+            // "Sum" of 0 or 1 means nothing to someone who doesn't know 1 stands for Yes, so the row
+            // controls never offer them — and a mode stored before that rule existed is overridden here
+            // rather than left to silently uncolour the row.
+            if (tag?.TypeId == InputTypeIds.Boolean)
+            {
+                config = config with { Aggregation = ComparisonAggregation.First };
+            }
+
             results.Add(new ComparisonRowResult(index, config, tag, BuildCells(timeline, config, tag, data)));
         }
 
