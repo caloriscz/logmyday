@@ -42,6 +42,27 @@ docker inspect --format='{{json .State.Health}}' logmyday-app
 
 The service exposes port `9099` by default. Add a reverse proxy (nginx, Traefik, Azure App Gateway) to terminate HTTPS in production.
 
+### Reverse proxy and the MCP endpoint
+
+The built-in [MCP server](../features/mcp.md) lives on the same port at `/mcp`; nothing extra needs to be exposed. Two proxy requirements apply to that path:
+
+- **Forward the `Authorization` header** — API keys travel as `Authorization: Bearer lmd_…`. Some proxies strip it by default.
+- **Do not buffer responses** — the endpoint streams server-sent events. With nginx:
+
+```nginx
+location /mcp {
+    proxy_pass         http://logmyday-app:9099;
+    proxy_http_version 1.1;
+    proxy_set_header   Authorization $http_authorization;
+    proxy_set_header   Host $host;
+    proxy_buffering    off;
+    proxy_cache        off;
+    proxy_read_timeout 300s;
+}
+```
+
+Traefik and Caddy stream by default and forward the header unless configured otherwise.
+
 ## Secrets & Configuration Flow
 
 1. **Base configuration**: `appsettings.json` baked into the image.

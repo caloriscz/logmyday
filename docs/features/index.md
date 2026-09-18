@@ -16,3 +16,5 @@ LogMyDay combines a web dashboard and mobile companion to help you build lasting
 - [Users](users.md)
 - [Tools](tools.md)
 - [Calendar](calendar.md)
+- [CLI Tool (lmd)](cli.md)
+- [MCP Server (agents)](mcp.md)

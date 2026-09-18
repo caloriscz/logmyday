@@ -9,6 +9,8 @@ nav_order: 7
 
 `lmd` is a .NET global tool that lets you interact with any LogMyDay server from the terminal. It is aimed at power users who prefer text-based workflows, developers building integrations, and automated pipelines that push data into LogMyDay without a browser.
 
+> **MCP for agents, CLI for scripts.** If an AI agent (Claude Code, Claude Desktop, …) should work with your data, use the built-in [MCP server](mcp.md) with an API key instead — it exposes every feature with descriptions an agent can follow. `lmd` stays the right tool for shell scripts and pipelines.
+
 ## Installation
 
 ```bash
