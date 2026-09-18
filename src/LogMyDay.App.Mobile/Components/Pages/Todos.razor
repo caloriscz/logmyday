@@ -807,6 +807,14 @@
         _refreshTimer?.Dispose();
     }
 
+    /// <summary>
+    /// Invalidates a refresh already in flight without paying for a reload of our own. Completion
+    /// returns the authoritative item, so applying it locally already leaves the list correct — the
+    /// full GetTodoLists+GetTags round trip that used to follow existed only to bump this counter,
+    /// and on mobile that second trip is what made checking a todo feel slow.
+    /// </summary>
+    private void DiscardInFlightLoad() => _loadGeneration++;
+
     private async Task LoadDataAsync()
     {
         _loadError = null;
@@ -816,8 +824,11 @@
 
         try
         {
+            // Tags are only needed to resolve completion-tag input types and change rarely, so
+            // fetch them once instead of on every load — the 30s refresh timer was paying for a
+            // full tag list each tick. Reminders.razor guards the same way.
             var listsTask = TodoApi.GetTodoLists();
-            var tagsTask = ActivityApi.GetTags();
+            var tagsTask = _allTags == null ? ActivityApi.GetTags() : Task.FromResult(_allTags);
             await Task.WhenAll(listsTask, tagsTask);
 
             if (myGeneration != _loadGeneration)
@@ -1135,6 +1146,10 @@
                         var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
                         ReminderScheduler.CancelItem(item.Id);
                         UpdateItemInList(updated);
+                        // The reload that used to follow cleared these; without it a stale error
+                        // from an earlier failed attempt would outlive the successful one.
+                        _itemErrorPerList.Remove(item.ListId);
+                        DiscardInFlightLoad();
                     }
                     catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
@@ -1152,8 +1167,6 @@
                         _completingItemId = null;
                     }
 
-                    // Authoritative reload — bumps _loadGeneration so any in-flight refresh response is discarded.
-                    await LoadDataAsync();
                     return;
                 }
 
@@ -1173,6 +1186,10 @@
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow });
             ReminderScheduler.CancelItem(item.Id);
             UpdateItemInList(updated);
+            // The reload that used to follow cleared these; without it a stale error from an
+            // earlier failed attempt would outlive the successful one.
+            _itemErrorPerList.Remove(item.ListId);
+            DiscardInFlightLoad();
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -1189,8 +1206,6 @@
             _isBusy = false;
             _completingItemId = null;
         }
-
-        await LoadDataAsync();
     }
 
     private async Task SaveQuickAsync()
@@ -1239,10 +1254,11 @@
         _quickError = null;
         try
         {
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
+            var updated = await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = notes });
             _showQuickModal = false;
             _quickItem = null;
-            await LoadDataAsync();
+            UpdateItemInList(updated);
+            DiscardInFlightLoad();
         }
         catch (ApiException ex)
         {

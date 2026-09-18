@@ -638,13 +638,9 @@
         if (newDate.HasValue) { _selectedDate = newDate.Value; await LoadDataAsync(); }
     }
 
+    // Shared with the notification scheduler so the list and the alarms agree on what is active.
     private static bool IsOutsideMonitoringWindow(ReminderResponse item, DateTime effectiveDate)
-    {
-        if (item.MonitorFromDate.HasValue && effectiveDate.Date < item.MonitorFromDate.Value.ToDateTime(TimeOnly.MinValue).Date) return true;
-        if (item.MonitorToDate.HasValue   && effectiveDate.Date > item.MonitorToDate.Value.ToDateTime(TimeOnly.MinValue).Date)   return true;
-
-        return false;
-    }
+        => !item.IsWithinMonitoringWindow(DateOnly.FromDateTime(effectiveDate));
 
     private async Task CompleteItemAsync(ReminderResponse item)
     {

@@ -10,8 +10,10 @@ namespace LogMyDay.App.Mobile.Platforms.Android;
 public class AlarmHandler : BroadcastReceiver
 {
     // How long the fire-time server check may take before we give up and show anyway.
-    // Kept well under the BroadcastReceiver.GoAsync budget (~10s).
-    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(4);
+    // Kept under the BroadcastReceiver.GoAsync budget (~10s), but generous enough for the cold
+    // path this check normally runs on: process start, keystore read, then a TLS handshake over a
+    // radio that was asleep. At 4s that routinely timed out and fell through to fail-open.
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(7);
 
     public override void OnReceive(Context? context, Intent? intent)
     {
@@ -77,16 +79,24 @@ public class AlarmHandler : BroadcastReceiver
             }
             else
             {
+                // An alarm usually wakes a process that never rendered the UI, so nothing has
+                // configured ApiContext and every client throws. Restore the stored session first
+                // — without it this check always fails open, which is why reminders completed on
+                // the web still fired here.
+                var restored = false;
+                if (services?.GetService(typeof(IApiContext)) is IApiContext ctx)
+                {
+                    restored = await StoredSession.TryRestore(ctx).ConfigureAwait(false);
+                }
+
                 IReminderApi? api = null;
                 try
                 {
-                    // Throws when the server/credentials aren't configured (pre-login, or a killed
-                    // process the alarm just woke — credentials are in-memory only).
                     api = provider.Reminder;
                 }
                 catch (Exception)
                 {
-                    failReason = "not-configured";
+                    failReason = restored ? "not-configured" : "no-stored-session";
                 }
 
                 if (api != null)
@@ -105,6 +115,21 @@ public class AlarmHandler : BroadcastReceiver
                     {
                         show = false;
                         suppressReason = item.IsDone ? "done" : "skipped";
+                    }
+                    else if (!item.IsWithinMonitoringWindow(DateOnly.FromDateTime(DateTime.Now)))
+                    {
+                        // The API reports reminders outside their monitoring window as live, so
+                        // "present and not done" is not enough to justify showing one.
+                        show = false;
+                        suppressReason = "out-of-window";
+                    }
+                    else
+                    {
+                        // Title/notes were snapshotted into the intent when the alarm was armed —
+                        // a day earlier, or much longer if the app was never reopened. Renaming a
+                        // reminder (a changed dosage) would otherwise keep firing the old text.
+                        title = item.Title;
+                        message = item.Notes ?? string.Empty;
                     }
                 }
             }

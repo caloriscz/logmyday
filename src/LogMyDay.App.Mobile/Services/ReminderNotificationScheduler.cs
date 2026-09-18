@@ -93,6 +93,18 @@ public class ReminderNotificationScheduler
         {
             var baseFireTime = CalculateNextFireTime(item);
 
+            // The API returns every reminder regardless of its monitoring window — the UI filters
+            // locally. Arming without that filter left ended reminders (a finished dosage, say)
+            // firing daily forever while hidden from the list, and SweepGhostAlarms can't catch
+            // them because the server still reports them as live. Test the day the alarm would
+            // actually fire, not today: CalculateNextFireTime usually targets tomorrow.
+            if (!item.IsWithinMonitoringWindow(DateOnly.FromDateTime(baseFireTime.ToLocalTime())))
+            {
+                CancelOutOfWindow(item.Id);
+
+                continue;
+            }
+
             var count = seenFireTimes.GetValueOrDefault(baseFireTime, 0);
             var adjustedFireTime = baseFireTime.AddSeconds(count * 30);
             seenFireTimes[baseFireTime] = count + 1;
@@ -190,6 +202,35 @@ public class ReminderNotificationScheduler
         }
 
         return ghostIds.Length;
+    }
+
+    /// <summary>
+    /// Drops the alarm for a reminder the server still reports as live but which is outside its
+    /// monitoring window on the day it would fire. Emits one diagnostic row the first time by
+    /// consuming the persistent ever-scheduled entry, so a restart doesn't re-log it and repeated
+    /// page loads stay quiet. If the window later reopens, <see cref="ScheduleItemAt"/> re-adds it.
+    /// </summary>
+    private void CancelOutOfWindow(int todoItemId)
+    {
+        _notificationService.CancelReminderAlarm(todoItemId);
+        ArmedAlarmStore.Remove(todoItemId);
+
+        bool wasArmed;
+        lock (_lock)
+        {
+            wasArmed = _everScheduledIds.Remove(todoItemId);
+            _activeAlarms.Remove(todoItemId);
+
+            if (wasArmed)
+            {
+                SaveEverScheduledIds();
+            }
+        }
+
+        if (wasArmed)
+        {
+            LogDiag($"event=cancelled itemId={todoItemId} surface=mobile reason=out-of-window");
+        }
     }
 
     public void CancelItem(int todoItemId)

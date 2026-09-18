@@ -23,4 +23,27 @@ public class ReminderResponse
     public bool AllowUnfilled { get; set; }
 
     public bool IsTagDayLocked { get; set; }
+
+    /// <summary>
+    /// True when <paramref name="date"/> falls inside the reminder's monitoring window. Both bounds
+    /// are independent — an end date alone still closes the window.
+    ///
+    /// The API returns every reminder regardless of its window and each surface filters locally, so
+    /// notification scheduling must apply this too. Without it, a reminder whose window has ended
+    /// keeps arming alarms and firing while being invisible in the UI.
+    /// </summary>
+    public bool IsWithinMonitoringWindow(DateOnly date)
+    {
+        if (MonitorFromDate.HasValue && date < MonitorFromDate.Value)
+        {
+            return false;
+        }
+
+        if (MonitorToDate.HasValue && date > MonitorToDate.Value)
+        {
+            return false;
+        }
+
+        return true;
+    }
 }

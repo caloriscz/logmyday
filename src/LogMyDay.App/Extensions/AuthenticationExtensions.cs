@@ -86,6 +86,7 @@ internal static class AuthenticationExtensions
             .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { });
 
         services.AddSingleton<LogMyDay.Api.Authentication.AuthAttemptTracker>();
+        services.AddSingleton<LogMyDay.Api.Authentication.PasswordVerificationCache>();
 
         services.AddAuthorization(options =>
         {

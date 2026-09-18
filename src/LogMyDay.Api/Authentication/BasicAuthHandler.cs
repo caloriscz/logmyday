@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+using System.Diagnostics;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using LogMyDay.Api.Application.Interfaces;
@@ -13,9 +14,19 @@ namespace LogMyDay.Api.Authentication;
 
 public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    // Diagnostic timings stashed for the request-logging middleware. Basic auth re-derives the
+    // password on every request (unlike the cookie scheme, which verifies once at sign-in), so the
+    // split between the user lookup and the Argon2 verify is what explains mobile latency.
+    public const string SchemeItemKey = "lmd.auth.scheme";
+    public const string LookupMsItemKey = "lmd.auth.lookupMs";
+    public const string VerifyMsItemKey = "lmd.auth.verifyMs";
+    public const string ParamsItemKey = "lmd.auth.params";
+    public const string CacheHitItemKey = "lmd.auth.cacheHit";
+
     private readonly IUserService _userService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly AuthAttemptTracker _attemptTracker;
+    private readonly PasswordVerificationCache _verificationCache;
 
     public BasicAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -23,12 +34,14 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         UrlEncoder encoder,
         IUserService userService,
         IPasswordHasher passwordHasher,
-        AuthAttemptTracker attemptTracker)
+        AuthAttemptTracker attemptTracker,
+        PasswordVerificationCache verificationCache)
         : base(options, logger, encoder)
     {
         _userService = userService;
         _passwordHasher = passwordHasher;
         _attemptTracker = attemptTracker;
+        _verificationCache = verificationCache;
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -77,9 +90,52 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
                 return AuthenticateResult.Fail("Too many failed attempts. Please try again later.");
             }
 
+            Context.Items[SchemeItemKey] = "basic";
+
             // Validate credentials against database
+            var lookupStart = Stopwatch.GetTimestamp();
             var user = await _userService.FindByEmail(email, CancellationToken.None);
-            if (user == null || !_passwordHasher.Verify(password, user.PasswordHash))
+            Context.Items[LookupMsItemKey] = Stopwatch.GetElapsedTime(lookupStart).TotalMilliseconds;
+
+            var verified = false;
+            if (user != null)
+            {
+                // Hash format: argon2id$v=19$m=<kib>,t=<iters>,p=<lanes>$<salt>$<hash>. The lane
+                // count is whatever the machine that hashed the password had, so record it —
+                // a p far above the server's core count makes every verify slower still.
+                var hashParts = user.PasswordHash.Split('$');
+                Context.Items[ParamsItemKey] = hashParts.Length == 5
+                    ? $"{hashParts[2]},cores={Environment.ProcessorCount}"
+                    : $"unparsed,cores={Environment.ProcessorCount}";
+
+                // Basic re-sends credentials on every request, so without a cache every request
+                // pays a full Argon2id derivation. Only successful verifications are ever cached,
+                // so a wrong password still costs an attacker the full derivation each time.
+                if (_verificationCache.IsVerified(user.Id, user.PasswordHash, password))
+                {
+                    verified = true;
+                    Context.Items[CacheHitItemKey] = true;
+                    Context.Items[VerifyMsItemKey] = 0d;
+                }
+                else
+                {
+                    var verifyStart = Stopwatch.GetTimestamp();
+                    verified = _passwordHasher.Verify(password, user.PasswordHash);
+                    Context.Items[VerifyMsItemKey] = Stopwatch.GetElapsedTime(verifyStart).TotalMilliseconds;
+                    Context.Items[CacheHitItemKey] = false;
+
+                    if (verified)
+                    {
+                        // Keyed on the stored hash, so a password change invalidates this entry
+                        // on the next request without any explicit eviction.
+                        _verificationCache.Record(user.Id, user.PasswordHash, password);
+                    }
+                }
+            }
+
+            // `user is null` is redundant with `verified` but keeps null-state analysis happy
+            // for the claim block below.
+            if (user is null || !verified)
             {
                 Logger.LogWarning(
                     "[BasicAuth] Invalid credentials for user: {Email} from IP: {ClientIp}",
