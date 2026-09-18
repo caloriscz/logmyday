@@ -42,7 +42,12 @@ public static class McpServiceCollectionExtensions
             .WithRequestFilters(filters => filters.AddCallToolFilter(McpToolFilters.AuditAndMapErrors))
             .WithTools<ServerInfoTools>(McpJson.Options)
             .WithTools<TagTools>(McpJson.Options)
-            .WithTools<ActivityTools>(McpJson.Options);
+            .WithTools<ActivityTools>(McpJson.Options)
+            .WithTools<TagGroupTools>(McpJson.Options)
+            .WithTools<OptionListTools>(McpJson.Options)
+            .WithTools<UnitTools>(McpJson.Options)
+            .WithTools<ColorSchemeTools>(McpJson.Options)
+            .WithTools<InputTypeTools>(McpJson.Options);
 
         return services;
     }

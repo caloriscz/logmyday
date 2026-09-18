@@ -49,11 +49,19 @@ public static class McpErrorMapper
             case ArgumentException ex:
                 return Error(Invalid, ex.Message);
 
+            // "X is in use by one or more tags" is the services' way of refusing a delete that a
+            // Restrict FK would otherwise turn into a database error.
+            case InvalidOperationException ex when ex.Message.Contains("in use", StringComparison.OrdinalIgnoreCase):
+                return Error(Conflict, ex.Message);
+
             case InvalidOperationException ex:
                 return Error(Invalid, ex.Message);
 
             case DbUpdateException ex when ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true:
                 return Error(Conflict, "A record with the same key already exists.");
+
+            case DbUpdateException ex when ex.InnerException?.Message.Contains("FOREIGN KEY", StringComparison.OrdinalIgnoreCase) == true:
+                return Error(Conflict, "The record is still referenced by another record.");
 
             default:
                 var correlationId = Guid.NewGuid().ToString("N")[..12];
