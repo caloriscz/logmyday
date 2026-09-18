@@ -1,4 +1,6 @@
+using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using Microsoft.AspNetCore.Hosting;
@@ -10,6 +12,13 @@ namespace LogMyDay.Api.IntegrationTests;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    public const string TestUserEmail = "test@example.com";
+    public const string TestUserPassword = "Integration-Test-Pa55";
+
+    /// <summary>Known API-key tokens for the test user; the seeded rows hold their hashes.</summary>
+    public const string ReadWriteKeyToken = "lmd_IntegrationTestReadWriteKey0000000000000000";
+    public const string ReadOnlyKeyToken = "lmd_IntegrationTestReadOnlyKey00000000000000000";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Test");
@@ -41,19 +50,23 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
             db.Database.EnsureCreated();
-            SeedTestData(db);
+            SeedTestData(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
         });
     }
 
-    private static void SeedTestData(LogMyDayDbContext db)
+    private static void SeedTestData(LogMyDayDbContext db, IPasswordHasher passwordHasher)
     {
         var testUser = new User
         {
             Id = Guid.NewGuid(),
-            Email = "test@example.com",
-            PasswordHash = "hashedpassword"
+            Email = TestUserEmail,
+            PasswordHash = passwordHasher.Hash(TestUserPassword)
         };
         db.Users.Add(testUser);
+
+        db.ApiKeys.AddRange(
+            SeededKey(testUser.Id, "rw", ReadWriteKeyToken, ApiKeyScope.ReadWrite),
+            SeededKey(testUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly));
 
         var tag1 = new Tag
         {
@@ -88,5 +101,23 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         );
 
         db.SaveChanges();
+    }
+
+    private static ApiKey SeededKey(Guid userId, string name, string token, ApiKeyScope scope)
+    {
+        if (token.Length != ApiKeyService.TokenLength)
+        {
+            throw new InvalidOperationException($"Seeded token '{name}' must be {ApiKeyService.TokenLength} characters.");
+        }
+
+        return new ApiKey
+        {
+            UserId = userId,
+            Name = name,
+            Prefix = token[..ApiKeyService.PrefixLength],
+            KeyHash = ApiKeyService.Hash(token),
+            Scope = scope,
+            CreatedUtc = DateTime.UtcNow
+        };
     }
 }

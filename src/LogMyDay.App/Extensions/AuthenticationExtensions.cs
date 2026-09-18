@@ -1,4 +1,5 @@
 using LogMyDay.Api.Authentication;
+using LogMyDay.Mcp;
 using LogMyDay.App.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Serilog;
@@ -28,6 +29,13 @@ internal static class AuthenticationExtensions
                     // Only our own token shape. Any other bearer value falls through to the cookie
                     // scheme and fails there, exactly as it did before keys existed.
                     if (authHeader?.StartsWith(ApiKeyAuthDefaults.BearerTokenPrefix, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        return ApiKeyAuthDefaults.SchemeName;
+                    }
+
+                    // The MCP endpoint is API-key only: never consult the browser cookie there, and
+                    // challenge with Bearer instead of redirecting an agent to the login page.
+                    if (context.Request.Path.StartsWithSegments(McpSchemaVersion.EndpointPath))
                     {
                         return ApiKeyAuthDefaults.SchemeName;
                     }

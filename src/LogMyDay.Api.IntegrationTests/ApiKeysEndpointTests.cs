@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using LogMyDay.Api.Infrastructure.Data;
-using LogMyDay.Api.Security;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -17,25 +16,14 @@ namespace LogMyDay.Api.IntegrationTests;
 /// </summary>
 public class ApiKeysEndpointTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private const string Email = "test@example.com";
-    private const string Password = "integration-test-password";
+    private const string Email = CustomWebApplicationFactory.TestUserEmail;
+    private const string Password = CustomWebApplicationFactory.TestUserPassword;
 
     private readonly CustomWebApplicationFactory _factory;
 
     public ApiKeysEndpointTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
-        GiveSeededUserARealPassword();
-    }
-
-    private void GiveSeededUserARealPassword()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        var user = db.Users.First(u => u.Email == Email);
-        user.PasswordHash = hasher.Hash(Password);
-        db.SaveChanges();
     }
 
     private HttpClient BasicClient()

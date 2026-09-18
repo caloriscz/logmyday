@@ -109,10 +109,15 @@ public class ApiKeyAuthenticationTests : IClassFixture<CustomWebApplicationFacto
     [InlineData("bearer LMD_case-insensitive", ApiKeyAuthDefaults.SchemeName)]
     [InlineData("Bearer tsk_taskino", "lmd-cookie")]
     [InlineData(null, "lmd-cookie")]
-    public void SmartAuthSelector_RoutesByHeaderShape(string? header, string expectedScheme)
+    [InlineData(null, ApiKeyAuthDefaults.SchemeName, "/mcp")]
+    [InlineData("Bearer tsk_taskino", ApiKeyAuthDefaults.SchemeName, "/mcp")]
+    [InlineData("Basic dXNlcjpwYXNz", "basic", "/mcp")]
+    [InlineData(null, "lmd-cookie", "/mcp-not-the-endpoint")]
+    public void SmartAuthSelector_RoutesByHeaderShape(string? header, string expectedScheme, string path = "/api/tags")
     {
         var options = _factory.Services.GetRequiredService<IOptionsMonitor<PolicySchemeOptions>>().Get("smart-auth");
         var context = new DefaultHttpContext();
+        context.Request.Path = path;
         if (header != null)
         {
             context.Request.Headers.Authorization = header;
