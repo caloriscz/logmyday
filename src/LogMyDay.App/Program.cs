@@ -2,6 +2,7 @@ using ApexCharts;
 using LogMyDay.App.Components;
 using LogMyDay.App.Extensions;
 using LogMyDay.Api.Infrastructure;
+using LogMyDay.Mcp;
 using LogMyDay.Shared.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 using Serilog;
@@ -46,6 +47,7 @@ services.AddHealthChecks();
 
 services.AddAppAuthentication();
 services.AddAppRateLimiting();
+services.AddLogMyDayMcp();
 
 services.AddResilientRazorComponents(builder.Configuration, builder.Environment);
 services.AddApexCharts();
@@ -111,6 +113,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapControllers();
+app.MapLogMyDayMcp();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 if (builder.Environment.EnvironmentName != "Test")

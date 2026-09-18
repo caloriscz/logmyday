@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.7.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LogMyDay.Api\LogMyDay.Api.csproj" />
+    <ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
+    <ProjectReference Include="..\LogMyDay.Domain\LogMyDay.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
