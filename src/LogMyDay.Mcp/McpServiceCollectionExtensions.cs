@@ -49,6 +49,7 @@ public static class McpServiceCollectionExtensions
             .WithTools<UnitTools>(McpJson.Options)
             .WithTools<ColorSchemeTools>(McpJson.Options)
             .WithTools<InputTypeTools>(McpJson.Options)
+            .WithTools<ReminderTools>(McpJson.Options)
             .WithResources<LogMyDayResources>();
 
         return services;

@@ -48,6 +48,37 @@ public static class DateArguments
         throw new ArgumentException($"{argument} must be yyyy-MM-ddTHH:mm (local) or an ISO-8601 date-time with offset, got '{text}'.");
     }
 
+    /// <summary>
+    /// For the few fields stored in UTC (reminder completion): a naive value is taken as the user's
+    /// local time and converted; a value with an offset is converted directly.
+    /// </summary>
+    public static DateTime ParseUtc(string text, string argument, TimeZoneInfo userZone)
+    {
+        var trimmed = text.Trim();
+        if (TryParseNaive(trimmed, out var naive))
+        {
+            return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(naive, DateTimeKind.Unspecified), userZone);
+        }
+
+        if (DateTimeOffset.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var offset))
+        {
+            return offset.UtcDateTime;
+        }
+
+        throw new ArgumentException($"{argument} must be yyyy-MM-ddTHH:mm (local) or an ISO-8601 date-time with offset, got '{text}'.");
+    }
+
+    public static TimeOnly ParseTime(string text, string argument)
+    {
+        string[] formats = ["HH:mm", "H:mm", "HH:mm:ss"];
+        if (TimeOnly.TryParseExact(text.Trim(), formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        {
+            return time;
+        }
+
+        throw new ArgumentException($"{argument} must be HH:mm (24-hour), got '{text}'.");
+    }
+
     /// <summary>The last tick of the given day, for inclusive "to" filters.</summary>
     public static DateTime EndOfDay(DateOnly date) => date.AddDays(1).ToDateTime(TimeOnly.MinValue).AddTicks(-1);
 
