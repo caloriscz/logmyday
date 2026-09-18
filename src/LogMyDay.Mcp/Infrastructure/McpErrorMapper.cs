@@ -35,7 +35,7 @@ public static class McpErrorMapper
                 return Error(NotFound, ex.Message);
 
             case ConfirmationRequiredException ex:
-                return Error(ConfirmationRequired, ex.Message, new { expected = ex.Expected });
+                return Error(ConfirmationRequired, ex.Message, new { expected = ex.Expected, impact = ex.Impact });
 
             case TagDayLockedException ex:
                 return Error(TagDayLocked,
@@ -89,11 +89,15 @@ public static class McpErrorMapper
 /// </summary>
 public sealed class ConfirmationRequiredException : Exception
 {
-    public ConfirmationRequiredException(string expected)
+    public ConfirmationRequiredException(string expected, string? impact = null)
         : base($"This action is destructive. Call again with confirm set to exactly \"{expected}\".")
     {
         Expected = expected;
+        Impact = impact;
     }
 
     public string Expected { get; }
+
+    /// <summary>What the call would do, in words the agent should relay before confirming.</summary>
+    public string? Impact { get; }
 }

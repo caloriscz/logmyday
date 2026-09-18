@@ -22,6 +22,7 @@ public static class McpServiceCollectionExtensions
     public static IServiceCollection AddLogMyDayMcp(this IServiceCollection services)
     {
         services.AddScoped<McpUserContext>();
+        services.AddScoped<TagLookup>();
         services.AddSingleton<DestructiveBudget>();
 
         services.AddMcpServer(options =>
@@ -38,7 +39,8 @@ public static class McpServiceCollectionExtensions
             .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
             .AddAuthorizationFilters()
             .WithRequestFilters(filters => filters.AddCallToolFilter(McpToolFilters.AuditAndMapErrors))
-            .WithTools<ServerInfoTools>(McpJson.Options);
+            .WithTools<ServerInfoTools>(McpJson.Options)
+            .WithTools<TagTools>(McpJson.Options);
 
         return services;
     }

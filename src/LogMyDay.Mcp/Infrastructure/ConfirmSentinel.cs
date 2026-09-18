@@ -7,11 +7,11 @@ namespace LogMyDay.Mcp.Infrastructure;
 /// </summary>
 public static class ConfirmSentinel
 {
-    public static void Require(string? confirm, string expected)
+    public static void Require(string? confirm, string expected, string? impact = null)
     {
         if (!string.Equals(confirm, expected, StringComparison.Ordinal))
         {
-            throw new ConfirmationRequiredException(expected);
+            throw new ConfirmationRequiredException(expected, impact);
         }
     }
 }
