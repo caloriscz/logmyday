@@ -256,6 +256,11 @@
         {
             SetStatus(string.IsNullOrWhiteSpace(ex.Content) ? "The key could not be created." : ex.Content.Trim('"'), isError: true);
         }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to create API key");
+            SetStatus($"The key could not be created (HTTP {(int)ex.StatusCode}). The Event Log has the details.", isError: true);
+        }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to create API key");
