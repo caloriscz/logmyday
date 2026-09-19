@@ -20,11 +20,16 @@ namespace LogMyDay.App.Mobile.Services;
 /// </summary>
 public class TimingDiagnosticHandler : DelegatingHandler
 {
+    /// <summary>A call slower than this is worth a row even when it succeeded.</summary>
+    public const double SlowCallMs = 750;
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var diag = DiagnosticStore.Instance;
 
-        if (diag is not { Enabled: true })
+        // Never measure the diagnostic outbox's own POSTs: each flushed row would create a new row
+        // and the backlog could never drain.
+        if (diag is not { Enabled: true } || IsOutboxRequest(request))
         {
             return await base.SendAsync(request, cancellationToken);
         }
@@ -53,8 +58,20 @@ public class TimingDiagnosticHandler : DelegatingHandler
         }
     }
 
+    private static bool IsOutboxRequest(HttpRequestMessage request)
+    {
+        return request.Method == HttpMethod.Post
+            && request.RequestUri?.AbsolutePath.TrimEnd('/').EndsWith("/api/eventlogs", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
     private static void Record(IDiagnosticStore diag, HttpRequestMessage request, HttpResponseMessage? response, double clientMs)
     {
+        // A fast, successful call says nothing; only failures and slow calls explain anything.
+        if (response is { IsSuccessStatusCode: true } && clientMs < SlowCallMs)
+        {
+            return;
+        }
+
         var status = response is null ? "failed" : ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture);
         var serverMs = ReadTiming(response, "total");
         var argon2Ms = ReadTiming(response, "argon2");
