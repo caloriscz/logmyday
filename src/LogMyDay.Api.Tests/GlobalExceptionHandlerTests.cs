@@ -2,7 +2,9 @@ using System.Security.Claims;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure;
 using LogMyDay.Domain.Enums;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -112,5 +114,48 @@ public class GlobalExceptionHandlerTests
         Assert.True(handled);
         Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
         problemDetails.Verify(p => p.TryWriteAsync(It.IsAny<ProblemDetailsContext>()), Times.Once);
+    }
+
+    // --- The middleware rewrites Request.Path to the fallback page before calling handlers ---
+
+    private sealed class PathFeature(string path) : IExceptionHandlerPathFeature
+    {
+        public string Path { get; } = path;
+        public Exception Error { get; } = new Exception("original");
+        public Endpoint? Endpoint => null;
+        public RouteValueDictionary? RouteValues => null;
+    }
+
+    [Fact]
+    public async Task ApiError_IsHandled_WhenTheMiddlewareHasAlreadyRewrittenThePathToErrorPage()
+    {
+        var (handler, problemDetails) = Create();
+        var userId = Guid.NewGuid();
+        var events = new Mock<IEventLogService>();
+        var context = ContextWithUser(userId, events);
+        // What ExceptionHandlerMiddleware does before invoking IExceptionHandlers.
+        context.Request.Path = "/Error";
+        context.Features.Set<IExceptionHandlerPathFeature>(new PathFeature("/api/account/api-keys"));
+
+        var handled = await handler.TryHandleAsync(context, new InvalidOperationException("boom"), CancellationToken.None);
+
+        Assert.True(handled);
+        problemDetails.Verify(p => p.TryWriteAsync(It.IsAny<ProblemDetailsContext>()), Times.Once);
+        events.Verify(e => e.Log(userId, EventLogLevel.Error,
+            It.Is<string>(m => m.StartsWith("API error: POST /api/account/api-keys")), It.IsAny<string?>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task BlazorError_IsNotHandled_EvenThoughThePathWasRewritten()
+    {
+        var (handler, problemDetails) = Create();
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/Error";
+        context.Features.Set<IExceptionHandlerPathFeature>(new PathFeature("/activities"));
+
+        var handled = await handler.TryHandleAsync(context, new Exception("boom"), CancellationToken.None);
+
+        Assert.False(handled);
+        problemDetails.Verify(p => p.TryWriteAsync(It.IsAny<ProblemDetailsContext>()), Times.Never);
     }
 }

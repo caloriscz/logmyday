@@ -259,7 +259,10 @@
         catch (ApiException ex)
         {
             Logger.LogWarning(ex, "Failed to create API key");
-            SetStatus($"The key could not be created (HTTP {(int)ex.StatusCode}). The Event Log has the details.", isError: true);
+            // Only a server error passes through the exception handler that writes the Event Log.
+            SetStatus(ex.StatusCode == HttpStatusCode.InternalServerError
+                ? "The key could not be created (HTTP 500). The Event Log has the details."
+                : $"The key could not be created (HTTP {(int)ex.StatusCode}).", isError: true);
         }
         catch (Exception ex)
         {

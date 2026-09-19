@@ -26,15 +26,17 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (!httpContext.Request.Path.StartsWithSegments("/api"))
+        // By the time an IExceptionHandler runs, the middleware has already rewritten Request.Path
+        // to its fallback page (/Error); the path that actually failed is in the feature.
+        var path = OriginalPath(httpContext);
+        if (!path.StartsWithSegments("/api"))
         {
             return false;
         }
 
-        _logger.LogError(exception, "Unhandled exception for {Method} {Path}",
-            httpContext.Request.Method, httpContext.Request.Path);
+        _logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, path);
 
-        await RecordInEventLog(httpContext, exception);
+        await RecordInEventLog(httpContext, path, exception);
 
         httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
@@ -51,12 +53,21 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         });
     }
 
+    private static PathString OriginalPath(HttpContext httpContext)
+    {
+        var failedPath = httpContext.Features.Get<IExceptionHandlerPathFeature>()?.Path;
+
+        return string.IsNullOrEmpty(failedPath) ? httpContext.Request.Path : new PathString(failedPath);
+    }
+
     /// <summary>
     /// The Event Log is where the owner looks first, so a failure the user just hit is written
-    /// there too — for the signed-in user, at Error level, with the exception as the admin-only
-    /// detail. Best effort: it must never mask the original error or change the response.
+    /// there too — for the signed-in user, at Error level. The message carries the exception type
+    /// and message (the owner asked for a description they can act on without the server log);
+    /// the full exception text goes to the admin-only detail column. Best effort: it must never
+    /// mask the original error or change the response.
     /// </summary>
-    private async Task RecordInEventLog(HttpContext httpContext, Exception exception)
+    private async Task RecordInEventLog(HttpContext httpContext, PathString path, Exception exception)
     {
         try
         {
@@ -72,7 +83,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 return;
             }
 
-            var message = $"API error: {httpContext.Request.Method} {httpContext.Request.Path} — {exception.GetType().Name}: {exception.Message}";
+            var message = $"API error: {httpContext.Request.Method} {path} — {exception.GetType().Name}: {exception.Message}";
             var detail = exception.ToString();
 
             await events.Log(userId, EventLogLevel.Error, message, detail.Length > MaxDetailLength ? detail[..MaxDetailLength] : detail);
