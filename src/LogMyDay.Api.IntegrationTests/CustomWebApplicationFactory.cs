@@ -13,6 +13,8 @@ namespace LogMyDay.Api.IntegrationTests;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _databaseName = "IntegrationTestDb-" + Guid.NewGuid().ToString("N");
+
     public const string TestUserEmail = "test@example.com";
     public const string TestUserPassword = "Integration-Test-Pa55";
 
@@ -48,10 +50,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
-            // Add InMemoryDatabase for testing - use static name so all DbContext instances connect to same database
+            // One in-memory database per factory instance: every DbContext of this host shares it,
+            // while a test that spins up its own factory (rate-limit tests) gets a store of its own
+            // instead of seeding into — and racing — the class fixture's data.
             services.AddDbContext<LogMyDayDbContext>(options =>
             {
-                options.UseInMemoryDatabase("IntegrationTestDb");
+                options.UseInMemoryDatabase(_databaseName);
                 // Services that wrap work in a transaction (backup restore) must still run here.
                 options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             });

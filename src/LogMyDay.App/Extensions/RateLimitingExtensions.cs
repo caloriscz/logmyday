@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using LogMyDay.Api.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
@@ -6,37 +7,53 @@ namespace LogMyDay.App.Extensions;
 
 internal static class RateLimitingExtensions
 {
+    internal const string ApiPolicy = "api";
+    internal const string AuthPolicy = "auth";
+    internal const string AiPolicy = "ai";
     internal const string McpPolicy = "mcp";
+    internal const int ApiPermitsPerMinute = 100;
+    internal const int AuthPermitsPerWindow = 10;
+    internal const int AiPermitsPerMinute = 20;
     internal const int McpPermitsPerMinute = 120;
 
     internal static IServiceCollection AddAppRateLimiting(this IServiceCollection services)
     {
         services.AddRateLimiter(options =>
         {
-            options.AddSlidingWindowLimiter("api", opt =>
-            {
-                opt.Window = TimeSpan.FromMinutes(1);
-                opt.PermitLimit = 100;
-                opt.SegmentsPerWindow = 6;
-            });
+            // Each caller gets their own budget: the authenticated user for the API and AI
+            // policies, the client address for the sign-in endpoints (nobody is signed in yet).
+            // AddSlidingWindowLimiter(name, …) would key on the policy name — one bucket shared by
+            // every web tab, phone, script and agent, so a single busy client 429s everyone.
+            options.AddPolicy(ApiPolicy, context =>
+                RateLimitPartition.GetSlidingWindowLimiter(UserOrAddressPartitionKey(context), _ => new SlidingWindowRateLimiterOptions
+                {
+                    Window = TimeSpan.FromMinutes(1),
+                    PermitLimit = ApiPermitsPerMinute,
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0
+                }));
 
-            options.AddSlidingWindowLimiter("auth", opt =>
-            {
-                opt.Window = TimeSpan.FromMinutes(15);
-                opt.PermitLimit = 10;
-                opt.SegmentsPerWindow = 3;
-            });
+            options.AddPolicy(AuthPolicy, context =>
+                RateLimitPartition.GetSlidingWindowLimiter(AddressPartitionKey(context), _ => new SlidingWindowRateLimiterOptions
+                {
+                    Window = TimeSpan.FromMinutes(15),
+                    PermitLimit = AuthPermitsPerWindow,
+                    SegmentsPerWindow = 3,
+                    QueueLimit = 0
+                }));
 
-            options.AddSlidingWindowLimiter("ai", opt =>
-            {
-                opt.Window = TimeSpan.FromMinutes(1);
-                opt.PermitLimit = 20;
-                opt.SegmentsPerWindow = 4;
-            });
+            options.AddPolicy(AiPolicy, context =>
+                RateLimitPartition.GetSlidingWindowLimiter(UserOrAddressPartitionKey(context), _ => new SlidingWindowRateLimiterOptions
+                {
+                    Window = TimeSpan.FromMinutes(1),
+                    PermitLimit = AiPermitsPerMinute,
+                    SegmentsPerWindow = 4,
+                    QueueLimit = 0
+                }));
 
             // The MCP endpoint gets its own budget per API key, so one busy agent neither starves
-            // the web and mobile clients nor is starved by them. Requires the limiter to run after
-            // authentication, or the claim is never there to partition on.
+            // the web and mobile clients nor is starved by them. All of these require the limiter
+            // to run after authentication, or the claims are never there to partition on.
             options.AddPolicy(McpPolicy, context =>
                 RateLimitPartition.GetSlidingWindowLimiter(McpPartitionKey(context), _ => new SlidingWindowRateLimiterOptions
                 {
@@ -63,5 +80,18 @@ internal static class RateLimitingExtensions
         return keyId is { Length: > 0 }
             ? "key:" + keyId
             : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+    }
+
+    /// <summary>The signed-in user's id, or the client address for anonymous requests.</summary>
+    internal static string UserOrAddressPartitionKey(HttpContext context)
+    {
+        var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return userId is { Length: > 0 } ? "user:" + userId : AddressPartitionKey(context);
+    }
+
+    internal static string AddressPartitionKey(HttpContext context)
+    {
+        return "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
     }
 }

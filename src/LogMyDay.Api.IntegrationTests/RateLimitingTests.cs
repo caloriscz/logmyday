@@ -70,4 +70,54 @@ public class RateLimitingTests
 
         Assert.Equal(HttpStatusCode.TooManyRequests, last);
     }
+
+    // --- API policy: one budget per signed-in user, not one for the whole server ---
+
+    private static DefaultHttpContext ContextWithUser(string? userId, string ip = "10.0.0.1")
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(ip);
+        if (userId != null)
+        {
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId) }, "test"));
+        }
+
+        return context;
+    }
+
+    [Fact]
+    public void ApiPartition_IsPerUser_AndPerAddressWhenAnonymous()
+    {
+        var alice = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser("alice"));
+        var bob = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser("bob"));
+        var aliceElsewhere = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser("alice", ip: "192.168.1.9"));
+        var anon1 = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser(null, ip: "10.0.0.1"));
+        var anon2 = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser(null, ip: "10.0.0.2"));
+
+        Assert.NotEqual(alice, bob);
+        Assert.Equal(alice, aliceElsewhere);
+        Assert.NotEqual(anon1, anon2);
+        Assert.NotEqual(anon1, alice);
+        Assert.Equal(anon1, RateLimitingExtensions.AddressPartitionKey(ContextWithUser("ignored", ip: "10.0.0.1")));
+    }
+
+    [Fact]
+    public async Task ApiPolicy_OneUserExhaustingTheirBudget_DoesNotAffectAnother()
+    {
+        // A fresh host so the exhausted budget belongs to this test alone.
+        using var factory = new CustomWebApplicationFactory();
+        var heavy = factory.CreateClient();
+        heavy.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CustomWebApplicationFactory.AdminKeyToken);
+        var other = factory.CreateClient();
+        other.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CustomWebApplicationFactory.ReadWriteKeyToken);
+
+        HttpStatusCode last = default;
+        for (var i = 0; i < RateLimitingExtensions.ApiPermitsPerMinute + 1; i++)
+        {
+            last = (await heavy.GetAsync("/api/tags")).StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, last);
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync("/api/tags")).StatusCode);
+    }
 }
