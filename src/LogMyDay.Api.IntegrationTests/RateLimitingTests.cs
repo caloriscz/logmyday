@@ -86,7 +86,7 @@ public class RateLimitingTests
     }
 
     [Fact]
-    public void ApiPartition_IsPerUser_AndPerAddressWhenAnonymous()
+    public void ApiPartition_IsPerUserAndAddress_AndPerAddressWhenAnonymous()
     {
         var alice = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser("alice"));
         var bob = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser("bob"));
@@ -95,7 +95,9 @@ public class RateLimitingTests
         var anon2 = RateLimitingExtensions.UserOrAddressPartitionKey(ContextWithUser(null, ip: "10.0.0.2"));
 
         Assert.NotEqual(alice, bob);
-        Assert.Equal(alice, aliceElsewhere);
+        // The same account from another device (the phone next to the web app's loopback calls)
+        // is its own budget.
+        Assert.NotEqual(alice, aliceElsewhere);
         Assert.NotEqual(anon1, anon2);
         Assert.NotEqual(anon1, alice);
         Assert.Equal(anon1, RateLimitingExtensions.AddressPartitionKey(ContextWithUser("ignored", ip: "10.0.0.1")));

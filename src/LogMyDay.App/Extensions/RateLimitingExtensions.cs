@@ -20,8 +20,9 @@ internal static class RateLimitingExtensions
     {
         services.AddRateLimiter(options =>
         {
-            // Each caller gets their own budget: the authenticated user for the API and AI
-            // policies, the client address for the sign-in endpoints (nobody is signed in yet).
+            // Each caller gets their own budget: the authenticated user per client address for the
+            // API and AI policies, the client address for the sign-in endpoints (nobody is signed
+            // in yet).
             // AddSlidingWindowLimiter(name, …) would key on the policy name — one bucket shared by
             // every web tab, phone, script and agent, so a single busy client 429s everyone.
             options.AddPolicy(ApiPolicy, context =>
@@ -82,12 +83,18 @@ internal static class RateLimitingExtensions
             : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
     }
 
-    /// <summary>The signed-in user's id, or the client address for anonymous requests.</summary>
+    /// <summary>
+    /// The signed-in user's id combined with the client address, or the address alone for
+    /// anonymous requests. The address matters even for a known user: the web app's own calls
+    /// all arrive from the loopback address, so a phone on the same account gets a budget of its
+    /// own instead of sharing one with every open dashboard tab.
+    /// </summary>
     internal static string UserOrAddressPartitionKey(HttpContext context)
     {
         var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var address = AddressPartitionKey(context);
 
-        return userId is { Length: > 0 } ? "user:" + userId : AddressPartitionKey(context);
+        return userId is { Length: > 0 } ? "user:" + userId + "|" + address : address;
     }
 
     internal static string AddressPartitionKey(HttpContext context)
