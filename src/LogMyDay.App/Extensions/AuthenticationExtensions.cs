@@ -137,6 +137,7 @@ internal static class AuthenticationExtensions
             options.Cookie.SameSite = SameSiteMode.Lax;
         });
 
+        services.AddScoped<CircuitRequestOrigin>();
         services.AddScoped<CookieAuthenticationHandler>();
 
         return services;
