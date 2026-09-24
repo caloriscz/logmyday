@@ -120,7 +120,10 @@ public class NotificationManagerService : INotificationManagerService
 
                 // Surface exact-vs-inexact into the durable diag store. An "inexact-no-permission"
                 // row explains intermittent misses — inexact alarms are deferred/dropped under Doze.
-                if (payload?.TodoItemId is int armedItemId)
+                // The alarm-clock arm is the normal case and is re-issued for every reminder on
+                // every refresh; the scheduler already records a "scheduled" row when the time
+                // changes, so only the degraded modes are worth a row.
+                if (payload?.TodoItemId is int armedItemId && armMode != "alarmclock")
                 {
                     DiagnosticStore.Instance?.Record("reminder-diag", $"event=alarm-armed itemId={armedItemId} mode={armMode}");
                 }

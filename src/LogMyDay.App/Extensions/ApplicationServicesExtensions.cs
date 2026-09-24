@@ -15,6 +15,8 @@ using Microsoft.Extensions.AI;
 using OpenAI;
 using Serilog;
 
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace LogMyDay.App.Extensions;
 
 internal static class ApplicationServicesExtensions
@@ -23,6 +25,7 @@ internal static class ApplicationServicesExtensions
     {
         // Core services
         services.AddScoped<IActivityService, ActivityService>();
+        services.AddScoped<IActivitySummaryService, ActivitySummaryService>();
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IInputTypeService, InputTypeService>();
         services.AddScoped<IUnitService, UnitService>();
@@ -30,6 +33,9 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IScanMappingService, ScanMappingService>();
         services.AddScoped<ITagGroupService, TagGroupService>();
         services.AddScoped<IColorSchemeService, ColorSchemeService>();
+        services.AddScoped<IApiKeyService, ApiKeyService>();
+        // Injected as a clock so expiry and last-used throttling are testable with a fake time.
+        services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<ITodoListService, TodoListService>();
         services.AddScoped<ITodoItemService, TodoItemService>();

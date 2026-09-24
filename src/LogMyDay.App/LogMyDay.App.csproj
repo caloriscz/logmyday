@@ -61,6 +61,7 @@
 		<ProjectReference Include="..\LogMyDay.Domain\LogMyDay.Domain.csproj" />
 		<ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
 		<ProjectReference Include="..\LogMyDay.UI\LogMyDay.UI.csproj" />
+		<ProjectReference Include="..\LogMyDay.Mcp\LogMyDay.Mcp.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

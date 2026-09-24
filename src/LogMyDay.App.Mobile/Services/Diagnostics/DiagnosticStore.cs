@@ -64,12 +64,23 @@ public sealed class DiagnosticStore : IDiagnosticStore
     private const string EnabledPrefsKey = "diag.enabled";
     private const string DbFileName = "diagnostics.db3";
 
+    // The outbox is one POST per row against an API budget of 100 requests a minute per client.
+    // Small batches, at most one flush a minute and a long pause after a 429 keep the diagnostics
+    // from starving the app's real calls; pruning keeps a backlog from growing without bound.
+    public const int FlushBatchSize = 25;
+    public static readonly TimeSpan FlushInterval = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan RateLimitedBackoff = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan SyncedRetention = TimeSpan.FromDays(7);
+    public static readonly TimeSpan UnsyncedRetention = TimeSpan.FromDays(14);
+
     private readonly IApiClientProvider _apiClientProvider;
     private readonly ILogger<DiagnosticStore> _logger;
     private readonly object _lock = new();
     private readonly SQLiteConnection _db;
 
     private bool _enabled;
+    private DateTime _nextFlushUtc = DateTime.MinValue;
+    private int _flushing;
 
     public static DiagnosticStore? Instance { get; private set; }
 
@@ -89,8 +100,37 @@ public sealed class DiagnosticStore : IDiagnosticStore
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, DbFileName);
         _db = new SQLiteConnection(dbPath);
         _db.CreateTable<DiagEventRow>();
+        Prune();
 
         Instance = this;
+    }
+
+    /// <summary>
+    /// Drops synced rows older than a week and unsynced rows older than two weeks. A row that has
+    /// not made it to the server in two weeks never will in any useful way, and keeping it only
+    /// makes the next flush longer.
+    /// </summary>
+    private void Prune()
+    {
+        try
+        {
+            var syncedCutoff = (DateTime.UtcNow - SyncedRetention).ToString("o");
+            var unsyncedCutoff = (DateTime.UtcNow - UnsyncedRetention).ToString("o");
+            int removed;
+            lock (_lock)
+            {
+                removed = _db.Execute("delete from diag_events where (Synced = 1 and TimestampUtc < ?) or (Synced = 0 and TimestampUtc < ?)", syncedCutoff, unsyncedCutoff);
+            }
+
+            if (removed > 0)
+            {
+                Record("diag", $"event=pruned rows={removed}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "DiagnosticStore.Prune failed");
+        }
     }
 
     public void SetEnabled(bool enabled)
@@ -130,11 +170,31 @@ public sealed class DiagnosticStore : IDiagnosticStore
 
     public async Task<int> FlushAsync(CancellationToken ct = default)
     {
-        if (!_enabled)
+        if (!_enabled || DateTime.UtcNow < _nextFlushUtc)
         {
             return 0;
         }
 
+        // One flush at a time; a page load and a refresh tick may ask together.
+        if (Interlocked.Exchange(ref _flushing, 1) == 1)
+        {
+            return 0;
+        }
+
+        try
+        {
+            _nextFlushUtc = DateTime.UtcNow + FlushInterval;
+
+            return await FlushBatchAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _flushing, 0);
+        }
+    }
+
+    private async Task<int> FlushBatchAsync(CancellationToken ct)
+    {
         IEventLogApi eventLog;
         try
         {
@@ -151,7 +211,7 @@ public sealed class DiagnosticStore : IDiagnosticStore
         List<DiagEventRow> pending;
         lock (_lock)
         {
-            pending = _db.Table<DiagEventRow>().Where(r => !r.Synced).OrderBy(r => r.Id).Take(200).ToList();
+            pending = _db.Table<DiagEventRow>().Where(r => !r.Synced).OrderBy(r => r.Id).Take(FlushBatchSize).ToList();
         }
 
         var synced = 0;
@@ -174,6 +234,14 @@ public sealed class DiagnosticStore : IDiagnosticStore
                 }
 
                 synced++;
+            }
+            catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                // The server is telling us to stop; the app's own calls share this budget.
+                _nextFlushUtc = DateTime.UtcNow + RateLimitedBackoff;
+                _logger.LogDebug(ex, "DiagnosticStore.Flush rate limited at row {Id}; backing off", row.Id);
+
+                break;
             }
             catch (Exception ex)
             {

@@ -21,6 +21,13 @@ LogMyDay supports both solo journaling and shared deployments. Administrators ca
 - Change your password, regenerate recovery codes, and manage notification preferences from either the web or mobile app.
 - Personal settings sync automatically so the mobile companion reflects your latest choices.
 
+## API keys for agents
+
+- The **API keys** panel on your Profile page creates keys for the built-in [MCP server](mcp.md), so an AI agent such as Claude Code can read and write your data on your behalf.
+- Each key has a name, a scope (**read-only** or **read-write**) and an optional expiry. The token is shown once, at creation; afterwards only its prefix is visible. Revoke a key at any time — its next call is refused.
+- Keys work for the MCP endpoint only. Signing in to the web or mobile app still uses your password, and a key can never create or revoke keys or change your password.
+- Everything an agent writes with a key is recorded in your Event Log under the type **MCP agent**, with the key prefix.
+
 ## Security at a glance
 
 - The web dashboard signs you in with secure cookies; the mobile app uses HTTPS and never stores your password on the device.

@@ -1,0 +1,356 @@
+@using System.Globalization
+@using System.Net
+@using Refit
+@inject IApiKeysApi ApiKeysApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<ApiKeysPanel> Logger
+
+@*
+    Self-service API keys for agents and other machine clients. The token is shown exactly once,
+    right after creation, and lives only in this component's state until the panel is dismissed —
+    it is never written to browser storage, and the server never returns it again.
+*@
+
+<section class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
+    <div class="rounded-t-xl border-b border-gray-200 bg-emerald-700 px-6 py-4 text-white dark:border-slate-700">
+        <h2 class="text-lg font-semibold">API keys</h2>
+        <p class="text-sm text-emerald-100">For agents and tools that talk to LogMyDay on your behalf — Claude Code, scripts, the MCP endpoint.</p>
+    </div>
+    <div class="space-y-5 p-6">
+        <StatusAlert Message="@_statusMessage" IsError="@_statusIsError" OnDismiss="() => _statusMessage = null" />
+
+        @if (_created is not null)
+        {
+            <div class="space-y-4 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-400/60 dark:bg-amber-500/10">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100">Your new key "@_created.Key.Name"</h3>
+                        <p class="text-xs text-amber-800 dark:text-amber-200">This is the only time it will be shown. Copy it now and store it somewhere safe.</p>
+                    </div>
+                    <button type="button" class="@SecondaryButtonCss" @onclick="DismissCreated">Done</button>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="@LabelCss" for="apiKeyToken">Token</label>
+                    <div class="flex gap-2">
+                        <input id="apiKeyToken" type="text" class="@MonoInputCss" value="@_created.Token" readonly />
+                        <button type="button" class="@CopyButtonCss" @onclick="() => CopyAsync(_created.Token, CopyTarget.Token)">@CopyLabel(CopyTarget.Token)</button>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="@LabelCss">Claude Code</label>
+                    <div class="flex gap-2">
+                        <input type="text" class="@MonoInputCss" value="@ClaudeSnippet" readonly />
+                        <button type="button" class="@CopyButtonCss" @onclick="() => CopyAsync(ClaudeSnippet, CopyTarget.Claude)">@CopyLabel(CopyTarget.Claude)</button>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="@LabelCss">Any MCP client (JSON)</label>
+                    <div class="flex gap-2">
+                        <textarea class="@MonoInputCss" rows="7" readonly>@JsonSnippet</textarea>
+                        <button type="button" class="@CopyButtonCss self-start" @onclick="() => CopyAsync(JsonSnippet, CopyTarget.Json)">@CopyLabel(CopyTarget.Json)</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-slate-100">Create a key</h3>
+            <div class="grid gap-4 md:grid-cols-3">
+                <div class="space-y-2">
+                    <label class="@LabelCss" for="apiKeyName">Name</label>
+                    <input id="apiKeyName" type="text" class="@InputCss" @bind="_newName" placeholder="e.g. Claude Code on laptop" maxlength="100" disabled="@_isCreating" />
+                </div>
+
+                <div class="space-y-2">
+                    <span class="@LabelCss">Access</span>
+                    @* Explicit checked + @onchange per radio: @bind on a bool renders "True"/"False" and never matches. *@
+                    <div class="flex flex-col gap-1.5" role="radiogroup" aria-label="Key access">
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-slate-200">
+                            <input type="radio" name="apiKeyScope" checked="@(_newScope == ScopeReadOnly)" @onchange="() => _newScope = ScopeReadOnly" class="@RadioCss" disabled="@_isCreating" />
+                            <span><span class="font-medium">Read-only</span> <span class="text-gray-500 dark:text-slate-400">— can look, cannot change</span></span>
+                        </label>
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-slate-200">
+                            <input type="radio" name="apiKeyScope" checked="@(_newScope == ScopeReadWrite)" @onchange="() => _newScope = ScopeReadWrite" class="@RadioCss" disabled="@_isCreating" />
+                            <span><span class="font-medium">Read and write</span> <span class="text-gray-500 dark:text-slate-400">— can log, edit and delete</span></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="@LabelCss" for="apiKeyExpiry">Expires</label>
+                    <select id="apiKeyExpiry" class="@InputCss" @bind="_newExpiryDays" disabled="@_isCreating">
+                        <option value="0">Never</option>
+                        <option value="30">In 30 days</option>
+                        <option value="90">In 90 days</option>
+                        <option value="365">In a year</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="button" class="@PrimaryButtonCss" @onclick="CreateAsync" disabled="@(_isCreating || string.IsNullOrWhiteSpace(_newName))">
+                @if (_isCreating)
+                {
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                    <span>Creating...</span>
+                }
+                else
+                {
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    <span>Create key</span>
+                }
+            </button>
+        </div>
+
+        <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-slate-100">Your keys</h3>
+            @if (_isLoading)
+            {
+                <p class="text-sm text-gray-500 dark:text-slate-400">Loading...</p>
+            }
+            else if (_keys.Count == 0)
+            {
+                <p class="text-sm text-gray-500 dark:text-slate-400">No keys yet.</p>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-slate-700 dark:text-slate-400">
+                                <th class="py-2 pr-4">Name</th>
+                                <th class="py-2 pr-4">Prefix</th>
+                                <th class="py-2 pr-4">Access</th>
+                                <th class="py-2 pr-4">Created</th>
+                                <th class="py-2 pr-4">Expires</th>
+                                <th class="py-2 pr-4">Last used</th>
+                                <th class="py-2 pr-4">Status</th>
+                                <th class="py-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var key in _keys)
+                            {
+                                var status = StatusOf(key);
+                                <tr class="border-b border-gray-100 dark:border-slate-800">
+                                    <td class="py-2 pr-4 font-medium text-gray-900 dark:text-slate-100">@key.Name</td>
+                                    <td class="py-2 pr-4 font-mono text-xs text-gray-700 dark:text-slate-300">@key.Prefix…</td>
+                                    <td class="py-2 pr-4 text-gray-700 dark:text-slate-300">@(key.Scope == ScopeReadWrite ? "Read and write" : "Read-only")</td>
+                                    <td class="py-2 pr-4 text-gray-700 dark:text-slate-300">@FormatDate(key.CreatedUtc)</td>
+                                    <td class="py-2 pr-4 text-gray-700 dark:text-slate-300">@(key.ExpiresUtc is null ? "Never" : FormatDate(key.ExpiresUtc.Value))</td>
+                                    <td class="py-2 pr-4 text-gray-700 dark:text-slate-300">@(key.LastUsedUtc is null ? "Never" : FormatDate(key.LastUsedUtc.Value))</td>
+                                    <td class="py-2 pr-4"><span class="@StatusBadgeCss(status)">@status</span></td>
+                                    <td class="py-2 text-right">
+                                        @if (status == "Active")
+                                        {
+                                            @if (_pendingRevokeId == key.Id)
+                                            {
+                                                <span class="inline-flex items-center gap-2">
+                                                    <span class="text-xs text-gray-600 dark:text-slate-300">Revoke?</span>
+                                                    <button type="button" class="@DangerButtonCss" @onclick="() => RevokeAsync(key)" disabled="@_isRevoking">Yes, revoke</button>
+                                                    <button type="button" class="@SecondaryButtonCss" @onclick="() => _pendingRevokeId = null" disabled="@_isRevoking">Keep</button>
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="@LinkDangerCss" @onclick="() => _pendingRevokeId = key.Id">Revoke</button>
+                                            }
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    private const string LabelCss = "text-sm font-medium text-gray-700 dark:text-slate-200";
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string MonoInputCss = "w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 font-mono text-xs text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string RadioCss = "h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800";
+    private const string PrimaryButtonCss = "inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-emerald-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:focus-visible:ring-offset-slate-900";
+    private const string SecondaryButtonCss = "inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
+    private const string CopyButtonCss = "inline-flex shrink-0 items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700";
+    private const string DangerButtonCss = "inline-flex items-center rounded-md bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 disabled:opacity-50";
+    private const string LinkDangerCss = "text-xs font-medium text-rose-600 hover:underline dark:text-rose-400";
+
+    private const string ScopeReadOnly = "ReadOnly";
+    private const string ScopeReadWrite = "ReadWrite";
+
+    private enum CopyTarget { Token, Claude, Json }
+
+    private List<ApiKeyDto> _keys = new();
+    private bool _isLoading = true;
+    private bool _isCreating;
+    private bool _isRevoking;
+    private string? _statusMessage;
+    private bool _statusIsError;
+
+    private string _newName = string.Empty;
+    private string _newScope = ScopeReadOnly;
+    private int _newExpiryDays;
+
+    private ApiKeyCreatedDto? _created;
+    private CopyTarget? _lastCopied;
+    private int? _pendingRevokeId;
+
+    private string McpUrl => Navigation.BaseUri.TrimEnd('/') + "/mcp";
+
+    private string ClaudeSnippet =>
+        $"claude mcp add --transport http logmyday {McpUrl} --header \"Authorization: Bearer {_created?.Token}\"";
+
+    private string JsonSnippet =>
+        "{\n" +
+        "  \"mcpServers\": {\n" +
+        "    \"logmyday\": {\n" +
+        "      \"type\": \"http\",\n" +
+        $"      \"url\": \"{McpUrl}\",\n" +
+        $"      \"headers\": {{ \"Authorization\": \"Bearer {_created?.Token}\" }}\n" +
+        "    }\n" +
+        "  }\n" +
+        "}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _keys = (await ApiKeysApi.ListAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load API keys");
+            SetStatus("Could not load your keys. Reload the page to try again.", isError: true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _isCreating = true;
+        _statusMessage = null;
+        try
+        {
+            DateTime? expires = _newExpiryDays > 0 ? DateTime.UtcNow.AddDays(_newExpiryDays) : null;
+            _created = await ApiKeysApi.CreateAsync(new CreateApiKeyDto(_newName.Trim(), _newScope, expires));
+            _lastCopied = null;
+            _newName = string.Empty;
+            await LoadAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
+        {
+            SetStatus(string.IsNullOrWhiteSpace(ex.Content) ? "The key could not be created." : ex.Content.Trim('"'), isError: true);
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to create API key");
+            // Only a server error passes through the exception handler that writes the Event Log.
+            SetStatus(ex.StatusCode == HttpStatusCode.InternalServerError
+                ? "The key could not be created (HTTP 500). The Event Log has the details."
+                : $"The key could not be created (HTTP {(int)ex.StatusCode}).", isError: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to create API key");
+            SetStatus("The key could not be created. Please try again.", isError: true);
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task RevokeAsync(ApiKeyDto key)
+    {
+        _isRevoking = true;
+        try
+        {
+            await ApiKeysApi.RevokeAsync(key.Id);
+            _pendingRevokeId = null;
+            // A revoked key's one-time panel is no longer worth showing.
+            if (_created?.Key.Id == key.Id)
+            {
+                _created = null;
+            }
+            SetStatus($"Key \"{key.Name}\" revoked. Anything still using it will be refused from now on.", isError: false);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to revoke API key {KeyId}", key.Id);
+            SetStatus("The key could not be revoked. Please try again.", isError: true);
+        }
+        finally
+        {
+            _isRevoking = false;
+        }
+    }
+
+    private void DismissCreated()
+    {
+        _created = null;
+        _lastCopied = null;
+    }
+
+    private async Task CopyAsync(string text, CopyTarget target)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            _lastCopied = target;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Clipboard write failed");
+            SetStatus("Copying failed — select the text and copy it by hand.", isError: true);
+        }
+    }
+
+    private string CopyLabel(CopyTarget target) => _lastCopied == target ? "Copied" : "Copy";
+
+    private void SetStatus(string message, bool isError)
+    {
+        _statusMessage = message;
+        _statusIsError = isError;
+    }
+
+    private static string StatusOf(ApiKeyDto key)
+    {
+        if (key.RevokedUtc is not null)
+        {
+            return "Revoked";
+        }
+
+        if (key.ExpiresUtc is not null && key.ExpiresUtc <= DateTime.UtcNow)
+        {
+            return "Expired";
+        }
+
+        return "Active";
+    }
+
+    private static string StatusBadgeCss(string status) => status switch
+    {
+        "Active" => "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
+        "Expired" => "inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
+        _ => "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-slate-300"
+    };
+
+    // Day precision is what matters here, and a UTC date avoids arguing about the server's zone.
+    private static string FormatDate(DateTime utc) => utc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+}

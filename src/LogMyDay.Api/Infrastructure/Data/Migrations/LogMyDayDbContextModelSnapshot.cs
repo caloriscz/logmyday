@@ -48,6 +48,56 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Activities", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ApiKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ExpiresUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastUsedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RevokedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Prefix")
+                        .HasDatabaseName("IX_LogMyDay_ApiKeys_Prefix");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_ApiKeys_UserId");
+
+                    b.ToTable("LogMyDay_ApiKeys", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.ColorScheme", b =>
                 {
                     b.Property<int>("Id")
@@ -970,6 +1020,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.ApiKey", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.ColorSchemeEntry", b =>
