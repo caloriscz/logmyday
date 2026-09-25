@@ -277,4 +277,174 @@ public class ActivityServiceTests
             PrimaryTagId = tag.Id
         }, userId));
     }
+
+    private static async Task<Tag> AddNumericTag(LogMyDayDbContext context, Guid ownerId, int inputTypeId = 1, bool repeatable = true,
+        TimeGranularity granularity = TimeGranularity.Daily, double? min = null, double? max = null)
+    {
+        var tag = new Tag
+        {
+            TagName = "Dose",
+            InputTypeId = inputTypeId,
+            IsRequired = false,
+            IsRepeatable = repeatable,
+            TimeGranularity = granularity,
+            MinValue = min,
+            MaxValue = max,
+            UserId = ownerId
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        return tag;
+    }
+
+    private static async Task<Activity> AddRow(LogMyDayDbContext context, Guid userId, Tag tag, DateTime when, string value)
+    {
+        var row = new Activity { UserId = userId, TagId = tag.Id, DateStarted = when, DateCreated = DateTime.UtcNow, Description = value };
+        context.Activities.Add(row);
+        await context.SaveChangesAsync();
+
+        return row;
+    }
+
+    [Fact]
+    public async Task Update_ValueAboveMax_Throws()
+    {
+        var (service, context) = CreateService(nameof(Update_ValueAboveMax_Throws));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, max: 10);
+        var row = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 9, 0, 0), "5");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.Update(row.Id, new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = row.DateStarted, Description = "11" }, userId));
+    }
+
+    [Fact]
+    public async Task Update_RepeatablePeriodTotal_IsCheckedAgainstMax()
+    {
+        var (service, context) = CreateService(nameof(Update_RepeatablePeriodTotal_IsCheckedAgainstMax));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, max: 10);
+        var morning = new DateTime(2026, 7, 1, 9, 0, 0);
+        await AddRow(context, userId, tag, morning, "6");
+        var edited = await AddRow(context, userId, tag, morning.AddHours(5), "3");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.Update(edited.Id, new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = edited.DateStarted, Description = "5" }, userId));
+
+        var ok = await service.Update(edited.Id, new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = edited.DateStarted, Description = "4" }, userId);
+        Assert.Equal("4", ok.Description);
+    }
+
+    [Fact]
+    public async Task Update_And_Delete_OnLockedDay_AreAllowed()
+    {
+        var (service, context) = CreateService(nameof(Update_And_Delete_OnLockedDay_AreAllowed));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId);
+        var row = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 9, 0, 0), "1");
+        context.TagDayLocks.Add(new TagDayLock { UserId = userId, TagId = tag.Id, Date = new DateOnly(2026, 7, 1), IsLocked = true, SetAt = DateTime.UtcNow });
+        await context.SaveChangesAsync();
+
+        var updated = await service.Update(row.Id, new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = row.DateStarted, Description = "2" }, userId);
+
+        Assert.Equal("2", updated.Description);
+        Assert.True(await service.Delete(row.Id, userId));
+    }
+
+    [Fact]
+    public async Task Update_And_Delete_WriteEventLog()
+    {
+        var (service, context) = CreateService(nameof(Update_And_Delete_WriteEventLog));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId);
+        var row = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 9, 0, 0), "1");
+
+        await service.Update(row.Id, new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = row.DateStarted, Description = "2" }, userId);
+        await service.Delete(row.Id, userId);
+
+        var messages = await context.EventLogs.Where(e => e.UserId == userId).Select(e => e.Message).ToListAsync();
+        Assert.Contains(messages, m => m.Contains("updated to value 2"));
+        Assert.Contains(messages, m => m.Contains("deleted"));
+    }
+
+    [Fact]
+    public async Task Create_BelowMin_Throws_ButSkipMarkerIsExempt()
+    {
+        var (service, context) = CreateService(nameof(Create_BelowMin_Throws_ButSkipMarkerIsExempt));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, min: 1);
+        var when = new DateTime(2026, 7, 1, 12, 0, 0);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.Create(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = when, Description = "0" }, userId));
+
+        var skip = await service.Create(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = when, Description = "0" }, userId, isSkipMarker: true);
+        Assert.Equal("0", skip.Description);
+    }
+
+    [Fact]
+    public async Task Create_Accumulate_ReadsDecimalCommaAndWritesInvariant()
+    {
+        var (service, context) = CreateService(nameof(Create_Accumulate_ReadsDecimalCommaAndWritesInvariant));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, inputTypeId: 6, repeatable: false);
+        var when = new DateTime(2026, 7, 1, 9, 0, 0);
+        await AddRow(context, userId, tag, when, "1,5");
+
+        var result = await service.Create(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = when.AddHours(1), Description = "2" }, userId);
+
+        Assert.Equal("3.5", result.Description);
+    }
+
+    [Fact]
+    public async Task Create_Accumulate_RoundsIntegerAndUsesEarliestRow()
+    {
+        var (service, context) = CreateService(nameof(Create_Accumulate_RoundsIntegerAndUsesEarliestRow));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, repeatable: false);
+        var later = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 15, 0, 0), "10");
+        var earliest = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 8, 0, 0), "2");
+
+        await service.Create(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = new DateTime(2026, 7, 1, 18, 0, 0), Description = "1.6" }, userId);
+
+        context.ChangeTracker.Clear();
+        Assert.Equal("4", (await context.Activities.FindAsync(earliest.Id))!.Description); // 2 + 1.6 = 3.6, rounded
+        Assert.Equal("10", (await context.Activities.FindAsync(later.Id))!.Description);
+    }
+
+    [Fact]
+    public async Task ReplaceForDay_ReplacesEarliestRowOfThatDay_OrCreates()
+    {
+        var (service, context) = CreateService(nameof(ReplaceForDay_ReplacesEarliestRowOfThatDay_OrCreates));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId);
+        var first = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 8, 0, 0), "1");
+        var second = await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 20, 0, 0), "2");
+
+        await service.ReplaceForDay(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = new DateTime(2026, 7, 1, 12, 0, 0), Description = "7" }, userId);
+        await service.ReplaceForDay(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = new DateTime(2026, 7, 2, 12, 0, 0), Description = "3" }, userId);
+
+        context.ChangeTracker.Clear();
+        var rows = await context.Activities.Where(a => a.TagId == tag.Id).OrderBy(a => a.DateStarted).ToListAsync();
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(first.Id, rows[0].Id);
+        Assert.Equal("7", rows[0].Description);
+        Assert.Equal(new DateTime(2026, 7, 1, 12, 0, 0), rows[0].DateStarted);
+        Assert.Equal(second.Id, rows[1].Id);
+        Assert.Equal("2", rows[1].Description);
+        Assert.Equal("3", rows[2].Description);
+    }
+
+    [Fact]
+    public async Task ReplaceForDay_EnforcesMax()
+    {
+        var (service, context) = CreateService(nameof(ReplaceForDay_EnforcesMax));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, max: 5);
+        await AddRow(context, userId, tag, new DateTime(2026, 7, 1, 8, 0, 0), "1");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ReplaceForDay(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = new DateTime(2026, 7, 1, 12, 0, 0), Description = "9" }, userId));
+    }
 }

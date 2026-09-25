@@ -90,31 +90,6 @@ public class TagDayLockService : ITagDayLockService
             .FirstOrDefaultAsync(l => l.UserId == userId && l.TagId == tagId && l.Date == date);
     }
 
-    public async Task TryAutoLock(Guid userId, int tagId, DateOnly date)
-    {
-        var existing = await _context.TagDayLocks
-            .FirstOrDefaultAsync(l => l.UserId == userId && l.TagId == tagId && l.Date == date);
-
-        if (existing != null)
-        {
-            // Respect any pre-existing row, including a manually-unlocked one.
-            return;
-        }
-
-        _context.TagDayLocks.Add(new TagDayLock
-        {
-            UserId = userId,
-            TagId = tagId,
-            Date = date,
-            IsLocked = true,
-            SetAt = DateTime.UtcNow,
-            SetBy = DayLockSetBy.Auto,
-            Reason = "auto-locked on activity create (non-repeatable tag)"
-        });
-
-        await _context.SaveChangesAsync();
-    }
-
     private static TagDayLockResponse MapToResponse(TagDayLock row) =>
         new()
         {

@@ -115,6 +115,18 @@ public class ActivitiesController : BaseApiController
         {
             return NotFound(ex.Message);
         }
+        catch (InvalidOperationException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity update failed: {ex.Message}",
+                $"ActivityId: {id}, TagId: {request.PrimaryTagId}, Date: {request.DateStarted:yyyy-MM-dd HH:mm}, Description: {request.Description}");
+
+            return Conflict(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id}")]

@@ -222,39 +222,7 @@ public class ReminderService : IReminderService
 
         if (item.CompletionTagId.HasValue)
         {
-            if (item.AutoLogMode == AutoLogMode.ResetIfExists)
-            {
-                // De-dup is scoped to the completion's own local day only — NOT the
-                // reminder's monitoring window. Using the monitoring window here meant a
-                // multi-day window (e.g. weekly recurrence) silently overwrote separate
-                // days' activities instead of adding one per day.
-                var windowStart = doneLocal.Date;
-                var windowEnd = windowStart.AddDays(1);
-
-                var existing = await _context.Activities
-                    .FirstOrDefaultAsync(a =>
-                        a.TagId == item.CompletionTagId.Value &&
-                        a.UserId == userId &&
-                        a.DateStarted >= windowStart &&
-                        a.DateStarted < windowEnd);
-
-                if (existing != null)
-                {
-                    existing.DateStarted = doneLocal;
-                    existing.Description = request.CompletionValue ?? item.Notes;
-                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on reminder {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
-                    await _eventLogService.Log(userId, EventLogLevel.Info,
-                        $"Activity '{item.CompletionTag?.TagName ?? "?"}' updated (same-day re-entry) on '{item.Title}' completion");
-                }
-                else
-                {
-                    await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
-                }
-            }
-            else
-            {
-                await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
-            }
+            await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
         }
 
         await PruneOldDays(item, user);
@@ -272,8 +240,19 @@ public class ReminderService : IReminderService
             DateStarted = doneAt
         };
 
-        await _activityService.Create(activityRequest, userId);
-        _logger.LogInformation("Auto-logged activity for tag {TagId} on reminder {ItemId} completion", item.CompletionTagId.Value, item.Id);
+        // ResetIfExists replaces the entry of the completion's own local day only, not the
+        // reminder's monitoring window, so each day keeps its own activity. It goes through
+        // ActivityService so it gets the same validation and event log as any other write.
+        if (item.AutoLogMode == AutoLogMode.ResetIfExists)
+        {
+            await _activityService.ReplaceForDay(activityRequest, userId);
+        }
+        else
+        {
+            await _activityService.Create(activityRequest, userId);
+        }
+
+        _logger.LogInformation("Auto-logged activity for tag {TagId} on reminder {ItemId} completion ({Mode})", item.CompletionTagId.Value, item.Id, item.AutoLogMode);
     }
 
     // The value a skip records, by the completion tag's input type: an explicit zero for types that
@@ -352,24 +331,37 @@ public class ReminderService : IReminderService
         day.IsSkipped = true;
         day.SkippedAt = skippedAt;
 
-        // A skip still records a value so the day has an explicit data point instead of a gap:
-        // 0 for numeric/rating types, false for Boolean, empty for string. Always adds — no
-        // dedup — so re-skipping or skipping multiple days just produces multiple zero rows.
+        // A skip records a value so an otherwise empty day has an explicit data point instead of a
+        // gap: 0 for numeric/rating types, false for Boolean, empty for string. It is written only
+        // when the tag has nothing on that local day and the day is not locked, so re-skipping the
+        // same day is idempotent and a skip never contradicts a value that is already logged.
         if (item.CompletionTagId.HasValue)
         {
+            var tagId = item.CompletionTagId.Value;
             var zeroValue = ZeroValueForInputType(item.CompletionTag?.InputTypeId);
             day.CompletionValue = zeroValue;
 
-            var skipDoneAt = localDate.ToDateTime(new TimeOnly(12, 0));
-            await _activityService.Create(new ActivityRequest
-            {
-                PrimaryTagId = item.CompletionTagId.Value,
-                Description = zeroValue,
-                DateStarted = skipDoneAt
-            }, userId);
+            var dayHasData = await _activityService.HasActivityForTagOnDate(tagId, localDate, userId);
+            var dayLocked = await _context.TagDayLocks
+                .AnyAsync(l => l.UserId == userId && l.TagId == tagId && l.Date == localDate && l.IsLocked);
 
-            await _eventLogService.Log(userId, EventLogLevel.Info,
-                $"Reminder '{item.Title}' skipped — logged '{zeroValue ?? "(empty)"}' to '{item.CompletionTag?.TagName ?? "?"}'");
+            if (!dayHasData && !dayLocked)
+            {
+                await _activityService.Create(new ActivityRequest
+                {
+                    PrimaryTagId = tagId,
+                    Description = zeroValue,
+                    DateStarted = localDate.ToDateTime(new TimeOnly(12, 0))
+                }, userId, isSkipMarker: true);
+
+                await _eventLogService.Log(userId, EventLogLevel.Info,
+                    $"Reminder '{item.Title}' skipped — logged '{zeroValue ?? "(empty)"}' to '{item.CompletionTag?.TagName ?? "?"}'");
+            }
+            else
+            {
+                await _eventLogService.Log(userId, EventLogLevel.Info,
+                    $"Reminder '{item.Title}' skipped — nothing logged, '{item.CompletionTag?.TagName ?? "?"}' is {(dayLocked ? "locked" : "already filled")} for {localDate:yyyy-MM-dd}");
+            }
         }
 
         await PruneOldDays(item, user);

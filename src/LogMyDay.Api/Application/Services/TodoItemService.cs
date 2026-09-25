@@ -114,38 +114,7 @@ public class TodoItemService : ITodoItemService
         var tagId = item.List.CompletionTagId;
         if (tagId.HasValue)
         {
-            if (item.List.AutoLogMode == AutoLogMode.ResetIfExists)
-            {
-                // De-dup scoped to the completion's own local day only, so each day keeps
-                // its own activity and same-day re-completion replaces. (Previously the
-                // recurrence-derived window could span a whole week and overwrite days.)
-                var windowStart = doneLocal.Date;
-                var windowEnd = windowStart.AddDays(1);
-
-                var existing = await _context.Activities
-                    .FirstOrDefaultAsync(a =>
-                        a.TagId == tagId.Value &&
-                        a.UserId == userId &&
-                        a.DateStarted >= windowStart &&
-                        a.DateStarted < windowEnd);
-
-                if (existing != null)
-                {
-                    existing.DateStarted = doneLocal;
-                    existing.Description = item.Title;
-                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, tagId.Value, id);
-                    await _eventLogService.Log(userId, EventLogLevel.Info,
-                        $"Activity '{item.List.CompletionTag?.TagName ?? "?"}' updated (same-day re-entry) on '{item.Title}' completion");
-                }
-                else
-                {
-                    await LogActivityAsync(item, tagId.Value, doneLocal, userId);
-                }
-            }
-            else
-            {
-                await LogActivityAsync(item, tagId.Value, doneLocal, userId);
-            }
+            await LogActivityAsync(item, tagId.Value, doneLocal, userId);
         }
 
         await _context.SaveChangesAsync();
@@ -162,8 +131,19 @@ public class TodoItemService : ITodoItemService
             DateStarted = doneAt
         };
 
-        await _activityService.Create(activityRequest, userId);
-        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", tagId, item.Id);
+        // ResetIfExists replaces the entry of the completion's own local day only, so each day
+        // keeps its own activity. It goes through ActivityService so it gets the same validation
+        // and event log as any other write.
+        if (item.List.AutoLogMode == AutoLogMode.ResetIfExists)
+        {
+            await _activityService.ReplaceForDay(activityRequest, userId);
+        }
+        else
+        {
+            await _activityService.Create(activityRequest, userId);
+        }
+
+        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion ({Mode})", tagId, item.Id, item.List.AutoLogMode);
     }
 
     /// <summary>A completion's DoneAt is UTC (an unspecified kind is read as UTC). Activities are
