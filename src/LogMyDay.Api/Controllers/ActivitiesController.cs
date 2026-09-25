@@ -74,6 +74,14 @@ public class ActivitiesController : BaseApiController
 
             return Conflict(ex.Message);
         }
+        catch (KeyNotFoundException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity creation failed: {ex.Message}",
+                $"TagId: {calendarRequest.PrimaryTagId}, Date: {calendarRequest.DateStarted:yyyy-MM-dd HH:mm}");
+
+            return NotFound(ex.Message);
+        }
         catch (ArgumentException ex)
         {
             await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
@@ -96,10 +104,29 @@ public class ActivitiesController : BaseApiController
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] ActivityRequest request)
     {
-        var userId = GetCurrentUserId();
-        var updatedActivity = await _activityService.Update(id, request, userId);
+        try
+        {
+            var userId = GetCurrentUserId();
+            var updatedActivity = await _activityService.Update(id, request, userId);
 
-        return Ok(updatedActivity);
+            return Ok(updatedActivity);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
+                $"Activity update failed: {ex.Message}",
+                $"ActivityId: {id}, TagId: {request.PrimaryTagId}, Date: {request.DateStarted:yyyy-MM-dd HH:mm}, Description: {request.Description}");
+
+            return Conflict(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id}")]
@@ -172,10 +199,17 @@ public class ActivitiesController : BaseApiController
         [FromQuery] DateTime dateStarted,
         [FromQuery] int? activityId = null)
     {
-        var userId = GetCurrentUserId();
-        var result = await _activityService.GetPeriodSum(tagId, dateStarted, userId, activityId);
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _activityService.GetPeriodSum(tagId, dateStarted, userId, activityId);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpGet("has-activity-for-tag")]

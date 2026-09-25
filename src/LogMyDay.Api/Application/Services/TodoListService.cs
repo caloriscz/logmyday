@@ -58,6 +58,8 @@ public class TodoListService : ITodoListService
 
     public async Task<TodoListResponse> Create(TodoListRequest request, Guid userId)
     {
+        await EnsureOwnedTag(request.CompletionTagId, userId);
+
         var list = new TodoList
         {
             UserId = userId,
@@ -88,6 +90,8 @@ public class TodoListService : ITodoListService
         {
             throw new KeyNotFoundException("Todo list not found");
         }
+
+        await EnsureOwnedTag(request.CompletionTagId, userId);
 
         var oldAutoLogMode = list.AutoLogMode;
         var oldCompletionTagId = list.CompletionTagId;
@@ -129,6 +133,15 @@ public class TodoListService : ITodoListService
         => tagId.HasValue
             ? await _context.Tags.AsNoTracking().Where(t => t.Id == tagId.Value).Select(t => t.TagName).FirstOrDefaultAsync()
             : null;
+
+    // Tags are strictly per user: a completion tag must belong to the caller.
+    private async Task EnsureOwnedTag(int? tagId, Guid userId)
+    {
+        if (tagId.HasValue && !await _context.Tags.AnyAsync(t => t.Id == tagId.Value && t.UserId == userId))
+        {
+            throw new KeyNotFoundException("Tag not found");
+        }
+    }
 
     private static string Describe(int? value) => value?.ToString() ?? "none";
 

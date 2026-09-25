@@ -6,8 +6,13 @@ public interface IActivityService
 {
     Task<ActivityResponse> GetById(int id, Guid userId);
     Task<List<ActivityResponse>> GetAll(Guid userId);
-    Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId);
+    Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId, bool isSkipMarker = false);
     Task<ActivityResponse> Update(int id, ActivityRequest request, Guid userId);
+    /// <summary>Replaces the tag's entry on the local day of <c>request.DateStarted</c> (the
+    /// earliest one when there are several) through <see cref="Update"/>, or creates one through
+    /// <see cref="Create"/>. Used by reminder/todo <c>AutoLogMode.ResetIfExists</c>, so the
+    /// write gets the same validation and event log as any other.</summary>
+    Task<ActivityResponse> ReplaceForDay(ActivityRequest request, Guid userId);
     Task<bool> Delete(int id, Guid userId);
     Task<List<ActivityResponse>> GetByDate(ActivityRequest request, Guid userId);
     Task<PagedResult<ActivityResponse>> GetPaged(

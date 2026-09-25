@@ -195,9 +195,9 @@ public class ReminderServiceTests
     }
 
     [Fact]
-    public async Task Skip_AddsValueEveryTime_NoDedup()
+    public async Task Skip_SameDayTwice_LogsOneZeroRow()
     {
-        var (service, context, userId) = CreateService(nameof(Skip_AddsValueEveryTime_NoDedup));
+        var (service, context, userId) = CreateService(nameof(Skip_SameDayTwice_LogsOneZeroRow));
         var tagId = await AddTag(context, userId, 1); // Integer
         var id = await AddDailyReminderWithTag(context, userId, tagId);
 
@@ -205,7 +205,7 @@ public class ReminderServiceTests
         await service.Skip(id, userId, day);
         await service.Skip(id, userId, day);
 
-        Assert.Equal(2, context.Activities.Count(a => a.TagId == tagId && a.UserId == userId));
+        Assert.Equal(1, context.Activities.Count(a => a.TagId == tagId && a.UserId == userId));
     }
 
     [Fact]
@@ -233,5 +233,139 @@ public class ReminderServiceTests
         Assert.Equal(RecurrenceType.Daily, created.RecurrenceType);
         var stored = await context.Reminders.FindAsync(created.Id);
         Assert.Equal(RecurrenceType.Daily, stored!.RecurrenceType);
+    }
+
+    private static async Task SetTimeZone(LogMyDayDbContext context, Guid userId, string timeZone)
+    {
+        var user = await context.Users.SingleAsync(u => u.Id == userId);
+        user.TimeZone = timeZone;
+        await context.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Complete_AutoLogsActivityInUserLocalTime()
+    {
+        var (service, context, userId) = CreateService(nameof(Complete_AutoLogsActivityInUserLocalTime));
+        await SetTimeZone(context, userId, "Europe/Prague");
+        var tagId = await AddTag(context, userId, inputTypeId: 1);
+        var reminderId = await AddDailyReminderWithTag(context, userId, tagId);
+
+        // 22:30 UTC on 1 July is 00:30 on 2 July in Prague (UTC+2).
+        await service.Complete(reminderId, new ReminderCompleteRequest
+        {
+            DoneAt = new DateTime(2026, 7, 1, 22, 30, 0, DateTimeKind.Utc),
+            CompletionValue = "1"
+        }, userId);
+
+        var activity = await context.Activities.SingleAsync(a => a.TagId == tagId);
+        Assert.Equal(new DateTime(2026, 7, 2, 0, 30, 0), activity.DateStarted);
+    }
+
+    [Fact]
+    public async Task Complete_ResetIfExists_ReplacesWithinTheLocalDay()
+    {
+        var (service, context, userId) = CreateService(nameof(Complete_ResetIfExists_ReplacesWithinTheLocalDay));
+        await SetTimeZone(context, userId, "Europe/Prague");
+        var tagId = await AddTag(context, userId, inputTypeId: 1);
+        var reminderId = await AddDailyReminderWithTag(context, userId, tagId);
+        var reminder = await context.Reminders.FindAsync(reminderId);
+        reminder!.AutoLogMode = AutoLogMode.ResetIfExists;
+        await context.SaveChangesAsync();
+
+        // Both are 2 July in Prague, although the first is still 1 July in UTC.
+        await service.Complete(reminderId, new ReminderCompleteRequest { DoneAt = new DateTime(2026, 7, 1, 22, 30, 0, DateTimeKind.Utc), CompletionValue = "1" }, userId);
+        await service.Complete(reminderId, new ReminderCompleteRequest { DoneAt = new DateTime(2026, 7, 2, 6, 0, 0, DateTimeKind.Utc), CompletionValue = "2" }, userId);
+
+        var activity = await context.Activities.SingleAsync(a => a.TagId == tagId);
+        Assert.Equal(new DateTime(2026, 7, 2, 8, 0, 0), activity.DateStarted);
+        Assert.Equal("2", activity.Description);
+    }
+
+    [Fact]
+    public async Task Skip_LogsZeroRowAtLocalNoon()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_LogsZeroRowAtLocalNoon));
+        await SetTimeZone(context, userId, "Europe/Prague");
+        var tagId = await AddTag(context, userId, inputTypeId: 1);
+        var reminderId = await AddDailyReminderWithTag(context, userId, tagId);
+
+        await service.Skip(reminderId, userId, new DateOnly(2026, 7, 2));
+
+        var activity = await context.Activities.SingleAsync(a => a.TagId == tagId);
+        Assert.Equal(new DateTime(2026, 7, 2, 12, 0, 0), activity.DateStarted);
+    }
+
+    [Fact]
+    public async Task Create_WithAnotherUsersCompletionTag_ThrowsNotFound()
+    {
+        var (service, context, userId) = CreateService(nameof(Create_WithAnotherUsersCompletionTag_ThrowsNotFound));
+        var foreignTagId = await AddTag(context, Guid.NewGuid(), inputTypeId: 1);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Create(new ReminderRequest { Title = "Pill", CompletionTagId = foreignTagId }, userId));
+        Assert.False(await context.Reminders.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Update_ToAnotherUsersCompletionTag_ThrowsNotFound()
+    {
+        var (service, context, userId) = CreateService(nameof(Update_ToAnotherUsersCompletionTag_ThrowsNotFound));
+        var ownTagId = await AddTag(context, userId, inputTypeId: 1);
+        var foreignTagId = await AddTag(context, Guid.NewGuid(), inputTypeId: 1);
+        var reminderId = await AddDailyReminderWithTag(context, userId, ownTagId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Update(reminderId, new ReminderRequest { Title = "Pill", CompletionTagId = foreignTagId }, userId));
+
+        context.ChangeTracker.Clear();
+        var stored = await context.Reminders.FindAsync(reminderId);
+        Assert.Equal(ownTagId, stored!.CompletionTagId);
+    }
+
+    [Fact]
+    public async Task Skip_DayWithAValue_LogsNoZeroRow()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_DayWithAValue_LogsNoZeroRow));
+        var tagId = await AddTag(context, userId, inputTypeId: 3); // Boolean
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+        context.Activities.Add(new Activity { UserId = userId, TagId = tagId, DateStarted = new DateTime(2026, 6, 10, 9, 0, 0), DateCreated = DateTime.UtcNow, Description = "true" });
+        await context.SaveChangesAsync();
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        var only = await context.Activities.SingleAsync(a => a.TagId == tagId);
+        Assert.Equal("true", only.Description);
+    }
+
+    [Fact]
+    public async Task Skip_LockedDay_LogsNoZeroRowAndDoesNotThrow()
+    {
+        var (service, context, userId) = CreateService(nameof(Skip_LockedDay_LogsNoZeroRowAndDoesNotThrow));
+        var tagId = await AddTag(context, userId, inputTypeId: 1);
+        var id = await AddDailyReminderWithTag(context, userId, tagId);
+        context.TagDayLocks.Add(new TagDayLock { UserId = userId, TagId = tagId, Date = new DateOnly(2026, 6, 10), IsLocked = true, SetAt = DateTime.UtcNow });
+        await context.SaveChangesAsync();
+
+        await service.Skip(id, userId, new DateOnly(2026, 6, 10));
+
+        Assert.False(await context.Activities.AnyAsync(a => a.TagId == tagId));
+    }
+
+    [Fact]
+    public async Task Complete_ResetIfExists_RespectsMax()
+    {
+        var (service, context, userId) = CreateService(nameof(Complete_ResetIfExists_RespectsMax));
+        var tag = new Tag { TagName = "Dose", UserId = userId, InputTypeId = 1, MaxValue = 5 };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+        var reminderId = await AddDailyReminderWithTag(context, userId, tag.Id);
+        var reminder = await context.Reminders.FindAsync(reminderId);
+        reminder!.AutoLogMode = AutoLogMode.ResetIfExists;
+        await context.SaveChangesAsync();
+
+        await service.Complete(reminderId, new ReminderCompleteRequest { DoneAt = new DateTime(2026, 7, 1, 8, 0, 0, DateTimeKind.Utc), CompletionValue = "2" }, userId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.Complete(reminderId, new ReminderCompleteRequest { DoneAt = new DateTime(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc), CompletionValue = "9" }, userId));
     }
 }

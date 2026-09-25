@@ -106,42 +106,15 @@ public class TodoItemService : ITodoItemService
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
+        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var doneLocal = ToUserLocalTime(request.DoneAt, user);
+
         // Auto-log against the parent list's tag, in the list's mode.
         var tagId = item.List.CompletionTagId;
         if (tagId.HasValue)
         {
-            if (item.List.AutoLogMode == AutoLogMode.ResetIfExists)
-            {
-                // De-dup scoped to the completion's own local day only, so each day keeps
-                // its own activity and same-day re-completion replaces. (Previously the
-                // recurrence-derived window could span a whole week and overwrite days.)
-                var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-                var (windowStart, windowEnd) = LocalDayWindowUtc(request.DoneAt, user);
-
-                var existing = await _context.Activities
-                    .FirstOrDefaultAsync(a =>
-                        a.TagId == tagId.Value &&
-                        a.UserId == userId &&
-                        a.DateStarted >= windowStart &&
-                        a.DateStarted < windowEnd);
-
-                if (existing != null)
-                {
-                    existing.DateStarted = request.DoneAt;
-                    existing.Description = item.Title;
-                    _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on todo item {ItemId} completion", existing.Id, tagId.Value, id);
-                    await _eventLogService.Log(userId, EventLogLevel.Info,
-                        $"Activity '{item.List.CompletionTag?.TagName ?? "?"}' updated (same-day re-entry) on '{item.Title}' completion");
-                }
-                else
-                {
-                    await LogActivityAsync(item, tagId.Value, request.DoneAt, userId);
-                }
-            }
-            else
-            {
-                await LogActivityAsync(item, tagId.Value, request.DoneAt, userId);
-            }
+            await LogActivityAsync(item, tagId.Value, doneLocal, userId);
         }
 
         await _context.SaveChangesAsync();
@@ -158,21 +131,31 @@ public class TodoItemService : ITodoItemService
             DateStarted = doneAt
         };
 
-        await _activityService.Create(activityRequest, userId);
-        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion", tagId, item.Id);
+        // ResetIfExists replaces the entry of the completion's own local day only, so each day
+        // keeps its own activity. It goes through ActivityService so it gets the same validation
+        // and event log as any other write.
+        if (item.List.AutoLogMode == AutoLogMode.ResetIfExists)
+        {
+            await _activityService.ReplaceForDay(activityRequest, userId);
+        }
+        else
+        {
+            await _activityService.Create(activityRequest, userId);
+        }
+
+        _logger.LogInformation("Auto-logged activity for tag {TagId} on todo item {ItemId} completion ({Mode})", tagId, item.Id, item.List.AutoLogMode);
     }
 
-    /// <summary>UTC bounds of the local calendar day containing <paramref name="doneAtUtc"/>,
-    /// in the user's time zone. Scopes <c>AutoLogMode.ResetIfExists</c> de-duplication to a
-    /// single day so each day keeps its own activity and same-day re-completion replaces.</summary>
-    private static (DateTime Start, DateTime End) LocalDayWindowUtc(DateTime doneAtUtc, Domain.Entities.User? user)
+    /// <summary>A completion's DoneAt is UTC (an unspecified kind is read as UTC). Activities are
+    /// stored in naive local time in the user's time zone, so the auto-logged row and the
+    /// <c>AutoLogMode.ResetIfExists</c> same-day window use this local value.</summary>
+    private static DateTime ToUserLocalTime(DateTime doneAt, Domain.Entities.User? user)
     {
-        var tz = ResolveTimeZone(user);
-        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(doneAtUtc, tz));
-        var startUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(TimeOnly.MinValue), tz);
-        var endUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
+        var utc = doneAt.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(doneAt, DateTimeKind.Utc)
+            : doneAt.ToUniversalTime();
 
-        return (startUtc, endUtc);
+        return DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(utc, ResolveTimeZone(user)), DateTimeKind.Unspecified);
     }
 
     private static TimeZoneInfo ResolveTimeZone(Domain.Entities.User? user)
