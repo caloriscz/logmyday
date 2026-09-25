@@ -137,9 +137,18 @@ public class TodoListService : ITodoListService
     // Tags are strictly per user: a completion tag must belong to the caller.
     private async Task EnsureOwnedTag(int? tagId, Guid userId)
     {
-        if (tagId.HasValue && !await _context.Tags.AnyAsync(t => t.Id == tagId.Value && t.UserId == userId))
+        if (!tagId.HasValue)
         {
-            throw new KeyNotFoundException("Tag not found");
+            return;
+        }
+
+        var tag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tagId.Value && t.UserId == userId)
+            ?? throw new KeyNotFoundException("Tag not found");
+
+        // A computed tag's values come from its rule; a todo list cannot log to it.
+        if (tag.IsComputed)
+        {
+            throw new InvalidOperationException($"'{tag.TagName}' is computed by a rule and cannot be a todo list's completion tag.");
         }
     }
 

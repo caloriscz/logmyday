@@ -337,7 +337,8 @@ else
     {
         try
         {
-            tags = await ActivityApi.GetTags();
+            // Computed tags get their values from a rule and cannot be logged by hand.
+            tags = (await ActivityApi.GetTags()).Where(t => !t.IsComputed).ToList();
             OnTagSelectionChanged();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)

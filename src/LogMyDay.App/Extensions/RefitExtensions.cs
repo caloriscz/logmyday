@@ -78,6 +78,11 @@ internal static class RefitExtensions
             .AddHttpMessageHandler<SelfBaseAddressHandler>()
             .AddHttpMessageHandler<CookieAuthenticationHandler>();
 
+        services.AddRefitClient<ITagRuleApi>(refitSettings)
+            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
+            .AddHttpMessageHandler<SelfBaseAddressHandler>()
+            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+
         services.AddRefitClient<IEventLogApi>(refitSettings)
             .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
             .AddHttpMessageHandler<SelfBaseAddressHandler>()

@@ -104,8 +104,15 @@ public class TagsController : BaseApiController
     public async Task<IActionResult> Delete(int id)
     {
         var userId = GetCurrentUserId();
-        await _tagService.Delete(id, userId);
-        
+        try
+        {
+            await _tagService.Delete(id, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+
         return NoContent();
     }
 }

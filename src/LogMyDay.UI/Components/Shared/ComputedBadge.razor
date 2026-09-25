@@ -1,0 +1,17 @@
+@* Marks a value a Tag Activity Relations rule generated. Such a row is read-only: it changes
+   when its source tags change, and the rule is edited on the Rules page. *@
+<span class="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 ring-1 ring-violet-500/20 dark:bg-violet-500/20 dark:text-violet-200 dark:ring-violet-400/30"
+      title="@Title" aria-label="@Title">
+    <Icon Name="link" Class="h-3.5 w-3.5" />
+    @if (ShowText)
+    {
+        <span>computed</span>
+    }
+</span>
+
+@code {
+    private const string Title = "Computed by a rule from other tags. It updates when they change; edit the rule to change how it is calculated.";
+
+    /// <summary>Show the word next to the icon. Off for tight spots such as calendar cells.</summary>
+    [Parameter] public bool ShowText { get; set; } = true;
+}
