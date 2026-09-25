@@ -294,4 +294,31 @@ public class ReminderServiceTests
         var activity = await context.Activities.SingleAsync(a => a.TagId == tagId);
         Assert.Equal(new DateTime(2026, 7, 2, 12, 0, 0), activity.DateStarted);
     }
+
+    [Fact]
+    public async Task Create_WithAnotherUsersCompletionTag_ThrowsNotFound()
+    {
+        var (service, context, userId) = CreateService(nameof(Create_WithAnotherUsersCompletionTag_ThrowsNotFound));
+        var foreignTagId = await AddTag(context, Guid.NewGuid(), inputTypeId: 1);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Create(new ReminderRequest { Title = "Pill", CompletionTagId = foreignTagId }, userId));
+        Assert.False(await context.Reminders.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Update_ToAnotherUsersCompletionTag_ThrowsNotFound()
+    {
+        var (service, context, userId) = CreateService(nameof(Update_ToAnotherUsersCompletionTag_ThrowsNotFound));
+        var ownTagId = await AddTag(context, userId, inputTypeId: 1);
+        var foreignTagId = await AddTag(context, Guid.NewGuid(), inputTypeId: 1);
+        var reminderId = await AddDailyReminderWithTag(context, userId, ownTagId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Update(reminderId, new ReminderRequest { Title = "Pill", CompletionTagId = foreignTagId }, userId));
+
+        context.ChangeTracker.Clear();
+        var stored = await context.Reminders.FindAsync(reminderId);
+        Assert.Equal(ownTagId, stored!.CompletionTagId);
+    }
 }

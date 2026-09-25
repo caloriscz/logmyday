@@ -21,8 +21,9 @@ public class ActivityServiceTests
             .UseInMemoryDatabase(databaseName: "ActivityService_Create_Test")
             .Options;
         using var context = new LogMyDayDbContext(options);
+        var userId = Guid.NewGuid();
         // Add a tag to reference (since Activity requires TagId)
-        var tag = new Tag { TagName = "TestTag", InputTypeId = 1, IsRequired = false };
+        var tag = new Tag { TagName = "TestTag", InputTypeId = 1, IsRequired = false, UserId = userId };
         context.Tags.Add(tag);
         context.SaveChanges();
         
@@ -37,9 +38,6 @@ public class ActivityServiceTests
             Description = "Test Activity",
             PrimaryTagId = tag.Id
         };
-
-        var userId = Guid.NewGuid(); // Add a userId for the required parameter
-
         // Act
         var response = await service.Create(request, userId);
 
@@ -61,6 +59,7 @@ public class ActivityServiceTests
             .Options;
         using var context = new LogMyDayDbContext(options);
 
+        var userId = Guid.NewGuid();
         // Non-repeatable numeric tag with a Step that differs from the carried value, so a
         // regression (adding Step instead of the value) is unambiguous: Step 10 vs value 20.
         var tag = new Tag
@@ -70,7 +69,8 @@ public class ActivityServiceTests
             IsRepeatable = false,
             TimeGranularity = TimeGranularity.Daily,
             Step = 10,
-            IsRequired = false
+            IsRequired = false,
+            UserId = userId
         };
         context.Tags.Add(tag);
         context.SaveChanges();
@@ -79,7 +79,6 @@ public class ActivityServiceTests
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var tagDayLockService = new TagDayLockService(context);
         var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
-        var userId = Guid.NewGuid();
         var when = DateTime.UtcNow;
 
         // Two completions, each "Add 20".
@@ -99,6 +98,7 @@ public class ActivityServiceTests
             .Options;
         using var context = new LogMyDayDbContext(options);
 
+        var userId = Guid.NewGuid();
         var tag = new Tag
         {
             TagName = "Quick",
@@ -106,7 +106,8 @@ public class ActivityServiceTests
             IsRepeatable = false,
             TimeGranularity = TimeGranularity.Daily,
             Step = 10,
-            IsRequired = false
+            IsRequired = false,
+            UserId = userId
         };
         context.Tags.Add(tag);
         context.SaveChanges();
@@ -115,7 +116,6 @@ public class ActivityServiceTests
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var tagDayLockService = new TagDayLockService(context);
         var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
-        var userId = Guid.NewGuid();
         var when = DateTime.UtcNow;
 
         await service.Create(new ActivityRequest { DateStarted = when, Description = "5", PrimaryTagId = tag.Id }, userId);
@@ -123,6 +123,93 @@ public class ActivityServiceTests
 
         var single = Assert.Single(await context.Activities.Where(a => a.TagId == tag.Id && a.UserId == userId).ToListAsync());
         Assert.Equal("15", single.Description); // 5 + Step(10)
+    }
+
+    private static (ActivityService service, LogMyDayDbContext context) CreateService(string dbName)
+    {
+        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+            .UseInMemoryDatabase(databaseName: dbName)
+            .Options;
+        var context = new LogMyDayDbContext(options);
+        var service = new ActivityService(
+            context,
+            new ActivityRepository(context),
+            new EventLogService(context, NullLogger<EventLogService>.Instance),
+            new TagDayLockService(context));
+
+        return (service, context);
+    }
+
+    private static async Task<Tag> AddTag(LogMyDayDbContext context, Guid? ownerId)
+    {
+        var tag = new Tag { TagName = "Coffee", InputTypeId = 1, IsRequired = false, IsRepeatable = true, UserId = ownerId };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+
+        return tag;
+    }
+
+    [Fact]
+    public async Task Create_WithAnotherUsersTag_ThrowsNotFoundAndWritesNothing()
+    {
+        var (service, context) = CreateService(nameof(Create_WithAnotherUsersTag_ThrowsNotFoundAndWritesNothing));
+        var foreignTag = await AddTag(context, Guid.NewGuid());
+        var userId = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Create(new ActivityRequest { DateStarted = DateTime.Now, Description = "1", PrimaryTagId = foreignTag.Id }, userId));
+        Assert.False(await context.Activities.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Create_WithUnownedTag_ThrowsNotFound()
+    {
+        var (service, context) = CreateService(nameof(Create_WithUnownedTag_ThrowsNotFound));
+        var unownedTag = await AddTag(context, ownerId: null);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Create(new ActivityRequest { DateStarted = DateTime.Now, Description = "1", PrimaryTagId = unownedTag.Id }, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task Update_MovingActivityToAnotherUsersTag_ThrowsNotFoundAndKeepsTag()
+    {
+        var (service, context) = CreateService(nameof(Update_MovingActivityToAnotherUsersTag_ThrowsNotFoundAndKeepsTag));
+        var userId = Guid.NewGuid();
+        var ownTag = await AddTag(context, userId);
+        var foreignTag = await AddTag(context, Guid.NewGuid());
+        var created = await service.Create(new ActivityRequest { DateStarted = DateTime.Now, Description = "1", PrimaryTagId = ownTag.Id }, userId);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.Update(created.Id, new ActivityRequest { DateStarted = DateTime.Now, Description = "2", PrimaryTagId = foreignTag.Id }, userId));
+
+        context.ChangeTracker.Clear();
+        var stored = await context.Activities.SingleAsync();
+        Assert.Equal(ownTag.Id, stored.TagId);
+        Assert.Equal("1", stored.Description);
+    }
+
+    [Fact]
+    public async Task GetPeriodSum_WithAnotherUsersTag_ThrowsNotFound()
+    {
+        var (service, context) = CreateService(nameof(GetPeriodSum_WithAnotherUsersTag_ThrowsNotFound));
+        var foreignTag = await AddTag(context, Guid.NewGuid());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetPeriodSum(foreignTag.Id, DateTime.Now, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task TagDayLock_Upsert_OnAnotherUsersTag_ThrowsNotFound()
+    {
+        var (_, context) = CreateService(nameof(TagDayLock_Upsert_OnAnotherUsersTag_ThrowsNotFound));
+        var foreignTag = await AddTag(context, Guid.NewGuid());
+        var locks = new TagDayLockService(context);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => locks.Upsert(
+            Guid.NewGuid(),
+            new TagDayLockRequest { TagId = foreignTag.Id, Date = DateOnly.FromDateTime(DateTime.Today), IsLocked = true },
+            DayLockSetBy.User));
+        Assert.False(await context.TagDayLocks.AnyAsync());
     }
 
     private static (ActivityService service, LogMyDayDbContext context, Guid userId, Tag tag) CreateServiceForPragueUser(string dbName)

@@ -35,6 +35,12 @@ public class TagDayLockService : ITagDayLockService
 
         if (row == null)
         {
+            // Tags are strictly per user: never create a lock row on another user's tag.
+            if (!await _context.Tags.AnyAsync(t => t.Id == request.TagId && t.UserId == userId))
+            {
+                throw new KeyNotFoundException("Tag not found");
+            }
+
             row = new TagDayLock
             {
                 UserId = userId,

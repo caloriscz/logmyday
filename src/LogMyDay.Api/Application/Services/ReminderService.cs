@@ -65,7 +65,8 @@ public class ReminderService : IReminderService
         Domain.Entities.Tag? completionTag = null;
         if (request.CompletionTagId.HasValue)
         {
-            completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value);
+            completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId)
+                ?? throw new KeyNotFoundException("Tag not found");
         }
 
         var item = new Domain.Entities.Reminder
@@ -104,6 +105,12 @@ public class ReminderService : IReminderService
         if (item == null)
         {
             throw new KeyNotFoundException("Reminder not found");
+        }
+
+        if (request.CompletionTagId.HasValue
+            && !await _context.Tags.AnyAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId))
+        {
+            throw new KeyNotFoundException("Tag not found");
         }
 
         var oldNotifyAt = item.NotifyAt;
