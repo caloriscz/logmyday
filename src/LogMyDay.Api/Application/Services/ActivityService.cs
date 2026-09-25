@@ -40,7 +40,11 @@ public class ActivityService : IActivityService
 
         // TagDayLock enforcement: reject any activity for a locked (UserId, TagId, localDate)
         // triple. The client (web/mobile) catches the 409 and offers an unlock-and-retry prompt.
-        var activityLocalDate = await GetUserLocalDate(userId, calendarRequest.DateStarted);
+        calendarRequest.DateStarted = await ToUserLocalTime(userId, calendarRequest.DateStarted);
+        calendarRequest.DateFinished = calendarRequest.DateFinished.HasValue
+            ? await ToUserLocalTime(userId, calendarRequest.DateFinished.Value)
+            : null;
+        var activityLocalDate = DateOnly.FromDateTime(calendarRequest.DateStarted);
         var existingLock = await _tagDayLockService.Find(userId, tag.Id, activityLocalDate);
         if (existingLock?.IsLocked == true)
         {
@@ -165,10 +169,17 @@ public class ActivityService : IActivityService
         return MapToResponse(reloadedActivity);
     }
 
-    /// <summary>Convert a UTC (or unspecified) DateTime into the user's local date.
-    /// Falls back to UTC if the user has no TimeZone preference or the ID is invalid.</summary>
-    private async Task<DateOnly> GetUserLocalDate(Guid userId, DateTime dateStarted)
+    /// <summary>Activity times are stored as naive local time in the user's time zone. An
+    /// unspecified value is already that and is kept as is. A value that carries a kind (UTC, or
+    /// Local after the JSON binder applied an offset in the server's zone) is converted into the
+    /// user's time zone. Falls back to UTC if the user has no valid TimeZone.</summary>
+    private async Task<DateTime> ToUserLocalTime(Guid userId, DateTime value)
     {
+        if (value.Kind == DateTimeKind.Unspecified)
+        {
+            return value;
+        }
+
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
         TimeZoneInfo tz;
@@ -181,11 +192,9 @@ public class ActivityService : IActivityService
             tz = TimeZoneInfo.Utc;
         }
 
-        var utc = dateStarted.Kind == DateTimeKind.Utc
-            ? dateStarted
-            : DateTime.SpecifyKind(dateStarted, DateTimeKind.Utc);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(value.ToUniversalTime(), tz);
 
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(utc, tz));
+        return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
     }
 
     public async Task<bool> Delete(int id, Guid userId)
@@ -398,6 +407,11 @@ public class ActivityService : IActivityService
         {
             throw new ArgumentException("Invalid tag ID");
         }
+
+        request.DateStarted = await ToUserLocalTime(userId, request.DateStarted);
+        request.DateFinished = request.DateFinished.HasValue
+            ? await ToUserLocalTime(userId, request.DateFinished.Value)
+            : null;
 
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
         {

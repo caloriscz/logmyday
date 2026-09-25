@@ -199,7 +199,9 @@ public class ReminderService : IReminderService
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
-        var doneLocalDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(request.DoneAt, ResolveTimeZone(user)));
+        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
+        var doneLocal = ToUserLocalTime(request.DoneAt, user);
+        var doneLocalDate = DateOnly.FromDateTime(doneLocal);
         var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, doneLocalDate, user));
         day.IsDone = true;
         day.DoneAt = request.DoneAt;
@@ -219,7 +221,8 @@ public class ReminderService : IReminderService
                 // reminder's monitoring window. Using the monitoring window here meant a
                 // multi-day window (e.g. weekly recurrence) silently overwrote separate
                 // days' activities instead of adding one per day.
-                var (windowStart, windowEnd) = LocalDayWindowUtc(request.DoneAt, user);
+                var windowStart = doneLocal.Date;
+                var windowEnd = windowStart.AddDays(1);
 
                 var existing = await _context.Activities
                     .FirstOrDefaultAsync(a =>
@@ -230,7 +233,7 @@ public class ReminderService : IReminderService
 
                 if (existing != null)
                 {
-                    existing.DateStarted = request.DoneAt;
+                    existing.DateStarted = doneLocal;
                     existing.Description = request.CompletionValue ?? item.Notes;
                     _logger.LogInformation("Reset activity {ActivityId} for tag {TagId} on reminder {ItemId} completion", existing.Id, item.CompletionTagId.Value, id);
                     await _eventLogService.Log(userId, EventLogLevel.Info,
@@ -238,12 +241,12 @@ public class ReminderService : IReminderService
                 }
                 else
                 {
-                    await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
+                    await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
                 }
             }
             else
             {
-                await LogActivityAsync(item, request.CompletionValue, request.DoneAt, userId);
+                await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
             }
         }
 
@@ -277,18 +280,16 @@ public class ReminderService : IReminderService
         _ => null
     };
 
-    // UTC bounds of the local calendar day that contains <paramref name="doneAtUtc"/>,
-    // in the user's time zone. Used to scope AutoLogMode.ResetIfExists de-duplication to a
-    // single day so re-completing the same day replaces, while separate days each keep their
-    // own activity.
-    private static (DateTime Start, DateTime End) LocalDayWindowUtc(DateTime doneAtUtc, User? user)
+    // A completion's DoneAt is UTC (an unspecified kind is read as UTC). Activities are stored in
+    // naive local time in the user's time zone, so the auto-logged row and the ResetIfExists
+    // same-day window use this local value.
+    private static DateTime ToUserLocalTime(DateTime doneAt, User? user)
     {
-        var tz = ResolveTimeZone(user);
-        var localDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(doneAtUtc, tz));
-        var startUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(TimeOnly.MinValue), tz);
-        var endUtc = TimeZoneInfo.ConvertTimeToUtc(localDate.AddDays(1).ToDateTime(TimeOnly.MinValue), tz);
+        var utc = doneAt.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(doneAt, DateTimeKind.Utc)
+            : doneAt.ToUniversalTime();
 
-        return (startUtc, endUtc);
+        return DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(utc, ResolveTimeZone(user)), DateTimeKind.Unspecified);
     }
 
     public async Task<ReminderResponse> Reopen(int id, Guid userId)
@@ -352,7 +353,7 @@ public class ReminderService : IReminderService
             var zeroValue = ZeroValueForInputType(item.CompletionTag?.InputTypeId);
             day.CompletionValue = zeroValue;
 
-            var skipDoneAt = TimeZoneInfo.ConvertTimeToUtc(localDate.ToDateTime(new TimeOnly(12, 0)), tz);
+            var skipDoneAt = localDate.ToDateTime(new TimeOnly(12, 0));
             await _activityService.Create(new ActivityRequest
             {
                 PrimaryTagId = item.CompletionTagId.Value,

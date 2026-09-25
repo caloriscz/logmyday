@@ -100,4 +100,22 @@ public class TodoItemServiceTests
         var stored = await context.TodoItems.FindAsync(created.Id);
         Assert.Null(stored!.CompletionTagId);
     }
+
+    [Fact]
+    public async Task Complete_AutoLogsActivityInUserLocalTime()
+    {
+        var (service, context, userId) = CreateService(nameof(Complete_AutoLogsActivityInUserLocalTime));
+        var user = await context.Users.SingleAsync(u => u.Id == userId);
+        user.TimeZone = "Europe/Prague";
+        var tag = new Tag { TagName = "Groceries", IsRequired = false, UserId = userId };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+        var (_, itemId) = await AddListWithItem(context, userId, tag.Id);
+
+        // 22:30 UTC on 1 July is 00:30 on 2 July in Prague (UTC+2).
+        await service.Complete(itemId, new TodoItemCompleteRequest { DoneAt = new DateTime(2026, 7, 1, 22, 30, 0, DateTimeKind.Utc) }, userId);
+
+        var activity = await context.Activities.SingleAsync(a => a.UserId == userId);
+        Assert.Equal(new DateTime(2026, 7, 2, 0, 30, 0), activity.DateStarted);
+    }
 }

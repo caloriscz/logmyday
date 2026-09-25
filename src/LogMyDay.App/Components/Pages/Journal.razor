@@ -542,9 +542,16 @@
         modalErrorMessage = error;
     }
 
-    private DateTime ConvertToDisplayZone(DateTime utcDateTime)
+    // Activity times are naive local time and are shown as stored; only a value that carries
+    // a kind is converted. Treating every value as UTC shifted each edit by the zone offset.
+    private DateTime ConvertToDisplayZone(DateTime dateTime)
     {
-        return TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, displayTimeZone);
+        return dateTime.Kind switch
+        {
+            DateTimeKind.Utc => TimeZoneInfo.ConvertTimeFromUtc(dateTime, displayTimeZone),
+            DateTimeKind.Local => TimeZoneInfo.ConvertTime(dateTime, displayTimeZone),
+            _ => dateTime
+        };
     }
 
     private class DateGrouping
