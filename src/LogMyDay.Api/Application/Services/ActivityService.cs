@@ -32,11 +32,7 @@ public class ActivityService : IActivityService
     public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId)
     {
         // Get the tag to check if it's repeatable and what its time granularity is
-        var tag = await _context.Tags.FindAsync(calendarRequest.PrimaryTagId);
-        if (tag == null)
-        {
-            throw new ArgumentException("Invalid tag ID");
-        }
+        var tag = await FindOwnedTag(calendarRequest.PrimaryTagId, userId) ?? throw new KeyNotFoundException("Tag not found");
 
         // TagDayLock enforcement: reject any activity for a locked (UserId, TagId, localDate)
         // triple. The client (web/mobile) catches the 409 and offers an unlock-and-retry prompt.
@@ -392,12 +388,7 @@ public class ActivityService : IActivityService
         var spec = new ActivityByIdAndUserSpec(id, userId);
         var activity = await _activityRepository.GetSingleAsync(spec) ?? throw new KeyNotFoundException("Activity not found");
         var tagId = request.PrimaryTagId ?? activity.TagId;
-        var tag = await _context.Tags.FindAsync(tagId);
-
-        if (tag == null)
-        {
-            throw new ArgumentException("Invalid tag ID");
-        }
+        var tag = await FindOwnedTag(tagId, userId) ?? throw new KeyNotFoundException("Tag not found");
 
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
         {
@@ -447,6 +438,17 @@ public class ActivityService : IActivityService
         };
     }
 
+    // Tags are strictly per user: a tag id owned by another user resolves to null, same as a missing one.
+    private async Task<Tag?> FindOwnedTag(int? tagId, Guid userId)
+    {
+        if (tagId is null)
+        {
+            return null;
+        }
+
+        return await _context.Tags.FirstOrDefaultAsync(t => t.Id == tagId && t.UserId == userId);
+    }
+
     private DateTime GetStartOfWeek(DateTime date)
     {
         int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
@@ -461,7 +463,7 @@ public class ActivityService : IActivityService
         int? excludeActivityId = null
     )
     {
-        var tag = await _context.Tags.FindAsync(tagId);
+        var tag = await FindOwnedTag(tagId, userId);
         if (tag == null || tag.TimeGranularity == TimeGranularity.Exact)
         {
             return false;
@@ -475,11 +477,7 @@ public class ActivityService : IActivityService
 
     public async Task<PeriodSumResponse> GetPeriodSum(int tagId, DateTime dateStarted, Guid userId, int? excludeActivityId = null)
     {
-        var tag = await _context.Tags.FindAsync(tagId);
-        if (tag == null)
-        {
-            throw new ArgumentException("Invalid tag ID");
-        }
+        var tag = await FindOwnedTag(tagId, userId) ?? throw new KeyNotFoundException("Tag not found");
 
         var isNumeric = tag.InputTypeId is 1 or 6;
         var response = new PeriodSumResponse
@@ -516,7 +514,7 @@ public class ActivityService : IActivityService
         Guid userId,
         int? excludeActivityId = null)
     {
-        var tag = await _context.Tags.FindAsync(tagId);
+        var tag = await FindOwnedTag(tagId, userId);
         if (tag == null || tag.TimeGranularity == TimeGranularity.Exact)
         {
             return (new List<Activity>(), (dateStarted, dateStarted));

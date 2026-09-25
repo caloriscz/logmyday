@@ -41,6 +41,10 @@ public class TodoListsController : BaseApiController
 
             return Created(string.Empty, list);
         }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Invalid todo list create request for user {UserId}", userId);

@@ -42,7 +42,15 @@ public class TagDayLocksController : BaseApiController
     {
         var userId = GetCurrentUserId();
 
-        var result = await _service.Upsert(userId, request, DayLockSetBy.User);
+        TagDayLockResponse result;
+        try
+        {
+            result = await _service.Upsert(userId, request, DayLockSetBy.User);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
 
         _logger.LogInformation(
             "[reminder-diag] event=tag-day-lock {Verb} tagId={TagId} date={Date} setBy=User",

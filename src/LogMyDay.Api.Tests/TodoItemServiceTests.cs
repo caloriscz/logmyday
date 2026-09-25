@@ -54,7 +54,7 @@ public class TodoItemServiceTests
     public async Task Complete_LoggsActivityAgainstListTag()
     {
         var (service, context, userId) = CreateService(nameof(Complete_LoggsActivityAgainstListTag));
-        var tag = new Tag { TagName = "Groceries", IsRequired = false };
+        var tag = new Tag { TagName = "Groceries", IsRequired = false, UserId = userId };
         context.Tags.Add(tag);
         await context.SaveChangesAsync();
 
@@ -84,7 +84,7 @@ public class TodoItemServiceTests
     public async Task Create_IgnoresItemLevelCompletionTag()
     {
         var (service, context, userId) = CreateService(nameof(Create_IgnoresItemLevelCompletionTag));
-        var tag = new Tag { TagName = "Groceries", IsRequired = false };
+        var tag = new Tag { TagName = "Groceries", IsRequired = false, UserId = userId };
         context.Tags.Add(tag);
         var list = new TodoList { UserId = userId, Name = "Shopping" };
         context.TodoLists.Add(list);
