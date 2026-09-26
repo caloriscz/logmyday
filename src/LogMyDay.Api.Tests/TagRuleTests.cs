@@ -151,8 +151,118 @@ public class TagRuleTests
         Assert.Equal("2.5", Assert.Single(await f.Results(total)).Description); // 0.5 × (4 + 1)
         await Assert.ThrowsAsync<TagComputedException>(() => f.Log(total, f.TodayAt(10), "1"));
 
+        // History across a month boundary, recomputed one month per transaction.
+        await f.Log(a, f.TodayAt(8).AddDays(-45), "6");
+        await f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today.AddDays(-45), To = f.Today }, f.UserId);
+        Assert.Equal(["3", "2.5"], (await f.Results(total)).Select(r => r.Description));
+
         await f.Rules.Delete(rule.Id, f.UserId);
         Assert.Empty(await f.Results(total));
+    }
+
+    [Fact]
+    public async Task Preview_CountsWhatARecomputeWouldDo_WithoutWriting()
+    {
+        var f = CreateFixture(nameof(Preview_CountsWhatARecomputeWouldDo_WithoutWriting));
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total");
+        // History over 40 days, so the range always crosses a month boundary.
+        foreach (var daysAgo in new[] { 40, 20, 1 })
+        {
+            await f.Log(a, f.TodayAt(8).AddDays(-daysAgo), "2");
+        }
+        await f.Log(a, f.TodayAt(9).AddDays(-20), "oops");
+        var rule = await f.CreateRule(total, (a, 3));
+
+        var preview = await f.Rules.Preview(rule.Id, from: null, to: null, f.UserId);
+
+        Assert.Equal(f.Today.AddDays(-40), preview.From);
+        Assert.Equal(f.Today, preview.To);
+        Assert.Equal(f.Today.AddDays(-40), preview.FirstSourceDate);
+        Assert.Equal(3, preview.Created);
+        Assert.Equal(0, preview.Updated + preview.Deleted + preview.Unchanged);
+        Assert.Equal(1, preview.SkippedSourceValues);
+        Assert.Empty(await f.Results(total)); // nothing written
+    }
+
+    [Fact]
+    public async Task Recompute_WritesHistory_IsIdempotent_AndMovesEffectiveFromBack()
+    {
+        var f = CreateFixture(nameof(Recompute_WritesHistory_IsIdempotent_AndMovesEffectiveFromBack));
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total");
+        var old = await f.Log(a, f.TodayAt(8).AddDays(-40), "2");
+        await f.Log(a, f.TodayAt(8).AddDays(-5), "1");
+        var rule = await f.CreateRule(total, (a, 3));
+        var range = new TagRuleRecomputeRequest { From = f.Today.AddDays(-40), To = f.Today };
+
+        var first = await f.Rules.Recompute(rule.Id, range, f.UserId);
+        Assert.Equal(2, first.Created);
+        Assert.Equal(["6", "3"], (await f.Results(total)).Select(r => r.Description));
+
+        var second = await f.Rules.Recompute(rule.Id, range, f.UserId);
+        Assert.Equal(0, second.Created + second.Updated + second.Deleted);
+        Assert.Equal(2, second.Unchanged);
+
+        Assert.Equal(f.Today.AddDays(-40), (await f.Rules.GetById(rule.Id, f.UserId)).EffectiveFrom);
+        // The recomputed past now follows source edits.
+        await f.Activities.Update(old.Id, new ActivityRequest { PrimaryTagId = a.Id, DateStarted = old.DateStarted, Description = "10" }, f.UserId);
+        Assert.Equal("30", (await f.Results(total)).First().Description);
+    }
+
+    [Fact]
+    public async Task PartialRecomputeAfterAFactorChange_MatchesItsPreview()
+    {
+        var f = CreateFixture(nameof(PartialRecomputeAfterAFactorChange_MatchesItsPreview));
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total");
+        foreach (var daysAgo in new[] { 30, 20, 10, 5 })
+        {
+            await f.Log(a, f.TodayAt(8).AddDays(-daysAgo), "1");
+        }
+        var rule = await f.CreateRule(total, (a, 1));
+        await f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today.AddDays(-30), To = f.Today }, f.UserId);
+
+        await f.Rules.Update(rule.Id, new TagRuleRequest
+        {
+            Name = "Total",
+            TargetTagId = total.Id,
+            Sources = [new() { SourceTagId = a.Id, Factor = 2 }]
+        }, f.UserId);
+        var from = f.Today.AddDays(-12);
+        var preview = await f.Rules.Preview(rule.Id, from, f.Today, f.UserId);
+        var run = await f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = from, To = f.Today }, f.UserId);
+
+        Assert.Equal(2, preview.Updated);             // days -10 and -5
+        Assert.Equal(2, preview.ResultsBeforeFrom);   // days -30 and -20 keep factor 1
+        Assert.Equal(preview.Created, run.Created);
+        Assert.Equal(preview.Updated, run.Updated);
+        Assert.Equal(preview.Deleted, run.Deleted);
+        Assert.Equal(["1", "1", "2", "2"], (await f.Results(total)).Select(r => r.Description));
+    }
+
+    [Fact]
+    public async Task Recompute_RefusesPausedRulesAndFutureDays()
+    {
+        var f = CreateFixture(nameof(Recompute_RefusesPausedRulesAndFutureDays));
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total");
+        var rule = await f.CreateRule(total, (a, 1));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today, To = f.Today.AddDays(1) }, f.UserId));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today, To = f.Today.AddDays(-1) }, f.UserId));
+
+        await f.Rules.Update(rule.Id, new TagRuleRequest
+        {
+            Name = "Total",
+            TargetTagId = total.Id,
+            IsEnabled = false,
+            Sources = [new() { SourceTagId = a.Id, Factor = 1 }]
+        }, f.UserId);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today, To = f.Today }, f.UserId));
     }
 
     [Fact]

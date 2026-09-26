@@ -29,12 +29,25 @@ public class TagRuleService : ITagRuleService
             .OrderBy(r => r.Name)
             .ToListAsync();
 
-        return rules.Select(MapToResponse).ToList();
+        var ruleIds = rules.Select(r => r.Id).ToList();
+        var counts = await _context.Activities
+            .Where(a => a.RuleId != null && ruleIds.Contains(a.RuleId.Value))
+            .GroupBy(a => a.RuleId!.Value)
+            .Select(g => new { RuleId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(c => c.RuleId, c => c.Count);
+
+        return rules.Select(r =>
+        {
+            var response = MapToResponse(r);
+            response.ResultCount = counts.GetValueOrDefault(r.Id);
+
+            return response;
+        }).ToList();
     }
 
     public async Task<TagRuleResponse> GetById(int id, Guid userId)
     {
-        return MapToResponse(await LoadRule(id, userId));
+        return await MapWithCount(await LoadRule(id, userId));
     }
 
     public async Task<TagRuleResponse> Create(TagRuleRequest request, Guid userId)
@@ -69,10 +82,10 @@ public class TagRuleService : ITagRuleService
         var saved = await LoadRule(rule.Id, userId);
         if (saved.IsEnabled)
         {
-            await _engine.EvaluateRange(saved, saved.EffectiveFrom, today);
+            await _engine.Recompute(saved, today, today);
         }
 
-        return MapToResponse(saved);
+        return await MapWithCount(saved);
     }
 
     public async Task<TagRuleResponse> Update(int id, TagRuleRequest request, Guid userId)
@@ -115,15 +128,110 @@ public class TagRuleService : ITagRuleService
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Rule '{rule.Name}' updated: '{target.TagName}' = {Describe(rule, sources)}{(rule.IsEnabled ? string.Empty : " (paused)")}");
 
-        // A paused rule keeps its results but stops updating them. An enabled rule is brought in
-        // line with its new definition over its active range.
+        // A paused rule keeps its results but stops updating them. An enabled rule gets today in
+        // line with its new definition; earlier days are recomputed only on request, after the
+        // editor has shown a preview of what changes.
         var saved = await LoadRule(id, userId);
         if (saved.IsEnabled)
         {
-            await _engine.EvaluateRange(saved, saved.EffectiveFrom, await UserToday(userId));
+            var today = await UserToday(userId);
+            await _engine.Recompute(saved, today, today);
         }
 
-        return MapToResponse(saved);
+        return await MapWithCount(saved);
+    }
+
+    public async Task<TagRuleRangeResponse> Preview(int id, DateOnly? from, DateOnly? to, Guid userId)
+    {
+        var rule = await LoadRule(id, userId);
+        var firstSourceDate = await FirstSourceDate(rule);
+        var today = await UserToday(userId);
+        var (start, end) = ValidateRange(from ?? firstSourceDate ?? today, to ?? today, today);
+
+        var result = await _engine.Preview(rule, start, end);
+
+        return await MapRange(rule, start, end, result, firstSourceDate);
+    }
+
+    public async Task<TagRuleRangeResponse> Recompute(int id, TagRuleRecomputeRequest request, Guid userId)
+    {
+        var rule = await LoadRule(id, userId);
+        if (!rule.IsEnabled)
+        {
+            throw new ArgumentException("The rule is paused. Activate it before recomputing.");
+        }
+
+        var today = await UserToday(userId);
+        var (start, end) = ValidateRange(request.From, request.To, today);
+        var started = DateTime.UtcNow;
+
+        var result = await _engine.Recompute(rule, start, end);
+
+        // The recomputed days now belong to the rule's active range and follow source edits.
+        if (start < rule.EffectiveFrom)
+        {
+            rule.EffectiveFrom = start;
+            rule.DateUpdated = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        await _eventLogService.Log(userId, EventLogLevel.Info,
+            $"Rule '{rule.Name}' recomputed {start:yyyy-MM-dd}..{end:yyyy-MM-dd}: {result.Created} created, {result.Updated} updated, {result.Deleted} removed, {result.Unchanged} unchanged, {result.SkippedSourceValues} non-numeric source value(s) skipped ({(DateTime.UtcNow - started).TotalMilliseconds:0} ms)");
+
+        return await MapRange(rule, start, end, result, await FirstSourceDate(rule));
+    }
+
+    private static (DateOnly Start, DateOnly End) ValidateRange(DateOnly from, DateOnly to, DateOnly today)
+    {
+        if (from > to)
+        {
+            throw new ArgumentException("The start date must not be after the end date.");
+        }
+
+        if (to > today)
+        {
+            throw new ArgumentException("Days after today cannot be recomputed.");
+        }
+
+        return (from, to);
+    }
+
+    private async Task<DateOnly?> FirstSourceDate(TagRule rule)
+    {
+        var sourceIds = rule.Sources.Select(s => s.SourceTagId).ToList();
+        var first = await _context.Activities
+            .Where(a => a.UserId == rule.UserId && sourceIds.Contains(a.TagId))
+            .OrderBy(a => a.DateStarted)
+            .Select(a => (DateTime?)a.DateStarted)
+            .FirstOrDefaultAsync();
+
+        return first.HasValue ? DateOnly.FromDateTime(first.Value) : null;
+    }
+
+    private async Task<TagRuleRangeResponse> MapRange(TagRule rule, DateOnly start, DateOnly end, TagRuleRangeResult result, DateOnly? firstSourceDate)
+    {
+        var startKey = start.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+        return new TagRuleRangeResponse
+        {
+            From = start,
+            To = end,
+            Created = result.Created,
+            Updated = result.Updated,
+            Deleted = result.Deleted,
+            Unchanged = result.Unchanged,
+            SkippedSourceValues = result.SkippedSourceValues,
+            FirstSourceDate = firstSourceDate,
+            ResultsBeforeFrom = await _context.Activities.CountAsync(a => a.RuleId == rule.Id && string.Compare(a.WindowKey, startKey) < 0)
+        };
+    }
+
+    private async Task<TagRuleResponse> MapWithCount(TagRule rule)
+    {
+        var response = MapToResponse(rule);
+        response.ResultCount = await _context.Activities.CountAsync(a => a.RuleId == rule.Id);
+
+        return response;
     }
 
     public async Task Delete(int id, Guid userId)
