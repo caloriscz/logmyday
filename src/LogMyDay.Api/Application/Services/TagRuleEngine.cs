@@ -44,142 +44,149 @@ public class TagRuleEngine : ITagRuleEngine
 
             foreach (var day in days)
             {
-                await EvaluateWindow(rule, day);
+                await EvaluateDays(rule, day, day, dryRun: false);
             }
         }
 
         await _context.SaveChangesAsync();
     }
 
-    public async Task<(int Created, int Updated, int Deleted)> EvaluateRange(TagRule rule, DateOnly from, DateOnly to)
+    public Task<TagRuleRangeResult> Preview(TagRule rule, DateOnly from, DateOnly to)
     {
-        var sourceIds = rule.Sources.Select(s => s.SourceTagId).ToList();
-        var start = from.ToDateTime(TimeOnly.MinValue);
-        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
-
-        var sourceDays = await _context.Activities
-            .AsNoTracking()
-            .Where(a => a.UserId == rule.UserId && sourceIds.Contains(a.TagId) && a.DateStarted >= start && a.DateStarted < end)
-            .Select(a => a.DateStarted)
-            .ToListAsync();
-
-        var fromKey = WindowKey(from);
-        var toKey = WindowKey(to);
-        var resultKeys = await _context.Activities
-            .AsNoTracking()
-            .Where(a => a.RuleId == rule.Id && string.Compare(a.WindowKey, fromKey) >= 0 && string.Compare(a.WindowKey, toKey) <= 0)
-            .Select(a => a.WindowKey!)
-            .ToListAsync();
-
-        var days = sourceDays.Select(DateOnly.FromDateTime)
-            .Concat(resultKeys.Select(k => DateOnly.ParseExact(k, "yyyy-MM-dd", CultureInfo.InvariantCulture)))
-            .Distinct()
-            .OrderBy(d => d);
-
-        var created = 0;
-        var updated = 0;
-        var deleted = 0;
-        foreach (var day in days)
-        {
-            switch (await EvaluateWindow(rule, day))
-            {
-                case WindowChange.Created:
-                    created++;
-                    break;
-                case WindowChange.Updated:
-                    updated++;
-                    break;
-                case WindowChange.Deleted:
-                    deleted++;
-                    break;
-            }
-        }
-
-        await _context.SaveChangesAsync();
-
-        return (created, updated, deleted);
+        return EvaluateDays(rule, from, to, dryRun: true);
     }
 
-    // Sums the rule's sources on one local day and brings the result row in line: insert, update
-    // or delete. A day without any contributing source row has no result (no zero rows). Changes
-    // are tracked but not saved; the caller saves once.
-    private async Task<WindowChange> EvaluateWindow(TagRule rule, DateOnly day)
+    public async Task<TagRuleRangeResult> Recompute(TagRule rule, DateOnly from, DateOnly to)
+    {
+        var total = TagRuleRangeResult.Empty;
+        var monthStart = from;
+        while (monthStart <= to)
+        {
+            var nextMonth = new DateOnly(monthStart.Year, monthStart.Month, 1).AddMonths(1);
+            var monthEnd = nextMonth.AddDays(-1) < to ? nextMonth.AddDays(-1) : to;
+
+            await using var transaction = _context.Database.IsRelational() && _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync()
+                : null;
+
+            total = total.Add(await EvaluateDays(rule, monthStart, monthEnd, dryRun: false));
+            await _context.SaveChangesAsync();
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+
+            monthStart = nextMonth;
+        }
+
+        return total;
+    }
+
+    // Set-based: loads the range's source rows and existing results once, groups the sources by
+    // local day and brings each day's result in line — insert, update or delete. A day without a
+    // contributing source row has no result (no zero rows). A dry run only counts. Changes are
+    // tracked but not saved; the caller saves.
+    private async Task<TagRuleRangeResult> EvaluateDays(TagRule rule, DateOnly from, DateOnly to, bool dryRun)
     {
         var factors = rule.Sources.ToDictionary(s => s.SourceTagId, s => s.Factor);
         var sourceIds = factors.Keys.ToList();
-        var start = day.ToDateTime(TimeOnly.MinValue);
-        var end = start.AddDays(1);
+        var start = from.ToDateTime(TimeOnly.MinValue);
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
 
         var sourceRows = await _context.Activities
             .AsNoTracking()
             .Where(a => a.UserId == rule.UserId && sourceIds.Contains(a.TagId) && a.DateStarted >= start && a.DateStarted < end)
-            .Select(a => new { a.TagId, a.Description })
+            .Select(a => new { a.TagId, a.DateStarted, a.Description })
             .ToListAsync();
 
-        var contributing = 0;
-        var sum = 0.0;
+        var fromKey = WindowKey(from);
+        var toKey = WindowKey(to);
+        var resultsQuery = _context.Activities
+            .Where(a => a.RuleId == rule.Id && string.Compare(a.WindowKey, fromKey) >= 0 && string.Compare(a.WindowKey, toKey) <= 0);
+        var results = dryRun
+            ? await resultsQuery.AsNoTracking().ToListAsync()
+            : await resultsQuery.ToListAsync();
+        var resultsByKey = results
+            .Where(r => r.WindowKey != null)
+            .GroupBy(r => r.WindowKey!)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var skipped = 0;
+        var sums = new Dictionary<string, double>();
         foreach (var row in sourceRows)
         {
-            if (!ActivityValueCodec.TryReadNumber(row.Description, out var value) || (rule.IgnoreZero && value == 0))
+            if (!ActivityValueCodec.TryReadNumber(row.Description, out var value))
+            {
+                if (!string.IsNullOrWhiteSpace(row.Description))
+                {
+                    skipped++;
+                }
+
+                continue;
+            }
+
+            if (rule.IgnoreZero && value == 0)
             {
                 continue;
             }
 
-            contributing++;
-            sum += value * factors[row.TagId];
+            var key = WindowKey(DateOnly.FromDateTime(row.DateStarted));
+            sums[key] = sums.GetValueOrDefault(key) + value * factors[row.TagId];
         }
 
-        var key = WindowKey(day);
-        var existing = _context.Activities.Local.FirstOrDefault(a => a.RuleId == rule.Id && a.WindowKey == key)
-            ?? await _context.Activities.FirstOrDefaultAsync(a => a.RuleId == rule.Id && a.WindowKey == key);
-
-        if (contributing == 0)
+        int created = 0, updated = 0, deleted = 0, unchanged = 0;
+        foreach (var key in sums.Keys.Union(resultsByKey.Keys))
         {
-            if (existing == null)
+            var hasResult = resultsByKey.TryGetValue(key, out var existing);
+            if (!sums.TryGetValue(key, out var sum))
             {
-                return WindowChange.None;
+                deleted++;
+                if (!dryRun)
+                {
+                    _context.Activities.Remove(existing!);
+                }
+
+                continue;
             }
 
-            _context.Activities.Remove(existing);
-
-            return WindowChange.Deleted;
-        }
-
-        var result = ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, sum);
-        if (existing == null)
-        {
-            _context.Activities.Add(new Activity
+            var value = ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, sum);
+            if (!hasResult)
             {
-                UserId = rule.UserId,
-                TagId = rule.TargetTagId,
-                DateStarted = start,
-                DateCreated = DateTime.UtcNow,
-                Description = result,
-                RuleId = rule.Id,
-                WindowKey = key
-            });
+                created++;
+                if (!dryRun)
+                {
+                    _context.Activities.Add(new Activity
+                    {
+                        UserId = rule.UserId,
+                        TagId = rule.TargetTagId,
+                        DateStarted = DateOnly.ParseExact(key, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToDateTime(TimeOnly.MinValue),
+                        DateCreated = DateTime.UtcNow,
+                        Description = value,
+                        RuleId = rule.Id,
+                        WindowKey = key
+                    });
+                }
 
-            return WindowChange.Created;
+                continue;
+            }
+
+            if (existing!.Description == value && existing.TagId == rule.TargetTagId)
+            {
+                unchanged++;
+                continue;
+            }
+
+            updated++;
+            if (!dryRun)
+            {
+                existing.Description = value;
+                existing.TagId = rule.TargetTagId;
+            }
         }
 
-        if (existing.Description == result && existing.TagId == rule.TargetTagId)
-        {
-            return WindowChange.None;
-        }
-
-        existing.Description = result;
-        existing.TagId = rule.TargetTagId;
-
-        return WindowChange.Updated;
+        return new TagRuleRangeResult(created, updated, deleted, unchanged, skipped);
     }
 
     private static string WindowKey(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-    private enum WindowChange
-    {
-        None,
-        Created,
-        Updated,
-        Deleted
-    }
 }

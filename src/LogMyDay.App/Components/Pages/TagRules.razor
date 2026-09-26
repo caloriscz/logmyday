@@ -7,6 +7,7 @@
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject ILogger<TagRules> Logger
 @inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("TagRules", "Manage rules that calculate a tag's daily value from other tags")]
 
@@ -55,7 +56,7 @@
                                 <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">@rule.Name</h3>
                                 @if (rule.IsEnabled)
                                 {
-                                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">Active since @rule.EffectiveFrom.ToString("d")</span>
+                                    <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200">Active since @rule.EffectiveFrom.ToString("d", displayCulture)</span>
                                 }
                                 else
                                 {
@@ -66,12 +67,15 @@
                                 <span class="inline-flex items-center gap-1 font-medium"><ComputedBadge ShowText="false" /> @rule.TargetTagName</span>
                                 = @Formula(rule) <span class="text-gray-500 dark:text-slate-400">per day</span>
                             </p>
-                            @if (rule.IgnoreZero)
-                            {
-                                <p class="text-xs text-gray-500 dark:text-slate-400">Zero values are ignored.</p>
-                            }
+                            <p class="text-xs text-gray-500 dark:text-slate-400">
+                                @rule.ResultCount calculated @(rule.ResultCount == 1 ? "value" : "values")@(rule.IgnoreZero ? " · zero values are ignored" : string.Empty)
+                            </p>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-violet-700 transition-all hover:bg-violet-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-violet-300 dark:hover:bg-violet-500/20" @onclick="() => OpenRecompute(rule)" disabled="@(isBusy || !rule.IsEnabled)" title="@(rule.IsEnabled ? "Calculate past days" : "Activate the rule to calculate past days")">
+                                <Icon Name="arrow-repeat" Class="h-4 w-4" />
+                                <span>Past days</span>
+                            </button>
                             <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(rule)" disabled="@(isBusy || tags == null)">
                                 <Icon Name="pencil" Class="h-4 w-4" />
                                 <span>Edit</span>
@@ -134,6 +138,93 @@
     </div>
 }
 
+@* Recompute past days: preview first, then an explicit confirmation *@
+@if (recomputeRule != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Calculate past days</h3>
+                <p class="text-sm text-gray-600 dark:text-slate-400">@recomputeRule.Name — @recomputeRule.TargetTagName</p>
+            </div>
+
+            <div class="space-y-4 px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                @if (recomputeDone != null)
+                {
+                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-200">
+                        Done: @Summary(recomputeDone)
+                    </div>
+                }
+                else
+                {
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label for="recompute-from" class="font-medium">From</label>
+                        <input id="recompute-from" type="date" value="@recomputeFrom.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                               max="@recomputeTo.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)"
+                               @onchange="OnRecomputeFromChanged" disabled="@isBusy"
+                               class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                        <span>to today (@recomputeTo.ToString("d", displayCulture))</span>
+                    </div>
+                    @if (recomputePreview?.FirstSourceDate is DateOnly firstSource && firstSource != recomputeFrom)
+                    {
+                        <button type="button" class="text-xs text-primary-600 hover:underline dark:text-primary-400" @onclick="() => SetRecomputeFrom(firstSource)" disabled="@isBusy">
+                            Use the first day with source values (@firstSource.ToString("d", displayCulture))
+                        </button>
+                    }
+
+                    @if (recomputePreview == null)
+                    {
+                        <p class="text-gray-500 dark:text-slate-400">Calculating preview…</p>
+                    }
+                    else
+                    {
+                        <div class="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
+                            @if (recomputePreview.Created + recomputePreview.Updated + recomputePreview.Deleted == 0)
+                            {
+                                <span>Nothing to change: every day in this range is already up to date.</span>
+                            }
+                            else
+                            {
+                                <span>Preview: @Summary(recomputePreview)</span>
+                            }
+                        </div>
+                        @if (recomputePreview.ResultsBeforeFrom > 0)
+                        {
+                            <p class="flex items-start gap-2 text-amber-700 dark:text-amber-300">
+                                <Icon Name="warning" Class="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>@recomputePreview.ResultsBeforeFrom earlier @(recomputePreview.ResultsBeforeFrom == 1 ? "value keeps" : "values keep") the previous calculation. Start earlier to include @(recomputePreview.ResultsBeforeFrom == 1 ? "it" : "them").</span>
+                            </p>
+                        }
+                        @if (recomputePreview.SkippedSourceValues > 0)
+                        {
+                            <p class="text-gray-500 dark:text-slate-400">@recomputePreview.SkippedSourceValues source @(recomputePreview.SkippedSourceValues == 1 ? "value is" : "values are") not a number and @(recomputePreview.SkippedSourceValues == 1 ? "is" : "are") left out.</p>
+                        }
+                        <p class="text-xs text-gray-500 dark:text-slate-400">Afterwards the rule keeps these days up to date when their sources change.</p>
+                    }
+                }
+
+                @if (!string.IsNullOrEmpty(recomputeError))
+                {
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">@recomputeError</div>
+                }
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="CloseRecompute" disabled="@isBusy">
+                    @(recomputeDone != null ? "Close" : "Not now")
+                </button>
+                @if (recomputeDone == null)
+                {
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" @onclick="RunRecompute" disabled="@(isBusy || recomputePreview == null)">
+                        <Icon Name="arrow-repeat" Class="h-4 w-4" />
+                        <span>@(isBusy ? "Calculating…" : "Calculate")</span>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 @* Delete Confirmation *@
 @if (pendingDelete != null)
 {
@@ -143,7 +234,7 @@
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete rule</h3>
             </div>
             <div class="px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
-                Delete rule <strong>@pendingDelete.Name</strong>? Every value it calculated for <strong>@pendingDelete.TargetTagName</strong> is deleted too, and the tag becomes a normal tag again. The source tags are not touched. This cannot be undone.
+                Delete rule <strong>@pendingDelete.Name</strong>? Its @pendingDelete.ResultCount calculated @(pendingDelete.ResultCount == 1 ? "value" : "values") for <strong>@pendingDelete.TargetTagName</strong> @(pendingDelete.ResultCount == 1 ? "is" : "are") deleted too, and the tag becomes a normal tag again. The source tags are not touched. This cannot be undone.
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
                 <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="() => pendingDelete = null" disabled="@isBusy">
@@ -170,10 +261,29 @@
     private int? editingId;
     private bool showModal;
     private TagRuleResponse? pendingDelete;
+    private System.Globalization.CultureInfo displayCulture = System.Globalization.CultureInfo.CurrentCulture;
+
+    // Past-days recompute dialog
+    private TagRuleResponse? recomputeRule;
+    private DateOnly recomputeFrom;
+    private DateOnly recomputeTo;
+    private TagRuleRangeResponse? recomputePreview;
+    private TagRuleRangeResponse? recomputeDone;
+    private string? recomputeError;
 
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Rules");
+
+        try
+        {
+            displayCulture = (await UserPreferencesService.GetAsync()).Culture;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load user preferences; using the server culture");
+        }
+
         await LoadDataAsync();
     }
 
@@ -247,16 +357,12 @@
         isBusy = true;
         formModel.Sources = formModel.Sources.Where(s => s.SourceTagId != 0).ToList();
 
+        TagRuleResponse? saved = null;
         try
         {
-            if (editingId.HasValue)
-            {
-                await TagRuleApi.UpdateTagRule(editingId.Value, formModel);
-            }
-            else
-            {
-                await TagRuleApi.CreateTagRule(formModel);
-            }
+            saved = editingId.HasValue
+                ? await TagRuleApi.UpdateTagRule(editingId.Value, formModel)
+                : await TagRuleApi.CreateTagRule(formModel);
 
             CloseModal();
             await LoadDataAsync();
@@ -279,6 +385,113 @@
         {
             isBusy = false;
         }
+
+        // A saved rule is current from today. Offer the past right away, with a preview, so a new
+        // rule gets its history and an edited one does not keep old factors unnoticed.
+        if (saved is { IsEnabled: true })
+        {
+            await OpenRecompute(saved);
+        }
+    }
+
+    private async Task OpenRecompute(TagRuleResponse rule)
+    {
+        recomputeRule = rule;
+        recomputePreview = null;
+        recomputeDone = null;
+        recomputeError = null;
+
+        try
+        {
+            // Without dates the server proposes the full range: first source value to today.
+            var preview = await TagRuleApi.PreviewTagRule(rule.Id);
+            recomputeFrom = preview.From;
+            recomputeTo = preview.To;
+            recomputePreview = preview;
+        }
+        catch (Exception ex)
+        {
+            recomputeError = $"Could not prepare the preview: {ex.Message}";
+            Logger.LogError(ex, "Failed to preview tag rule {RuleId}", rule.Id);
+        }
+    }
+
+    private async Task OnRecomputeFromChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParseExact(e.Value?.ToString(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var from))
+        {
+            await SetRecomputeFrom(from);
+        }
+    }
+
+    private async Task SetRecomputeFrom(DateOnly from)
+    {
+        if (recomputeRule == null)
+        {
+            return;
+        }
+
+        recomputeFrom = from > recomputeTo ? recomputeTo : from;
+        recomputePreview = null;
+        recomputeError = null;
+
+        try
+        {
+            recomputePreview = await TagRuleApi.PreviewTagRule(recomputeRule.Id, recomputeFrom, recomputeTo);
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            recomputeError = string.IsNullOrWhiteSpace(ex.Content) ? "This range cannot be calculated." : ex.Content.Trim('"');
+        }
+        catch (Exception ex)
+        {
+            recomputeError = $"Could not prepare the preview: {ex.Message}";
+            Logger.LogError(ex, "Failed to preview tag rule {RuleId}", recomputeRule.Id);
+        }
+    }
+
+    private async Task RunRecompute()
+    {
+        if (recomputeRule == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        recomputeError = null;
+        try
+        {
+            recomputeDone = await TagRuleApi.RecomputeTagRule(recomputeRule.Id, new TagRuleRecomputeRequest { From = recomputeFrom, To = recomputeTo });
+            await LoadDataAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            recomputeError = string.IsNullOrWhiteSpace(ex.Content) ? "This range cannot be calculated." : ex.Content.Trim('"');
+        }
+        catch (Exception ex)
+        {
+            recomputeError = $"Calculation failed: {ex.Message}";
+            Logger.LogError(ex, "Failed to recompute tag rule {RuleId}", recomputeRule.Id);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void CloseRecompute()
+    {
+        recomputeRule = null;
+        recomputePreview = null;
+        recomputeDone = null;
+        recomputeError = null;
+    }
+
+    private static string Summary(TagRuleRangeResponse r)
+    {
+        static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+
+        return $"{Days(r.Created)} get a value, {Days(r.Updated)} change, {Days(r.Deleted)} lose theirs, {Days(r.Unchanged)} stay the same.";
     }
 
     private string? Validate()
@@ -327,9 +540,9 @@
         }
     }
 
-    private static string Formula(TagRuleResponse rule)
+    private string Formula(TagRuleResponse rule)
     {
         return string.Join(" + ", rule.Sources.Select(s =>
-            $"{s.Factor.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture)} × {s.SourceTagName}"));
+            $"{s.Factor.ToString("0.####", displayCulture)} × {s.SourceTagName}"));
     }
 }

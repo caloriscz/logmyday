@@ -65,4 +65,39 @@ public class TagRuleIntegrationTests : IClassFixture<CustomWebApplicationFactory
         Assert.True(refused.IsError);
         Assert.Equal("conflict", McpTestClient.Json(refused).GetProperty("code").GetString());
     }
+
+    [Fact]
+    public async Task RestApi_PreviewAndRecompute_CalculatePastDays()
+    {
+        await using var mcp = await McpTestClient.ConnectAsync(_factory, CustomWebApplicationFactory.ReadWriteKeyToken);
+        var (sourceId, sourceName) = await CreateTag(mcp, "Dose", InputTypeIds.Integer);
+        var (targetId, targetName) = await CreateTag(mcp, "Sum", InputTypeIds.Decimal);
+        var past = DateTime.UtcNow.Date.AddDays(-10);
+        await mcp.CallAsync("log_value", new { tag = sourceName, value = 4, dateTime = $"{past:yyyy-MM-dd}T09:00" });
+
+        var http = _factory.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CustomWebApplicationFactory.ReadWriteKeyToken);
+        var api = Refit.RestService.For<LogMyDay.Shared.Interfaces.ITagRuleApi>(http);
+
+        var rule = await api.CreateTagRule(new TagRuleRequest
+        {
+            Name = "Dose sum",
+            TargetTagId = targetId,
+            Sources = [new() { SourceTagId = sourceId, Factor = 0.5 }]
+        });
+        Assert.Equal(0, rule.ResultCount); // starts today; the past is not calculated yet
+
+        var from = DateOnly.FromDateTime(past);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var preview = await api.PreviewTagRule(rule.Id, from, today);
+        Assert.Equal(from, preview.From);
+        Assert.Equal(1, preview.Created);
+
+        var run = await api.RecomputeTagRule(rule.Id, new TagRuleRecomputeRequest { From = from, To = today });
+        Assert.Equal(1, run.Created);
+
+        var results = McpTestClient.Json(await mcp.CallAsync("list_activities", new { tag = targetName }));
+        Assert.Equal("2", Assert.Single(results.GetProperty("items").EnumerateArray()).GetProperty("value").GetString());
+        Assert.Equal(1, (await api.GetTagRuleById(rule.Id)).ResultCount);
+    }
 }

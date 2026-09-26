@@ -87,6 +87,46 @@ public class TagRulesController : BaseApiController
         }
     }
 
+    /// <summary>What recomputing the rule over the range would change; nothing is written.
+    /// Defaults: from the first source date to today.</summary>
+    [HttpGet("{id:int}/preview")]
+    public async Task<ActionResult<TagRuleRangeResponse>> Preview(int id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
+    {
+        var userId = GetCurrentUserId();
+        try
+        {
+            return Ok(await _tagRuleService.Preview(id, from, to, userId));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("{id:int}/recompute")]
+    public async Task<ActionResult<TagRuleRangeResponse>> Recompute(int id, TagRuleRecomputeRequest request)
+    {
+        var userId = GetCurrentUserId();
+        try
+        {
+            return Ok(await _tagRuleService.Recompute(id, request, userId));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogInformation("Rule {RuleId} recompute rejected for user {UserId}: {Reason}", id, userId, ex.Message);
+
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

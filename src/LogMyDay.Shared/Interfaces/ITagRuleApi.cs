@@ -19,4 +19,12 @@ public interface ITagRuleApi
 
     [Delete("/api/tag-rules/{id}")]
     Task DeleteTagRule(int id);
+
+    /// <summary>What recomputing the rule over the range would change. Without dates the range
+    /// is the first source date to today.</summary>
+    [Get("/api/tag-rules/{id}/preview")]
+    Task<TagRuleRangeResponse> PreviewTagRule(int id, [Query(Format = "yyyy-MM-dd")] DateOnly? from = null, [Query(Format = "yyyy-MM-dd")] DateOnly? to = null);
+
+    [Post("/api/tag-rules/{id}/recompute")]
+    Task<TagRuleRangeResponse> RecomputeTagRule(int id, [Body] TagRuleRecomputeRequest request);
 }
