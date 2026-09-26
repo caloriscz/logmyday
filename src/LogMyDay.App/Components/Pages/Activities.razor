@@ -129,7 +129,11 @@
                                         </td>
                                         <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                             @{ var dailyTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                            @if (dailyTag?.TypeId == InputTypeIds.Boolean)
+                                            @if (activity.IsGenerated)
+                                            {
+                                                @* A computed value changes with its sources; it has no inline controls. *@
+                                            }
+                                            else if (dailyTag?.TypeId == InputTypeIds.Boolean)
                                             {
                                                 <BooleanSwitch
                                                     Value="@GetBoolValue(activity)"
@@ -302,7 +306,11 @@
                                             </td>
                                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-slate-200">
                                                 @{ var groupTag = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                                                @if (groupTag?.TypeId == InputTypeIds.Boolean)
+                                                @if (activity.IsGenerated)
+                                                {
+                                                    @* A computed value changes with its sources; it has no inline controls. *@
+                                                }
+                                                else if (groupTag?.TypeId == InputTypeIds.Boolean)
                                                 {
                                                     <BooleanSwitch
                                                         Value="@GetBoolValue(activity)"
