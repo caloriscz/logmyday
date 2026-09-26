@@ -31,7 +31,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <label class="@LabelCss" for="@($"{modalId}PrimaryTag")">Primary Tag</label>
-                        <GroupedTagSelect Tags="AvailableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="HandleTagSelectionChanged" SelectClass="@InputCss" />
+                        <GroupedTagSelect Tags="loggableTags" @bind-Value="Activity.PrimaryTagId" @bind-Value:after="HandleTagSelectionChanged" SelectClass="@InputCss" />
                     </div>
 
                     <div class="space-y-2">
@@ -337,8 +337,19 @@
         }
     }
 
+    // Computed tags get their values from a rule and cannot be logged by hand. The filtered list
+    // is rebuilt only when the tags change, so the picker keeps its selected group.
+    private IList<TagResponse>? loggableTags;
+    private IList<TagResponse>? loggableTagsSource;
+
     protected override void OnParametersSet()
     {
+        if (!ReferenceEquals(AvailableTags, loggableTagsSource))
+        {
+            loggableTagsSource = AvailableTags;
+            loggableTags = AvailableTags?.Where(t => !t.IsComputed).ToList();
+        }
+
         if (DisplayCulture is not null)
         {
             effectiveCulture = DisplayCulture;

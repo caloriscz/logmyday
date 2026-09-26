@@ -24,4 +24,8 @@ public class TagResponse
     public int? GroupId { get; set; }
     public string? GroupName { get; set; }
     public int? ColorSchemeId { get; set; }
+
+    /// <summary>True while a Tag Activity Relations rule targets this tag: its values are
+    /// generated and it is not offered for manual logging.</summary>
+    public bool IsComputed { get; set; }
 }

@@ -67,6 +67,7 @@ public class ReminderService : IReminderService
         {
             completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId)
                 ?? throw new KeyNotFoundException("Tag not found");
+            EnsureNotComputed(completionTag);
         }
 
         var item = new Domain.Entities.Reminder
@@ -96,6 +97,15 @@ public class ReminderService : IReminderService
         return MapItemToResponse(item);
     }
 
+    // A computed tag's values come from its rule; a reminder cannot log to it.
+    private static void EnsureNotComputed(Domain.Entities.Tag tag)
+    {
+        if (tag.IsComputed)
+        {
+            throw new InvalidOperationException($"'{tag.TagName}' is computed by a rule and cannot be a reminder's completion tag.");
+        }
+    }
+
     public async Task Update(int id, ReminderRequest request, Guid userId)
     {
         var item = await _context.Reminders
@@ -107,10 +117,11 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
-        if (request.CompletionTagId.HasValue
-            && !await _context.Tags.AnyAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId))
+        if (request.CompletionTagId.HasValue)
         {
-            throw new KeyNotFoundException("Tag not found");
+            var completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId)
+                ?? throw new KeyNotFoundException("Tag not found");
+            EnsureNotComputed(completionTag);
         }
 
         var oldNotifyAt = item.NotifyAt;

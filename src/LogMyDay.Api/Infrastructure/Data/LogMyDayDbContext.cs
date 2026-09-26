@@ -31,6 +31,8 @@ public class LogMyDayDbContext : DbContext
     public DbSet<ColorScheme> ColorSchemes => Set<ColorScheme>();
     public DbSet<ColorSchemeEntry> ColorSchemeEntries => Set<ColorSchemeEntry>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<TagRule> TagRules => Set<TagRule>();
+    public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +62,8 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<ColorScheme>().ToTable("LogMyDay_ColorSchemes");
         modelBuilder.Entity<ColorSchemeEntry>().ToTable("LogMyDay_ColorSchemeEntries");
         modelBuilder.Entity<ApiKey>().ToTable("LogMyDay_ApiKeys");
+        modelBuilder.Entity<TagRule>().ToTable("LogMyDay_TagRules");
+        modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -305,6 +309,66 @@ public class LogMyDayDbContext : DbContext
         {
             entity.Property(e => e.Color).HasMaxLength(20).IsRequired();
             entity.Property(e => e.Label).HasMaxLength(100);
+        });
+
+        // Tag Activity Relations. A rule owns its target tag (unique TargetTagId). Tags used by a
+        // rule cannot be deleted while the rule exists (Restrict); TagService checks first and
+        // explains which rule uses the tag.
+        modelBuilder.Entity<TagRule>(entity =>
+        {
+            entity.HasOne(r => r.TargetTag)
+                .WithMany()
+                .HasForeignKey(r => r.TargetTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(r => r.Sources)
+                .WithOne(s => s.Rule)
+                .HasForeignKey(s => s.RuleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(r => r.TargetTagId).IsUnique().HasDatabaseName("IX_LogMyDay_TagRules_TargetTagId");
+            entity.HasIndex(r => r.UserId).HasDatabaseName("IX_LogMyDay_TagRules_UserId");
+            entity.Property(r => r.Name).HasMaxLength(100).IsRequired();
+            entity.Property(r => r.Template).HasConversion<int>();
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(r => r.EffectiveFrom).HasColumnType("date");
+                entity.Property(r => r.DateCreated).HasColumnType("datetime2");
+                entity.Property(r => r.DateUpdated).HasColumnType("datetime2");
+            }
+        });
+
+        modelBuilder.Entity<TagRuleSource>(entity =>
+        {
+            entity.HasOne(s => s.SourceTag)
+                .WithMany()
+                .HasForeignKey(s => s.SourceTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(s => new { s.RuleId, s.SourceTagId })
+                .IsUnique()
+                .HasDatabaseName("IX_LogMyDay_TagRuleSources_RuleId_SourceTagId");
+            entity.HasIndex(s => s.SourceTagId).HasDatabaseName("IX_LogMyDay_TagRuleSources_SourceTagId");
+        });
+
+        // Generated rows: one per (RuleId, WindowKey). The FK to TagRule lives only in the model;
+        // adding it to the existing Activities table would force a full SQLite table rebuild, so
+        // the migration adds the columns and indexes only. Rule delete removes its rows itself.
+        modelBuilder.Entity<Activity>(entity =>
+        {
+            entity.HasOne<TagRule>()
+                .WithMany()
+                .HasForeignKey(a => a.RuleId)
+                .OnDelete(DeleteBehavior.ClientCascade);
+
+            entity.HasIndex(a => new { a.RuleId, a.WindowKey })
+                .IsUnique()
+                .HasFilter("[RuleId] IS NOT NULL")
+                .HasDatabaseName("IX_LogMyDay_Activities_RuleId_WindowKey");
+
+            entity.HasIndex(a => new { a.UserId, a.TagId, a.DateStarted })
+                .HasDatabaseName("IX_LogMyDay_Activities_UserId_TagId_DateStarted");
         });
 
         modelBuilder.SeedData();

@@ -148,9 +148,7 @@ public class ActivitySummaryService(LogMyDayDbContext context) : IActivitySummar
         switch (kind)
         {
             case Numeric:
-                if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var n)
-                    || (text.Count(c => c == ',') == 1 && !text.Contains('.')
-                        && double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out n)))
+                if (ActivityValueCodec.TryReadNumber(text, out var n))
                 {
                     return (n, false);
                 }

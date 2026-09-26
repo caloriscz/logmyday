@@ -33,6 +33,8 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IScanMappingService, ScanMappingService>();
         services.AddScoped<ITagGroupService, TagGroupService>();
         services.AddScoped<IColorSchemeService, ColorSchemeService>();
+        services.AddScoped<ITagRuleEngine, TagRuleEngine>();
+        services.AddScoped<ITagRuleService, TagRuleService>();
         services.AddScoped<IApiKeyService, ApiKeyService>();
         // Injected as a clock so expiry and last-used throttling are testable with a fake time.
         services.TryAddSingleton(TimeProvider.System);
