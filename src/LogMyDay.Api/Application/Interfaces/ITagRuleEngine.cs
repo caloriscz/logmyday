@@ -12,8 +12,24 @@ public interface ITagRuleEngine
     /// is saved; it saves its own changes.</summary>
     Task OnSourcesChanged(Guid userId, IReadOnlyCollection<(int TagId, DateOnly Day)> changes);
 
-    /// <summary>Re-evaluates a rule for every day in the range that has a source row or an
-    /// existing result, and saves. Returns the number of result rows created, updated and
-    /// deleted.</summary>
-    Task<(int Created, int Updated, int Deleted)> EvaluateRange(TagRule rule, DateOnly from, DateOnly to);
+    /// <summary>What recomputing the range would change, without writing anything.</summary>
+    Task<TagRuleRangeResult> Preview(TagRule rule, DateOnly from, DateOnly to);
+
+    /// <summary>Recomputes the range one calendar month at a time. Each month is saved in its own
+    /// transaction (on relational providers), so a long range never holds the database for long.</summary>
+    Task<TagRuleRangeResult> Recompute(TagRule rule, DateOnly from, DateOnly to);
+}
+
+/// <summary>Counts of result rows a range evaluation creates, changes, removes or leaves as they
+/// are, and how many source values it skipped because they are not numbers.</summary>
+public record TagRuleRangeResult(int Created, int Updated, int Deleted, int Unchanged, int SkippedSourceValues)
+{
+    public static TagRuleRangeResult Empty { get; } = new(0, 0, 0, 0, 0);
+
+    public TagRuleRangeResult Add(TagRuleRangeResult other) => new(
+        Created + other.Created,
+        Updated + other.Updated,
+        Deleted + other.Deleted,
+        Unchanged + other.Unchanged,
+        SkippedSourceValues + other.SkippedSourceValues);
 }
