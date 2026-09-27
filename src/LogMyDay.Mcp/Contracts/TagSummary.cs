@@ -5,7 +5,8 @@ namespace LogMyDay.Mcp.Contracts;
 
 /// <summary>
 /// The compact row list tools and lookups return: enough to pick a tag and encode a value for it,
-/// without the full configuration <c>get_tag</c> gives.
+/// without the full configuration <c>get_tag</c> gives. <c>IsComputed</c> marks a tag a Tag Activity
+/// Relations rule owns: its values are calculated and it cannot be logged.
 /// </summary>
 public sealed record TagSummary(
     int Id,
@@ -19,7 +20,8 @@ public sealed record TagSummary(
     bool IsRepeatable,
     bool IsRequired,
     TimeGranularity TimeGranularity,
-    int? OptionListId)
+    int? OptionListId,
+    bool IsComputed = false)
 {
     public static TagSummary From(TagResponse tag, IReadOnlyDictionary<int, string> inputTypeNames)
     {
@@ -40,6 +42,7 @@ public sealed record TagSummary(
             tag.IsRepeatable,
             tag.IsRequired,
             tag.TimeGranularity,
-            tag.OptionListId);
+            tag.OptionListId,
+            tag.IsComputed);
     }
 }

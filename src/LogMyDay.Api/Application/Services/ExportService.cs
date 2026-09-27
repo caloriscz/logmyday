@@ -46,7 +46,8 @@ public class ExportService : IExcelExportService
                 {
                     t.Id,
                     t.TagName,
-                    DisplayName = t.Group != null ? $"{t.Group.Name}: {t.TagName}" : t.TagName
+                    DisplayName = t.Group != null ? $"{t.Group.Name}: {t.TagName}" : t.TagName,
+                    t.IsComputed
                 })
                 .OrderBy(t => t.DisplayName)
                 .ToList();
@@ -109,7 +110,8 @@ public class ExportService : IExcelExportService
 
             foreach (var tag in selectedTags)
             {
-                worksheet.Cell(1, columnIndex).Value = tag.DisplayName;
+                // A computed tag's values are calculated by a Tag Activity Relations rule.
+                worksheet.Cell(1, columnIndex).Value = tag.IsComputed ? $"{tag.DisplayName} (computed)" : tag.DisplayName;
                 worksheet.Cell(1, columnIndex).Style.Font.Bold = true;
                 worksheet.Cell(1, columnIndex).Style.Fill.BackgroundColor = XLColor.LightGray;
                 worksheet.Cell(1, columnIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -471,7 +473,8 @@ public class ExportService : IExcelExportService
                     DateStarted = a.DateStarted,
                     Tag = a.Tag.Group != null ? $"{a.Tag.Group.Name}: {a.Tag.TagName}" : a.Tag.TagName,
                     Description = a.Description ?? "",
-                    TimeGranularity = (int)a.Tag.TimeGranularity
+                    TimeGranularity = (int)a.Tag.TimeGranularity,
+                    Generated = a.RuleId != null
                 })
                 .ToList();
 

@@ -17,7 +17,7 @@
         <option value="">@TagPlaceholder</option>
         @foreach (var tag in _filteredTags)
         {
-            <option value="@tag.Id">@GetBareTagName(tag)</option>
+            <option value="@tag.Id">@GetBareTagName(tag)@(tag.IsComputed ? " (computed)" : string.Empty)</option>
         }
     </select>
 </div>

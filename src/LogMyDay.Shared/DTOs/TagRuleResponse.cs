@@ -11,6 +11,9 @@ public class TagRuleResponse
     public bool IgnoreZero { get; set; }
     public bool IsEnabled { get; set; }
     public DateOnly EffectiveFrom { get; set; }
+
+    /// <summary>How many calculated values the rule currently has.</summary>
+    public int ResultCount { get; set; }
     public DateTime DateCreated { get; set; }
     public DateTime DateUpdated { get; set; }
     public List<TagRuleSourceResponse> Sources { get; set; } = new();
