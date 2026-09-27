@@ -171,14 +171,21 @@
 
                                         <!-- Action Buttons -->
                                         <div class="shrink-0 flex items-center gap-2">
-                                            <button @onclick="() => EditActivity(activity)" 
-                                                    class="btn btn-sm btn-secondary">
-                                                <Icon Name="pencil" Class="w-4 h-4" />
-                                            </button>
-                                            <button @onclick="() => DeleteActivity(activity)" 
-                                                    class="btn btn-sm btn-danger">
-                                                <Icon Name="trash" Class="w-4 h-4" />
-                                            </button>
+                                            @if (activity.IsGenerated)
+                                            {
+                                                <ComputedBadge />
+                                            }
+                                            else
+                                            {
+                                                <button @onclick="() => EditActivity(activity)" 
+                                                        class="btn btn-sm btn-secondary">
+                                                    <Icon Name="pencil" Class="w-4 h-4" />
+                                                </button>
+                                                <button @onclick="() => DeleteActivity(activity)" 
+                                                        class="btn btn-sm btn-danger">
+                                                    <Icon Name="trash" Class="w-4 h-4" />
+                                                </button>
+                                            }
                                         </div>
                                     </div>
                                 </div>

@@ -68,12 +68,19 @@
                                     <p class="text-xs text-gray-500 dark:text-slate-400">@FormatActivityTime(activity)</p>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => StartEdit(activity)" aria-label="Edit activity">
-                                        <Icon Name="pencil" Class="w-4 h-4" />
-                                    </button>
-                                    <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteAsync(activity.Id)" aria-label="Delete activity">
-                                        <Icon Name="trash" Class="w-4 h-4" />
-                                    </button>
+                                    @if (activity.IsGenerated)
+                                    {
+                                        <ComputedBadge />
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-sky-600 transition-all hover:bg-sky-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:focus-visible:ring-sky-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => StartEdit(activity)" aria-label="Edit activity">
+                                            <Icon Name="pencil" Class="w-4 h-4" />
+                                        </button>
+                                        <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:text-rose-400 dark:hover:bg-rose-500/20 dark:focus-visible:ring-rose-400 dark:focus-visible:ring-offset-slate-900" @onclick="() => DeleteAsync(activity.Id)" aria-label="Delete activity">
+                                            <Icon Name="trash" Class="w-4 h-4" />
+                                        </button>
+                                    }
                                 </div>
                             </div>
                         </div>

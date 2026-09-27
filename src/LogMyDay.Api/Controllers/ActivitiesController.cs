@@ -66,6 +66,10 @@ public class ActivitiesController : BaseApiController
 
             return Conflict(new { code = "tag-day-locked", tagId = ex.TagId, date = ex.Date.ToString("yyyy-MM-dd") });
         }
+        catch (TagComputedException ex)
+        {
+            return TagComputed(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
@@ -115,6 +119,10 @@ public class ActivitiesController : BaseApiController
         {
             return NotFound(ex.Message);
         }
+        catch (TagComputedException ex)
+        {
+            return TagComputed(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
@@ -133,7 +141,15 @@ public class ActivitiesController : BaseApiController
     public async Task<IActionResult> Delete(int id)
     {
         var userId = GetCurrentUserId();
-        var result = await _activityService.Delete(id, userId);
+        bool result;
+        try
+        {
+            result = await _activityService.Delete(id, userId);
+        }
+        catch (TagComputedException ex)
+        {
+            return TagComputed(ex);
+        }
 
         if (!result)
         {
@@ -141,6 +157,13 @@ public class ActivitiesController : BaseApiController
         }
 
         return NoContent();
+    }
+
+    // Rows a Tag Activity Relations rule generates are read-only; the client explains that the
+    // rule has to change instead.
+    private ConflictObjectResult TagComputed(TagComputedException ex)
+    {
+        return Conflict(new { code = "tag-computed", tagId = ex.TagId, message = ex.Message });
     }
 
     [HttpPost("by-date")]

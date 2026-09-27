@@ -7,6 +7,7 @@ using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LogMyDay.Api.Application.Services;
 
@@ -16,23 +17,49 @@ public class ActivityService : IActivityService
     private readonly IActivityRepository _activityRepository;
     private readonly IEventLogService _eventLogService;
     private readonly ITagDayLockService _tagDayLockService;
+    private readonly ITagRuleEngine _tagRuleEngine;
 
     public ActivityService(
         LogMyDayDbContext context,
         IActivityRepository activityRepository,
         IEventLogService eventLogService,
-        ITagDayLockService tagDayLockService)
+        ITagDayLockService tagDayLockService,
+        ITagRuleEngine? tagRuleEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _activityRepository = activityRepository ?? throw new ArgumentNullException(nameof(activityRepository));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _tagDayLockService = tagDayLockService ?? throw new ArgumentNullException(nameof(tagDayLockService));
+        _tagRuleEngine = tagRuleEngine ?? new TagRuleEngine(context);
+    }
+
+    private static async Task CommitIfOwned(IDbContextTransaction? transaction)
+    {
+        if (transaction != null)
+        {
+            await transaction.CommitAsync();
+        }
+    }
+
+    // A source write and the rule results it changes are saved together. The in-memory test
+    // provider has no transactions, and an outer transaction (e.g. backup) is joined, not nested.
+    private async Task<IDbContextTransaction?> BeginWriteTransaction()
+    {
+        return _context.Database.IsRelational() && _context.Database.CurrentTransaction == null
+            ? await _context.Database.BeginTransactionAsync()
+            : null;
     }
 
     public async Task<ActivityResponse> Create(ActivityRequest calendarRequest, Guid userId, bool isSkipMarker = false)
     {
         // Get the tag to check if it's repeatable and what its time granularity is
         var tag = await FindOwnedTag(calendarRequest.PrimaryTagId, userId) ?? throw new KeyNotFoundException("Tag not found");
+        if (tag.IsComputed)
+        {
+            throw new TagComputedException(tag.Id);
+        }
+
+        await using var transaction = await BeginWriteTransaction();
 
         // TagDayLock enforcement: reject any activity for a locked (UserId, TagId, localDate)
         // triple. The client (web/mobile) catches the 409 and offers an unlock-and-retry prompt.
@@ -48,7 +75,7 @@ public class ActivityService : IActivityService
         }
 
         var isNumeric = tag.InputTypeId is 1 or 6; // Integer or Decimal
-        var hasNumber = TryParseNumber(calendarRequest.Description, out var number);
+        var hasNumber = ActivityValueCodec.TryReadNumber(calendarRequest.Description, out var number);
 
         // Non-repeatable tag handling
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
@@ -69,7 +96,7 @@ public class ActivityService : IActivityService
                     // Fall back to the tag's Step only when the request has no numeric value,
                     // preserving the quick-tap "+Step" behavior.
                     var increment = hasNumber ? number : tag.Step ?? 1.0;
-                    var currentValue = TryParseNumber(existing.Description, out var parsed) ? parsed : 0.0;
+                    var currentValue = ActivityValueCodec.TryReadNumber(existing.Description, out var parsed) ? parsed : 0.0;
                     var newValue = currentValue + increment;
 
                     if (tag.MaxValue.HasValue && newValue > tag.MaxValue.Value)
@@ -81,7 +108,7 @@ public class ActivityService : IActivityService
 
                     EnsureWithinLimits(tag, newValue, isSkipMarker);
 
-                    existing.Description = FormatNumber(tag, newValue);
+                    existing.Description = ActivityValueCodec.WriteNumber(tag.InputTypeId, newValue);
 
                     await _activityRepository.UpdateAsync(existing);
                     await _activityRepository.SaveChangesAsync();
@@ -94,7 +121,10 @@ public class ActivityService : IActivityService
                     }
 
                     await _eventLogService.Log(userId, EventLogLevel.Info,
-                        $"Activity '{tag.TagName}' increased by {FormatNumber(tag, increment)} to {existing.Description}");
+                        $"Activity '{tag.TagName}' increased by {ActivityValueCodec.WriteNumber(tag.InputTypeId, increment)} to {existing.Description}");
+
+                    await _tagRuleEngine.OnSourcesChanged(userId, [(tag.Id, DateOnly.FromDateTime(existing.DateStarted))]);
+                    await CommitIfOwned(transaction);
 
                     return MapToResponse(existing);
                 }
@@ -121,7 +151,7 @@ public class ActivityService : IActivityService
         {
             var (existingActivities, _) = await GetActivitiesInPeriod(tag.Id, calendarRequest.DateStarted, userId);
             var currentSum = existingActivities
-                .Sum(a => TryParseNumber(a.Description, out var v) ? v : 0.0);
+                .Sum(a => ActivityValueCodec.TryReadNumber(a.Description, out var v) ? v : 0.0);
             var newValue = hasNumber ? number : 0.0;
 
             if (currentSum + newValue > tag.MaxValue.Value)
@@ -159,6 +189,9 @@ public class ActivityService : IActivityService
             ? string.Empty
             : $" of value {reloadedActivity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info, $"Activity '{tagName}'{desc} added");
+
+        await _tagRuleEngine.OnSourcesChanged(userId, [(tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
+        await CommitIfOwned(transaction);
 
         // TagDayLock is intentionally user-driven only — no auto-lock here. Non-repeatable
         // numeric tags accumulate via Step up to MaxValue across multiple activity creates;
@@ -206,12 +239,22 @@ public class ActivityService : IActivityService
             return false;
         }
 
+        if (activity.RuleId != null || activity.Tag?.IsComputed == true)
+        {
+            throw new TagComputedException(activity.TagId);
+        }
+
+        await using var transaction = await BeginWriteTransaction();
+
         await _activityRepository.DeleteAsync(activity);
         await _activityRepository.SaveChangesAsync();
 
         var desc = string.IsNullOrWhiteSpace(activity.Description) ? string.Empty : $" of value {activity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Activity '{activity.Tag?.TagName ?? "unknown"}'{desc} on {activity.DateStarted:yyyy-MM-dd} deleted");
+
+        await _tagRuleEngine.OnSourcesChanged(userId, [(activity.TagId, DateOnly.FromDateTime(activity.DateStarted))]);
+        await CommitIfOwned(transaction);
 
         return true;
     }
@@ -238,27 +281,6 @@ public class ActivityService : IActivityService
         return existing is int existingId
             ? await Update(existingId, request, userId)
             : await Create(request, userId);
-    }
-
-    // Stored values are written with the invariant culture. Older rows may carry a decimal comma
-    // (they were formatted in the server culture), so a comma is accepted as the decimal separator.
-    private static bool TryParseNumber(string? text, out double value)
-    {
-        value = 0;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
-            || double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
-    }
-
-    private static string FormatNumber(Tag tag, double value)
-    {
-        return tag.InputTypeId == 1
-            ? Math.Round(value, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)
-            : value.ToString("G", CultureInfo.InvariantCulture);
     }
 
     // A single stored value must lie within the tag's MinValue/MaxValue. A reminder skip's zero row
@@ -468,10 +490,23 @@ public class ActivityService : IActivityService
         var tagId = request.PrimaryTagId ?? activity.TagId;
         var tag = await FindOwnedTag(tagId, userId) ?? throw new KeyNotFoundException("Tag not found");
 
+        if (activity.RuleId != null || activity.Tag?.IsComputed == true)
+        {
+            throw new TagComputedException(activity.TagId);
+        }
+
+        if (tag.IsComputed)
+        {
+            throw new TagComputedException(tag.Id);
+        }
+
         request.DateStarted = await ToUserLocalTime(userId, request.DateStarted);
         request.DateFinished = request.DateFinished.HasValue
             ? await ToUserLocalTime(userId, request.DateFinished.Value)
             : null;
+
+        // The window the row leaves, for rules that use the old tag or day as a source.
+        var previous = (activity.TagId, DateOnly.FromDateTime(activity.DateStarted));
 
         if (!tag.IsRepeatable && tag.TimeGranularity != TimeGranularity.Exact)
         {
@@ -486,14 +521,14 @@ public class ActivityService : IActivityService
         // The same value limits as Create. For a repeatable tag the period total is the other
         // rows of the period plus the edited value. TagDayLock intentionally does not apply to
         // edits: the lock only stops new entries.
-        if (tag.InputTypeId is 1 or 6 && TryParseNumber(request.Description, out var number))
+        if (tag.InputTypeId is 1 or 6 && ActivityValueCodec.TryReadNumber(request.Description, out var number))
         {
             EnsureWithinLimits(tag, number, isSkipMarker: false);
 
             if (tag.IsRepeatable && tag.MaxValue.HasValue && tag.TimeGranularity != TimeGranularity.Exact)
             {
                 var (others, _) = await GetActivitiesInPeriod(tag.Id, request.DateStarted, userId, excludeActivityId: id);
-                var otherSum = others.Sum(a => TryParseNumber(a.Description, out var v) ? v : 0.0);
+                var otherSum = others.Sum(a => ActivityValueCodec.TryReadNumber(a.Description, out var v) ? v : 0.0);
 
                 if (otherSum + number > tag.MaxValue.Value)
                 {
@@ -502,6 +537,8 @@ public class ActivityService : IActivityService
                 }
             }
         }
+
+        await using var transaction = await BeginWriteTransaction();
 
         activity.TagId = tag.Id;
         activity.DateStarted = request.DateStarted;
@@ -521,6 +558,9 @@ public class ActivityService : IActivityService
         var desc = string.IsNullOrWhiteSpace(activity.Description) ? string.Empty : $" to value {activity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Activity '{tag.TagName}' on {activity.DateStarted:yyyy-MM-dd} updated{desc}");
+
+        await _tagRuleEngine.OnSourcesChanged(userId, [previous, (tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
+        await CommitIfOwned(transaction);
 
         return MapToResponse(activity);
     }
@@ -542,6 +582,8 @@ public class ActivityService : IActivityService
             ElementId = primaryTag?.Tag?.InputType?.Id,
             ElementName = primaryTag?.Tag?.InputType?.Name ?? string.Empty,
             TagRequired = primaryTag?.Tag?.IsRequired ?? false,
+            RuleId = calendar.RuleId,
+            IsGenerated = calendar.RuleId != null,
         };
     }
 
@@ -599,7 +641,7 @@ public class ActivityService : IActivityService
         }
 
         var (activities, _) = await GetActivitiesInPeriod(tagId, dateStarted, userId, excludeActivityId);
-        response.CurrentSum = activities.Sum(a => TryParseNumber(a.Description, out var v) ? v : 0.0);
+        response.CurrentSum = activities.Sum(a => ActivityValueCodec.TryReadNumber(a.Description, out var v) ? v : 0.0);
         response.RemainingCapacity = tag.MaxValue.HasValue ? tag.MaxValue.Value - response.CurrentSum : null;
 
         if (!tag.IsRepeatable && isNumeric)
@@ -607,7 +649,7 @@ public class ActivityService : IActivityService
             var existing = activities.OrderBy(a => a.DateStarted).ThenBy(a => a.Id).FirstOrDefault();
             if (existing != null)
             {
-                response.ExistingValue = TryParseNumber(existing.Description, out var ev) ? ev : 0.0;
+                response.ExistingValue = ActivityValueCodec.TryReadNumber(existing.Description, out var ev) ? ev : 0.0;
                 response.ExistingActivityId = existing.Id;
             }
         }
@@ -675,6 +717,8 @@ public class ActivityService : IActivityService
                 ElementId = a.Tag?.InputType?.Id,
                 ElementName = a.Tag?.InputType?.Name ?? string.Empty,
                 TagRequired = a.Tag?.IsRequired ?? false,
+                RuleId = a.RuleId,
+                IsGenerated = a.RuleId != null,
             })];
     }
 

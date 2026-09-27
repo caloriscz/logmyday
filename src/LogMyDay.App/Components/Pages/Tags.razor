@@ -458,6 +458,11 @@
         {
             Navigation.NavigateTo("/login");
         }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict && !string.IsNullOrWhiteSpace(ex.Content))
+        {
+            // The server says why the tag cannot go, e.g. which rule still uses it.
+            errorMessage = ex.Content.Trim('"');
+        }
         catch (Exception ex)
         {
             errorMessage = $"Error deleting tag: {ex.Message}";

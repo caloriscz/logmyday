@@ -4,6 +4,7 @@ using LogMyDay.Api.Infrastructure.Repositories;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Helpers;
 using LogMyDay.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using static LogMyDay.Api.Infrastructure.Specifications.TagSpecifications;
 
@@ -179,6 +180,18 @@ public class TagService : ITagService
 
         if (link != null)
         {
+            // A tag a Tag Activity Relations rule uses (as source or target) stays until the rule
+            // is changed or deleted; the database would refuse it anyway (Restrict).
+            var ruleNames = await _context.TagRules
+                .Where(r => r.TargetTagId == id || r.Sources.Any(s => s.SourceTagId == id))
+                .Select(r => r.Name)
+                .ToListAsync();
+            if (ruleNames.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Tag '{link.TagName}' is in use by rule {string.Join(", ", ruleNames.Select(n => $"'{n}'"))}. Change or delete the rule first.");
+            }
+
             _context.Tags.Remove(link);
             await _context.SaveChangesAsync();
         }
@@ -244,7 +257,8 @@ public class TagService : ITagService
                 OptionListName = t.OptionList?.Name,
                 GroupId = t.Group?.Id,
                 GroupName = t.Group?.Name,
-                ColorSchemeId = t.ColorSchemeId
+                ColorSchemeId = t.ColorSchemeId,
+                IsComputed = t.IsComputed
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -275,7 +289,8 @@ public class TagService : ITagService
             OptionListName = tag.OptionList?.Name,
             GroupId = tag.Group?.Id,
             GroupName = tag.Group?.Name,
-            ColorSchemeId = tag.ColorSchemeId
+            ColorSchemeId = tag.ColorSchemeId,
+            IsComputed = tag.IsComputed
         };
     }
 }

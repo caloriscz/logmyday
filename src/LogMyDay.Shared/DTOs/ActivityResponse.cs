@@ -13,4 +13,10 @@ public class ActivityResponse
     public int? ElementId { get; set; }
     public string? ElementName { get; set; }
     public bool TagRequired { get; set; }
+
+    /// <summary>The Tag Activity Relations rule that generated this row, if any.</summary>
+    public int? RuleId { get; set; }
+
+    /// <summary>True for a row a rule generated. It is read-only: edit the rule instead.</summary>
+    public bool IsGenerated { get; set; }
 }

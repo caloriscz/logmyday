@@ -19,5 +19,14 @@ public class Activity
 
     public int TagId { get; set; }
     [ForeignKey(nameof(TagId))]
-    public Tag Tag { get; set; } 
+    public Tag Tag { get; set; }
+
+    /// <summary>The Tag Activity Relations rule that generated this row; null for entries
+    /// logged by hand. A generated row is read-only.</summary>
+    public int? RuleId { get; set; }
+
+    /// <summary>The window a generated row covers (the local date, yyyy-MM-dd). With
+    /// <see cref="RuleId"/> it identifies the result: one row per rule and window.</summary>
+    [MaxLength(10)]
+    public string? WindowKey { get; set; }
 }

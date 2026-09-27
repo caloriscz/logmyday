@@ -43,6 +43,10 @@ public static class McpErrorMapper
                     $"Tag {ex.TagId} is locked for {ex.Date:yyyy-MM-dd}; nothing was logged.",
                     new { tagId = ex.TagId, date = ex.Date.ToString("yyyy-MM-dd"), hint = "Unlock the day with set_tag_day_lock, or log to another day." });
 
+            case TagComputedException ex:
+                return Error(Conflict, ex.Message,
+                    new { tagId = ex.TagId, hint = "Log the rule's source tags instead; the computed value follows." });
+
             case UnauthorizedAccessException ex:
                 return Error(Forbidden, ex.Message);
 
