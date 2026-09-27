@@ -329,6 +329,45 @@ public class TagRuleTests
     }
 
     [Fact]
+    public async Task OnSqlite_BackupRoundTrip_KeepsAPausedRulesValuesAsTheyAre()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total", inputTypeId: 6);
+        var rule = await f.CreateRule(total, (a, 2));
+        var logged = await f.Log(a, f.TodayAt(8), "3");
+        Assert.Equal("6", Assert.Single(await f.Results(total)).Description);
+
+        // Paused: the value stays at 6 although its source changes afterwards.
+        await f.Rules.Update(rule.Id, new TagRuleRequest
+        {
+            Name = "Total",
+            TargetTagId = total.Id,
+            IsEnabled = false,
+            Sources = [new() { SourceTagId = a.Id, Factor = 2 }]
+        }, f.UserId);
+        await f.Activities.Update(logged.Id, new ActivityRequest { PrimaryTagId = a.Id, DateStarted = f.TodayAt(8), Description = "10" }, f.UserId);
+        Assert.Equal("6", Assert.Single(await f.Results(total)).Description);
+
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+        var export = await backups.ExportDataAsync(f.UserId);
+        Assert.Equal("6", Assert.Single(Assert.Single(export.TagRules).Values).Value);
+
+        await backups.ClearDataAsync(f.UserId);
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, f.UserId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors));
+
+        var restoredRule = await f.Context.TagRules.SingleAsync();
+        Assert.False(restoredRule.IsEnabled);
+        var restoredTotal = await f.Context.Tags.SingleAsync(t => t.TagName == "Total" && t.UserId == f.UserId);
+        var value = Assert.Single(await f.Results(restoredTotal));
+        Assert.Equal("6", value.Description);        // restored as it was, not recomputed to 20
+        Assert.Equal(restoredRule.Id, value.RuleId);
+    }
+
+    [Fact]
     public async Task BackupImport_SkipsARuleWhoseTagsDoNotFit_WithAWarning()
     {
         using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");

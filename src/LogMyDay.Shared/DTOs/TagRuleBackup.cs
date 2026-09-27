@@ -12,6 +12,17 @@ public class TagRuleBackup
     public DateOnly EffectiveFrom { get; set; }
     public DateTime DateCreated { get; set; }
     public List<TagRuleSourceBackup> Sources { get; set; } = new();
+
+    /// <summary>Only for a paused rule: its values as they stand. A paused rule keeps its values
+    /// but no longer follows its sources, so they cannot be recomputed after a restore; they are
+    /// carried over as they are. Empty for an active rule, whose values are recomputed.</summary>
+    public List<TagRuleValueBackup> Values { get; set; } = new();
+}
+
+public class TagRuleValueBackup
+{
+    public DateOnly Date { get; set; }
+    public string Value { get; set; } = string.Empty;
 }
 
 public class TagRuleSourceBackup

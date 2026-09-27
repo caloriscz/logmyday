@@ -20,27 +20,49 @@ public class BackupService : IBackupService
         _tagRuleEngine = tagRuleEngine ?? new TagRuleEngine(context);
     }
 
-    // Tag Activity Relations rules travel by tag name. Their calculated values are not exported:
-    // after an import they are recomputed from the restored sources.
+    // Tag Activity Relations rules travel by tag name. An active rule's calculated values are not
+    // exported: after an import they are recomputed from the restored sources. A paused rule no
+    // longer follows its sources, so its values travel with it and are restored as they are.
     private async Task<List<TagRuleBackup>> ExportTagRulesAsync(Guid? userId)
     {
-        return await _context.TagRules
+        var rules = await _context.TagRules
             .Where(r => userId == null || r.UserId == userId)
             .OrderBy(r => r.Name)
-            .Select(r => new TagRuleBackup
+            .Select(r => new
             {
-                Name = r.Name,
-                TargetTagName = r.TargetTag!.TagName,
-                IgnoreZero = r.IgnoreZero,
-                IsEnabled = r.IsEnabled,
-                EffectiveFrom = r.EffectiveFrom,
-                DateCreated = r.DateCreated,
-                Sources = r.Sources
-                    .OrderBy(s => s.Id)
-                    .Select(s => new TagRuleSourceBackup { SourceTagName = s.SourceTag!.TagName, Factor = s.Factor })
-                    .ToList()
+                r.Id,
+                Backup = new TagRuleBackup
+                {
+                    Name = r.Name,
+                    TargetTagName = r.TargetTag!.TagName,
+                    IgnoreZero = r.IgnoreZero,
+                    IsEnabled = r.IsEnabled,
+                    EffectiveFrom = r.EffectiveFrom,
+                    DateCreated = r.DateCreated,
+                    Sources = r.Sources
+                        .OrderBy(s => s.Id)
+                        .Select(s => new TagRuleSourceBackup { SourceTagName = s.SourceTag!.TagName, Factor = s.Factor })
+                        .ToList()
+                }
             })
             .ToListAsync();
+
+        var pausedIds = rules.Where(r => !r.Backup.IsEnabled).Select(r => r.Id).ToList();
+        var pausedValues = (await _context.Activities
+                .Where(a => a.RuleId != null && pausedIds.Contains(a.RuleId.Value))
+                .Select(a => new { RuleId = a.RuleId!.Value, a.DateStarted, a.Description })
+                .ToListAsync())
+            .ToLookup(v => v.RuleId);
+
+        foreach (var rule in rules.Where(r => !r.Backup.IsEnabled))
+        {
+            rule.Backup.Values = pausedValues[rule.Id]
+                .OrderBy(v => v.DateStarted)
+                .Select(v => new TagRuleValueBackup { Date = DateOnly.FromDateTime(v.DateStarted), Value = v.Description ?? string.Empty })
+                .ToList();
+        }
+
+        return rules.Select(r => r.Backup).ToList();
     }
 
     // Restores rules by tag name with the same conditions as creating one: number tags only, the
@@ -59,6 +81,7 @@ public class BackupService : IBackupService
             .ToListAsync();
         var tagsByName = tags.GroupBy(t => t.TagName).ToDictionary(g => g.Key, g => g.First());
         var claimedTargets = await _context.TagRules.Select(r => r.TargetTagId).ToHashSetAsync();
+        var pausedValues = new List<(TagRule Rule, List<TagRuleValueBackup> Values)>();
 
         foreach (var backup in rules)
         {
@@ -92,9 +115,39 @@ public class BackupService : IBackupService
             _context.TagRules.Add(rule);
             imported.Add(rule);
             result.Statistics.TagRulesImported++;
+
+            if (!backup.IsEnabled)
+            {
+                pausedValues.Add((rule, backup.Values));
+            }
         }
 
         await _context.SaveChangesAsync();
+
+        // A paused rule keeps the values it had; they are restored as they are, now that the rule
+        // has its id.
+        foreach (var (rule, values) in pausedValues)
+        {
+            foreach (var value in values.GroupBy(v => v.Date).Select(g => g.First()))
+            {
+                _context.Activities.Add(new Activity
+                {
+                    UserId = rule.UserId,
+                    TagId = rule.TargetTagId,
+                    RuleId = rule.Id,
+                    DateStarted = value.Date.ToDateTime(TimeOnly.MinValue),
+                    DateCreated = DateTime.UtcNow,
+                    Description = value.Value,
+                    WindowKey = value.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                });
+                result.Statistics.TagRuleValuesComputed++;
+            }
+        }
+
+        if (pausedValues.Count > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
 
         return imported;
     }
@@ -167,6 +220,9 @@ public class BackupService : IBackupService
             }
             catch (Exception ex)
             {
+                // Drop the failed month's unsaved changes, or the next rule's save would retry
+                // them and fail as well.
+                _context.ChangeTracker.Clear();
                 _logger.LogError(ex, "Recomputing restored rule {RuleId} failed", rule.Id);
                 result.Warnings.Add($"Rule '{rule.Name}' was restored but its values could not be calculated: {ex.Message}. Use 'Past days' on the Rules page.");
             }
