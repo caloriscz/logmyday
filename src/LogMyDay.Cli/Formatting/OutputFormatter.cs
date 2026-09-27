@@ -118,7 +118,8 @@ public static class OutputFormatter
             table.AddRow(
                 a.Id.ToString(),
                 a.DateStarted.ToString("yyyy-MM-dd"),
-                Markup.Escape(a.PrimaryTagName ?? ""),
+                // A value a Tag Activity Relations rule calculated is marked; it is read-only.
+                Markup.Escape(a.PrimaryTagName ?? "") + (a.IsGenerated ? " [grey](computed)[/]" : string.Empty),
                 Markup.Escape(a.PrimaryTagValue ?? ""),
                 Markup.Escape(a.Description ?? ""));
         }
@@ -151,7 +152,7 @@ public static class OutputFormatter
         {
             table.AddRow(
                 t.Id.ToString(),
-                Markup.Escape(t.Title),
+                Markup.Escape(t.DisplayTitle),
                 t.InputTypeId?.ToString() ?? "",
                 Markup.Escape(t.UnitSymbol ?? ""),
                 Markup.Escape(t.GroupName ?? ""));
@@ -173,7 +174,7 @@ public static class OutputFormatter
         table.AddColumn("Value");
 
         table.AddRow("ID", t.Id.ToString());
-        table.AddRow("Name", Markup.Escape(t.Title));
+        table.AddRow("Name", Markup.Escape(t.DisplayTitle));
         table.AddRow("Description", Markup.Escape(t.Description ?? ""));
         table.AddRow("Input Type ID", t.InputTypeId?.ToString() ?? "");
         table.AddRow("Unit", Markup.Escape(t.UnitSymbol ?? ""));

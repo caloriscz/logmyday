@@ -536,7 +536,7 @@
                 var tag = numericTags.FirstOrDefault(t => t.Id == tagIds[i]!.Value);
                 if (tag != null)
                 {
-                    selections.Add(new TagSelection(tag.Id, tag.Title, tag.InputTypeId ?? 0, chartTypes[i]));
+                    selections.Add(new TagSelection(tag.Id, tag.DisplayTitle, tag.InputTypeId ?? 0, chartTypes[i]));
                 }
             }
         }

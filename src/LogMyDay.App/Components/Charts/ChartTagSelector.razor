@@ -13,7 +13,7 @@
                 var inputTypeName = tag.InputTypeId.HasValue && InputTypeNames.ContainsKey(tag.InputTypeId.Value)
                     ? InputTypeNames[tag.InputTypeId.Value]
                     : "Unknown";
-                <option value="@tag.Id">@tag.Title (@inputTypeName)</option>
+                <option value="@tag.Id">@tag.DisplayTitle (@inputTypeName)</option>
             }
         </select>
     </div>

@@ -273,7 +273,7 @@
     }
 
     private string BuildCellAriaLabel(ComparisonRowResult row, ComparisonCell cell)
-        => $"Open {row.Tag?.Title} for {cell.ActualDate.ToString("D", displayCulture)}";
+        => $"Open {row.Tag?.DisplayTitle} for {cell.ActualDate.ToString("D", displayCulture)}";
 
     // Copied from Calendar.razor rather than extracted: refactoring Calendar is out of scope here.
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
@@ -562,7 +562,7 @@
     /// </summary>
     private string BuildCellTooltip(ComparisonRowResult row, ComparisonCell cell)
     {
-        var name = row.Tag?.Title ?? "No metric";
+        var name = row.Tag?.DisplayTitle ?? "No metric";
         var offset = row.Config.EffectiveOffsetDays == 0
             ? string.Empty
             : $" ({ComparisonRowControls.FormatOffset(row.Config.EffectiveOffsetDays)})";

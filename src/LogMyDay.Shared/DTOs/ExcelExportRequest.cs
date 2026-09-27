@@ -43,4 +43,7 @@ public class ActivityExportRow
     public string Tag { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public int TimeGranularity { get; set; } // 0=Exact, 1=Daily, 2=Hourly
+
+    /// <summary>True for a value a Tag Activity Relations rule calculated.</summary>
+    public bool Generated { get; set; }
 }
