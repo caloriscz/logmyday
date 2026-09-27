@@ -11,11 +11,166 @@ public class BackupService : IBackupService
 {
     private readonly LogMyDayDbContext _context;
     private readonly ILogger<BackupService> _logger;
+    private readonly ITagRuleEngine _tagRuleEngine;
 
-    public BackupService(LogMyDayDbContext context, ILogger<BackupService> logger)
+    public BackupService(LogMyDayDbContext context, ILogger<BackupService> logger, ITagRuleEngine? tagRuleEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _tagRuleEngine = tagRuleEngine ?? new TagRuleEngine(context);
+    }
+
+    // Tag Activity Relations rules travel by tag name. Their calculated values are not exported:
+    // after an import they are recomputed from the restored sources.
+    private async Task<List<TagRuleBackup>> ExportTagRulesAsync(Guid? userId)
+    {
+        return await _context.TagRules
+            .Where(r => userId == null || r.UserId == userId)
+            .OrderBy(r => r.Name)
+            .Select(r => new TagRuleBackup
+            {
+                Name = r.Name,
+                TargetTagName = r.TargetTag!.TagName,
+                IgnoreZero = r.IgnoreZero,
+                IsEnabled = r.IsEnabled,
+                EffectiveFrom = r.EffectiveFrom,
+                DateCreated = r.DateCreated,
+                Sources = r.Sources
+                    .OrderBy(s => s.Id)
+                    .Select(s => new TagRuleSourceBackup { SourceTagName = s.SourceTag!.TagName, Factor = s.Factor })
+                    .ToList()
+            })
+            .ToListAsync();
+    }
+
+    // Restores rules by tag name with the same conditions as creating one: number tags only, the
+    // target is not a source, has no logged values and belongs to no other rule, and no rule feeds
+    // another. A rule that does not fit is skipped with a warning. Nothing is calculated here.
+    private async Task<List<TagRule>> ImportTagRulesAsync(List<TagRuleBackup> rules, BackupImportResult result, Guid? userId)
+    {
+        var imported = new List<TagRule>();
+        if (rules.Count == 0)
+        {
+            return imported;
+        }
+
+        var tags = await _context.Tags
+            .Where(t => userId == null || t.UserId == userId)
+            .ToListAsync();
+        var tagsByName = tags.GroupBy(t => t.TagName).ToDictionary(g => g.Key, g => g.First());
+        var claimedTargets = await _context.TagRules.Select(r => r.TargetTagId).ToHashSetAsync();
+
+        foreach (var backup in rules)
+        {
+            var reason = await RejectRule(backup, tagsByName, claimedTargets);
+            if (reason != null)
+            {
+                result.Statistics.TagRulesSkipped++;
+                result.Warnings.Add($"Rule '{backup.Name}' was not restored: {reason}");
+                continue;
+            }
+
+            var target = tagsByName[backup.TargetTagName];
+            var now = DateTime.UtcNow;
+            var rule = new TagRule
+            {
+                UserId = userId ?? target.UserId ?? Guid.Empty,
+                Name = backup.Name,
+                TargetTagId = target.Id,
+                IgnoreZero = backup.IgnoreZero,
+                IsEnabled = backup.IsEnabled,
+                EffectiveFrom = backup.EffectiveFrom,
+                DateCreated = backup.DateCreated == default ? now : backup.DateCreated,
+                DateUpdated = now,
+                Sources = backup.Sources
+                    .Select(s => new TagRuleSource { SourceTagId = tagsByName[s.SourceTagName].Id, Factor = s.Factor })
+                    .ToList()
+            };
+
+            target.IsComputed = true;
+            claimedTargets.Add(target.Id);
+            _context.TagRules.Add(rule);
+            imported.Add(rule);
+            result.Statistics.TagRulesImported++;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return imported;
+    }
+
+    private async Task<string?> RejectRule(TagRuleBackup backup, Dictionary<string, Tag> tagsByName, HashSet<int> claimedTargets)
+    {
+        if (!tagsByName.TryGetValue(backup.TargetTagName, out var target))
+        {
+            return $"its tag '{backup.TargetTagName}' is missing";
+        }
+
+        if (target.InputTypeId is not (1 or 6))
+        {
+            return $"'{target.TagName}' is not a number tag";
+        }
+
+        if (target.IsComputed || claimedTargets.Contains(target.Id))
+        {
+            return $"'{target.TagName}' already belongs to another rule";
+        }
+
+        if (backup.Sources.Count == 0)
+        {
+            return "it has no source tags";
+        }
+
+        foreach (var source in backup.Sources)
+        {
+            if (!tagsByName.TryGetValue(source.SourceTagName, out var tag))
+            {
+                return $"its source tag '{source.SourceTagName}' is missing";
+            }
+
+            if (tag.Id == target.Id || tag.IsComputed || tag.InputTypeId is not (1 or 6) || !double.IsFinite(source.Factor))
+            {
+                return $"its source '{source.SourceTagName}' cannot be used";
+            }
+        }
+
+        if (backup.Sources.Select(s => s.SourceTagName).Distinct().Count() != backup.Sources.Count)
+        {
+            return "a source tag appears twice";
+        }
+
+        if (await _context.Activities.AnyAsync(a => a.TagId == target.Id))
+        {
+            return $"'{target.TagName}' has logged values of its own";
+        }
+
+        return null;
+    }
+
+    // The separate step after the import is committed: every restored, enabled rule is recomputed
+    // over its active range from the restored source values, one month per transaction. Source
+    // rows were inserted directly, so nothing was evaluated during the import itself.
+    private async Task RecomputeImportedRulesAsync(List<TagRule> rules, BackupImportResult result)
+    {
+        var until = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        foreach (var rule in rules.Where(r => r.IsEnabled))
+        {
+            try
+            {
+                var loaded = await _context.TagRules
+                    .Include(r => r.Sources)
+                    .Include(r => r.TargetTag)
+                    .FirstAsync(r => r.Id == rule.Id);
+                var from = loaded.EffectiveFrom <= until ? loaded.EffectiveFrom : until;
+                var computed = await _tagRuleEngine.Recompute(loaded, from, until);
+                result.Statistics.TagRuleValuesComputed += computed.Created + computed.Updated;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Recomputing restored rule {RuleId} failed", rule.Id);
+                result.Warnings.Add($"Rule '{rule.Name}' was restored but its values could not be calculated: {ex.Message}. Use 'Past days' on the Rules page.");
+            }
+        }
     }
 
     public async Task<BackupData> ExportDataAsync(Guid? userId = null)
@@ -269,6 +424,8 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            var tagRules = await ExportTagRulesAsync(userId);
+
             var backupData = new BackupData
             {
                 Metadata = new BackupMetadata
@@ -286,7 +443,8 @@ public class BackupService : IBackupService
                     TotalScanMappings = scanMappings.Count,
                     TotalTodoLists = todoLists.Count,
                     TotalTodoItems = todoLists.Sum(l => l.Items.Count),
-                    TotalReminders = reminders.Count
+                    TotalReminders = reminders.Count,
+                    TotalTagRules = tagRules.Count
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -298,7 +456,8 @@ public class BackupService : IBackupService
                 Activities = activities,
                 ScanMappings = scanMappings,
                 TodoLists = todoLists,
-                Reminders = reminders
+                Reminders = reminders,
+                TagRules = tagRules
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -353,8 +512,13 @@ public class BackupService : IBackupService
                 await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
                 await ImportTodoListsAsync(backupData.TodoLists, result, userId);
                 await ImportRemindersAsync(backupData.Reminders, result, userId);
+                var importedRules = await ImportTagRulesAsync(backupData.TagRules, result, userId);
 
                 await transaction.CommitAsync();
+
+                // Rule values are recomputed from the restored sources as their own step, after
+                // the import is safely committed.
+                await RecomputeImportedRulesAsync(importedRules, result);
                 result.Message = "Data import completed successfully";
 
                 _logger.LogInformation("Data import completed successfully");
@@ -1224,7 +1388,8 @@ public class BackupService : IBackupService
                 TagGroups = userTagGroups,
                 TagOptionLists = userTagOptionLists,
                 TagOptions = userTagOptions,
-                ScanMappings = userScanMappings
+                ScanMappings = userScanMappings,
+                TagRules = await ExportTagRulesAsync(userId)
             };
 
             _logger.LogInformation("Secure backup created successfully");
@@ -1445,8 +1610,16 @@ public class BackupService : IBackupService
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Step 8: Tag Activity Relations rules, by tag name
+                var importedRules = await ImportTagRulesAsync(backup.TagRules, result, userId);
+
                 await transaction.CommitAsync();
-                
+
+                // Rule values are recomputed from the restored sources as their own step, after the
+                // restore is safely committed.
+                await RecomputeImportedRulesAsync(importedRules, result);
+
                 result.Message = "Secure backup restored successfully. All data has been assigned to your user account.";
                 
                 _logger.LogInformation("Secure backup restore completed successfully");

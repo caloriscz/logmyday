@@ -282,6 +282,74 @@ public class TagRuleTests
     }
 
     [Fact]
+    public async Task OnSqlite_BackupRoundTrip_RestoresRulesAndRecomputesTheirValues()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        var a = await f.AddTag("A");
+        var total = await f.AddTag("Total", inputTypeId: 6);
+        var rule = await f.CreateRule(total, (a, 2));
+        foreach (var daysAgo in new[] { 40, 3, 0 })
+        {
+            await f.Log(a, f.TodayAt(8).AddDays(-daysAgo), "3");
+        }
+        await f.Rules.Recompute(rule.Id, new TagRuleRecomputeRequest { From = f.Today.AddDays(-40), To = f.Today }, f.UserId);
+        var before = (await f.Results(total)).Select(r => (r.WindowKey, r.Description)).ToList();
+        Assert.Equal(3, before.Count);
+
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+
+        // Full backup: the rule is exported by tag name, its values are not.
+        var export = await backups.ExportDataAsync(f.UserId);
+        var exportedRule = Assert.Single(export.TagRules);
+        Assert.Equal("Total", exportedRule.TargetTagName);
+        Assert.Equal(("A", 2.0), (exportedRule.Sources.Single().SourceTagName, exportedRule.Sources.Single().Factor));
+        Assert.DoesNotContain(export.Activities, x => x.TagName == "Total");
+
+        await backups.ClearDataAsync(f.UserId);
+        Assert.False(await f.Context.TagRules.AnyAsync());
+
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, f.UserId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors));
+        Assert.Equal(1, imported.Statistics.TagRulesImported);
+        Assert.Equal(3, imported.Statistics.TagRuleValuesComputed);
+
+        var restoredTotal = await f.Context.Tags.SingleAsync(t => t.TagName == "Total" && t.UserId == f.UserId);
+        Assert.True(restoredTotal.IsComputed);
+        Assert.Equal(before, (await f.Results(restoredTotal)).Select(r => (r.WindowKey, r.Description)).ToList());
+
+        // Secure backup: the same round trip through the per-user format.
+        var secure = await backups.CreateSecureBackup(f.UserId);
+        Assert.Single(secure.TagRules);
+        await backups.ClearUserData(f.UserId);
+        var restored = await backups.RestoreSecureBackup(secure, f.UserId);
+        Assert.True(restored.Success, string.Join("; ", restored.Errors));
+        Assert.Equal(3, restored.Statistics.TagRuleValuesComputed);
+    }
+
+    [Fact]
+    public async Task BackupImport_SkipsARuleWhoseTagsDoNotFit_WithAWarning()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        await f.AddTag("Total", inputTypeId: 6);
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+
+        var result = await backups.ImportDataAsync(new BackupData
+        {
+            Metadata = new BackupMetadata(),
+            TagRules = [new TagRuleBackup { Name = "Orphan", TargetTagName = "Total", Sources = [new() { SourceTagName = "Missing", Factor = 1 }] }]
+        }, clearExistingData: false, f.UserId);
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(1, result.Statistics.TagRulesSkipped);
+        Assert.Contains(result.Warnings, w => w.Contains("'Missing'"));
+        Assert.False(await f.Context.TagRules.AnyAsync());
+    }
+
+    [Fact]
     public async Task AccumulatePath_AlsoUpdatesTheResult()
     {
         var f = CreateFixture(nameof(AccumulatePath_AlsoUpdatesTheResult));
