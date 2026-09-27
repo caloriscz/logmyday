@@ -266,6 +266,22 @@ public class TagRuleTests
     }
 
     [Fact]
+    public async Task RepeatableSourceSeveralTimesADay_AndANegativeFactor_SumPerDay()
+    {
+        var f = CreateFixture(nameof(RepeatableSourceSeveralTimesADay_AndANegativeFactor_SumPerDay));
+        var dose = await f.AddTag("Dose", repeatable: true);   // logged morning and afternoon
+        var loss = await f.AddTag("Loss", inputTypeId: 6);     // subtracted
+        var net = await f.AddTag("Net", inputTypeId: 6);
+        await f.CreateRule(net, (dose, 1), (loss, -0.5));
+
+        await f.Log(dose, f.TodayAt(8), "144");
+        await f.Log(dose, f.TodayAt(14), "96");
+        await f.Log(loss, f.TodayAt(20), "10");
+
+        Assert.Equal("235", Assert.Single(await f.Results(net)).Description); // 144 + 96 − 0.5 × 10
+    }
+
+    [Fact]
     public async Task AccumulatePath_AlsoUpdatesTheResult()
     {
         var f = CreateFixture(nameof(AccumulatePath_AlsoUpdatesTheResult));

@@ -28,4 +28,9 @@ public class TagResponse
     /// <summary>True while a Tag Activity Relations rule targets this tag: its values are
     /// generated and it is not offered for manual logging.</summary>
     public bool IsComputed { get; set; }
+
+    /// <summary>The title as analysis views show it: a computed tag is marked so a chart or
+    /// comparison never passes a calculated value off as a logged one. Not serialized.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayTitle => IsComputed ? $"{Title} (computed)" : Title;
 }

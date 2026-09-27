@@ -60,6 +60,24 @@ public class TagRuleIntegrationTests : IClassFixture<CustomWebApplicationFactory
         var results = McpTestClient.Json(await client.CallAsync("list_activities", new { tag = targetName }));
         var row = Assert.Single(results.GetProperty("items").EnumerateArray());
         Assert.Equal("5", row.GetProperty("value").GetString());
+        Assert.True(row.GetProperty("generated").GetBoolean());
+
+        var source = McpTestClient.Json(await client.CallAsync("list_activities", new { tag = sourceName }));
+        Assert.False(Assert.Single(source.GetProperty("items").EnumerateArray()).GetProperty("generated").GetBoolean());
+
+        // The rule is readable over MCP, and the target tag says it is computed.
+        var listed = McpTestClient.Json(await client.CallAsync("list_tag_rules", new { }));
+        var rule = Assert.Single(listed.EnumerateArray(), r => r.GetProperty("targetTagId").GetInt32() == targetId);
+        var ruleSource = Assert.Single(rule.GetProperty("sources").EnumerateArray());
+        Assert.Equal(sourceId, ruleSource.GetProperty("sourceTagId").GetInt32());
+        Assert.Equal(2.5, ruleSource.GetProperty("factor").GetDouble());
+        Assert.Equal(1, rule.GetProperty("resultCount").GetInt32());
+
+        var one = McpTestClient.Json(await client.CallAsync("get_tag_rule", new { ruleId = rule.GetProperty("id").GetInt32() }));
+        Assert.Equal("Pill total", one.GetProperty("name").GetString());
+
+        var found = McpTestClient.Json(await client.CallAsync("find_tag", new { query = targetName }));
+        Assert.Contains("\"isComputed\":true", found.GetRawText());
 
         var refused = await client.CallAsync("log_value", new { tag = targetName, value = 1, dateTime = $"{today}T10:00" });
         Assert.True(refused.IsError);
