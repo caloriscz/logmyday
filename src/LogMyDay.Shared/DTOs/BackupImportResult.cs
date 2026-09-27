@@ -37,6 +37,10 @@ public class BackupImportStatistics
     public int TodoItemsSkipped { get; set; }
     public int RemindersImported { get; set; }
     public int RemindersSkipped { get; set; }
+    public int TagRulesImported { get; set; }
+    public int TagRulesSkipped { get; set; }
+    /// <summary>Values the restored rules calculated from the restored sources.</summary>
+    public int TagRuleValuesComputed { get; set; }
     public int RecordsCleared { get; set; }
 }
 

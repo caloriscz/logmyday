@@ -15,6 +15,7 @@ public class BackupData
     public List<ScanMappingBackup> ScanMappings { get; set; } = new();
     public List<TodoListBackup> TodoLists { get; set; } = new();
     public List<ReminderBackup> Reminders { get; set; } = new();
+    public List<TagRuleBackup> TagRules { get; set; } = new();
 }
 
 public class BackupMetadata
@@ -34,4 +35,5 @@ public class BackupMetadata
     public int TotalTodoLists { get; set; }
     public int TotalTodoItems { get; set; }
     public int TotalReminders { get; set; }
+    public int TotalTagRules { get; set; }
 }

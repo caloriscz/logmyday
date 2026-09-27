@@ -14,6 +14,7 @@ public class SecureBackupDto
     public List<SecureTagOptionBackupDto> TagOptions { get; set; } = new();
     public List<SecureNotificationBackupDto> Notifications { get; set; } = new();
     public List<SecureScanMappingBackupDto> ScanMappings { get; set; } = new();
+    public List<TagRuleBackup> TagRules { get; set; } = new();
 }
 
 /// <summary>
