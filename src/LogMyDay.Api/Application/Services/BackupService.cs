@@ -44,6 +44,10 @@ public class BackupService : IBackupService
                     Sources = r.Sources
                         .OrderBy(s => s.Id)
                         .Select(s => new TagRuleSourceBackup { SourceTagName = s.SourceTag!.TagName, Factor = s.Factor })
+                        .ToList(),
+                    Cases = r.Cases
+                        .OrderBy(c => c.SortOrder)
+                        .Select(c => new TagRuleCaseBackup { Operator = c.Operator, Operand = c.Operand, ResultValue = c.ResultValue })
                         .ToList()
                 }
             })
@@ -111,6 +115,9 @@ public class BackupService : IBackupService
                 DateUpdated = now,
                 Sources = backup.Sources
                     .Select(s => new TagRuleSource { SourceTagId = tagsByName[s.SourceTagName].Id, Factor = s.Factor })
+                    .ToList(),
+                Cases = backup.Cases
+                    .Select((c, i) => new TagRuleCase { SortOrder = i, Operator = c.Operator, Operand = c.Operand, ResultValue = c.ResultValue })
                     .ToList()
             };
 
@@ -163,9 +170,10 @@ public class BackupService : IBackupService
             return $"its tag '{backup.TargetTagName}' is missing";
         }
 
-        if (target.InputTypeId is not (1 or 6))
+        var conditional = backup.Template == Domain.Enums.TagRuleTemplate.Conditional;
+        if (conditional ? !(target.OptionListId != null || target.InputTypeId is 1 or 2 or 3 or 6) : target.InputTypeId is not (1 or 6))
         {
-            return $"'{target.TagName}' is not a number tag";
+            return $"'{target.TagName}' cannot hold this rule's results";
         }
 
         if (target.IsComputed || claimedTargets.Contains(target.Id))
@@ -178,9 +186,9 @@ public class BackupService : IBackupService
             return "it has no source tags";
         }
 
-        if (backup.Template == Domain.Enums.TagRuleTemplate.Conditional)
+        if (conditional && (backup.Sources.Count != 1 || backup.Cases.Count == 0))
         {
-            return "conditional rules cannot be restored by this version";
+            return "a conditional rule needs one source tag and at least one case";
         }
 
         if (backup.Template == Domain.Enums.TagRuleTemplate.Aggregate && backup.AggregateKind == null)
@@ -222,6 +230,7 @@ public class BackupService : IBackupService
         {
             Domain.Enums.TagRuleTemplate.Aggregate when backup.AggregateKind == Domain.Enums.TagRuleAggregateKind.Count => true,
             Domain.Enums.TagRuleTemplate.Aggregate => tag.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11,
+            Domain.Enums.TagRuleTemplate.Conditional => true,
             _ => tag.InputTypeId is 1 or 6
         };
     }
@@ -237,7 +246,8 @@ public class BackupService : IBackupService
             try
             {
                 var loaded = await _context.TagRules
-                    .Include(r => r.Sources)
+                    .Include(r => r.Sources).ThenInclude(s => s.SourceTag)
+                    .Include(r => r.Cases)
                     .Include(r => r.TargetTag)
                     .FirstAsync(r => r.Id == rule.Id);
                 var from = loaded.EffectiveFrom <= until ? loaded.EffectiveFrom : until;

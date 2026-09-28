@@ -501,6 +501,181 @@ public class TagRuleTests
         Assert.Equal("2.5", Assert.Single(await f.Results(restored)).Description);
     }
 
+    private static Task<TagRuleResponse> CreateConditional(Fixture f, Tag target, Tag source, bool ignoreZero, params (TagRuleOperator Op, string? Operand, string Result)[] cases) =>
+        f.Rules.Create(new TagRuleRequest
+        {
+            Name = "Conditional",
+            Template = TagRuleTemplate.Conditional,
+            TargetTagId = target.Id,
+            IgnoreZero = ignoreZero,
+            Sources = [new() { SourceTagId = source.Id }],
+            Cases = cases.Select(c => new TagRuleCaseRequest { Operator = c.Op, Operand = c.Operand, ResultValue = c.Result }).ToList()
+        }, f.UserId);
+
+    [Fact]
+    public async Task Presence_GivesTheFixedValueOnLoggedDaysOnly()
+    {
+        var f = CreateFixture(nameof(Presence_GivesTheFixedValueOnLoggedDaysOnly));
+        var gym = await f.AddTag("Gym", inputTypeId: 2);
+        var exercise = await f.AddTag("Exercise", inputTypeId: 3);
+        await CreateConditional(f, exercise, gym, ignoreZero: true, (TagRuleOperator.IsLogged, null, "yes"));
+
+        var visit = await f.Log(gym, f.TodayAt(18), "legs");
+        Assert.Equal("true", Assert.Single(await f.Results(exercise)).Description);
+
+        await f.Activities.Delete(visit.Id, f.UserId);
+        Assert.Empty(await f.Results(exercise));
+    }
+
+    [Fact]
+    public async Task Conditional_OrderedCasesOnTheDayTotal_FirstMatchWins()
+    {
+        var f = CreateFixture(nameof(Conditional_OrderedCasesOnTheDayTotal_FirstMatchWins));
+        var coffees = await f.AddTag("Coffees");
+        var caffeine = await f.AddTag("Caffeine", inputTypeId: 2);
+        await CreateConditional(f, caffeine, coffees, ignoreZero: true,
+            (TagRuleOperator.GreaterOrEqual, "4", "Over limit"),
+            (TagRuleOperator.GreaterOrEqual, "2", "Normal"),
+            (TagRuleOperator.Otherwise, null, "Low"));
+
+        var first = await f.Log(coffees, f.TodayAt(7), "1");
+        Assert.Equal("Low", Assert.Single(await f.Results(caffeine)).Description);
+
+        await f.Log(coffees, f.TodayAt(10), "2");                  // day total 3
+        Assert.Equal("Normal", Assert.Single(await f.Results(caffeine)).Description);
+
+        await f.Activities.Update(first.Id, new ActivityRequest { PrimaryTagId = coffees.Id, DateStarted = f.TodayAt(7), Description = "2" }, f.UserId);
+        Assert.Equal("Over limit", Assert.Single(await f.Results(caffeine)).Description); // total 4
+    }
+
+    [Fact]
+    public async Task Conditional_NoMatchingCase_LeavesNoValue()
+    {
+        var f = CreateFixture(nameof(Conditional_NoMatchingCase_LeavesNoValue));
+        var coffees = await f.AddTag("Coffees");
+        var flag = await f.AddTag("Over", inputTypeId: 3);
+        await CreateConditional(f, flag, coffees, ignoreZero: true, (TagRuleOperator.Greater, "3", "yes"));
+
+        var logged = await f.Log(coffees, f.TodayAt(7), "5");
+        Assert.Equal("true", Assert.Single(await f.Results(flag)).Description);
+
+        await f.Activities.Update(logged.Id, new ActivityRequest { PrimaryTagId = coffees.Id, DateStarted = f.TodayAt(7), Description = "2" }, f.UserId);
+        Assert.Empty(await f.Results(flag)); // the condition stopped holding: the value is retracted
+    }
+
+    [Fact]
+    public async Task Conditional_TextSource_UsesTheLatestEntry_AndWritesAnOption()
+    {
+        var f = CreateFixture(nameof(Conditional_TextSource_UsesTheLatestEntry_AndWritesAnOption));
+        var list = new TagOptionList { Name = "Breakfast kinds", UserId = f.UserId };
+        f.Context.TagOptionLists.Add(list);
+        await f.Context.SaveChangesAsync();
+        f.Context.TagOptions.AddRange(
+            new TagOption { OptionListId = list.Id, Value = "hotel", DisplayName = "Hotel breakfast" },
+            new TagOption { OptionListId = list.Id, Value = "home", DisplayName = "At home" });
+        var place = await f.AddTag("Place", inputTypeId: 2);
+        var breakfast = await f.AddTag("Breakfast kind", inputTypeId: 2);
+        var tracked = await f.Context.Tags.FindAsync(breakfast.Id);
+        tracked!.OptionListId = list.Id;
+        await f.Context.SaveChangesAsync();
+
+        // The option is given by its display name and stored as its value.
+        await CreateConditional(f, breakfast, place, ignoreZero: true,
+            (TagRuleOperator.Equal, "HOTEL", "Hotel breakfast"),
+            (TagRuleOperator.Otherwise, null, "home"));
+
+        await f.Log(place, f.TodayAt(7), "home");
+        await f.Log(place, f.TodayAt(20), "hotel"); // the latest entry decides
+        Assert.Equal("hotel", Assert.Single(await f.Results(breakfast)).Description);
+
+        var ruleId = (await f.Rules.GetAll(f.UserId)).Single().Id;
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Update(
+            ruleId,
+            new TagRuleRequest
+            {
+                Name = "Conditional",
+                Template = TagRuleTemplate.Conditional,
+                TargetTagId = breakfast.Id,
+                Sources = [new() { SourceTagId = place.Id }],
+                Cases = [new() { Operator = TagRuleOperator.IsLogged, ResultValue = "not an option" }]
+            }, f.UserId));
+    }
+
+    [Fact]
+    public async Task Conditional_YesNoSource_IsYesAndIsNo()
+    {
+        var f = CreateFixture(nameof(Conditional_YesNoSource_IsYesAndIsNo));
+        var alcohol = await f.AddTag("Alcohol", inputTypeId: 3);
+        var note = await f.AddTag("Evening", inputTypeId: 2);
+
+        // "is no" cannot match while zero values ("no" entries) are ignored.
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, note, alcohol, ignoreZero: true,
+            (TagRuleOperator.IsNo, null, "sober")));
+
+        await CreateConditional(f, note, alcohol, ignoreZero: false,
+            (TagRuleOperator.IsYes, null, "drank"),
+            (TagRuleOperator.IsNo, null, "sober"));
+        await f.Log(alcohol, f.TodayAt(21), "false");
+        Assert.Equal("sober", Assert.Single(await f.Results(note)).Description);
+    }
+
+    [Fact]
+    public async Task Conditional_Validation_RejectsCasesThatCannotWork()
+    {
+        var f = CreateFixture(nameof(Conditional_Validation_RejectsCasesThatCannotWork));
+        var text = await f.AddTag("Text", inputTypeId: 2);
+        var number = await f.AddTag("Number");
+        var other = await f.AddTag("Other");
+        var target = await f.AddTag("Target", inputTypeId: 1);
+        var date = await f.AddTag("Date", inputTypeId: 4);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, number, true,
+            (TagRuleOperator.Otherwise, null, "1"), (TagRuleOperator.Greater, "2", "2")));          // otherwise not last
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, text, true,
+            (TagRuleOperator.Greater, "2", "1")));                                                 // > needs a number source
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, number, true,
+            (TagRuleOperator.Equal, "abc", "1")));                                                 // operand must be a number
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, number, true,
+            (TagRuleOperator.IsLogged, null, "lots")));                                            // number target needs a number
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, date, number, true,
+            (TagRuleOperator.IsLogged, null, "2026-01-01")));                                      // date is not a result type
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
+        {
+            Name = "Two sources",
+            Template = TagRuleTemplate.Conditional,
+            TargetTagId = target.Id,
+            Sources = [new() { SourceTagId = number.Id }, new() { SourceTagId = other.Id }],
+            Cases = [new() { Operator = TagRuleOperator.IsLogged, ResultValue = "1" }]
+        }, f.UserId));
+    }
+
+    [Fact]
+    public async Task OnSqlite_ConditionalRule_SurvivesBackupRoundTrip()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        var coffees = await f.AddTag("Coffees");
+        var caffeine = await f.AddTag("Caffeine", inputTypeId: 2);
+        await CreateConditional(f, caffeine, coffees, ignoreZero: true,
+            (TagRuleOperator.GreaterOrEqual, "4", "Over limit"),
+            (TagRuleOperator.Otherwise, null, "Fine"));
+        await f.Log(coffees, f.TodayAt(8), "5");
+
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+        var export = await backups.ExportDataAsync(f.UserId);
+        Assert.Equal(2, Assert.Single(export.TagRules).Cases.Count);
+
+        await backups.ClearDataAsync(f.UserId);
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, f.UserId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors) + string.Join("; ", imported.Warnings));
+
+        var rule = await f.Context.TagRules.Include(r => r.Cases).SingleAsync();
+        Assert.Equal([TagRuleOperator.GreaterOrEqual, TagRuleOperator.Otherwise], rule.Cases.OrderBy(c => c.SortOrder).Select(c => c.Operator));
+        var restored = await f.Context.Tags.SingleAsync(t => t.TagName == "Caffeine" && t.UserId == f.UserId);
+        Assert.Equal("Over limit", Assert.Single(await f.Results(restored)).Description);
+    }
+
     [Fact]
     public async Task AccumulatePath_AlsoUpdatesTheResult()
     {

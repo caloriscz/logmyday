@@ -17,6 +17,22 @@ public class TagRuleRequest
     public bool IgnoreZero { get; set; } = true;
     public bool IsEnabled { get; set; } = true;
     public List<TagRuleSourceRequest> Sources { get; set; } = new();
+
+    /// <summary>For <see cref="TagRuleTemplate.Conditional"/>: the ordered cases; the first whose
+    /// condition holds on the source's day value gives the result. Presence is a single
+    /// <see cref="TagRuleOperator.IsLogged"/> case.</summary>
+    public List<TagRuleCaseRequest> Cases { get; set; } = new();
+}
+
+public class TagRuleCaseRequest
+{
+    public TagRuleOperator Operator { get; set; }
+
+    /// <summary>The value compared with; required for =, ≠, &gt;, ≥, &lt;, ≤.</summary>
+    public string? Operand { get; set; }
+
+    /// <summary>The value the result tag gets: text, an option of its list, true/false, or a number.</summary>
+    public string ResultValue { get; set; } = string.Empty;
 }
 
 public class TagRuleSourceRequest

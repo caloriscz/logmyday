@@ -25,7 +25,8 @@ public class TagRuleEngine : ITagRuleEngine
 
         var tagIds = changes.Select(c => c.TagId).Distinct().ToList();
         var rules = await _context.TagRules
-            .Include(r => r.Sources)
+            .Include(r => r.Sources).ThenInclude(s => s.SourceTag)
+            .Include(r => r.Cases)
             .Include(r => r.TargetTag)
             .Where(r => r.UserId == userId && r.IsEnabled && r.Sources.Any(s => tagIds.Contains(s.SourceTagId)))
             .ToListAsync();
@@ -114,35 +115,35 @@ public class TagRuleEngine : ITagRuleEngine
             .ToDictionary(g => g.Key, g => g.First());
 
         var skipped = 0;
-        var byDay = new Dictionary<string, List<(int TagId, string? Description)>>();
+        var byDay = new Dictionary<string, List<SourceRow>>();
         foreach (var row in sourceRows)
         {
             var dayKey = WindowKey(DateOnly.FromDateTime(row.DateStarted));
             if (!byDay.TryGetValue(dayKey, out var dayRows))
             {
-                byDay[dayKey] = dayRows = new List<(int, string?)>();
+                byDay[dayKey] = dayRows = new List<SourceRow>();
             }
 
-            dayRows.Add((row.TagId, row.Description));
+            dayRows.Add(new SourceRow(row.TagId, row.DateStarted, row.Description));
         }
 
-        // The rule's value for each day that has one. A day missing here has no value.
-        var sums = new Dictionary<string, double>();
+        // The rule's stored value for each day that has one. A day missing here has no value.
+        var values = new Dictionary<string, string>();
         foreach (var (dayKey, dayRows) in byDay)
         {
             var (value, daySkipped) = DayValue(rule, factors, dayRows);
             skipped += daySkipped;
-            if (value.HasValue)
+            if (value != null)
             {
-                sums[dayKey] = value.Value;
+                values[dayKey] = value;
             }
         }
 
         int created = 0, updated = 0, deleted = 0, unchanged = 0;
-        foreach (var key in sums.Keys.Union(resultsByKey.Keys))
+        foreach (var key in values.Keys.Union(resultsByKey.Keys))
         {
             var hasResult = resultsByKey.TryGetValue(key, out var existing);
-            if (!sums.TryGetValue(key, out var sum))
+            if (!values.TryGetValue(key, out var value))
             {
                 deleted++;
                 if (!dryRun)
@@ -153,7 +154,6 @@ public class TagRuleEngine : ITagRuleEngine
                 continue;
             }
 
-            var value = ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, sum);
             if (!hasResult)
             {
                 created++;
@@ -191,36 +191,38 @@ public class TagRuleEngine : ITagRuleEngine
         return new TagRuleRangeResult(created, updated, deleted, unchanged, skipped);
     }
 
-    // One day's value by template, and how many non-empty source values were not numbers where a
-    // number was needed. "Ignore zero values" leaves out skip markers (0 / false) everywhere, so a
-    // day with only skip markers has no value.
-    private static (double? Value, int Skipped) DayValue(TagRule rule, Dictionary<int, double> factors, List<(int TagId, string? Description)> rows)
-    {
-        var skipped = 0;
-        var numbers = new List<(int TagId, double Value)>();
-        var entries = 0;
-        foreach (var (tagId, description) in rows)
-        {
-            if (rule.IgnoreZero && IsSkipMarker(description))
-            {
-                continue;
-            }
+    private sealed record SourceRow(int TagId, DateTime DateStarted, string? Description);
 
-            entries++;
-            if (ActivityValueCodec.TryReadNumber(description, out var number))
-            {
-                numbers.Add((tagId, number));
-            }
-            else if (!string.IsNullOrWhiteSpace(description))
-            {
-                skipped++;
-            }
+    // One day's stored value by template, and how many non-empty source values were not numbers
+    // where a number was needed. "Ignore zero values" leaves out skip markers (0 / false)
+    // everywhere, so a day with only skip markers has no value.
+    private static (string? Value, int Skipped) DayValue(TagRule rule, Dictionary<int, double> factors, List<SourceRow> rows)
+    {
+        var counted = rows.Where(r => !(rule.IgnoreZero && IsSkipMarker(r.Description))).ToList();
+
+        if (rule.Template == TagRuleTemplate.Conditional)
+        {
+            return (ConditionalValue(rule, counted), 0);
         }
 
         if (rule.Template == TagRuleTemplate.Aggregate && rule.AggregateKind == TagRuleAggregateKind.Count)
         {
             // Count takes entries of any type, so nothing it sees is skipped.
-            return (entries > 0 ? entries : null, 0);
+            return (counted.Count > 0 ? ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, counted.Count) : null, 0);
+        }
+
+        var skipped = 0;
+        var numbers = new List<(int TagId, double Value)>();
+        foreach (var row in counted)
+        {
+            if (ActivityValueCodec.TryReadNumber(row.Description, out var number))
+            {
+                numbers.Add((row.TagId, number));
+            }
+            else if (!string.IsNullOrWhiteSpace(row.Description))
+            {
+                skipped++;
+            }
         }
 
         if (numbers.Count == 0)
@@ -228,7 +230,7 @@ public class TagRuleEngine : ITagRuleEngine
             return (null, skipped);
         }
 
-        double value = rule.Template switch
+        double result = rule.Template switch
         {
             TagRuleTemplate.Aggregate => rule.AggregateKind switch
             {
@@ -239,7 +241,88 @@ public class TagRuleEngine : ITagRuleEngine
             _ => numbers.Sum(n => n.Value * factors[n.TagId])
         };
 
-        return (value, skipped);
+        return (ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, result), skipped);
+    }
+
+    // The first case whose condition holds on the day value gives the result; none → no value.
+    // The day value is the day total for a number source and the latest entry otherwise. A day
+    // without a counted entry has no value at all, so "otherwise" applies only to logged days.
+    private static string? ConditionalValue(TagRule rule, List<SourceRow> counted)
+    {
+        if (counted.Count == 0)
+        {
+            return null;
+        }
+
+        var source = rule.Sources.FirstOrDefault()?.SourceTag;
+        var numericSource = source?.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
+
+        double? dayNumber = null;
+        string? dayText = null;
+        if (numericSource)
+        {
+            var numbers = counted
+                .Select(r => ActivityValueCodec.TryReadNumber(r.Description, out var n) ? (double?)n : null)
+                .Where(n => n.HasValue)
+                .ToList();
+            dayNumber = numbers.Count > 0 ? numbers.Sum() : null;
+        }
+        else
+        {
+            dayText = counted.OrderBy(r => r.DateStarted).Last().Description?.Trim();
+        }
+
+        foreach (var ruleCase in rule.Cases.OrderBy(c => c.SortOrder))
+        {
+            if (Holds(ruleCase, numericSource, dayNumber, dayText))
+            {
+                return ruleCase.ResultValue;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool Holds(TagRuleCase ruleCase, bool numericSource, double? dayNumber, string? dayText)
+    {
+        switch (ruleCase.Operator)
+        {
+            case TagRuleOperator.IsLogged:
+            case TagRuleOperator.Otherwise:
+                return true;
+            case TagRuleOperator.IsYes:
+                return string.Equals(dayText, "true", StringComparison.OrdinalIgnoreCase);
+            case TagRuleOperator.IsNo:
+                return string.Equals(dayText, "false", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (numericSource)
+        {
+            if (dayNumber is not double day || !ActivityValueCodec.TryReadNumber(ruleCase.Operand, out var operand))
+            {
+                return false;
+            }
+
+            return ruleCase.Operator switch
+            {
+                TagRuleOperator.Equal => day == operand,
+                TagRuleOperator.NotEqual => day != operand,
+                TagRuleOperator.Greater => day > operand,
+                TagRuleOperator.GreaterOrEqual => day >= operand,
+                TagRuleOperator.Less => day < operand,
+                TagRuleOperator.LessOrEqual => day <= operand,
+                _ => false
+            };
+        }
+
+        var matches = string.Equals(dayText, ruleCase.Operand?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        return ruleCase.Operator switch
+        {
+            TagRuleOperator.Equal => matches,
+            TagRuleOperator.NotEqual => !matches,
+            _ => false
+        };
     }
 
     private static bool IsSkipMarker(string? description)

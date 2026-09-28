@@ -52,7 +52,7 @@ public class TagRuleService : ITagRuleService
 
     public async Task<TagRuleResponse> Create(TagRuleRequest request, Guid userId)
     {
-        var (target, sources) = await Validate(request, userId, ruleId: null);
+        var (target, sources, cases) = await Validate(request, userId, ruleId: null);
         var today = await UserToday(userId);
         var now = DateTime.UtcNow;
 
@@ -70,7 +70,8 @@ public class TagRuleService : ITagRuleService
             DateUpdated = now,
             Sources = request.Sources
                 .Select(s => new TagRuleSource { SourceTagId = s.SourceTagId, Factor = FactorFor(request, s) })
-                .ToList()
+                .ToList(),
+            Cases = cases
         };
 
         target.IsComputed = true;
@@ -97,7 +98,7 @@ public class TagRuleService : ITagRuleService
             throw new ArgumentException("The target tag of a rule cannot change. Delete the rule and create a new one.");
         }
 
-        var (target, sources) = await Validate(request, userId, ruleId: id);
+        var (target, sources, cases) = await Validate(request, userId, ruleId: id);
 
         rule.Name = request.Name.Trim();
         rule.Template = request.Template;
@@ -124,6 +125,28 @@ public class TagRuleService : ITagRuleService
         foreach (var (sourceTagId, factor) in requested)
         {
             rule.Sources.Add(new TagRuleSource { RuleId = rule.Id, SourceTagId = sourceTagId, Factor = factor });
+        }
+
+        // Cases are rewritten by position, so the unique (rule, sort order) index never sees a clash.
+        var existingCases = rule.Cases.OrderBy(c => c.SortOrder).ToList();
+        for (var i = 0; i < Math.Max(existingCases.Count, cases.Count); i++)
+        {
+            if (i >= cases.Count)
+            {
+                rule.Cases.Remove(existingCases[i]);
+                _context.TagRuleCases.Remove(existingCases[i]);
+            }
+            else if (i >= existingCases.Count)
+            {
+                cases[i].RuleId = rule.Id;
+                rule.Cases.Add(cases[i]);
+            }
+            else
+            {
+                existingCases[i].Operator = cases[i].Operator;
+                existingCases[i].Operand = cases[i].Operand;
+                existingCases[i].ResultValue = cases[i].ResultValue;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -259,16 +282,16 @@ public class TagRuleService : ITagRuleService
     // A rule reads tags the caller owns and writes a numeric target tag that belongs to this rule
     // alone. Weighted sum: number sources. Aggregate: number, rating, score or percentage sources,
     // or any tag for Count. No chaining: a computed tag cannot be a source.
-    private async Task<(Tag Target, Dictionary<int, Tag> Sources)> Validate(TagRuleRequest request, Guid userId, int? ruleId)
+    private async Task<(Tag Target, Dictionary<int, Tag> Sources, List<TagRuleCase> Cases)> Validate(TagRuleRequest request, Guid userId, int? ruleId)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
         {
             throw new ArgumentException("A rule needs a name of at most 100 characters.");
         }
 
-        if (request.Template == TagRuleTemplate.Conditional)
+        if (request.Template == TagRuleTemplate.Conditional && request.Sources.Count != 1)
         {
-            throw new ArgumentException("Conditional rules are not available yet.");
+            throw new ArgumentException("A conditional rule reads exactly one source tag.");
         }
 
         if (request.Template == TagRuleTemplate.Aggregate && request.AggregateKind == null)
@@ -311,7 +334,14 @@ public class TagRuleService : ITagRuleService
             throw new KeyNotFoundException("Target tag not found");
         }
 
-        if (!IsNumeric(target))
+        if (request.Template == TagRuleTemplate.Conditional)
+        {
+            if (!IsConditionalTarget(target))
+            {
+                throw new ArgumentException($"The result tag '{target.TagName}' must be a text, option list, yes/no or number tag.");
+            }
+        }
+        else if (!IsNumeric(target))
         {
             throw new ArgumentException($"The target tag '{target.TagName}' must be a number tag (Integer or Decimal).");
         }
@@ -356,7 +386,11 @@ public class TagRuleService : ITagRuleService
             }
         }
 
-        return (target, sources);
+        var cases = request.Template == TagRuleTemplate.Conditional
+            ? await ValidateCases(request, sources.Values.Single(), target)
+            : new List<TagRuleCase>();
+
+        return (target, sources, cases);
     }
 
     private static bool IsNumeric(Tag tag) => tag.InputTypeId is 1 or 6;
@@ -377,6 +411,140 @@ public class TagRuleService : ITagRuleService
         };
     }
 
+    private const int MaxCases = 20;
+
+    // A conditional result can be text, one option of a list, yes/no or a number.
+    private static bool IsConditionalTarget(Tag tag) => tag.OptionListId != null || tag.InputTypeId is 1 or 2 or 3 or 6;
+
+    // Checks each case against the source's type and normalises its result to the target's stored
+    // encoding. The first matching case wins at evaluation, so overlap is never ambiguous.
+    private async Task<List<TagRuleCase>> ValidateCases(TagRuleRequest request, Tag source, Tag target)
+    {
+        if (request.Cases.Count == 0)
+        {
+            throw new ArgumentException("A conditional rule needs at least one case.");
+        }
+
+        if (request.Cases.Count > MaxCases)
+        {
+            throw new ArgumentException($"A rule can have at most {MaxCases} cases.");
+        }
+
+        var numericSource = IsNumericLike(source);
+        var booleanSource = source.InputTypeId == 3 && source.OptionListId == null;
+        var options = target.OptionListId is int listId
+            ? await _context.TagOptions.Where(o => o.OptionListId == listId).ToListAsync()
+            : null;
+
+        var cases = new List<TagRuleCase>();
+        for (var i = 0; i < request.Cases.Count; i++)
+        {
+            var requested = request.Cases[i];
+            var position = $"Case {i + 1}";
+            var op = requested.Operator;
+
+            if (op == TagRuleOperator.Otherwise && i != request.Cases.Count - 1)
+            {
+                throw new ArgumentException($"{position}: \"otherwise\" can only be the last case.");
+            }
+
+            var operand = requested.Operand?.Trim();
+            switch (op)
+            {
+                case TagRuleOperator.IsLogged:
+                case TagRuleOperator.Otherwise:
+                    operand = null;
+                    break;
+                case TagRuleOperator.IsYes:
+                case TagRuleOperator.IsNo:
+                    if (!booleanSource)
+                    {
+                        throw new ArgumentException($"{position}: \"is yes\" and \"is no\" need a yes/no source tag.");
+                    }
+
+                    if (op == TagRuleOperator.IsNo && request.IgnoreZero)
+                    {
+                        throw new ArgumentException($"{position}: \"is no\" cannot match while \"Ignore zero values\" leaves out \"no\" entries. Turn that option off.");
+                    }
+
+                    operand = null;
+                    break;
+                case TagRuleOperator.Equal:
+                case TagRuleOperator.NotEqual:
+                    if (booleanSource)
+                    {
+                        throw new ArgumentException($"{position}: use \"is yes\" or \"is no\" for a yes/no source tag.");
+                    }
+
+                    if (string.IsNullOrEmpty(operand) || (numericSource && !ActivityValueCodec.TryReadNumber(operand, out _)))
+                    {
+                        throw new ArgumentException($"{position}: enter {(numericSource ? "a number" : "a value")} to compare with.");
+                    }
+
+                    break;
+                default:
+                    if (!numericSource)
+                    {
+                        throw new ArgumentException($"{position}: greater and less than need a number, rating, score or percentage source tag.");
+                    }
+
+                    if (!ActivityValueCodec.TryReadNumber(operand, out _))
+                    {
+                        throw new ArgumentException($"{position}: enter a number to compare with.");
+                    }
+
+                    break;
+            }
+
+            cases.Add(new TagRuleCase
+            {
+                SortOrder = i,
+                Operator = op,
+                Operand = operand,
+                ResultValue = NormaliseResult(requested.ResultValue, target, options, position)
+            });
+        }
+
+        return cases;
+    }
+
+    private static string NormaliseResult(string? value, Tag target, List<TagOption>? options, string position)
+    {
+        var text = value?.Trim() ?? string.Empty;
+        if (text.Length == 0)
+        {
+            throw new ArgumentException($"{position}: enter the value the result tag gets.");
+        }
+
+        if (options != null)
+        {
+            var option = options.FirstOrDefault(o => string.Equals(o.Value, text, StringComparison.OrdinalIgnoreCase)
+                || (o.DisplayName != null && string.Equals(o.DisplayName, text, StringComparison.OrdinalIgnoreCase)));
+
+            return option?.Value
+                ?? throw new ArgumentException($"{position}: '{text}' is not an option of '{target.TagName}'.");
+        }
+
+        switch (target.InputTypeId)
+        {
+            case 3:
+                return text.ToLowerInvariant() switch
+                {
+                    "true" or "yes" => "true",
+                    "false" or "no" => "false",
+                    _ => throw new ArgumentException($"{position}: '{target.TagName}' takes yes or no.")
+                };
+            case 1 or 6:
+                return ActivityValueCodec.TryReadNumber(text, out var number)
+                    ? ActivityValueCodec.WriteNumber(target.InputTypeId, number)
+                    : throw new ArgumentException($"{position}: '{target.TagName}' takes a number.");
+            default:
+                return text.Length <= 500
+                    ? text
+                    : throw new ArgumentException($"{position}: the text is longer than 500 characters.");
+        }
+    }
+
     // Factors belong to the weighted sum; other templates store 1.
     private static double FactorFor(TagRuleRequest request, TagRuleSourceRequest source)
     {
@@ -389,7 +557,8 @@ public class TagRuleService : ITagRuleService
             .Include(r => r.TargetTag).ThenInclude(t => t!.Unit)
             .Include(r => r.TargetTag).ThenInclude(t => t!.Group)
             .Include(r => r.Sources).ThenInclude(s => s.SourceTag).ThenInclude(t => t!.Unit)
-            .Include(r => r.Sources).ThenInclude(s => s.SourceTag).ThenInclude(t => t!.Group);
+            .Include(r => r.Sources).ThenInclude(s => s.SourceTag).ThenInclude(t => t!.Group)
+            .Include(r => r.Cases);
     }
 
     private async Task<TagRule> LoadRule(int id, Guid userId)
@@ -427,6 +596,14 @@ public class TagRuleService : ITagRuleService
             var kind = rule.AggregateKind?.ToString().ToLowerInvariant() ?? "aggregate";
 
             return $"{kind} of {string.Join(", ", rule.Sources.Select(s => Name(s.SourceTagId)))}";
+        }
+
+        if (rule.Template == TagRuleTemplate.Conditional)
+        {
+            var source = rule.Sources.Select(s => Name(s.SourceTagId)).FirstOrDefault() ?? "?";
+
+            return string.Join("; ", rule.Cases.OrderBy(c => c.SortOrder)
+                .Select(c => $"'{c.ResultValue}' if {source} {c.Operator}{(c.Operand != null ? " " + c.Operand : string.Empty)}"));
         }
 
         return string.Join(" + ", rule.Sources.Select(s =>
@@ -467,6 +644,15 @@ public class TagRuleService : ITagRuleService
                     SourceTagName = TagTitle(s.SourceTag),
                     SourceUnitSymbol = s.SourceTag?.Unit?.Symbol,
                     Factor = s.Factor
+                })
+                .ToList(),
+            Cases = rule.Cases
+                .OrderBy(c => c.SortOrder)
+                .Select(c => new TagRuleCaseResponse
+                {
+                    Operator = c.Operator.ToString(),
+                    Operand = c.Operand,
+                    ResultValue = c.ResultValue
                 })
                 .ToList()
         };

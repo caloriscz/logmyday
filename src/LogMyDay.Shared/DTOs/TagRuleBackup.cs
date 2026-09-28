@@ -18,10 +18,20 @@ public class TagRuleBackup
     public DateTime DateCreated { get; set; }
     public List<TagRuleSourceBackup> Sources { get; set; } = new();
 
+    /// <summary>For a conditional rule: the ordered cases, with results as stored values.</summary>
+    public List<TagRuleCaseBackup> Cases { get; set; } = new();
+
     /// <summary>Only for a paused rule: its values as they stand. A paused rule keeps its values
     /// but no longer follows its sources, so they cannot be recomputed after a restore; they are
     /// carried over as they are. Empty for an active rule, whose values are recomputed.</summary>
     public List<TagRuleValueBackup> Values { get; set; } = new();
+}
+
+public class TagRuleCaseBackup
+{
+    public LogMyDay.Domain.Enums.TagRuleOperator Operator { get; set; }
+    public string? Operand { get; set; }
+    public string ResultValue { get; set; } = string.Empty;
 }
 
 public class TagRuleValueBackup

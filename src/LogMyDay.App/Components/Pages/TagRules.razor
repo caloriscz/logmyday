@@ -113,7 +113,7 @@
                 }
 
                 <div class="px-6 py-5">
-                    <TagRuleEditor Tags="tags" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" Culture="displayCulture" />
+                    <TagRuleEditor Tags="tags" OptionLists="optionLists" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" Culture="displayCulture" />
                 </div>
 
                 <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
@@ -252,6 +252,7 @@
 @code {
     private readonly List<TagRuleResponse> rules = new();
     private IList<TagResponse>? tags;
+    private IList<TagOptionListResponse>? optionLists;
     private TagRuleRequest formModel = new() { Name = string.Empty };
 
     private string? loadError;
@@ -296,11 +297,13 @@
         {
             var rulesTask = TagRuleApi.GetTagRules();
             var tagsTask = ActivityApi.GetTags();
-            await Task.WhenAll(rulesTask, tagsTask);
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(rulesTask, tagsTask, optionListsTask);
 
             rules.Clear();
             rules.AddRange(rulesTask.Result);
             tags = tagsTask.Result;
+            optionLists = optionListsTask.Result;
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -336,7 +339,15 @@
             TargetTagId = rule.TargetTagId,
             IgnoreZero = rule.IgnoreZero,
             IsEnabled = rule.IsEnabled,
-            Sources = rule.Sources.Select(s => new TagRuleSourceRequest { SourceTagId = s.SourceTagId, Factor = s.Factor }).ToList()
+            Sources = rule.Sources.Select(s => new TagRuleSourceRequest { SourceTagId = s.SourceTagId, Factor = s.Factor }).ToList(),
+            Cases = rule.Cases
+                .Select(c => new TagRuleCaseRequest
+                {
+                    Operator = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleOperator>(c.Operator, out var op) ? op : LogMyDay.Domain.Enums.TagRuleOperator.IsLogged,
+                    Operand = c.Operand,
+                    ResultValue = c.ResultValue
+                })
+                .ToList()
         };
         formError = null;
         showModal = true;
