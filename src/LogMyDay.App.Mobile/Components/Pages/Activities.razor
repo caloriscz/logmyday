@@ -92,19 +92,31 @@
                         <div class="flex justify-between items-start mb-1">
                             <h6 class="text-base font-semibold text-gray-900 dark:text-white">@activity.PrimaryTagName</h6>
                             <div class="flex items-center gap-2">
-                                <button @onclick="() => OpenEditActivityModal(activity)" type="button" title="Edit activity"
-                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary-500 text-white focus:outline-hidden focus:ring-2 focus:ring-primary-300">
-                                    <i class="bi bi-pencil text-base"></i>
-                                </button>
-                                <button @onclick="() => DeleteActivity(activity.Id)" type="button" title="Delete activity"
-                                        class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-rose-500 text-white focus:outline-hidden focus:ring-2 focus:ring-rose-300">
-                                    <i class="bi bi-trash text-base"></i>
-                                </button>
+                                @if (activity.IsGenerated)
+                                {
+                                    <ComputedBadge />
+                                }
+                                else
+                                {
+                                    <button @onclick="() => OpenEditActivityModal(activity)" type="button" title="Edit activity"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-primary-500 text-white focus:outline-hidden focus:ring-2 focus:ring-primary-300">
+                                        <i class="bi bi-pencil text-base"></i>
+                                    </button>
+                                    <button @onclick="() => DeleteActivity(activity.Id)" type="button" title="Delete activity"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-rose-500 text-white focus:outline-hidden focus:ring-2 focus:ring-rose-300">
+                                        <i class="bi bi-trash text-base"></i>
+                                    </button>
+                                }
                             </div>
                         </div>
 
                         @{ var mobTag1 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                        @if (IsStarRatingTag(mobTag1))
+                        @if (activity.IsGenerated)
+                        {
+                            @* A computed value changes with its sources; it has no inline controls. *@
+                            <p class="mb-2 text-gray-700 dark:text-gray-300">@(activity.PrimaryTagValue ?? activity.Description)@(mobTag1?.UnitSymbol is not null ? " " + mobTag1.UnitSymbol : "")</p>
+                        }
+                        else if (IsStarRatingTag(mobTag1))
                         {
                             <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag1!)" Color="@TagColor(mobTag1, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                             <div class="mb-2">
@@ -167,18 +179,30 @@
                             <div class="flex justify-between items-start mb-2">
                                 <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-0">@activity.PrimaryTagName</h6>
                                 <div class="flex items-center gap-2">
-                                    <button @onclick="() => OpenEditActivityModal(activity)"
-                                            class="btn-secondary btn-sm" title="Edit">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button @onclick="() => DeleteActivity(activity.Id)"
-                                            class="btn-danger btn-sm" title="Delete">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if (activity.IsGenerated)
+                                    {
+                                        <ComputedBadge />
+                                    }
+                                    else
+                                    {
+                                        <button @onclick="() => OpenEditActivityModal(activity)"
+                                                class="btn-secondary btn-sm" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button @onclick="() => DeleteActivity(activity.Id)"
+                                                class="btn-danger btn-sm" title="Delete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
                                 </div>
                             </div>
                             @{ var mobTag2 = tags?.FirstOrDefault(t => t.Id == activity.PrimaryTagId); }
-                            @if (IsStarRatingTag(mobTag2))
+                            @if (activity.IsGenerated)
+                            {
+                                @* A computed value changes with its sources; it has no inline controls. *@
+                                <p class="mb-2 text-gray-700 dark:text-gray-300">@(activity.PrimaryTagValue ?? activity.Description)@(mobTag2?.UnitSymbol is not null ? " " + mobTag2.UnitSymbol : "")</p>
+                            }
+                            else if (IsStarRatingTag(mobTag2))
                             {
                                 <div class="mb-2"><StarDisplay Value="@GetIntegerValue(activity)" MaxStars="@GetStarMax(mobTag2!)" Color="@TagColor(mobTag2, GetIntegerValue(activity).ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
                                 <div class="mb-2">
