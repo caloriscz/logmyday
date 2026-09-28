@@ -2,6 +2,7 @@ using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace LogMyDay.Api.Application.Services;
@@ -113,26 +114,28 @@ public class TagRuleEngine : ITagRuleEngine
             .ToDictionary(g => g.Key, g => g.First());
 
         var skipped = 0;
-        var sums = new Dictionary<string, double>();
+        var byDay = new Dictionary<string, List<(int TagId, string? Description)>>();
         foreach (var row in sourceRows)
         {
-            if (!ActivityValueCodec.TryReadNumber(row.Description, out var value))
+            var dayKey = WindowKey(DateOnly.FromDateTime(row.DateStarted));
+            if (!byDay.TryGetValue(dayKey, out var dayRows))
             {
-                if (!string.IsNullOrWhiteSpace(row.Description))
-                {
-                    skipped++;
-                }
-
-                continue;
+                byDay[dayKey] = dayRows = new List<(int, string?)>();
             }
 
-            if (rule.IgnoreZero && value == 0)
-            {
-                continue;
-            }
+            dayRows.Add((row.TagId, row.Description));
+        }
 
-            var key = WindowKey(DateOnly.FromDateTime(row.DateStarted));
-            sums[key] = sums.GetValueOrDefault(key) + value * factors[row.TagId];
+        // The rule's value for each day that has one. A day missing here has no value.
+        var sums = new Dictionary<string, double>();
+        foreach (var (dayKey, dayRows) in byDay)
+        {
+            var (value, daySkipped) = DayValue(rule, factors, dayRows);
+            skipped += daySkipped;
+            if (value.HasValue)
+            {
+                sums[dayKey] = value.Value;
+            }
         }
 
         int created = 0, updated = 0, deleted = 0, unchanged = 0;
@@ -186,6 +189,63 @@ public class TagRuleEngine : ITagRuleEngine
         }
 
         return new TagRuleRangeResult(created, updated, deleted, unchanged, skipped);
+    }
+
+    // One day's value by template, and how many non-empty source values were not numbers where a
+    // number was needed. "Ignore zero values" leaves out skip markers (0 / false) everywhere, so a
+    // day with only skip markers has no value.
+    private static (double? Value, int Skipped) DayValue(TagRule rule, Dictionary<int, double> factors, List<(int TagId, string? Description)> rows)
+    {
+        var skipped = 0;
+        var numbers = new List<(int TagId, double Value)>();
+        var entries = 0;
+        foreach (var (tagId, description) in rows)
+        {
+            if (rule.IgnoreZero && IsSkipMarker(description))
+            {
+                continue;
+            }
+
+            entries++;
+            if (ActivityValueCodec.TryReadNumber(description, out var number))
+            {
+                numbers.Add((tagId, number));
+            }
+            else if (!string.IsNullOrWhiteSpace(description))
+            {
+                skipped++;
+            }
+        }
+
+        if (rule.Template == TagRuleTemplate.Aggregate && rule.AggregateKind == TagRuleAggregateKind.Count)
+        {
+            // Count takes entries of any type, so nothing it sees is skipped.
+            return (entries > 0 ? entries : null, 0);
+        }
+
+        if (numbers.Count == 0)
+        {
+            return (null, skipped);
+        }
+
+        double value = rule.Template switch
+        {
+            TagRuleTemplate.Aggregate => rule.AggregateKind switch
+            {
+                TagRuleAggregateKind.Minimum => numbers.Min(n => n.Value),
+                TagRuleAggregateKind.Maximum => numbers.Max(n => n.Value),
+                _ => numbers.Average(n => n.Value)
+            },
+            _ => numbers.Sum(n => n.Value * factors[n.TagId])
+        };
+
+        return (value, skipped);
+    }
+
+    private static bool IsSkipMarker(string? description)
+    {
+        return (ActivityValueCodec.TryReadNumber(description, out var number) && number == 0)
+            || string.Equals(description?.Trim(), "false", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string WindowKey(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

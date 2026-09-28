@@ -4,7 +4,11 @@ public class TagRuleResponse
 {
     public int Id { get; set; }
     public required string Name { get; set; }
+    /// <summary>WeightedSum, Aggregate or Conditional.</summary>
     public string Template { get; set; } = "WeightedSum";
+
+    /// <summary>For an aggregate rule: Average, Minimum, Maximum or Count.</summary>
+    public string? AggregateKind { get; set; }
     public int TargetTagId { get; set; }
     public string TargetTagName { get; set; } = string.Empty;
     public string? TargetUnitSymbol { get; set; }

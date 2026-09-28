@@ -1,11 +1,27 @@
-@* Form for a weighted-sum Tag Activity Relations rule: the target tag gets, per day, the sum of
-   each source tag's values multiplied by its factor. Presentational only: the host page loads
-   the tags, owns the Model and saves it. Shared by web and mobile. *@
+@using LogMyDay.Domain.Enums
+@using LogMyDay.UI.Formatting
+@* Form for a Tag Activity Relations rule: a weighted sum (Σ value × factor) or an aggregate
+   (average, minimum, maximum, count) of source tags per day, written to the rule's own result
+   tag. Presentational only: the host page loads the tags, owns the Model and saves it. Shared by
+   web and mobile. *@
 <div class="space-y-5">
     <div class="space-y-2">
         <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="rule-name">Name <span class="text-rose-500">*</span></label>
         <input id="rule-name" type="text" @bind="Model.Name" maxlength="100" placeholder="e.g., Total vitamin B1"
                class="@InputCss" disabled="@Disabled" />
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="rule-calculation">What the rule calculates</label>
+        @* Template and aggregate kind as one string-valued choice; a select is never bound to a bool or enum directly. *@
+        <select id="rule-calculation" class="@InputCss" value="@CalculationValue" @onchange="OnCalculationChanged" disabled="@Disabled">
+            <option value="@WeightedSumValue">Weighted sum — each value × its factor, added up</option>
+            <option value="@nameof(TagRuleAggregateKind.Average)">Average of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Minimum)">Minimum of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Maximum)">Maximum of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Count)">Count of entries</option>
+        </select>
+        <p class="text-xs text-gray-500 dark:text-slate-400">@CalculationHint</p>
     </div>
 
     <div class="space-y-2">
@@ -43,8 +59,11 @@
                     <GroupedTagSelect Tags="sourceCandidates" Value="@(source.SourceTagId == 0 ? null : source.SourceTagId)" ValueChanged="@((int? id) => source.SourceTagId = id ?? 0)" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Source tag --" />
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500 dark:text-slate-400" aria-hidden="true">×</span>
-                    <input type="number" step="any" @bind="source.Factor" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@Disabled" aria-label="Factor" title="Each value of this tag is multiplied by the factor. Use it for unit conversion, e.g. 100 when one pill contains 100 mg; negative values subtract." />
+                    @if (Model.Template == TagRuleTemplate.WeightedSum)
+                    {
+                        <span class="text-sm text-gray-500 dark:text-slate-400" aria-hidden="true">×</span>
+                        <input type="number" step="any" @bind="source.Factor" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@Disabled" aria-label="Factor" title="Each value of this tag is multiplied by the factor. Use it for unit conversion, e.g. 100 when one pill contains 100 mg; negative values subtract." />
+                    }
                     <button type="button" class="inline-flex items-center rounded-md px-2 py-1 text-rose-600 transition-all hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => Model.Sources.Remove(source)" disabled="@Disabled" title="Remove source">
                         <Icon Name="trash" Class="h-4 w-4" />
                     </button>
@@ -63,7 +82,7 @@
     <div class="space-y-2">
         <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
             <input type="checkbox" @bind="Model.IgnoreZero" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
-            <span>Ignore zero values <span class="text-gray-500 dark:text-slate-400">— a day with only zeros (e.g. skipped reminders) gets no result</span></span>
+            <span>Ignore zero values <span class="text-gray-500 dark:text-slate-400">— zeros and "no" entries (e.g. skipped reminders) are left out; a day with only those gets no result</span></span>
         </label>
         <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
             <input type="checkbox" @bind="Model.IsEnabled" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
@@ -79,8 +98,9 @@
 
 @code {
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string WeightedSumValue = "WeightedSum";
 
-    /// <summary>All of the user's tags. The editor offers the number tags that can take part.</summary>
+    /// <summary>All of the user's tags. The editor offers the tags that can take part.</summary>
     [Parameter, EditorRequired] public IList<TagResponse>? Tags { get; set; }
 
     [Parameter, EditorRequired] public TagRuleRequest Model { get; set; } = default!;
@@ -90,23 +110,68 @@
 
     [Parameter] public bool Disabled { get; set; }
 
-    // Stable lists, rebuilt only when the tags change, so the grouped pickers keep their group.
+    /// <summary>Formats factors in the preview; the user's culture.</summary>
+    [Parameter] public System.Globalization.CultureInfo? Culture { get; set; }
+
+    // Stable lists, rebuilt only when the tags or the calculation change, so the grouped pickers
+    // keep their selected group.
     private IList<TagResponse>? targetCandidates;
     private IList<TagResponse>? sourceCandidates;
     private IList<TagResponse>? candidatesSource;
+    private string? candidatesCalculation;
+
+    private string CalculationValue => Model.Template == TagRuleTemplate.Aggregate
+        ? (Model.AggregateKind ?? TagRuleAggregateKind.Average).ToString()
+        : WeightedSumValue;
+
+    private string CalculationHint => CalculationValue switch
+    {
+        nameof(TagRuleAggregateKind.Count) => "How many entries the source tags have that day, of any tag type.",
+        WeightedSumValue => "For totals, e.g. a nutrient from several products. Sources are number tags.",
+        _ => "Over all of the day's values of the source tags. Sources are number, rating, score or percentage tags."
+    };
 
     protected override void OnParametersSet()
     {
-        if (ReferenceEquals(Tags, candidatesSource))
+        RebuildCandidates();
+    }
+
+    private void OnCalculationChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (value == WeightedSumValue || !Enum.TryParse<TagRuleAggregateKind>(value, out var kind))
+        {
+            Model.Template = TagRuleTemplate.WeightedSum;
+            Model.AggregateKind = null;
+        }
+        else
+        {
+            Model.Template = TagRuleTemplate.Aggregate;
+            Model.AggregateKind = kind;
+        }
+
+        RebuildCandidates();
+    }
+
+    private void RebuildCandidates()
+    {
+        if (ReferenceEquals(Tags, candidatesSource) && candidatesCalculation == CalculationValue)
         {
             return;
         }
 
         candidatesSource = Tags;
-        var numeric = (Tags ?? []).Where(t => t.InputTypeId is 1 or 6).ToList();
-        targetCandidates = numeric.Where(t => !t.IsComputed).ToList();
-        // A computed tag cannot be a source: rules do not feed rules.
-        sourceCandidates = numeric.Where(t => !t.IsComputed).ToList();
+        candidatesCalculation = CalculationValue;
+
+        // A computed tag is never offered: a rule owns it, and rules do not feed rules.
+        var usable = (Tags ?? []).Where(t => !t.IsComputed).ToList();
+        targetCandidates = usable.Where(t => t.InputTypeId is 1 or 6).ToList();
+        sourceCandidates = CalculationValue switch
+        {
+            WeightedSumValue => usable.Where(t => t.InputTypeId is 1 or 6).ToList(),
+            nameof(TagRuleAggregateKind.Count) => usable,
+            _ => usable.Where(t => t.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11).ToList()
+        };
     }
 
     private void SetTarget(int? tagId)
@@ -126,10 +191,12 @@
 
     private string Formula()
     {
-        var terms = Model.Sources
+        var sources = Model.Sources
             .Where(s => s.SourceTagId != 0)
-            .Select(s => $"{s.Factor.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture)} × {TagName(s.SourceTagId)}");
+            .Select(s => (TagName(s.SourceTagId), s.Factor))
+            .ToList();
 
-        return string.Join(" + ", terms);
+        return TagRuleText.Formula(Model.Template.ToString(), Model.AggregateKind?.ToString(), sources,
+            Culture ?? System.Globalization.CultureInfo.CurrentCulture);
     }
 }

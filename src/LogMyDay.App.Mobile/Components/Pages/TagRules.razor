@@ -108,7 +108,7 @@
                 }
 
                 <div class="px-6 py-5">
-                    <TagRuleEditor Tags="tags" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" />
+                    <TagRuleEditor Tags="tags" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" Culture="displayCulture" />
                 </div>
 
                 <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
@@ -326,6 +326,8 @@
         formModel = new TagRuleRequest
         {
             Name = rule.Name,
+            Template = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleTemplate>(rule.Template, out var template) ? template : LogMyDay.Domain.Enums.TagRuleTemplate.WeightedSum,
+            AggregateKind = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleAggregateKind>(rule.AggregateKind, out var kind) ? kind : null,
             TargetTagId = rule.TargetTagId,
             IgnoreZero = rule.IgnoreZero,
             IsEnabled = rule.IsEnabled,
@@ -537,7 +539,6 @@
 
     private string Formula(TagRuleResponse rule)
     {
-        return string.Join(" + ", rule.Sources.Select(s =>
-            $"{s.Factor.ToString("0.####", displayCulture)} × {s.SourceTagName}"));
+        return LogMyDay.UI.Formatting.TagRuleText.Formula(rule, displayCulture);
     }
 }

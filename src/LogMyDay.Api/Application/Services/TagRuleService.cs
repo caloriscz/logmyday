@@ -60,7 +60,8 @@ public class TagRuleService : ITagRuleService
         {
             UserId = userId,
             Name = request.Name.Trim(),
-            Template = TagRuleTemplate.WeightedSum,
+            Template = request.Template,
+            AggregateKind = request.Template == TagRuleTemplate.Aggregate ? request.AggregateKind : null,
             TargetTagId = target.Id,
             IgnoreZero = request.IgnoreZero,
             IsEnabled = request.IsEnabled,
@@ -68,7 +69,7 @@ public class TagRuleService : ITagRuleService
             DateCreated = now,
             DateUpdated = now,
             Sources = request.Sources
-                .Select(s => new TagRuleSource { SourceTagId = s.SourceTagId, Factor = s.Factor })
+                .Select(s => new TagRuleSource { SourceTagId = s.SourceTagId, Factor = FactorFor(request, s) })
                 .ToList()
         };
 
@@ -99,12 +100,14 @@ public class TagRuleService : ITagRuleService
         var (target, sources) = await Validate(request, userId, ruleId: id);
 
         rule.Name = request.Name.Trim();
+        rule.Template = request.Template;
+        rule.AggregateKind = request.Template == TagRuleTemplate.Aggregate ? request.AggregateKind : null;
         rule.IgnoreZero = request.IgnoreZero;
         rule.IsEnabled = request.IsEnabled;
         rule.DateUpdated = DateTime.UtcNow;
 
         // Sources are matched by tag, so an unchanged source keeps its row (unique per rule and tag).
-        var requested = request.Sources.ToDictionary(s => s.SourceTagId, s => s.Factor);
+        var requested = request.Sources.ToDictionary(s => s.SourceTagId, s => FactorFor(request, s));
         foreach (var existing in rule.Sources.ToList())
         {
             if (requested.Remove(existing.SourceTagId, out var factor))
@@ -253,13 +256,24 @@ public class TagRuleService : ITagRuleService
             $"Rule '{rule.Name}' deleted with {results.Count} generated value(s); '{rule.TargetTag?.TagName ?? "?"}' is a normal tag again");
     }
 
-    // Phase 1 rules: a weighted sum of numeric tags the caller owns, written to a numeric target
-    // tag that belongs to this rule alone. No chaining: a computed tag cannot be a source.
+    // A rule reads tags the caller owns and writes a numeric target tag that belongs to this rule
+    // alone. Weighted sum: number sources. Aggregate: number, rating, score or percentage sources,
+    // or any tag for Count. No chaining: a computed tag cannot be a source.
     private async Task<(Tag Target, Dictionary<int, Tag> Sources)> Validate(TagRuleRequest request, Guid userId, int? ruleId)
     {
         if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
         {
             throw new ArgumentException("A rule needs a name of at most 100 characters.");
+        }
+
+        if (request.Template == TagRuleTemplate.Conditional)
+        {
+            throw new ArgumentException("Conditional rules are not available yet.");
+        }
+
+        if (request.Template == TagRuleTemplate.Aggregate && request.AggregateKind == null)
+        {
+            throw new ArgumentException("Choose what the rule calculates: average, minimum, maximum or count.");
         }
 
         if (request.Sources.Count == 0)
@@ -310,9 +324,9 @@ public class TagRuleService : ITagRuleService
                 throw new KeyNotFoundException("Source tag not found");
             }
 
-            if (!IsNumeric(source))
+            if (SourceTypeError(request, source) is string typeError)
             {
-                throw new ArgumentException($"The source tag '{source.TagName}' must be a number tag (Integer or Decimal).");
+                throw new ArgumentException(typeError);
             }
 
             if (source.IsComputed)
@@ -346,6 +360,28 @@ public class TagRuleService : ITagRuleService
     }
 
     private static bool IsNumeric(Tag tag) => tag.InputTypeId is 1 or 6;
+
+    // Numbers plus the integer-valued ratings, scores and percentage (input types 7–11).
+    private static bool IsNumericLike(Tag tag) => tag.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11;
+
+    private static string? SourceTypeError(TagRuleRequest request, Tag source)
+    {
+        return request.Template switch
+        {
+            TagRuleTemplate.Aggregate when request.AggregateKind == TagRuleAggregateKind.Count => null,
+            TagRuleTemplate.Aggregate when !IsNumericLike(source) =>
+                $"The source tag '{source.TagName}' must be a number, rating, score or percentage tag.",
+            TagRuleTemplate.WeightedSum when !IsNumeric(source) =>
+                $"The source tag '{source.TagName}' must be a number tag (Integer or Decimal).",
+            _ => null
+        };
+    }
+
+    // Factors belong to the weighted sum; other templates store 1.
+    private static double FactorFor(TagRuleRequest request, TagRuleSourceRequest source)
+    {
+        return request.Template == TagRuleTemplate.WeightedSum ? source.Factor : 1;
+    }
 
     private IQueryable<TagRule> RulesWithTags()
     {
@@ -384,8 +420,17 @@ public class TagRuleService : ITagRuleService
 
     private static string Describe(TagRule rule, Dictionary<int, Tag> sources)
     {
+        string Name(int tagId) => $"'{(sources.TryGetValue(tagId, out var t) ? t.TagName : "?")}'";
+
+        if (rule.Template == TagRuleTemplate.Aggregate)
+        {
+            var kind = rule.AggregateKind?.ToString().ToLowerInvariant() ?? "aggregate";
+
+            return $"{kind} of {string.Join(", ", rule.Sources.Select(s => Name(s.SourceTagId)))}";
+        }
+
         return string.Join(" + ", rule.Sources.Select(s =>
-            $"{s.Factor.ToString(System.Globalization.CultureInfo.InvariantCulture)} × '{(sources.TryGetValue(s.SourceTagId, out var t) ? t.TagName : "?")}'"));
+            $"{s.Factor.ToString(System.Globalization.CultureInfo.InvariantCulture)} × {Name(s.SourceTagId)}"));
     }
 
     private static string TagTitle(Tag? tag)
@@ -405,6 +450,7 @@ public class TagRuleService : ITagRuleService
             Id = rule.Id,
             Name = rule.Name,
             Template = rule.Template.ToString(),
+            AggregateKind = rule.AggregateKind?.ToString(),
             TargetTagId = rule.TargetTagId,
             TargetTagName = TagTitle(rule.TargetTag),
             TargetUnitSymbol = rule.TargetTag?.Unit?.Symbol,

@@ -388,6 +388,119 @@ public class TagRuleTests
         Assert.False(await f.Context.TagRules.AnyAsync());
     }
 
+    private Task<TagRuleResponse> CreateAggregate(Fixture f, Tag target, TagRuleAggregateKind kind, bool ignoreZero, params Tag[] sources) =>
+        f.Rules.Create(new TagRuleRequest
+        {
+            Name = kind.ToString(),
+            Template = TagRuleTemplate.Aggregate,
+            AggregateKind = kind,
+            TargetTagId = target.Id,
+            IgnoreZero = ignoreZero,
+            Sources = sources.Select(s => new TagRuleSourceRequest { SourceTagId = s.Id, Factor = 7 }).ToList()
+        }, f.UserId);
+
+    [Fact]
+    public async Task Aggregate_AverageMinimumMaximum_OverScoresPerDay()
+    {
+        var f = CreateFixture(nameof(Aggregate_AverageMinimumMaximum_OverScoresPerDay));
+        var headache = await f.AddTag("Headache", inputTypeId: 10); // score 0-5
+        var backPain = await f.AddTag("Back pain", inputTypeId: 10);
+        var average = await f.AddTag("Average pain", inputTypeId: 6);
+        var minimum = await f.AddTag("Least pain", inputTypeId: 6);
+        var maximum = await f.AddTag("Worst pain", inputTypeId: 6);
+        var avgRule = await CreateAggregate(f, average, TagRuleAggregateKind.Average, ignoreZero: false, headache, backPain);
+        await CreateAggregate(f, minimum, TagRuleAggregateKind.Minimum, ignoreZero: false, headache, backPain);
+        await CreateAggregate(f, maximum, TagRuleAggregateKind.Maximum, ignoreZero: false, headache, backPain);
+
+        var morning = await f.Log(headache, f.TodayAt(8), "4");
+        await f.Log(headache, f.TodayAt(18), "1");
+        await f.Log(backPain, f.TodayAt(9), "2");
+
+        Assert.Equal("2.33", Assert.Single(await f.Results(average)).Description); // (4 + 1 + 2) / 3
+        Assert.Equal("1", Assert.Single(await f.Results(minimum)).Description);
+        Assert.Equal("4", Assert.Single(await f.Results(maximum)).Description);
+
+        await f.Activities.Update(morning.Id, new ActivityRequest { PrimaryTagId = headache.Id, DateStarted = f.TodayAt(8), Description = "5" }, f.UserId);
+        Assert.Equal("2.67", Assert.Single(await f.Results(average)).Description);
+        Assert.Equal("5", Assert.Single(await f.Results(maximum)).Description);
+
+        // Factors belong to the weighted sum; an aggregate stores 1.
+        Assert.All(avgRule.Sources, s => Assert.Equal(1, s.Factor));
+        Assert.Equal("Aggregate", avgRule.Template);
+        Assert.Equal("Average", avgRule.AggregateKind);
+    }
+
+    [Fact]
+    public async Task Aggregate_Count_CountsEntriesOfAnyType_AndIgnoresSkipMarkers()
+    {
+        var f = CreateFixture(nameof(Aggregate_Count_CountsEntriesOfAnyType_AndIgnoresSkipMarkers));
+        var walk = await f.AddTag("Walk", inputTypeId: 3);     // yes/no
+        var note = await f.AddTag("Note", inputTypeId: 2);     // text
+        var count = await f.AddTag("Entries", inputTypeId: 1);
+        await CreateAggregate(f, count, TagRuleAggregateKind.Count, ignoreZero: true, walk, note);
+
+        await f.Log(walk, f.TodayAt(8), "true");
+        await f.Log(walk, f.TodayAt(12), "false");   // a skip marker: left out
+        await f.Log(note, f.TodayAt(13), "felt fine");
+
+        Assert.Equal("2", Assert.Single(await f.Results(count)).Description);
+    }
+
+    [Fact]
+    public async Task Aggregate_Validation_ChecksSourceTypesPerCalculation()
+    {
+        var f = CreateFixture(nameof(Aggregate_Validation_ChecksSourceTypesPerCalculation));
+        var text = await f.AddTag("Text", inputTypeId: 2);
+        var score = await f.AddTag("Score", inputTypeId: 10);
+        var target = await f.AddTag("Result", inputTypeId: 6);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateAggregate(f, target, TagRuleAggregateKind.Average, true, text));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.CreateRule(target, (score, 1))); // weighted sum: numbers only
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
+        {
+            Name = "No kind",
+            Template = TagRuleTemplate.Aggregate,
+            TargetTagId = target.Id,
+            Sources = [new() { SourceTagId = score.Id }]
+        }, f.UserId));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
+        {
+            Name = "Not yet",
+            Template = TagRuleTemplate.Conditional,
+            TargetTagId = target.Id,
+            Sources = [new() { SourceTagId = score.Id }]
+        }, f.UserId));
+
+        var counted = await CreateAggregate(f, target, TagRuleAggregateKind.Count, true, text); // count takes any type
+        Assert.Equal("Count", counted.AggregateKind);
+    }
+
+    [Fact]
+    public async Task OnSqlite_AggregateRule_SurvivesBackupRoundTrip()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        var score = await f.AddTag("Score", inputTypeId: 10);
+        var average = await f.AddTag("Average", inputTypeId: 6);
+        await CreateAggregate(f, average, TagRuleAggregateKind.Average, ignoreZero: false, score);
+        await f.Log(score, f.TodayAt(8), "2");
+        await f.Log(score, f.TodayAt(9), "3");
+
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+        var export = await backups.ExportDataAsync(f.UserId);
+        Assert.Equal(TagRuleTemplate.Aggregate, Assert.Single(export.TagRules).Template);
+
+        await backups.ClearDataAsync(f.UserId);
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, f.UserId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors));
+
+        var rule = await f.Context.TagRules.SingleAsync();
+        Assert.Equal((TagRuleTemplate.Aggregate, TagRuleAggregateKind.Average), (rule.Template, rule.AggregateKind!.Value));
+        var restored = await f.Context.Tags.SingleAsync(t => t.TagName == "Average" && t.UserId == f.UserId);
+        Assert.Equal("2.5", Assert.Single(await f.Results(restored)).Description);
+    }
+
     [Fact]
     public async Task AccumulatePath_AlsoUpdatesTheResult()
     {

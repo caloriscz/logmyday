@@ -6,6 +6,11 @@ namespace LogMyDay.Shared.DTOs;
 public class TagRuleBackup
 {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>Absent in backups made before phase 2, which only had weighted sums.</summary>
+    public LogMyDay.Domain.Enums.TagRuleTemplate Template { get; set; } = LogMyDay.Domain.Enums.TagRuleTemplate.WeightedSum;
+    public LogMyDay.Domain.Enums.TagRuleAggregateKind? AggregateKind { get; set; }
+
     public string TargetTagName { get; set; } = string.Empty;
     public bool IgnoreZero { get; set; } = true;
     public bool IsEnabled { get; set; } = true;

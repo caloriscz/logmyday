@@ -34,6 +34,8 @@ public class BackupService : IBackupService
                 Backup = new TagRuleBackup
                 {
                     Name = r.Name,
+                    Template = r.Template,
+                    AggregateKind = r.AggregateKind,
                     TargetTagName = r.TargetTag!.TagName,
                     IgnoreZero = r.IgnoreZero,
                     IsEnabled = r.IsEnabled,
@@ -100,6 +102,8 @@ public class BackupService : IBackupService
                 UserId = userId ?? target.UserId ?? Guid.Empty,
                 Name = backup.Name,
                 TargetTagId = target.Id,
+                Template = backup.Template,
+                AggregateKind = backup.Template == Domain.Enums.TagRuleTemplate.Aggregate ? backup.AggregateKind : null,
                 IgnoreZero = backup.IgnoreZero,
                 IsEnabled = backup.IsEnabled,
                 EffectiveFrom = backup.EffectiveFrom,
@@ -174,6 +178,16 @@ public class BackupService : IBackupService
             return "it has no source tags";
         }
 
+        if (backup.Template == Domain.Enums.TagRuleTemplate.Conditional)
+        {
+            return "conditional rules cannot be restored by this version";
+        }
+
+        if (backup.Template == Domain.Enums.TagRuleTemplate.Aggregate && backup.AggregateKind == null)
+        {
+            return "it has no aggregate kind";
+        }
+
         foreach (var source in backup.Sources)
         {
             if (!tagsByName.TryGetValue(source.SourceTagName, out var tag))
@@ -181,7 +195,7 @@ public class BackupService : IBackupService
                 return $"its source tag '{source.SourceTagName}' is missing";
             }
 
-            if (tag.Id == target.Id || tag.IsComputed || tag.InputTypeId is not (1 or 6) || !double.IsFinite(source.Factor))
+            if (tag.Id == target.Id || tag.IsComputed || !SourceFits(backup, tag) || !double.IsFinite(source.Factor))
             {
                 return $"its source '{source.SourceTagName}' cannot be used";
             }
@@ -198,6 +212,18 @@ public class BackupService : IBackupService
         }
 
         return null;
+    }
+
+    // The same source types as creating a rule: numbers for a weighted sum, numbers, ratings,
+    // scores and percentage for an aggregate, any tag for a count.
+    private static bool SourceFits(TagRuleBackup backup, Tag tag)
+    {
+        return backup.Template switch
+        {
+            Domain.Enums.TagRuleTemplate.Aggregate when backup.AggregateKind == Domain.Enums.TagRuleAggregateKind.Count => true,
+            Domain.Enums.TagRuleTemplate.Aggregate => tag.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11,
+            _ => tag.InputTypeId is 1 or 6
+        };
     }
 
     // The separate step after the import is committed: every restored, enabled rule is recomputed
