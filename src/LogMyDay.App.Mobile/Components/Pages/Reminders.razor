@@ -316,7 +316,7 @@
                             <option value="">— None —</option>
                             @if (_allTags != null)
                             {
-                                @foreach (var tag in _allTags)
+                                @foreach (var tag in _allTags.Where(t => !t.IsComputed))
                                 {
                                     <option value="@tag.Id">@tag.Title</option>
                                 }

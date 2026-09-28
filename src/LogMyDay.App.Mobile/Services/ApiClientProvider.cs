@@ -14,6 +14,7 @@ public interface IApiClientProvider
     IScanMappingApi ScanMapping { get; }
     ITagGroupApi TagGroup { get; }
     IColorSchemeApi ColorScheme { get; }
+    ITagRuleApi TagRule { get; }
     IAiApi Ai { get; }
     ITodoApi Todo { get; }
     IEventLogApi EventLog { get; }
@@ -33,6 +34,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private IScanMappingApi? _scanMapping;
     private ITagGroupApi? _tagGroup;
     private IColorSchemeApi? _colorScheme;
+    private ITagRuleApi? _tagRule;
     private IAiApi? _ai;
     private ITodoApi? _todo;
     private IEventLogApi? _eventLog;
@@ -53,6 +55,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public IScanMappingApi ScanMapping => _scanMapping ??= Build<IScanMappingApi>();
     public ITagGroupApi TagGroup => _tagGroup ??= Build<ITagGroupApi>();
     public IColorSchemeApi ColorScheme => _colorScheme ??= Build<IColorSchemeApi>();
+    public ITagRuleApi TagRule => _tagRule ??= Build<ITagRuleApi>();
     public IAiApi Ai => _ai ??= Build<IAiApi>();
     public ITodoApi Todo => _todo ??= Build<ITodoApi>();
     public IEventLogApi EventLog => _eventLog ??= Build<IEventLogApi>();
@@ -85,6 +88,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _scanMapping = null;
         _tagGroup = null;
         _colorScheme = null;
+        _tagRule = null;
         _ai = null;
         _todo = null;
         _eventLog = null;

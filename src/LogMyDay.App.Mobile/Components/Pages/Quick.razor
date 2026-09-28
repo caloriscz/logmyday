@@ -366,7 +366,8 @@
         try
         {
             var tagsList = await SharedDataCache.GetTagsAsync();
-            availableTags = tagsList.ToList();
+            // Computed tags get their values from a rule and cannot be logged by hand.
+            availableTags = tagsList.Where(t => !t.IsComputed).ToList();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
