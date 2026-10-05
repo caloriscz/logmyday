@@ -12,6 +12,9 @@ public class TagRule
     public required string Name { get; set; }
     public TagRuleTemplate Template { get; set; } = TagRuleTemplate.WeightedSum;
 
+    /// <summary>For <see cref="TagRuleTemplate.Aggregate"/>: which aggregate the rule computes.</summary>
+    public TagRuleAggregateKind? AggregateKind { get; set; }
+
     public int TargetTagId { get; set; }
     public Tag? TargetTag { get; set; }
 
@@ -27,4 +30,7 @@ public class TagRule
     public DateTime DateUpdated { get; set; }
 
     public ICollection<TagRuleSource> Sources { get; set; } = new List<TagRuleSource>();
+
+    /// <summary>For <see cref="TagRuleTemplate.Conditional"/>: the ordered cases.</summary>
+    public ICollection<TagRuleCase> Cases { get; set; } = new List<TagRuleCase>();
 }

@@ -33,6 +33,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
+    public DbSet<TagRuleCase> TagRuleCases => Set<TagRuleCase>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<ApiKey>().ToTable("LogMyDay_ApiKeys");
         modelBuilder.Entity<TagRule>().ToTable("LogMyDay_TagRules");
         modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
+        modelBuilder.Entity<TagRuleCase>().ToTable("LogMyDay_TagRuleCases");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -330,6 +332,12 @@ public class LogMyDayDbContext : DbContext
             entity.HasIndex(r => r.UserId).HasDatabaseName("IX_LogMyDay_TagRules_UserId");
             entity.Property(r => r.Name).HasMaxLength(100).IsRequired();
             entity.Property(r => r.Template).HasConversion<int>();
+            entity.Property(r => r.AggregateKind).HasConversion<int?>();
+
+            entity.HasMany(r => r.Cases)
+                .WithOne(c => c.Rule)
+                .HasForeignKey(c => c.RuleId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             if (Database.IsSqlServer())
             {
@@ -350,6 +358,16 @@ public class LogMyDayDbContext : DbContext
                 .IsUnique()
                 .HasDatabaseName("IX_LogMyDay_TagRuleSources_RuleId_SourceTagId");
             entity.HasIndex(s => s.SourceTagId).HasDatabaseName("IX_LogMyDay_TagRuleSources_SourceTagId");
+        });
+
+        modelBuilder.Entity<TagRuleCase>(entity =>
+        {
+            entity.HasIndex(c => new { c.RuleId, c.SortOrder })
+                .IsUnique()
+                .HasDatabaseName("IX_LogMyDay_TagRuleCases_RuleId_SortOrder");
+            entity.Property(c => c.Operator).HasConversion<int>();
+            entity.Property(c => c.Operand).HasMaxLength(500);
+            entity.Property(c => c.ResultValue).HasMaxLength(500).IsRequired();
         });
 
         // Generated rows: one per (RuleId, WindowKey). The FK to TagRule lives only in the model;

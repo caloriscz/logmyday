@@ -1,11 +1,30 @@
-@* Form for a weighted-sum Tag Activity Relations rule: the target tag gets, per day, the sum of
-   each source tag's values multiplied by its factor. Presentational only: the host page loads
-   the tags, owns the Model and saves it. Shared by web and mobile. *@
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Enums
+@using LogMyDay.UI.Formatting
+@* Form for a Tag Activity Relations rule: a weighted sum (Σ value × factor), an aggregate
+   (average, minimum, maximum, count), a presence value or ordered conditional cases, per day,
+   written to the rule's own result tag. Presentational only: the host page loads the tags and
+   option lists, owns the Model and saves it. Shared by web and mobile. *@
 <div class="space-y-5">
     <div class="space-y-2">
         <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="rule-name">Name <span class="text-rose-500">*</span></label>
         <input id="rule-name" type="text" @bind="Model.Name" maxlength="100" placeholder="e.g., Total vitamin B1"
                class="@InputCss" disabled="@Disabled" />
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="rule-calculation">What the rule calculates</label>
+        @* Template and aggregate kind as one string-valued choice; a select is never bound to a bool or enum directly. *@
+        <select id="rule-calculation" class="@InputCss" value="@CalculationValue" @onchange="OnCalculationChanged" disabled="@Disabled">
+            <option value="@WeightedSumValue">Weighted sum — each value × its factor, added up</option>
+            <option value="@nameof(TagRuleAggregateKind.Average)">Average of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Minimum)">Minimum of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Maximum)">Maximum of the values</option>
+            <option value="@nameof(TagRuleAggregateKind.Count)">Count of entries</option>
+            <option value="@PresenceValue">A value when a tag is logged</option>
+            <option value="@ConditionalValue">A value by conditions</option>
+        </select>
+        <p class="text-xs text-gray-500 dark:text-slate-400">@CalculationHint</p>
     </div>
 
     <div class="space-y-2">
@@ -18,17 +37,20 @@
         else
         {
             <GroupedTagSelect Tags="targetCandidates" Value="@(Model.TargetTagId == 0 ? null : Model.TargetTagId)" ValueChanged="SetTarget" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Result tag --" />
-            <p class="text-xs text-gray-500 dark:text-slate-400">A number tag with no values of its own. The rule owns it: its values are calculated and cannot be logged by hand.</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400">@(IsConditional ? "A text, option list, yes/no or number tag" : "A number tag") with no values of its own. The rule owns it: its values are calculated and cannot be logged by hand.</p>
         }
     </div>
 
     <div class="space-y-3">
         <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Sources <span class="text-rose-500">*</span></label>
-            <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddSource" disabled="@Disabled">
-                <Icon Name="plus" Class="h-3.5 w-3.5" />
-                Add source
-            </button>
+            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">@(IsConditional ? "Source" : "Sources") <span class="text-rose-500">*</span></label>
+            @if (!IsConditional)
+            {
+                <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddSource" disabled="@Disabled">
+                    <Icon Name="plus" Class="h-3.5 w-3.5" />
+                    Add source
+                </button>
+            }
         </div>
 
         @if (Model.Sources.Count == 0)
@@ -40,30 +62,110 @@
         {
             <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                 <div class="min-w-0 flex-1">
-                    <GroupedTagSelect Tags="sourceCandidates" Value="@(source.SourceTagId == 0 ? null : source.SourceTagId)" ValueChanged="@((int? id) => source.SourceTagId = id ?? 0)" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Source tag --" />
+                    <GroupedTagSelect Tags="sourceCandidates" Value="@(source.SourceTagId == 0 ? null : source.SourceTagId)" ValueChanged="@((int? id) => SetSource(source, id))" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Source tag --" />
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500 dark:text-slate-400" aria-hidden="true">×</span>
-                    <input type="number" step="any" @bind="source.Factor" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@Disabled" aria-label="Factor" title="Each value of this tag is multiplied by the factor. Use it for unit conversion, e.g. 100 when one pill contains 100 mg; negative values subtract." />
-                    <button type="button" class="inline-flex items-center rounded-md px-2 py-1 text-rose-600 transition-all hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => Model.Sources.Remove(source)" disabled="@Disabled" title="Remove source">
-                        <Icon Name="trash" Class="h-4 w-4" />
-                    </button>
-                </div>
+                @if (!IsConditional)
+                {
+                    <div class="flex items-center gap-2">
+                        @if (Template == TagRuleTemplate.WeightedSum)
+                        {
+                            <span class="text-sm text-gray-500 dark:text-slate-400" aria-hidden="true">×</span>
+                            <input type="number" step="any" @bind="source.Factor" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" disabled="@Disabled" aria-label="Factor" title="Each value of this tag is multiplied by the factor. Use it for unit conversion, e.g. 100 when one pill contains 100 mg; negative values subtract." />
+                        }
+                        <button type="button" class="inline-flex items-center rounded-md px-2 py-1 text-rose-600 transition-all hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => Model.Sources.Remove(source)" disabled="@Disabled" title="Remove source">
+                            <Icon Name="trash" Class="h-4 w-4" />
+                        </button>
+                    </div>
+                }
             </div>
         }
-
-        @if (Model.Sources.Any(s => s.SourceTagId != 0))
-        {
-            <p class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
-                Each day: <strong>@TagName(Model.TargetTagId)</strong> = @Formula()
-            </p>
-        }
     </div>
+
+    @if (CalculationValue == PresenceValue && Model.Cases.Count > 0)
+    {
+        <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Value on days the source is logged <span class="text-rose-500">*</span></label>
+            @ResultInput(Model.Cases[0])
+        </div>
+    }
+    else if (CalculationValue == ConditionalValue)
+    {
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Cases <span class="text-rose-500">*</span></label>
+                <button type="button" class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="AddCase" disabled="@Disabled">
+                    <Icon Name="plus" Class="h-3.5 w-3.5" />
+                    Add case
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-slate-400">Checked from the top; the first case that holds gives the value. @DayValueHint "Otherwise" can only be last.</p>
+
+            @for (var i = 0; i < Model.Cases.Count; i++)
+            {
+                var index = i;
+                var ruleCase = Model.Cases[index];
+                <div class="space-y-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-500 dark:text-slate-400">@(index + 1).</span>
+                        <select class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="@ruleCase.Operator.ToString()" @onchange="e => SetOperator(ruleCase, e.Value?.ToString())" disabled="@Disabled" aria-label="Condition">
+                            @foreach (var (op, label) in OperatorChoices)
+                            {
+                                <option value="@op.ToString()">@label</option>
+                            }
+                        </select>
+                        @if (TagRuleInputTypes.NeedsOperand(ruleCase.Operator))
+                        {
+                            @if (SourceKind is TagRuleValueKind.Number or TagRuleValueKind.Scale)
+                            {
+                                <input type="number" step="any" class="w-28 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="@ruleCase.Operand" @onchange="e => ruleCase.Operand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value" />
+                            }
+                            else if (SourceOptions is { } sourceOptions)
+                            {
+                                <select class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="@ruleCase.Operand" @onchange="e => ruleCase.Operand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value">
+                                    <option value="">-- Option --</option>
+                                    @foreach (var option in sourceOptions.Options)
+                                    {
+                                        <option value="@option.Value">@(option.DisplayName ?? option.Value)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="w-40 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="@ruleCase.Operand" @onchange="e => ruleCase.Operand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value" />
+                            }
+                        }
+                        <div class="ml-auto flex items-center gap-1">
+                            <button type="button" class="rounded-md px-2 py-1 text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700" @onclick="() => MoveCase(index, -1)" disabled="@(Disabled || index == 0)" title="Move up" aria-label="Move up">
+                                <Icon Name="chevron-up" Class="h-4 w-4" />
+                            </button>
+                            <button type="button" class="rounded-md px-2 py-1 text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700" @onclick="() => MoveCase(index, 1)" disabled="@(Disabled || index == Model.Cases.Count - 1)" title="Move down" aria-label="Move down">
+                                <Icon Name="chevron-down" Class="h-4 w-4" />
+                            </button>
+                            <button type="button" class="rounded-md px-2 py-1 text-rose-600 hover:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => Model.Cases.RemoveAt(index)" disabled="@Disabled" title="Remove case" aria-label="Remove case">
+                                <Icon Name="trash" Class="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm text-gray-500 dark:text-slate-400">→ value</span>
+                        <div class="min-w-0 flex-1">@ResultInput(ruleCase)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.Sources.Any(s => s.SourceTagId != 0))
+    {
+        <p class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
+            Each day: <strong>@TagName(Model.TargetTagId)</strong> = @Formula()
+        </p>
+    }
 
     <div class="space-y-2">
         <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
             <input type="checkbox" @bind="Model.IgnoreZero" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
-            <span>Ignore zero values <span class="text-gray-500 dark:text-slate-400">— a day with only zeros (e.g. skipped reminders) gets no result</span></span>
+            <span>Ignore zero values <span class="text-gray-500 dark:text-slate-400">— zeros and "no" entries (e.g. skipped reminders) are left out; a day with only those gets no result</span></span>
         </label>
         <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
             <input type="checkbox" @bind="Model.IsEnabled" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
@@ -79,9 +181,24 @@
 
 @code {
     private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string SmallInputCss = "w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string WeightedSumValue = "WeightedSum";
+    private const string PresenceValue = "Presence";
+    private const string ConditionalValue = "Conditional";
 
-    /// <summary>All of the user's tags. The editor offers the number tags that can take part.</summary>
+    // The order conditions are offered in; each source kind shows the ones it allows.
+    private static readonly TagRuleOperator[] OperatorOrder =
+    [
+        TagRuleOperator.IsLogged, TagRuleOperator.Equal, TagRuleOperator.NotEqual, TagRuleOperator.Greater,
+        TagRuleOperator.GreaterOrEqual, TagRuleOperator.Less, TagRuleOperator.LessOrEqual, TagRuleOperator.IsYes,
+        TagRuleOperator.IsNo, TagRuleOperator.Otherwise
+    ];
+
+    /// <summary>All of the user's tags. The editor offers the tags that can take part.</summary>
     [Parameter, EditorRequired] public IList<TagResponse>? Tags { get; set; }
+
+    /// <summary>The user's option lists, for option-list sources and results.</summary>
+    [Parameter] public IList<TagOptionListResponse>? OptionLists { get; set; }
 
     [Parameter, EditorRequired] public TagRuleRequest Model { get; set; } = default!;
 
@@ -90,23 +207,231 @@
 
     [Parameter] public bool Disabled { get; set; }
 
-    // Stable lists, rebuilt only when the tags change, so the grouped pickers keep their group.
+    /// <summary>Formats factors in the preview; the user's culture.</summary>
+    [Parameter] public System.Globalization.CultureInfo? Culture { get; set; }
+
+    // Stable lists, rebuilt only when the tags or the calculation change, so the grouped pickers
+    // keep their selected group.
     private IList<TagResponse>? targetCandidates;
     private IList<TagResponse>? sourceCandidates;
     private IList<TagResponse>? candidatesSource;
+    private string? candidatesCalculation;
+
+    // The chosen calculation, read from the model only when a model arrives. Presence and "by
+    // conditions" can hold the same single "is logged" case, so the mode must not follow the
+    // cases while they are being edited.
+    private string calculation = WeightedSumValue;
+    private TagRuleRequest? calculationModel;
+
+    private TagRuleTemplate Template => Model.Template ?? TagRuleTemplate.WeightedSum;
+
+    private bool IsConditional => Template == TagRuleTemplate.Conditional;
+
+    private string CalculationValue => calculation;
+
+    private string CalculationHint => CalculationValue switch
+    {
+        nameof(TagRuleAggregateKind.Count) => "How many entries the source tags have that day, of any tag type.",
+        WeightedSumValue => "For totals, e.g. a nutrient from several products. Sources are number tags.",
+        PresenceValue => "The result tag gets a fixed value on every day the source tag is logged, e.g. Gym → Exercise = yes.",
+        ConditionalValue => "The result tag gets the value of the first case that holds, e.g. 'Over limit' when Coffees ≥ 4.",
+        _ => "Over all of the day's values of the source tags. Sources are number, rating, score or percentage tags."
+    };
+
+    private string DayValueHint => SourceKind switch
+    {
+        TagRuleValueKind.Number => "The day's total is compared.",
+        TagRuleValueKind.Scale => "The day's average is compared.",
+        _ => "The day's latest entry is compared."
+    };
+
+    private TagResponse? SourceTag => TagById(Model.Sources.FirstOrDefault()?.SourceTagId);
+    private TagResponse? TargetTag => TagById(Model.TargetTagId);
+
+    private TagResponse? TagById(int? tagId) => Tags?.FirstOrDefault(t => t.Id == tagId);
+
+    private TagRuleValueKind SourceKind => KindOf(SourceTag);
+
+    private static TagRuleValueKind KindOf(TagResponse? tag) =>
+        tag == null ? TagRuleValueKind.Text : TagRuleInputTypes.ConditionKind(tag.InputTypeId, tag.OptionListId != null);
+
+    private TagOptionListResponse? SourceOptions => OptionListOf(SourceTag);
+    private TagOptionListResponse? TargetOptions => OptionListOf(TargetTag);
+
+    private TagOptionListResponse? OptionListOf(TagResponse? tag) =>
+        tag?.OptionListId is int id ? OptionLists?.FirstOrDefault(l => l.Id == id) : null;
+
+    private IEnumerable<(TagRuleOperator Op, string Label)> OperatorChoices
+    {
+        get
+        {
+            var kind = SourceKind;
+            var numeric = kind is TagRuleValueKind.Number or TagRuleValueKind.Scale;
+
+            return OperatorOrder
+                .Where(op => TagRuleInputTypes.Allows(kind, op))
+                .Select(op => (op, OperatorLabel(op, numeric)));
+        }
+    }
+
+    private static string OperatorLabel(TagRuleOperator op, bool numeric) => op switch
+    {
+        TagRuleOperator.IsLogged => "is logged",
+        TagRuleOperator.Otherwise => "otherwise",
+        TagRuleOperator.IsYes => "is yes",
+        TagRuleOperator.IsNo => "is no",
+        TagRuleOperator.Equal => numeric ? "=" : "equals",
+        TagRuleOperator.NotEqual => numeric ? "≠" : "does not equal",
+        _ => TagRuleText.Symbol(op.ToString())
+    };
+
+    // A new case starts with a test the source allows.
+    private static TagRuleOperator DefaultOperator(TagRuleValueKind kind) => kind switch
+    {
+        TagRuleValueKind.Number or TagRuleValueKind.Scale => TagRuleOperator.GreaterOrEqual,
+        TagRuleValueKind.YesNo => TagRuleOperator.IsYes,
+        _ => TagRuleOperator.Equal
+    };
+
+    // The value input matches the result tag: an option list, yes/no, a number or free text.
+    private RenderFragment ResultInput(TagRuleCaseRequest ruleCase) => __builder =>
+    {
+        if (TargetOptions is { } options)
+        {
+            <select class="@SmallInputCss" value="@ruleCase.ResultValue" @onchange="e => ruleCase.ResultValue = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" aria-label="Result value">
+                <option value="">-- Option --</option>
+                @foreach (var option in options.Options)
+                {
+                    <option value="@option.Value">@(option.DisplayName ?? option.Value)</option>
+                }
+            </select>
+        }
+        else if (TargetTag?.InputTypeId == InputTypeIds.Boolean)
+        {
+            <select class="@SmallInputCss" value="@ruleCase.ResultValue" @onchange="e => ruleCase.ResultValue = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" aria-label="Result value">
+                <option value="">-- Yes or no --</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+        }
+        else if (TagRuleInputTypes.IsNumber(TargetTag?.InputTypeId))
+        {
+            <input type="number" step="any" class="@SmallInputCss" value="@ruleCase.ResultValue" @onchange="e => ruleCase.ResultValue = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" aria-label="Result value" />
+        }
+        else
+        {
+            <input type="text" maxlength="500" class="@SmallInputCss" value="@ruleCase.ResultValue" @onchange="e => ruleCase.ResultValue = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" aria-label="Result value" placeholder="Text" />
+        }
+    };
 
     protected override void OnParametersSet()
     {
-        if (ReferenceEquals(Tags, candidatesSource))
+        if (!ReferenceEquals(Model, calculationModel))
+        {
+            calculationModel = Model;
+            calculation = CalculationOf(Model);
+        }
+
+        RebuildCandidates();
+    }
+
+    private static string CalculationOf(TagRuleRequest model) => (model.Template ?? TagRuleTemplate.WeightedSum) switch
+    {
+        TagRuleTemplate.Aggregate => (model.AggregateKind ?? TagRuleAggregateKind.Average).ToString(),
+        TagRuleTemplate.Conditional when model.Cases.Count == 1 && model.Cases[0].Operator == TagRuleOperator.IsLogged => PresenceValue,
+        TagRuleTemplate.Conditional => ConditionalValue,
+        _ => WeightedSumValue
+    };
+
+    private void OnCalculationChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? WeightedSumValue;
+        calculation = value;
+        switch (value)
+        {
+            case PresenceValue:
+                Model.Template = TagRuleTemplate.Conditional;
+                Model.AggregateKind = null;
+                KeepOneSource();
+                Model.Cases = [new TagRuleCaseRequest { Operator = TagRuleOperator.IsLogged, ResultValue = Model.Cases.FirstOrDefault()?.ResultValue ?? string.Empty }];
+                break;
+            case ConditionalValue:
+                Model.Template = TagRuleTemplate.Conditional;
+                Model.AggregateKind = null;
+                KeepOneSource();
+                // Coming from presence, its "is logged" case stays as the first case.
+                if (Model.Cases.Count == 0)
+                {
+                    Model.Cases = [new TagRuleCaseRequest { Operator = DefaultOperator(SourceKind) }];
+                }
+
+                break;
+            default:
+                Model.Cases = [];
+                if (Enum.TryParse<TagRuleAggregateKind>(value, out var kind) && Enum.IsDefined(kind))
+                {
+                    Model.Template = TagRuleTemplate.Aggregate;
+                    Model.AggregateKind = kind;
+                }
+                else
+                {
+                    calculation = WeightedSumValue;
+                    Model.Template = TagRuleTemplate.WeightedSum;
+                    Model.AggregateKind = null;
+                }
+
+                break;
+        }
+
+        RebuildCandidates();
+        DropUnfitSelections();
+    }
+
+    // A presence or conditional rule reads exactly one source tag.
+    private void KeepOneSource()
+    {
+        if (Model.Sources.Count == 0)
+        {
+            Model.Sources.Add(new TagRuleSourceRequest { Factor = 1 });
+        }
+        else if (Model.Sources.Count > 1)
+        {
+            Model.Sources = [Model.Sources[0]];
+        }
+    }
+
+    // A tag that no longer fits the calculation is cleared, so a picker never shows its
+    // placeholder while the model still holds a tag that would be saved.
+    private void DropUnfitSelections()
+    {
+        if (!IsEditing && Model.TargetTagId != 0 && targetCandidates?.Any(t => t.Id == Model.TargetTagId) != true)
+        {
+            Model.TargetTagId = 0;
+        }
+
+        foreach (var source in Model.Sources)
+        {
+            if (source.SourceTagId != 0 && sourceCandidates?.Any(t => t.Id == source.SourceTagId) != true)
+            {
+                SetSource(source, null);
+            }
+        }
+    }
+
+    private void RebuildCandidates()
+    {
+        if (ReferenceEquals(Tags, candidatesSource) && candidatesCalculation == CalculationValue)
         {
             return;
         }
 
         candidatesSource = Tags;
-        var numeric = (Tags ?? []).Where(t => t.InputTypeId is 1 or 6).ToList();
-        targetCandidates = numeric.Where(t => !t.IsComputed).ToList();
-        // A computed tag cannot be a source: rules do not feed rules.
-        sourceCandidates = numeric.Where(t => !t.IsComputed).ToList();
+        candidatesCalculation = CalculationValue;
+
+        // A computed tag is never offered: a rule owns it, and rules do not feed rules.
+        var usable = (Tags ?? []).Where(t => !t.IsComputed).ToList();
+        targetCandidates = usable.Where(t => TagRuleInputTypes.FitsTarget(Template, t.InputTypeId, t.OptionListId != null)).ToList();
+        sourceCandidates = usable.Where(t => TagRuleInputTypes.FitsSource(Template, Model.AggregateKind, t.InputTypeId)).ToList();
     }
 
     private void SetTarget(int? tagId)
@@ -114,22 +439,93 @@
         Model.TargetTagId = tagId ?? 0;
     }
 
+    private void SetSource(TagRuleSourceRequest source, int? tagId)
+    {
+        var previous = TagById(source.SourceTagId);
+        source.SourceTagId = tagId ?? 0;
+        if (IsConditional && ReferenceEquals(source, Model.Sources.FirstOrDefault()))
+        {
+            FitCasesToSource(previous);
+        }
+    }
+
+    // Tests the new source does not allow go back to its default. Compared values stay between
+    // sources of the same kind and are cleared when the kind or the option list changes.
+    private void FitCasesToSource(TagResponse? previous)
+    {
+        var current = SourceTag;
+        var kind = KindOf(current);
+        var keepOperands = KindOf(previous) == kind && previous?.OptionListId == current?.OptionListId;
+        foreach (var ruleCase in Model.Cases)
+        {
+            if (!TagRuleInputTypes.Allows(kind, ruleCase.Operator))
+            {
+                ruleCase.Operator = DefaultOperator(kind);
+            }
+
+            if (!keepOperands || !TagRuleInputTypes.NeedsOperand(ruleCase.Operator))
+            {
+                ruleCase.Operand = null;
+            }
+        }
+    }
+
     private void AddSource()
     {
         Model.Sources.Add(new TagRuleSourceRequest { Factor = 1 });
     }
 
+    private void AddCase()
+    {
+        // A new case goes before a trailing "otherwise", which must stay last.
+        var newCase = new TagRuleCaseRequest { Operator = DefaultOperator(SourceKind) };
+        var otherwiseLast = Model.Cases.Count > 0 && Model.Cases[^1].Operator == TagRuleOperator.Otherwise;
+        Model.Cases.Insert(otherwiseLast ? Model.Cases.Count - 1 : Model.Cases.Count, newCase);
+    }
+
+    private void MoveCase(int index, int step)
+    {
+        var target = index + step;
+        if (target < 0 || target >= Model.Cases.Count)
+        {
+            return;
+        }
+
+        (Model.Cases[index], Model.Cases[target]) = (Model.Cases[target], Model.Cases[index]);
+    }
+
+    private static void SetOperator(TagRuleCaseRequest ruleCase, string? value)
+    {
+        if (Enum.TryParse<TagRuleOperator>(value, out var op) && Enum.IsDefined(op))
+        {
+            ruleCase.Operator = op;
+            if (!TagRuleInputTypes.NeedsOperand(op))
+            {
+                ruleCase.Operand = null;
+            }
+        }
+    }
+
     private string TagName(int tagId)
     {
-        return Tags?.FirstOrDefault(t => t.Id == tagId)?.Title ?? "result";
+        return TagById(tagId)?.Title ?? "result";
     }
 
     private string Formula()
     {
-        var terms = Model.Sources
+        var sources = Model.Sources
             .Where(s => s.SourceTagId != 0)
-            .Select(s => $"{s.Factor.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture)} × {TagName(s.SourceTagId)}");
+            .Select(s => (TagName(s.SourceTagId), s.Factor))
+            .ToList();
+        var cases = Model.Cases
+            .Select(c => new TagRuleText.Case(c.Operator.ToString(), c.Operand, ResultLabel(c.ResultValue)))
+            .ToList();
 
-        return string.Join(" + ", terms);
+        return TagRuleText.Formula(Template.ToString(), Model.AggregateKind?.ToString(), sources, cases,
+            Culture ?? System.Globalization.CultureInfo.CurrentCulture);
     }
+
+    // An option result reads better by its display name.
+    private string ResultLabel(string value) =>
+        TargetOptions?.Options.FirstOrDefault(o => o.Value == value)?.DisplayName ?? value;
 }

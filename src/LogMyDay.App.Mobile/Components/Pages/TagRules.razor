@@ -1,6 +1,7 @@
 @page "/tag-rules"
 
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.UI.Formatting
 @using Refit
 @inject LogMyDay.Shared.Interfaces.ITagRuleApi TagRuleApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
@@ -70,7 +71,7 @@
                                 <Icon Name="arrow-repeat" Class="h-4 w-4" />
                                 <span>Past days</span>
                             </button>
-                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(rule)" disabled="@(isBusy || tags == null)">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(rule)" disabled="@(isBusy || tags == null || TagRuleForm.ToRequest(rule) is null)" title="@(TagRuleForm.ToRequest(rule) is null ? TagRuleForm.NotEditableHint : null)">
                                 <Icon Name="pencil" Class="h-4 w-4" />
                                 <span>Edit</span>
                             </button>
@@ -108,7 +109,7 @@
                 }
 
                 <div class="px-6 py-5">
-                    <TagRuleEditor Tags="tags" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" />
+                    <TagRuleEditor Tags="tags" OptionLists="optionLists" Model="formModel" IsEditing="editingId.HasValue" Disabled="isBusy" Culture="displayCulture" />
                 </div>
 
                 <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
@@ -247,6 +248,7 @@
 @code {
     private readonly List<TagRuleResponse> rules = new();
     private IList<TagResponse>? tags;
+    private IList<TagOptionListResponse>? optionLists;
     private TagRuleRequest formModel = new() { Name = string.Empty };
 
     private string? loadError;
@@ -291,11 +293,13 @@
         {
             var rulesTask = TagRuleApi.GetTagRules();
             var tagsTask = ActivityApi.GetTags();
-            await Task.WhenAll(rulesTask, tagsTask);
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(rulesTask, tagsTask, optionListsTask);
 
             rules.Clear();
             rules.AddRange(rulesTask.Result);
             tags = tagsTask.Result;
+            optionLists = optionListsTask.Result;
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
@@ -322,15 +326,13 @@
 
     private void OpenEditModal(TagRuleResponse rule)
     {
-        editingId = rule.Id;
-        formModel = new TagRuleRequest
+        if (TagRuleForm.ToRequest(rule) is not { } model)
         {
-            Name = rule.Name,
-            TargetTagId = rule.TargetTagId,
-            IgnoreZero = rule.IgnoreZero,
-            IsEnabled = rule.IsEnabled,
-            Sources = rule.Sources.Select(s => new TagRuleSourceRequest { SourceTagId = s.SourceTagId, Factor = s.Factor }).ToList()
-        };
+            return;
+        }
+
+        editingId = rule.Id;
+        formModel = model;
         formError = null;
         showModal = true;
     }
@@ -537,7 +539,6 @@
 
     private string Formula(TagRuleResponse rule)
     {
-        return string.Join(" + ", rule.Sources.Select(s =>
-            $"{s.Factor.ToString("0.####", displayCulture)} × {s.SourceTagName}"));
+        return TagRuleText.Formula(rule, displayCulture);
     }
 }
