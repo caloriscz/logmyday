@@ -677,6 +677,204 @@ public class TagRuleTests
     }
 
     [Fact]
+    public async Task Update_WithoutATemplate_KeepsTheStoredTemplateAndCases()
+    {
+        // A client that predates templates sends name, sources and switches only.
+        var f = CreateFixture(nameof(Update_WithoutATemplate_KeepsTheStoredTemplateAndCases));
+        var coffees = await f.AddTag("Coffees");
+        var level = await f.AddTag("Level", inputTypeId: 2);
+        var average = await f.AddTag("Average");
+        var conditional = await CreateConditional(f, level, coffees, ignoreZero: true,
+            (TagRuleOperator.GreaterOrEqual, "4", "High"),
+            (TagRuleOperator.Otherwise, null, "Low"));
+        var aggregate = await CreateAggregate(f, average, TagRuleAggregateKind.Average, ignoreZero: true, coffees);
+
+        await f.Rules.Update(conditional.Id, new TagRuleRequest
+        {
+            Name = "Renamed",
+            TargetTagId = level.Id,
+            IsEnabled = false,
+            Sources = [new() { SourceTagId = coffees.Id, Factor = 1 }]
+        }, f.UserId);
+        await f.Rules.Update(aggregate.Id, new TagRuleRequest
+        {
+            Name = "Average",
+            TargetTagId = average.Id,
+            Sources = [new() { SourceTagId = coffees.Id, Factor = 1 }]
+        }, f.UserId);
+
+        var rules = await f.Rules.GetAll(f.UserId);
+        var savedConditional = rules.Single(r => r.Id == conditional.Id);
+        Assert.Equal(("Renamed", "Conditional", false), (savedConditional.Name, savedConditional.Template, savedConditional.IsEnabled));
+        Assert.Equal(["GreaterOrEqual", "Otherwise"], savedConditional.Cases.Select(c => c.Operator));
+        var savedAggregate = rules.Single(r => r.Id == aggregate.Id);
+        Assert.Equal(("Aggregate", "Average"), (savedAggregate.Template, savedAggregate.AggregateKind));
+    }
+
+    [Fact]
+    public async Task Conditional_ScaleSource_ComparesTheDayAverage()
+    {
+        var f = CreateFixture(nameof(Conditional_ScaleSource_ComparesTheDayAverage));
+        var mood = await f.AddTag("Mood", inputTypeId: 10); // score 0-5
+        var day = await f.AddTag("Day", inputTypeId: 2);
+        await CreateConditional(f, day, mood, ignoreZero: true,
+            (TagRuleOperator.GreaterOrEqual, "4", "good"),
+            (TagRuleOperator.Otherwise, null, "meh"));
+
+        await f.Log(mood, f.TodayAt(8), "3");
+        await f.Log(mood, f.TodayAt(20), "4");
+        Assert.Equal("meh", Assert.Single(await f.Results(day)).Description); // average 3.5, not the total 7
+
+        await f.Log(mood, f.TodayAt(21), "5");
+        Assert.Equal("good", Assert.Single(await f.Results(day)).Description); // average 4
+    }
+
+    [Fact]
+    public async Task Conditional_DecimalDayTotal_MatchesDespiteBinaryRounding()
+    {
+        var f = CreateFixture(nameof(Conditional_DecimalDayTotal_MatchesDespiteBinaryRounding));
+        var water = await f.AddTag("Water", inputTypeId: 6);
+        var flag = await f.AddTag("Amount", inputTypeId: 2);
+        await CreateConditional(f, flag, water, ignoreZero: true,
+            (TagRuleOperator.Equal, "0.3", "exact"),
+            (TagRuleOperator.Greater, "0.3", "over"),
+            (TagRuleOperator.Otherwise, null, "under"));
+
+        await f.Log(water, f.TodayAt(8), "0.1");
+        await f.Log(water, f.TodayAt(9), "0.2"); // 0.30000000000000004 as a double
+
+        Assert.Equal("exact", Assert.Single(await f.Results(flag)).Description);
+    }
+
+    [Fact]
+    public async Task Conditional_OptionListOnANumberTag_ComparesTheLatestOption()
+    {
+        var f = CreateFixture(nameof(Conditional_OptionListOnANumberTag_ComparesTheLatestOption));
+        var list = new TagOptionList { Name = "Levels", UserId = f.UserId };
+        f.Context.TagOptionLists.Add(list);
+        await f.Context.SaveChangesAsync();
+        f.Context.TagOptions.AddRange(
+            new TagOption { OptionListId = list.Id, Value = "1", DisplayName = "Low" },
+            new TagOption { OptionListId = list.Id, Value = "3", DisplayName = "High" });
+        var level = await f.AddTag("Level");
+        (await f.Context.Tags.FindAsync(level.Id))!.OptionListId = list.Id;
+        await f.Context.SaveChangesAsync();
+        var label = await f.AddTag("Label", inputTypeId: 2);
+
+        // The compared option is given by its display name and stored as its value.
+        var rule = await CreateConditional(f, label, level, ignoreZero: true,
+            (TagRuleOperator.Equal, "High", "high day"),
+            (TagRuleOperator.Otherwise, null, "other"));
+        Assert.Equal("3", rule.Cases[0].Operand);
+
+        await f.Log(level, f.TodayAt(8), "3");
+        Assert.Equal("high day", Assert.Single(await f.Results(label)).Description);
+
+        await f.Log(level, f.TodayAt(9), "1"); // the latest option decides; a day total would be 4
+        Assert.Equal("other", Assert.Single(await f.Results(label)).Description);
+    }
+
+    [Fact]
+    public async Task YesNoSource_AcceptsYesNoSpellings_AndNoIsASkipMarker()
+    {
+        var f = CreateFixture(nameof(YesNoSource_AcceptsYesNoSpellings_AndNoIsASkipMarker));
+        var alcohol = await f.AddTag("Alcohol", inputTypeId: 3);
+        var evening = await f.AddTag("Evening", inputTypeId: 2);
+        var drinks = await f.AddTag("Drinks");
+        await CreateConditional(f, evening, alcohol, ignoreZero: true, (TagRuleOperator.IsYes, null, "drank"));
+        await CreateAggregate(f, drinks, TagRuleAggregateKind.Count, ignoreZero: true, alcohol);
+
+        await f.Log(alcohol, f.TodayAt(20), "yes");
+        await f.Log(alcohol, f.TodayAt(22), "no");
+
+        Assert.Equal("1", Assert.Single(await f.Results(drinks)).Description); // "no" is left out
+        Assert.Equal("drank", Assert.Single(await f.Results(evening)).Description);
+    }
+
+    [Fact]
+    public async Task Conditional_EntriesAtTheSameMoment_ResolveByTheLaterEntry()
+    {
+        var f = CreateFixture(nameof(Conditional_EntriesAtTheSameMoment_ResolveByTheLaterEntry));
+        var place = await f.AddTag("Place", inputTypeId: 2);
+        var where = await f.AddTag("Where", inputTypeId: 2);
+        await CreateConditional(f, where, place, ignoreZero: true,
+            (TagRuleOperator.Equal, "b", "second"),
+            (TagRuleOperator.Otherwise, null, "first"));
+
+        await f.Log(place, f.TodayAt(8), "a");
+        await f.Log(place, f.TodayAt(8), "b");
+
+        Assert.Equal("second", Assert.Single(await f.Results(where)).Description);
+    }
+
+    [Fact]
+    public async Task Validation_RejectsUnknownValues_AndEqualsZeroWhileZerosAreIgnored()
+    {
+        var f = CreateFixture(nameof(Validation_RejectsUnknownValues_AndEqualsZeroWhileZerosAreIgnored));
+        var number = await f.AddTag("Number");
+        var target = await f.AddTag("Target", inputTypeId: 2);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
+        {
+            Name = "Unknown template",
+            Template = (TagRuleTemplate)3,
+            TargetTagId = target.Id,
+            Sources = [new() { SourceTagId = number.Id }]
+        }, f.UserId));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
+        {
+            Name = "Unknown kind",
+            Template = TagRuleTemplate.Aggregate,
+            AggregateKind = (TagRuleAggregateKind)9,
+            TargetTagId = target.Id,
+            Sources = [new() { SourceTagId = number.Id }]
+        }, f.UserId));
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, number, ignoreZero: false,
+            ((TagRuleOperator)42, "1", "x")));
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateConditional(f, target, number, ignoreZero: true,
+            (TagRuleOperator.Equal, "0", "none")));
+
+        var counted = await CreateConditional(f, target, number, ignoreZero: false, (TagRuleOperator.Equal, "0", "none"));
+        Assert.Equal("Equal", Assert.Single(counted.Cases).Operator);
+    }
+
+    [Fact]
+    public async Task OnSqlite_BackupImport_ChecksCasesAgainstTheTagsTheyNameNow()
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        var f = CreateSqliteFixture(connection);
+        await f.AddTag("Coffees");
+        await f.AddTag("Too much", inputTypeId: 3);
+        await f.AddTag("Over limit", inputTypeId: 3);
+        var backups = new BackupService(f.Context, NullLogger<BackupService>.Instance, new TagRuleEngine(f.Context));
+
+        TagRuleBackup Rule(string name, string target, string result) => new()
+        {
+            Name = name,
+            Template = TagRuleTemplate.Conditional,
+            TargetTagName = target,
+            IgnoreZero = true,
+            IsEnabled = true,
+            EffectiveFrom = f.Today,
+            Sources = [new() { SourceTagName = "Coffees", Factor = 1 }],
+            Cases = [new() { Operator = TagRuleOperator.GreaterOrEqual, Operand = "4", ResultValue = result }]
+        };
+
+        var result = await backups.ImportDataAsync(new BackupData
+        {
+            Metadata = new BackupMetadata(),
+            TagRules = [Rule("Bad", "Too much", "lots"), Rule("Good", "Over limit", "Yes")]
+        }, clearExistingData: false, f.UserId);
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(1, result.Statistics.TagRulesSkipped);
+        Assert.Contains(result.Warnings, w => w.Contains("'Bad'") && w.Contains("yes or no"));
+        var restored = await f.Context.TagRules.Include(r => r.Cases).SingleAsync();
+        Assert.Equal(("Good", "true"), (restored.Name, Assert.Single(restored.Cases).ResultValue));
+    }
+
+    [Fact]
     public async Task AccumulatePath_AlsoUpdatesTheResult()
     {
         var f = CreateFixture(nameof(AccumulatePath_AlsoUpdatesTheResult));

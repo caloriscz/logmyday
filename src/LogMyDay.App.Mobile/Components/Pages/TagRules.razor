@@ -1,6 +1,7 @@
 @page "/tag-rules"
 
 @using LogMyDay.Shared.DTOs
+@using LogMyDay.UI.Formatting
 @using Refit
 @inject LogMyDay.Shared.Interfaces.ITagRuleApi TagRuleApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
@@ -70,7 +71,7 @@
                                 <Icon Name="arrow-repeat" Class="h-4 w-4" />
                                 <span>Past days</span>
                             </button>
-                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(rule)" disabled="@(isBusy || tags == null)">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(rule)" disabled="@(isBusy || tags == null || TagRuleForm.ToRequest(rule) is null)" title="@(TagRuleForm.ToRequest(rule) is null ? TagRuleForm.NotEditableHint : null)">
                                 <Icon Name="pencil" Class="h-4 w-4" />
                                 <span>Edit</span>
                             </button>
@@ -325,25 +326,13 @@
 
     private void OpenEditModal(TagRuleResponse rule)
     {
-        editingId = rule.Id;
-        formModel = new TagRuleRequest
+        if (TagRuleForm.ToRequest(rule) is not { } model)
         {
-            Name = rule.Name,
-            Template = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleTemplate>(rule.Template, out var template) ? template : LogMyDay.Domain.Enums.TagRuleTemplate.WeightedSum,
-            AggregateKind = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleAggregateKind>(rule.AggregateKind, out var kind) ? kind : null,
-            TargetTagId = rule.TargetTagId,
-            IgnoreZero = rule.IgnoreZero,
-            IsEnabled = rule.IsEnabled,
-            Sources = rule.Sources.Select(s => new TagRuleSourceRequest { SourceTagId = s.SourceTagId, Factor = s.Factor }).ToList(),
-            Cases = rule.Cases
-                .Select(c => new TagRuleCaseRequest
-                {
-                    Operator = Enum.TryParse<LogMyDay.Domain.Enums.TagRuleOperator>(c.Operator, out var op) ? op : LogMyDay.Domain.Enums.TagRuleOperator.IsLogged,
-                    Operand = c.Operand,
-                    ResultValue = c.ResultValue
-                })
-                .ToList()
-        };
+            return;
+        }
+
+        editingId = rule.Id;
+        formModel = model;
         formError = null;
         showModal = true;
     }
@@ -550,6 +539,6 @@
 
     private string Formula(TagRuleResponse rule)
     {
-        return LogMyDay.UI.Formatting.TagRuleText.Formula(rule, displayCulture);
+        return TagRuleText.Formula(rule, displayCulture);
     }
 }

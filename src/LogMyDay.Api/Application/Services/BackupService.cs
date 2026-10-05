@@ -1,5 +1,6 @@
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -71,9 +72,10 @@ public class BackupService : IBackupService
         return rules.Select(r => r.Backup).ToList();
     }
 
-    // Restores rules by tag name with the same conditions as creating one: number tags only, the
-    // target is not a source, has no logged values and belongs to no other rule, and no rule feeds
-    // another. A rule that does not fit is skipped with a warning. Nothing is calculated here.
+    // Restores rules by tag name with the same conditions as creating one: tag types that fit the
+    // template, cases checked against the tags they now name, the target is not a source, has no
+    // logged values and belongs to no other rule, and no rule feeds another. A rule that does not
+    // fit is skipped with a warning. Nothing is calculated here.
     private async Task<List<TagRule>> ImportTagRulesAsync(List<TagRuleBackup> rules, BackupImportResult result, Guid? userId)
     {
         var imported = new List<TagRule>();
@@ -91,7 +93,7 @@ public class BackupService : IBackupService
 
         foreach (var backup in rules)
         {
-            var reason = await RejectRule(backup, tagsByName, claimedTargets);
+            var (reason, cases) = await RejectRule(backup, tagsByName, claimedTargets);
             if (reason != null)
             {
                 result.Statistics.TagRulesSkipped++;
@@ -116,9 +118,7 @@ public class BackupService : IBackupService
                 Sources = backup.Sources
                     .Select(s => new TagRuleSource { SourceTagId = tagsByName[s.SourceTagName].Id, Factor = s.Factor })
                     .ToList(),
-                Cases = backup.Cases
-                    .Select((c, i) => new TagRuleCase { SortOrder = i, Operator = c.Operator, Operand = c.Operand, ResultValue = c.ResultValue })
-                    .ToList()
+                Cases = cases
             };
 
             target.IsComputed = true;
@@ -163,76 +163,96 @@ public class BackupService : IBackupService
         return imported;
     }
 
-    private async Task<string?> RejectRule(TagRuleBackup backup, Dictionary<string, Tag> tagsByName, HashSet<int> claimedTargets)
+    private async Task<(string? Reason, List<TagRuleCase> Cases)> RejectRule(TagRuleBackup backup, Dictionary<string, Tag> tagsByName, HashSet<int> claimedTargets)
     {
-        if (!tagsByName.TryGetValue(backup.TargetTagName, out var target))
+        var noCases = new List<TagRuleCase>();
+        if (!Enum.IsDefined(backup.Template)
+            || (backup.AggregateKind is Domain.Enums.TagRuleAggregateKind kind && !Enum.IsDefined(kind)))
         {
-            return $"its tag '{backup.TargetTagName}' is missing";
+            return ("it uses a rule type this version does not know", noCases);
         }
 
-        var conditional = backup.Template == Domain.Enums.TagRuleTemplate.Conditional;
-        if (conditional ? !(target.OptionListId != null || target.InputTypeId is 1 or 2 or 3 or 6) : target.InputTypeId is not (1 or 6))
+        if (!tagsByName.TryGetValue(backup.TargetTagName, out var target))
         {
-            return $"'{target.TagName}' cannot hold this rule's results";
+            return ($"its tag '{backup.TargetTagName}' is missing", noCases);
+        }
+
+        if (!TagRuleInputTypes.FitsTarget(backup.Template, target.InputTypeId, target.OptionListId != null))
+        {
+            return ($"'{target.TagName}' cannot hold this rule's results", noCases);
         }
 
         if (target.IsComputed || claimedTargets.Contains(target.Id))
         {
-            return $"'{target.TagName}' already belongs to another rule";
+            return ($"'{target.TagName}' already belongs to another rule", noCases);
         }
 
         if (backup.Sources.Count == 0)
         {
-            return "it has no source tags";
+            return ("it has no source tags", noCases);
         }
 
-        if (conditional && (backup.Sources.Count != 1 || backup.Cases.Count == 0))
+        var conditional = backup.Template == Domain.Enums.TagRuleTemplate.Conditional;
+        if (conditional && backup.Sources.Count != 1)
         {
-            return "a conditional rule needs one source tag and at least one case";
+            return ("a conditional rule needs exactly one source tag", noCases);
         }
 
         if (backup.Template == Domain.Enums.TagRuleTemplate.Aggregate && backup.AggregateKind == null)
         {
-            return "it has no aggregate kind";
+            return ("it has no aggregate kind", noCases);
         }
 
         foreach (var source in backup.Sources)
         {
             if (!tagsByName.TryGetValue(source.SourceTagName, out var tag))
             {
-                return $"its source tag '{source.SourceTagName}' is missing";
+                return ($"its source tag '{source.SourceTagName}' is missing", noCases);
             }
 
-            if (tag.Id == target.Id || tag.IsComputed || !SourceFits(backup, tag) || !double.IsFinite(source.Factor))
+            if (tag.Id == target.Id || tag.IsComputed || !double.IsFinite(source.Factor)
+                || !TagRuleInputTypes.FitsSource(backup.Template, backup.AggregateKind, tag.InputTypeId))
             {
-                return $"its source '{source.SourceTagName}' cannot be used";
+                return ($"its source '{source.SourceTagName}' cannot be used", noCases);
             }
         }
 
         if (backup.Sources.Select(s => s.SourceTagName).Distinct().Count() != backup.Sources.Count)
         {
-            return "a source tag appears twice";
+            return ("a source tag appears twice", noCases);
+        }
+
+        var cases = noCases;
+        if (conditional)
+        {
+            // The tags are matched by name, so they may have another type or option list than
+            // where the backup was made: the cases must fit the tags they name now.
+            var sourceTag = tagsByName[backup.Sources[0].SourceTagName];
+            try
+            {
+                cases = TagRuleCaseValidator.Validate(
+                    backup.Cases.Select(c => new TagRuleCaseRequest { Operator = c.Operator, Operand = c.Operand, ResultValue = c.ResultValue }).ToList(),
+                    backup.IgnoreZero, sourceTag, target, await OptionsOf(sourceTag), await OptionsOf(target));
+            }
+            catch (ArgumentException ex)
+            {
+                return (ex.Message, noCases);
+            }
         }
 
         if (await _context.Activities.AnyAsync(a => a.TagId == target.Id))
         {
-            return $"'{target.TagName}' has logged values of its own";
+            return ($"'{target.TagName}' has logged values of its own", noCases);
         }
 
-        return null;
+        return (null, cases);
     }
 
-    // The same source types as creating a rule: numbers for a weighted sum, numbers, ratings,
-    // scores and percentage for an aggregate, any tag for a count.
-    private static bool SourceFits(TagRuleBackup backup, Tag tag)
+    private async Task<List<TagOption>?> OptionsOf(Tag tag)
     {
-        return backup.Template switch
-        {
-            Domain.Enums.TagRuleTemplate.Aggregate when backup.AggregateKind == Domain.Enums.TagRuleAggregateKind.Count => true,
-            Domain.Enums.TagRuleTemplate.Aggregate => tag.InputTypeId is 1 or 6 or 7 or 8 or 9 or 10 or 11,
-            Domain.Enums.TagRuleTemplate.Conditional => true,
-            _ => tag.InputTypeId is 1 or 6
-        };
+        return tag.OptionListId is int listId
+            ? await _context.TagOptions.Where(o => o.OptionListId == listId).ToListAsync()
+            : null;
     }
 
     // The separate step after the import is committed: every restored, enabled rule is recomputed

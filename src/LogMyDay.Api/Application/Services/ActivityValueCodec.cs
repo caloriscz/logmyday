@@ -25,6 +25,27 @@ public static class ActivityValueCodec
                 && double.TryParse(trimmed.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value));
     }
 
+    /// <summary>Reads a yes/no value. Stored values are true/false; rows logged through the API
+    /// or older clients may carry yes/no or 1/0, which the activity summary accepts too.</summary>
+    public static bool TryReadYesNo(string? text, out bool value)
+    {
+        switch (text?.Trim().ToLowerInvariant())
+        {
+            case "true" or "yes" or "1":
+                value = true;
+
+                return true;
+            case "false" or "no" or "0":
+                value = false;
+
+                return true;
+            default:
+                value = false;
+
+                return false;
+        }
+    }
+
     /// <summary>Integer tags are rounded to a whole number; every other numeric tag (Decimal,
     /// precision 2) is rounded to two decimals and written without trailing zeros.</summary>
     public static string WriteNumber(int? inputTypeId, double value)

@@ -8,7 +8,10 @@ namespace LogMyDay.Shared.DTOs;
 public class TagRuleRequest
 {
     public required string Name { get; set; }
-    public TagRuleTemplate Template { get; set; } = TagRuleTemplate.WeightedSum;
+
+    /// <summary>Weighted sum when creating without one. On an update, leaving it out keeps the
+    /// rule's template, aggregate kind and cases (clients that predate templates).</summary>
+    public TagRuleTemplate? Template { get; set; }
 
     /// <summary>Required for <see cref="TagRuleTemplate.Aggregate"/>.</summary>
     public TagRuleAggregateKind? AggregateKind { get; set; }

@@ -42,3 +42,19 @@ public enum TagRuleOperator
     IsYes = 8,
     IsNo = 9
 }
+
+/// <summary>How a conditional rule reads its source tag's day value and which tests apply.</summary>
+public enum TagRuleValueKind
+{
+    /// <summary>Integer or decimal: the day total, compared as a number.</summary>
+    Number,
+
+    /// <summary>Rating, score or percentage: the day average, compared as a number.</summary>
+    Scale,
+
+    /// <summary>Yes/no: the latest entry, tested with "is yes" / "is no".</summary>
+    YesNo,
+
+    /// <summary>Text, date, time or any tag with an option list: the latest entry, compared as text.</summary>
+    Text
+}
