@@ -447,6 +447,25 @@ public class TagRuleTests
     }
 
     [Fact]
+    public async Task WeightedSum_OverScoresAndRatings_GivesAWeightedComposite()
+    {
+        var f = CreateFixture(nameof(WeightedSum_OverScoresAndRatings_GivesAWeightedComposite));
+        var headache = await f.AddTag("Headache", inputTypeId: 11, repeatable: false); // score 0-10
+        var fatigue = await f.AddTag("Fatigue", inputTypeId: 10, repeatable: false);   // score 0-5
+        var sleep = await f.AddTag("Sleep quality", inputTypeId: 7, repeatable: false); // star rating 0-5
+        var index = await f.AddTag("Symptom index", inputTypeId: 6);
+        await f.CreateRule(index, (headache, 0.5), (fatigue, 1), (sleep, -0.5));
+
+        var morning = await f.Log(headache, f.TodayAt(8), "6");
+        await f.Log(fatigue, f.TodayAt(9), "2");
+        await f.Log(sleep, f.TodayAt(7), "4");
+        Assert.Equal("3", Assert.Single(await f.Results(index)).Description); // 0.5×6 + 1×2 − 0.5×4
+
+        await f.Activities.Update(morning.Id, new ActivityRequest { PrimaryTagId = headache.Id, DateStarted = f.TodayAt(8), Description = "3" }, f.UserId);
+        Assert.Equal("1.5", Assert.Single(await f.Results(index)).Description);
+    }
+
+    [Fact]
     public async Task Aggregate_Validation_ChecksSourceTypesPerCalculation()
     {
         var f = CreateFixture(nameof(Aggregate_Validation_ChecksSourceTypesPerCalculation));
@@ -455,7 +474,7 @@ public class TagRuleTests
         var target = await f.AddTag("Result", inputTypeId: 6);
 
         await Assert.ThrowsAsync<ArgumentException>(() => CreateAggregate(f, target, TagRuleAggregateKind.Average, true, text));
-        await Assert.ThrowsAsync<ArgumentException>(() => f.CreateRule(target, (score, 1))); // weighted sum: numbers only
+        await Assert.ThrowsAsync<ArgumentException>(() => f.CreateRule(target, (text, 1))); // weighted sum: numbers and scales only
         await Assert.ThrowsAsync<ArgumentException>(() => f.Rules.Create(new TagRuleRequest
         {
             Name = "No kind",
