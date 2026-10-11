@@ -365,6 +365,12 @@ public class TagRuleService : ITagRuleService
                 : $"The target tag '{target.TagName}' must be a number tag (Integer or Decimal).");
         }
 
+        // A field's values are logged as part of a record, so a rule cannot write to it.
+        if (target.RecordTypeId != null)
+        {
+            throw new ArgumentException($"'{target.TagName}' is a field of a record type and cannot hold a rule's results.");
+        }
+
         var sources = new Dictionary<int, Tag>();
         foreach (var sourceId in request.Sources.Select(s => s.SourceTagId))
         {

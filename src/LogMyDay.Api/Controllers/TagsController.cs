@@ -57,7 +57,14 @@ public class TagsController : BaseApiController
     public async Task<IActionResult> Update(int id, TagRequest model)
     {
         var userId = GetCurrentUserId();
-        await _tagService.Update(id, model, userId);
+        try
+        {
+            await _tagService.Update(id, model, userId);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
 
         return NoContent();
     }

@@ -72,6 +72,189 @@ public class BackupService : IBackupService
         return rules.Select(r => r.Backup).ToList();
     }
 
+    // Record types travel whole: their fields' definitions and their records with values by field
+    // name. Field tags and record values are left out of the tag and activity lists.
+    private async Task<List<RecordTypeBackup>> ExportRecordTypesAsync(Guid? userId)
+    {
+        var types = await _context.RecordTypes
+            .AsNoTracking()
+            .Include(t => t.Group)
+            .Include(t => t.Fields).ThenInclude(f => f.InputType)
+            .Include(t => t.Fields).ThenInclude(f => f.Unit)
+            .Include(t => t.Fields).ThenInclude(f => f.OptionList)
+            .Where(t => userId == null || t.UserId == userId)
+            .OrderBy(t => t.DisplayOrder)
+            .ThenBy(t => t.Name)
+            .ToListAsync();
+        var typeIds = types.Select(t => t.Id).ToList();
+        var records = (await _context.Records
+                .AsNoTracking()
+                .Include(r => r.Values)
+                .Where(r => typeIds.Contains(r.RecordTypeId))
+                .OrderBy(r => r.DateStarted)
+                .ThenBy(r => r.Id)
+                .ToListAsync())
+            .ToLookup(r => r.RecordTypeId);
+
+        return types.Select(t =>
+        {
+            var fields = t.Fields.OrderBy(f => f.RecordFieldOrder).ThenBy(f => f.Id).ToList();
+            var names = fields.ToDictionary(f => f.Id, f => RecordFieldValues.FieldName(t.Name, f.TagName));
+
+            return new RecordTypeBackup
+            {
+                Name = t.Name,
+                GroupName = t.Group?.Name,
+                OncePerDay = t.OncePerDay,
+                DisplayOrder = t.DisplayOrder,
+                DateCreated = t.DateCreated,
+                Fields = fields.Select(f => new RecordFieldBackup
+                {
+                    Name = names[f.Id],
+                    Description = f.Description,
+                    InputTypeName = f.InputType?.Name,
+                    UnitKey = f.Unit?.Key,
+                    MinValue = f.MinValue,
+                    MaxValue = f.MaxValue,
+                    Step = f.Step,
+                    DefaultValue = f.DefaultValue,
+                    OptionListKey = f.OptionList?.Name,
+                    DayCombine = f.DayCombine
+                }).ToList(),
+                Records = records[t.Id].Select(r => new RecordBackup
+                {
+                    DateStarted = r.DateStarted,
+                    DateCreated = r.DateCreated,
+                    Values = r.Values
+                        .Where(v => names.ContainsKey(v.TagId))
+                        .Select(v => new RecordValueBackup { FieldName = names[v.TagId], Value = v.Description ?? string.Empty })
+                        .ToList()
+                }).ToList()
+            };
+        }).ToList();
+    }
+
+    // A record type restores with its fields and records, unless one of that name already exists
+    // or a field's tag name is taken; then it is skipped with a warning (its records would be
+    // duplicates or land on another tag). Values naming no field of the type are left out.
+    private async Task ImportRecordTypesAsync(List<RecordTypeBackup> recordTypes, BackupImportResult result, Guid? userId)
+    {
+        if (recordTypes.Count == 0)
+        {
+            return;
+        }
+
+        var owner = userId ?? Guid.Empty;
+        var existingTypes = (await _context.RecordTypes.Where(t => userId == null || t.UserId == userId).Select(t => t.Name).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var tagNames = (await _context.Tags.Where(t => userId == null || t.UserId == userId).Select(t => t.TagName).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var groups = (await _context.TagGroups.Where(g => userId == null || g.UserId == userId).ToListAsync())
+            .GroupBy(g => g.Name)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        var inputTypes = await _context.InputTypes.ToDictionaryAsync(t => t.Name, t => t.Id);
+        var units = await _context.Units.ToDictionaryAsync(u => u.Key, u => u.Id);
+        var optionLists = (await _context.TagOptionLists.Where(l => userId == null || l.UserId == userId).ToListAsync())
+            .GroupBy(l => l.Name)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        foreach (var backup in recordTypes)
+        {
+            if (string.IsNullOrWhiteSpace(backup.Name) || existingTypes.Contains(backup.Name))
+            {
+                result.Statistics.RecordTypesSkipped++;
+                result.Warnings.Add($"Record type '{backup.Name}' was not restored: a record type of that name already exists.");
+                continue;
+            }
+
+            var clash = backup.Fields.Select(f => RecordFieldValues.TagName(backup.Name, f.Name)).FirstOrDefault(tagNames.Contains);
+            if (clash != null || backup.Fields.Count == 0)
+            {
+                result.Statistics.RecordTypesSkipped++;
+                result.Warnings.Add(clash != null
+                    ? $"Record type '{backup.Name}' was not restored: a tag named '{clash}' already exists."
+                    : $"Record type '{backup.Name}' was not restored: it has no fields.");
+                continue;
+            }
+
+            var type = new RecordType
+            {
+                UserId = owner,
+                Name = backup.Name,
+                GroupId = backup.GroupName != null && groups.TryGetValue(backup.GroupName, out var groupId) ? groupId : null,
+                OncePerDay = backup.OncePerDay,
+                DisplayOrder = backup.DisplayOrder,
+                DateCreated = backup.DateCreated == default ? DateTime.UtcNow : backup.DateCreated
+            };
+            _context.RecordTypes.Add(type);
+
+            var fields = new Dictionary<string, Tag>(StringComparer.Ordinal);
+            for (var i = 0; i < backup.Fields.Count; i++)
+            {
+                var field = backup.Fields[i];
+                int? inputTypeId = field.InputTypeName != null && inputTypes.TryGetValue(field.InputTypeName, out var typeId) ? typeId : null;
+                int? optionListId = field.OptionListKey != null && optionLists.TryGetValue(field.OptionListKey, out var listId) ? listId : null;
+                var tag = new Tag
+                {
+                    TagName = RecordFieldValues.TagName(backup.Name, field.Name),
+                    Description = field.Description,
+                    InputTypeId = inputTypeId,
+                    TimeGranularity = Domain.Enums.TimeGranularity.Exact,
+                    IsRepeatable = true,
+                    UnitId = field.UnitKey != null && units.TryGetValue(field.UnitKey, out var unitId) ? unitId : null,
+                    MinValue = field.MinValue,
+                    MaxValue = field.MaxValue,
+                    Step = field.Step,
+                    DefaultValue = field.DefaultValue,
+                    OptionListId = optionListId,
+                    GroupId = type.GroupId,
+                    UserId = owner,
+                    RecordType = type,
+                    RecordFieldOrder = i,
+                    DayCombine = RecordFieldValues.DayCombineFor(inputTypeId, optionListId, field.DayCombine)
+                };
+                _context.Tags.Add(tag);
+                fields[field.Name] = tag;
+                tagNames.Add(tag.TagName);
+            }
+
+            foreach (var recordBackup in backup.Records)
+            {
+                var values = recordBackup.Values
+                    .Where(v => fields.ContainsKey(v.FieldName) && !string.IsNullOrWhiteSpace(v.Value))
+                    .GroupBy(v => v.FieldName)
+                    .Select(g => g.First())
+                    .ToList();
+                if (values.Count == 0)
+                {
+                    continue;
+                }
+
+                _context.Records.Add(new Record
+                {
+                    UserId = owner,
+                    RecordType = type,
+                    DateStarted = recordBackup.DateStarted,
+                    DateCreated = recordBackup.DateCreated == default ? DateTime.UtcNow : recordBackup.DateCreated,
+                    Values = values.Select(v => new Activity
+                    {
+                        UserId = owner,
+                        Tag = fields[v.FieldName],
+                        DateStarted = recordBackup.DateStarted,
+                        DateCreated = recordBackup.DateCreated == default ? DateTime.UtcNow : recordBackup.DateCreated,
+                        Description = v.Value
+                    }).ToList()
+                });
+                result.Statistics.RecordsImported++;
+            }
+
+            existingTypes.Add(type.Name);
+            result.Statistics.RecordTypesImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     // Restores rules by tag name with the same conditions as creating one: tag types that fit the
     // template, cases checked against the tags they now name, the target is not a source, has no
     // logged values and belongs to no other rule, and no rule feeds another. A rule that does not
@@ -185,6 +368,11 @@ public class BackupService : IBackupService
         if (target.IsComputed || claimedTargets.Contains(target.Id))
         {
             return ($"'{target.TagName}' already belongs to another rule", noCases);
+        }
+
+        if (target.RecordTypeId != null)
+        {
+            return ($"'{target.TagName}' is a field of a record type", noCases);
         }
 
         if (backup.Sources.Count == 0)
@@ -370,6 +558,9 @@ public class BackupService : IBackupService
                 tagsQuery = tagsQuery.Where(t => t.UserId == userId);
             }
 
+            // Record fields travel with their record types.
+            tagsQuery = tagsQuery.Where(t => t.RecordTypeId == null);
+
             var tags = await tagsQuery
                 .Select(t => new TagBackup
                 {
@@ -410,10 +601,11 @@ public class BackupService : IBackupService
                 .ToListAsync();
 
             // Export Activities with user filtering. Rows generated by a Tag Activity Relations rule
-            // are not exported: they are recomputed from their sources.
+            // are not exported: they are recomputed from their sources. Record values travel with
+            // their records.
             var activitiesQuery = _context.Activities
                 .Include(a => a.Tag)
-                .Where(a => a.RuleId == null)
+                .Where(a => a.RuleId == null && a.RecordId == null && a.Tag.RecordTypeId == null)
                 .AsQueryable();
 
             if (userId.HasValue)
@@ -537,6 +729,7 @@ public class BackupService : IBackupService
                 .ToListAsync();
 
             var tagRules = await ExportTagRulesAsync(userId);
+            var recordTypes = await ExportRecordTypesAsync(userId);
 
             var backupData = new BackupData
             {
@@ -556,7 +749,9 @@ public class BackupService : IBackupService
                     TotalTodoLists = todoLists.Count,
                     TotalTodoItems = todoLists.Sum(l => l.Items.Count),
                     TotalReminders = reminders.Count,
-                    TotalTagRules = tagRules.Count
+                    TotalTagRules = tagRules.Count,
+                    TotalRecordTypes = recordTypes.Count,
+                    TotalRecords = recordTypes.Sum(t => t.Records.Count)
                 },
                 InputTypes = inputTypes,
                 Patterns = patterns,
@@ -569,7 +764,8 @@ public class BackupService : IBackupService
                 ScanMappings = scanMappings,
                 TodoLists = todoLists,
                 Reminders = reminders,
-                TagRules = tagRules
+                TagRules = tagRules,
+                RecordTypes = recordTypes
             };
 
             _logger.LogInformation("Data export completed successfully");
@@ -621,6 +817,7 @@ public class BackupService : IBackupService
                 await ImportTagGroupsAsync(backupData.TagGroups, result, userId);
                 await ImportTagsAsync(backupData.Tags, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
+                await ImportRecordTypesAsync(backupData.RecordTypes, result, userId);
                 await ImportScanMappingsAsync(backupData.ScanMappings, result, userId);
                 await ImportTodoListsAsync(backupData.TodoLists, result, userId);
                 await ImportRemindersAsync(backupData.Reminders, result, userId);
@@ -672,6 +869,15 @@ public class BackupService : IBackupService
             var activitiesToDelete = await activitiesQuery.ToListAsync();
             _context.Activities.RemoveRange(activitiesToDelete);
             recordsCleared += activitiesToDelete.Count;
+
+            // Records and record types go with their values, before the field tags.
+            var recordsToDelete = await _context.Records.Where(r => !userId.HasValue || r.UserId == userId).ToListAsync();
+            _context.Records.RemoveRange(recordsToDelete);
+            recordsCleared += recordsToDelete.Count;
+
+            var recordTypesToDelete = await _context.RecordTypes.Where(t => !userId.HasValue || t.UserId == userId).ToListAsync();
+            _context.RecordTypes.RemoveRange(recordTypesToDelete);
+            recordsCleared += recordTypesToDelete.Count;
 
             // 2. Clear scan mappings (depends on tags)
             var scanMappingsQuery = _context.ScanMappings.AsQueryable();
@@ -1410,7 +1616,7 @@ public class BackupService : IBackupService
             var userTags = await _context.Tags
                 .Include(t => t.InputType)
                 .Include(t => t.Pattern)
-                .Where(t => t.UserId == userId)
+                .Where(t => t.UserId == userId && t.RecordTypeId == null)
                 .Select(t => new SecureTagBackupDto
                 {
                     Id = t.Id,
@@ -1429,7 +1635,7 @@ public class BackupService : IBackupService
             var userActivities = await _context.Activities
                 .Include(a => a.Tag)
                 .Where(a => a.UserId == userId)
-                .Where(a => a.RuleId == null)
+                .Where(a => a.RuleId == null && a.RecordId == null && a.Tag.RecordTypeId == null)
                 .Select(a => new SecureActivityBackupDto
                 {
                     Id = a.Id,
@@ -1501,7 +1707,8 @@ public class BackupService : IBackupService
                 TagOptionLists = userTagOptionLists,
                 TagOptions = userTagOptions,
                 ScanMappings = userScanMappings,
-                TagRules = await ExportTagRulesAsync(userId)
+                TagRules = await ExportTagRulesAsync(userId),
+                RecordTypes = await ExportRecordTypesAsync(userId)
             };
 
             _logger.LogInformation("Secure backup created successfully");
@@ -1688,6 +1895,9 @@ public class BackupService : IBackupService
 
                 await _context.SaveChangesAsync();
 
+                // Step 6: Record types with their fields and records
+                await ImportRecordTypesAsync(backup.RecordTypes, result, userId);
+
                 // Step 7: Import scan mappings
                 foreach (var scanDto in backup.ScanMappings)
                 {
@@ -1778,6 +1988,15 @@ public class BackupService : IBackupService
 
                 _context.Activities.RemoveRange(userActivities);
                 recordsCleared += userActivities.Count;
+
+                // Records and record types go with their values, before the field tags.
+                var userRecords = await _context.Records.Where(r => r.UserId == userId).ToListAsync();
+                _context.Records.RemoveRange(userRecords);
+                recordsCleared += userRecords.Count;
+
+                var userRecordTypes = await _context.RecordTypes.Where(t => t.UserId == userId).ToListAsync();
+                _context.RecordTypes.RemoveRange(userRecordTypes);
+                recordsCleared += userRecordTypes.Count;
 
                 // 2. Clear user's scan mappings
                 var userScanMappings = await _context.ScanMappings

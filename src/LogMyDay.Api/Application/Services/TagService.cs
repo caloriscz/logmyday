@@ -117,6 +117,8 @@ public class TagService : ITagService
             throw new KeyNotFoundException("Tag not found");
         }
 
+        EnsureNotRecordField(tag);
+
         // Apply InputType constraints for locked types
         var inputTypeId = model.TypeId == 0 ? (int?)null : model.TypeId;
         double? minValue = model.MinValue;
@@ -180,6 +182,8 @@ public class TagService : ITagService
 
         if (link != null)
         {
+            EnsureNotRecordField(link);
+
             // A tag a Tag Activity Relations rule uses (as source or target) stays until the rule
             // is changed or deleted; the database would refuse it anyway (Restrict).
             var ruleNames = await _context.TagRules
@@ -194,6 +198,16 @@ public class TagService : ITagService
 
             _context.Tags.Remove(link);
             await _context.SaveChangesAsync();
+        }
+    }
+
+    // A field's name, type and group follow its record type, so it is changed or removed there.
+    private static void EnsureNotRecordField(Tag tag)
+    {
+        if (tag.RecordTypeId != null)
+        {
+            throw new InvalidOperationException(
+                $"Tag '{tag.TagName}' is a field of the record type '{tag.RecordType?.Name}'. Change or remove it in the record type.");
         }
     }
 
@@ -258,7 +272,10 @@ public class TagService : ITagService
                 GroupId = t.Group?.Id,
                 GroupName = t.Group?.Name,
                 ColorSchemeId = t.ColorSchemeId,
-                IsComputed = t.IsComputed
+                IsComputed = t.IsComputed,
+                RecordTypeId = t.RecordTypeId,
+                RecordTypeName = t.RecordType != null ? t.RecordType.Name : null,
+                DayCombine = t.DayCombine
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -290,7 +307,10 @@ public class TagService : ITagService
             GroupId = tag.Group?.Id,
             GroupName = tag.Group?.Name,
             ColorSchemeId = tag.ColorSchemeId,
-            IsComputed = tag.IsComputed
+            IsComputed = tag.IsComputed,
+            RecordTypeId = tag.RecordTypeId,
+            RecordTypeName = tag.RecordType?.Name,
+            DayCombine = tag.DayCombine
         };
     }
 }

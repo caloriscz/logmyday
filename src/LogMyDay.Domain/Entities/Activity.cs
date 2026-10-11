@@ -29,4 +29,8 @@ public class Activity
     /// <see cref="RuleId"/> it identifies the result: one row per rule and window.</summary>
     [MaxLength(10)]
     public string? WindowKey { get; set; }
+
+    /// <summary>The record this value belongs to; null for an entry logged on its own. A record's
+    /// values are written only through the record.</summary>
+    public int? RecordId { get; set; }
 }
