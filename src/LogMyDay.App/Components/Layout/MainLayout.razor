@@ -337,8 +337,9 @@ else
     {
         try
         {
-            // Computed tags get their values from a rule and cannot be logged by hand.
-            tags = (await ActivityApi.GetTags()).Where(t => !t.IsComputed).ToList();
+            // Computed tags get their values from a rule and record fields are logged through their
+            // record, so neither is offered here.
+            tags = (await ActivityApi.GetTags()).Where(t => t.IsLoggable).ToList();
             OnTagSelectionChanged();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)

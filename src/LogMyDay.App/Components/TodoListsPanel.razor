@@ -493,7 +493,7 @@ else
                             <option value="">— None —</option>
                             @if (_allTags != null)
                             {
-                                @foreach (var tag in _allTags)
+                                @foreach (var tag in _allTags.Where(t => t.IsLoggable))
                                 {
                                     <option value="@tag.Id">@tag.Title</option>
                                 }
@@ -585,7 +585,7 @@ else
                                 <option value="">— None —</option>
                                 @if (_allTags != null)
                                 {
-                                    @foreach (var tag in _allTags)
+                                    @foreach (var tag in _allTags.Where(t => t.IsLoggable))
                                     {
                                         <option value="@tag.Id">@tag.Title</option>
                                     }

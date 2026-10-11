@@ -315,7 +315,7 @@
         if (!ReferenceEquals(AvailableTags, loggableTagsSource))
         {
             loggableTagsSource = AvailableTags;
-            loggableTags = AvailableTags?.Where(t => !t.IsComputed).ToList();
+            loggableTags = AvailableTags?.Where(t => t.IsLoggable).ToList();
         }
 
         effectiveTimeZone = DisplayTimeZone ?? TimeZoneInfo.Local;
