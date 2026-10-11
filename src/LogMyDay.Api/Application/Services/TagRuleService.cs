@@ -375,9 +375,7 @@ public class TagRuleService : ITagRuleService
 
             if (!TagRuleInputTypes.FitsSource(template, request.AggregateKind, source.InputTypeId))
             {
-                throw new ArgumentException(template == TagRuleTemplate.Aggregate
-                    ? $"The source tag '{source.TagName}' must be a number, rating, score or percentage tag."
-                    : $"The source tag '{source.TagName}' must be a number tag (Integer or Decimal).");
+                throw new ArgumentException($"The source tag '{source.TagName}' must be a number, rating, score or percentage tag.");
             }
 
             if (source.IsComputed)

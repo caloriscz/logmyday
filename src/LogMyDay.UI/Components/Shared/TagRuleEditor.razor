@@ -37,7 +37,7 @@
         else
         {
             <GroupedTagSelect Tags="targetCandidates" Value="@(Model.TargetTagId == 0 ? null : Model.TargetTagId)" ValueChanged="SetTarget" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Result tag --" />
-            <p class="text-xs text-gray-500 dark:text-slate-400">@(IsConditional ? "A text, option list, yes/no or number tag" : "A number tag") with no values of its own. The rule owns it: its values are calculated and cannot be logged by hand.</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400">@(IsConditional ? "A text, option list, yes/no or number tag" : "A number tag (Integer or Decimal)") with no values of its own. The rule owns it: its values are calculated and cannot be logged by hand. Only tags that fit are listed, so a group without one does not appear.</p>
         }
     </div>
 
@@ -52,6 +52,8 @@
                 </button>
             }
         </div>
+
+        <p class="text-xs text-gray-500 dark:text-slate-400">@SourceListHint</p>
 
         @if (Model.Sources.Count == 0)
         {
@@ -232,11 +234,17 @@
     private string CalculationHint => CalculationValue switch
     {
         nameof(TagRuleAggregateKind.Count) => "How many entries the source tags have that day, of any tag type.",
-        WeightedSumValue => "For totals, e.g. a nutrient from several products. Sources are number tags.",
+        WeightedSumValue => "For totals and weighted composites, e.g. a nutrient from several products or one score made of several symptom scores.",
         PresenceValue => "The result tag gets a fixed value on every day the source tag is logged, e.g. Gym → Exercise = yes.",
         ConditionalValue => "The result tag gets the value of the first case that holds, e.g. 'Over limit' when Coffees ≥ 4.",
-        _ => "Over all of the day's values of the source tags. Sources are number, rating, score or percentage tags."
+        _ => "Over all of the day's values of the source tags."
     };
+
+    // The pickers list only tags that fit the calculation, and a group whose tags all fall out
+    // disappears; say so, or a group looks missing.
+    private string SourceListHint => CalculationValue is nameof(TagRuleAggregateKind.Count) or PresenceValue or ConditionalValue
+        ? "Tags of any type are listed, except tags a rule computes."
+        : "Only number, rating, score and percentage tags are listed, so a group without them does not appear. Tags a rule computes are not listed.";
 
     private string DayValueHint => SourceKind switch
     {

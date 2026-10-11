@@ -6,14 +6,15 @@ namespace LogMyDay.Domain.Constants;
 /// validation, backup import, the engine and the editor.</summary>
 public static class TagRuleInputTypes
 {
-    /// <summary>Integer or decimal: weighted-sum sources and number targets.</summary>
+    /// <summary>Integer or decimal: the targets of number results.</summary>
     public static bool IsNumber(int? inputTypeId) => inputTypeId is InputTypeIds.Integer or InputTypeIds.Decimal;
 
     /// <summary>Rating, score or percentage: bounded scales.</summary>
     public static bool IsScale(int? inputTypeId) => inputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10
         or InputTypeIds.Percentage or InputTypeIds.Score or InputTypeIds.Score10;
 
-    /// <summary>Numbers and scales: aggregate (average, minimum, maximum) sources.</summary>
+    /// <summary>Numbers and scales: weighted-sum and aggregate (average, minimum, maximum)
+    /// sources. A weighted sum of scales is e.g. a composite of several symptom scores.</summary>
     public static bool IsNumeric(int? inputTypeId) => IsNumber(inputTypeId) || IsScale(inputTypeId);
 
     /// <summary>A conditional result: text, yes/no, a number or one option of a list.</summary>
@@ -23,7 +24,7 @@ public static class TagRuleInputTypes
     /// <summary>Whether a tag can be a source of the template. Count takes any tag.</summary>
     public static bool FitsSource(TagRuleTemplate template, TagRuleAggregateKind? aggregateKind, int? inputTypeId) => template switch
     {
-        TagRuleTemplate.WeightedSum => IsNumber(inputTypeId),
+        TagRuleTemplate.WeightedSum => IsNumeric(inputTypeId),
         TagRuleTemplate.Aggregate when aggregateKind == TagRuleAggregateKind.Count => true,
         TagRuleTemplate.Aggregate => IsNumeric(inputTypeId),
         TagRuleTemplate.Conditional => true,
