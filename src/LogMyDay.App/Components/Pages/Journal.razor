@@ -435,7 +435,7 @@
             }
 
             // A record's values show as one entry.
-            activities = LogMyDay.UI.Formatting.RecordRows.Collapse(activities, await RecordFields(), displayCulture);
+            activities = LogMyDay.UI.Formatting.RecordRows.Collapse(activities, await RecordFields(), displayCulture, optionListLookup);
 
             // Sort activities
             var sortedActivities = sortOrder == "desc" 

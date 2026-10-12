@@ -666,7 +666,7 @@
             // A record's values show as one row.
             if (pagedResult != null)
             {
-                pagedResult.Items = LogMyDay.UI.Formatting.RecordRows.Collapse(pagedResult.Items, recordFields, displayCulture);
+                pagedResult.Items = LogMyDay.UI.Formatting.RecordRows.Collapse(pagedResult.Items, recordFields, displayCulture, optionListLookup);
             }
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)

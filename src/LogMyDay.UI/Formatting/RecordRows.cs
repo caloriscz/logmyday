@@ -27,9 +27,10 @@ public static class RecordRows
     /// <summary>The list with each record's values replaced by one row, in the place of the
     /// record's first value. The row has no tag (it is not a value of one tag), carries the
     /// record id, its type as the tag name and the values as text. Rows of unknown fields stay
-    /// as they are.</summary>
+    /// as they are. With the option lists, an option shows its display name.</summary>
     public static List<ActivityResponse> Collapse(IEnumerable<ActivityResponse> items,
-        IReadOnlyDictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)> fields, CultureInfo culture)
+        IReadOnlyDictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)> fields, CultureInfo culture,
+        IReadOnlyDictionary<int, TagOptionListResponse>? optionLists = null)
     {
         var list = items.ToList();
         if (fields.Count == 0 || list.All(a => a.RecordId == null))
@@ -58,7 +59,7 @@ public static class RecordRows
             }
 
             var type = fields[values[0].PrimaryTagId!.Value].Type;
-            var summary = Summary(values.Select(v => (fields[v.PrimaryTagId!.Value].Field, v.Description ?? string.Empty)), culture);
+            var summary = Summary(values.Select(v => (fields[v.PrimaryTagId!.Value].Field, v.Description ?? string.Empty)), culture, optionLists);
             result.Add(new ActivityResponse
             {
                 Id = values.Min(v => v.Id),
@@ -81,17 +82,24 @@ public static class RecordRows
         type.GroupName != null ? $"{type.GroupName}: {type.Name}" : type.Name;
 
     /// <summary>"Systolic 128 · Diastolic 82 · Pulse 64 bpm", in field order.</summary>
-    public static string Summary(IEnumerable<(RecordFieldResponse Field, string Value)> values, CultureInfo culture)
+    public static string Summary(IEnumerable<(RecordFieldResponse Field, string Value)> values, CultureInfo culture,
+        IReadOnlyDictionary<int, TagOptionListResponse>? optionLists = null)
     {
         return string.Join(" · ", values
             .OrderBy(v => v.Field.Order)
-            .Select(v => $"{v.Field.Name} {FormatValue(v.Field, v.Value, culture)}"));
+            .Select(v => $"{v.Field.Name} {FormatValue(v.Field, v.Value, culture, optionLists)}"));
     }
 
-    public static string FormatValue(RecordFieldResponse field, string value, CultureInfo culture)
+    public static string FormatValue(RecordFieldResponse field, string value, CultureInfo culture,
+        IReadOnlyDictionary<int, TagOptionListResponse>? optionLists = null)
     {
         string text;
-        if (field.OptionListId == null && TagRuleInputTypes.IsNumeric(field.InputTypeId)
+        if (field.OptionListId is int listId && optionLists != null && optionLists.TryGetValue(listId, out var list)
+            && list.Options.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase)) is { } option)
+        {
+            text = option.DisplayName ?? option.Value;
+        }
+        else if (field.OptionListId == null && TagRuleInputTypes.IsNumeric(field.InputTypeId)
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
         {
             text = number.ToString("0.##", culture);

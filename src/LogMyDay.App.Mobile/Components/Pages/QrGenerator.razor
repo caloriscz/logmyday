@@ -135,7 +135,7 @@
 
         try
         {
-            tags = await ActivityApi.GetTags();
+            tags = (await ActivityApi.GetTags()).Where(t => t.IsLoggable).ToList();
         }
         catch (Exception ex)
         {

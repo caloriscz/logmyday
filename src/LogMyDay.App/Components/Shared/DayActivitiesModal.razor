@@ -266,7 +266,7 @@
                 : result.Items.OrderByDescending(a => a.DateStarted).ToList();
 
             // A record field's values are shown as their records.
-            _activities = LogMyDay.UI.Formatting.RecordRows.Collapse(ordered, _recordFields, DisplayCulture);
+            _activities = LogMyDay.UI.Formatting.RecordRows.Collapse(ordered, _recordFields, DisplayCulture, _optionListLookup);
         }
         catch (Exception ex)
         {

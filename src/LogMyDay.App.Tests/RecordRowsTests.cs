@@ -68,6 +68,20 @@ public class RecordRowsTests
     }
 
     [Fact]
+    public void FormatValue_ShowsAnOptionsDisplayName()
+    {
+        var position = new RecordFieldResponse { TagId = 14, Name = "Position", TagName = "Blood pressure: Position", InputTypeId = InputTypeIds.String, OptionListId = 3 };
+        var lists = new Dictionary<int, TagOptionListResponse>
+        {
+            [3] = new() { Id = 3, Name = "Positions", Options = [new() { Id = 1, Value = "sit", DisplayName = "Sitting" }, new() { Id = 2, Value = "lie" }] }
+        };
+
+        Assert.Equal("Sitting", RecordRows.FormatValue(position, "sit", CultureInfo.InvariantCulture, lists));
+        Assert.Equal("lie", RecordRows.FormatValue(position, "lie", CultureInfo.InvariantCulture, lists));
+        Assert.Equal("sit", RecordRows.FormatValue(position, "sit", CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public void FormatValue_UsesTheDisplayCulture()
     {
         var pulse = BloodPressure.Fields[2];
