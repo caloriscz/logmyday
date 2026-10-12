@@ -366,8 +366,9 @@
         try
         {
             var tagsList = await SharedDataCache.GetTagsAsync();
-            // Computed tags get their values from a rule and cannot be logged by hand.
-            availableTags = tagsList.Where(t => !t.IsComputed).ToList();
+            // Computed tags get their values from a rule and record fields are logged through their
+            // record, so neither is offered here.
+            availableTags = tagsList.Where(t => t.IsLoggable).ToList();
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {

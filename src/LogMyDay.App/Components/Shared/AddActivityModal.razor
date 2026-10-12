@@ -10,13 +10,14 @@
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject ILogger<AddActivityModal> Logger
 @inject IUserPreferencesService UserPreferencesService
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 
 <!-- Add New Activity Modal -->
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-gray-600 bg-opacity-75" @onclick="HandleBackdropClick"></div>
     <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden z-10">
         <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(IsEditMode ? "Edit Activity" : "Add New Activity")</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(IsEditMode ? "Edit Activity" : recordMode ? "Log Record" : "Add New Activity")</h3>
             <button type="button" @onclick="HandleCloseClick" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -24,6 +25,20 @@
             </button>
         </div>
         <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+            @* Values measured together are logged as a record: one form for all its fields. *@
+            @if (!IsEditMode && recordTypes.Count > 0)
+            {
+                <div class="mb-5 inline-flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600">
+                    <button type="button" class="@ModeCss(!recordMode)" @onclick="() => recordMode = false">Activity</button>
+                    <button type="button" class="@ModeCss(recordMode)" @onclick="() => recordMode = true">Record</button>
+                </div>
+            }
+            @if (recordMode)
+            {
+                <RecordEditor RecordTypes="recordTypes" OptionLists="OptionLists" DefaultTime="Activity.DateStarted" OnSaved="OnRecordSaved" OnCanceled="HandleCloseClick" />
+            }
+            else
+            {
             <EditForm Model="Activity" OnValidSubmit="HandleValidSubmit">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="text-sm text-red-600 dark:text-red-400" />
@@ -228,6 +243,7 @@
                     </div>
                 </div>
             </EditForm>
+            }
         </div>
     </div>
 </div>
@@ -319,6 +335,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadUserPreferencesAsync();
+        await LoadRecordTypesAsync();
     }
 
     private async Task LoadUserPreferencesAsync()
@@ -337,7 +354,35 @@
         }
     }
 
-    // Computed tags get their values from a rule and cannot be logged by hand. The filtered list
+    // Records: the switch to the record form shows only when the user has record types.
+    private IList<RecordTypeResponse> recordTypes = [];
+    private bool recordMode;
+
+    private static string ModeCss(bool active) => active
+        ? "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white"
+        : "rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700";
+
+    private async Task LoadRecordTypesAsync()
+    {
+        try
+        {
+            recordTypes = await RecordApi.GetRecordTypes();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types; only activities can be logged");
+        }
+    }
+
+    // Hosts read the request they get (e.g. Scan names its tag), so a record passes an empty one.
+    private async Task OnRecordSaved()
+    {
+        anyActivitiesCreated = false;
+        await OnActivityCreated.InvokeAsync(new ActivityRequest { DateStarted = Activity.DateStarted });
+    }
+
+    // Computed tags get their values from a rule and cannot be logged by hand, and a record's
+    // fields are logged through the record form. The filtered list
     // is rebuilt only when the tags change, so the picker keeps its selected group.
     private IList<TagResponse>? loggableTags;
     private IList<TagResponse>? loggableTagsSource;
@@ -347,7 +392,7 @@
         if (!ReferenceEquals(AvailableTags, loggableTagsSource))
         {
             loggableTagsSource = AvailableTags;
-            loggableTags = AvailableTags?.Where(t => !t.IsComputed).ToList();
+            loggableTags = AvailableTags?.Where(t => t.IsLoggable).ToList();
         }
 
         if (DisplayCulture is not null)

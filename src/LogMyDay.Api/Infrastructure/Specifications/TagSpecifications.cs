@@ -15,6 +15,7 @@ public static class TagSpecifications
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
             AddInclude(t => t.Group);
+            AddInclude(t => t.RecordType);
             ApplyOrderBy(t => t.TagName.ToLower());
         }
     }
@@ -30,6 +31,7 @@ public static class TagSpecifications
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
             AddInclude(t => t.Group);
+            AddInclude(t => t.RecordType);
         }
     }
 
@@ -51,6 +53,7 @@ public static class TagSpecifications
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
             AddInclude(t => t.Group);
+            AddInclude(t => t.RecordType);
 
             // Apply filter if provided
             if (!string.IsNullOrWhiteSpace(filter))

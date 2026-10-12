@@ -1,0 +1,29 @@
+@using LogMyDay.Shared.DTOs
+
+@* A record in a dialog: edit or delete one from an activity list, or log a new one. *@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-gray-600 bg-opacity-75" @onclick="OnCanceled"></div>
+    <div class="relative z-10 w-full max-w-lg max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800">
+        <div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(RecordId != null ? "Edit Record" : "Log Record")</h3>
+            <button type="button" @onclick="OnCanceled" class="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200" aria-label="Close">
+                <Icon Name="close" Class="h-6 w-6" />
+            </button>
+        </div>
+        <div class="max-h-[calc(90vh-70px)] overflow-y-auto p-6">
+            <RecordEditor RecordTypes="RecordTypes" OptionLists="OptionLists" RecordId="RecordId" DefaultTime="DefaultTime" RecordTypeId="RecordTypeId"
+                          StartWithDeleteConfirmation="StartWithDeleteConfirmation" OnSaved="OnSaved" OnCanceled="OnCanceled" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IList<RecordTypeResponse> RecordTypes { get; set; } = [];
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public int? RecordId { get; set; }
+    [Parameter] public DateTime DefaultTime { get; set; } = DateTime.Now;
+    [Parameter] public int? RecordTypeId { get; set; }
+    [Parameter] public bool StartWithDeleteConfirmation { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+}

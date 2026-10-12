@@ -47,6 +47,10 @@ public static class McpErrorMapper
                 return Error(Conflict, ex.Message,
                     new { tagId = ex.TagId, hint = "Log the rule's source tags instead; the computed value follows." });
 
+            case TagInRecordException ex:
+                return Error(Conflict, ex.Message,
+                    new { tagId = ex.TagId, hint = "This tag is a field of a record type. Its values are logged together with the other fields as one record, in the app." });
+
             case UnauthorizedAccessException ex:
                 return Error(Forbidden, ex.Message);
 

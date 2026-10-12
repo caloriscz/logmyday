@@ -436,9 +436,10 @@
         candidatesSource = Tags;
         candidatesCalculation = CalculationValue;
 
-        // A computed tag is never offered: a rule owns it, and rules do not feed rules.
+        // A computed tag is never offered: a rule owns it, and rules do not feed rules. A record
+        // field can be read but not written: it is logged as part of its record.
         var usable = (Tags ?? []).Where(t => !t.IsComputed).ToList();
-        targetCandidates = usable.Where(t => TagRuleInputTypes.FitsTarget(Template, t.InputTypeId, t.OptionListId != null)).ToList();
+        targetCandidates = usable.Where(t => t.RecordTypeId == null && TagRuleInputTypes.FitsTarget(Template, t.InputTypeId, t.OptionListId != null)).ToList();
         sourceCandidates = usable.Where(t => TagRuleInputTypes.FitsSource(Template, Model.AggregateKind, t.InputTypeId)).ToList();
     }
 

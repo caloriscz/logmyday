@@ -85,6 +85,11 @@
                                 <Icon Name="link" Class="w-4 h-4" />
                                 <span>Rules</span>
                             </NavLink>
+                            <NavLink href="record-types" @onclick="() => showTagsMenu = false"
+                                     class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <Icon Name="clipboard" Class="w-4 h-4" />
+                                <span>Record Types</span>
+                            </NavLink>
                             </div>
                         </div>
                     }
@@ -310,6 +315,12 @@
                              ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
                         <Icon Name="link" Class="w-5 h-5" />
                         <span>Rules</span>
+                    </NavLink>
+                    <NavLink href="record-types" @onclick="() => showMobileMenu = false"
+                             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 pl-6"
+                             ActiveClass="bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400">
+                        <Icon Name="clipboard" Class="w-5 h-5" />
+                        <span>Record Types</span>
                     </NavLink>
 
                     <NavLink href="insights" @onclick="() => showMobileMenu = false"

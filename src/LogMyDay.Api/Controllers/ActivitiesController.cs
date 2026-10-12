@@ -70,6 +70,10 @@ public class ActivitiesController : BaseApiController
         {
             return TagComputed(ex);
         }
+        catch (TagInRecordException ex)
+        {
+            return TagInRecord(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
@@ -123,6 +127,10 @@ public class ActivitiesController : BaseApiController
         {
             return TagComputed(ex);
         }
+        catch (TagInRecordException ex)
+        {
+            return TagInRecord(ex);
+        }
         catch (InvalidOperationException ex)
         {
             await _eventLogService.Log(GetCurrentUserId(), EventLogLevel.Error,
@@ -150,6 +158,10 @@ public class ActivitiesController : BaseApiController
         {
             return TagComputed(ex);
         }
+        catch (TagInRecordException ex)
+        {
+            return TagInRecord(ex);
+        }
 
         if (!result)
         {
@@ -164,6 +176,12 @@ public class ActivitiesController : BaseApiController
     private ConflictObjectResult TagComputed(TagComputedException ex)
     {
         return Conflict(new { code = "tag-computed", tagId = ex.TagId, message = ex.Message });
+    }
+
+    // A record type's field is logged together with the other fields, as a record.
+    private ConflictObjectResult TagInRecord(TagInRecordException ex)
+    {
+        return Conflict(new { code = "tag-in-record", tagId = ex.TagId, message = ex.Message });
     }
 
     [HttpPost("by-date")]

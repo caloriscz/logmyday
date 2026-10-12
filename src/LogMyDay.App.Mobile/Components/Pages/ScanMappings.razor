@@ -270,7 +270,7 @@
         {
             var tagResults = await ActivityApi.GetTags();
             tags.Clear();
-            tags.AddRange(tagResults.OrderBy(t => t.Title));
+            tags.AddRange(tagResults.Where(t => t.IsLoggable).OrderBy(t => t.Title));
 
             var mappingResults = await ScanMappingApi.GetAll();
             mappings.Clear();

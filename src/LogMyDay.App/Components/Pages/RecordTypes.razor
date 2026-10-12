@@ -1,0 +1,390 @@
+@page "/record-types"
+
+@using LogMyDay.Shared.DTOs
+@using LogMyDay.Domain.Enums
+@using LogMyDay.App.Services
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
+@inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.ITagGroupApi TagGroupApi
+@inject ILogger<RecordTypes> Logger
+@inject IPageTitleService PageTitleService
+
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("RecordTypes", "Manage record types: several values measured together, e.g. blood pressure")]
+
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <PageHeader Title="Record types" Subtitle="Values measured together at one moment, logged with one form and kept together, e.g. blood pressure.">
+        <Actions>
+            <div class="flex items-center gap-3">
+                <a href="/tags" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                    <Icon Name="tag" Class="h-4 w-4" />
+                    Tags
+                </a>
+                <button type="button" class="inline-flex items-center gap-2 self-start rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 sm:self-auto" @onclick="OpenCreateModal" disabled="@(isBusy || inputTypes == null)">
+                    <Icon Name="plus" Class="h-4 w-4" />
+                    New Record Type
+                </button>
+            </div>
+        </Actions>
+    </PageHeader>
+
+    <section class="space-y-4">
+        @if (isLoading)
+        {
+            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent dark:border-slate-600"></span>
+                <span>Loading record types…</span>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(loadError))
+        {
+            <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                @loadError
+            </div>
+        }
+        else if (types.Count == 0)
+        {
+            <EmptyState Message="No record types yet. Create one for values you measure together, e.g. blood pressure with systolic, diastolic and pulse." />
+        }
+        else
+        {
+            @foreach (var type in types)
+            {
+                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1 space-y-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-slate-100">@type.Name</h3>
+                                @if (!string.IsNullOrEmpty(type.GroupName))
+                                {
+                                    <span class="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">@type.GroupName</span>
+                                }
+                                @if (type.OncePerDay)
+                                {
+                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700 dark:bg-slate-700 dark:text-slate-200">Once per day</span>
+                                }
+                            </div>
+                            <p class="text-sm text-gray-700 dark:text-slate-200">@FieldList(type)</p>
+                            <p class="text-xs text-gray-500 dark:text-slate-400">@type.RecordCount @(type.RecordCount == 1 ? "record" : "records")</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:text-slate-300 dark:hover:bg-slate-800" @onclick="() => OpenEditModal(type)" disabled="@isBusy">
+                                <Icon Name="pencil" Class="h-4 w-4" />
+                                <span>Edit</span>
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-rose-600 transition-all hover:bg-rose-500/10 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-400 dark:hover:bg-rose-500/20" @onclick="() => { pendingDelete = type; deleteError = null; }" disabled="@isBusy">
+                                <Icon Name="trash" Class="h-4 w-4" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </section>
+</div>
+
+@* Create/Edit Modal *@
+@if (showModal)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isBusy) CloseModal(); }">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(editing != null ? "Edit Record Type" : "New Record Type")</h2>
+                <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                    <Icon Name="close" Class="h-5 w-5" />
+                </button>
+            </div>
+
+            <form @onsubmit="HandleSubmit" @onsubmit:preventDefault>
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="mx-6 mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-xs dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">
+                        @formError
+                    </div>
+                }
+
+                <div class="px-6 py-5">
+                    <RecordTypeEditor @ref="editor" Model="formModel" Existing="editing" Groups="groups" InputTypes="inputTypes" Units="units" OptionLists="optionLists" Disabled="isBusy" />
+                </div>
+
+                @if (confirmRemoval)
+                {
+                    <div class="mx-6 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                        The removed fields' values are deleted for good. Records left without any value are deleted too. Select Save again to continue.
+                    </div>
+                }
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900">
+                    <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-lg @(confirmRemoval ? "bg-rose-600 hover:bg-rose-700" : "bg-primary-600 hover:bg-primary-700") px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60" disabled="@isBusy">
+                        @if (isBusy)
+                        {
+                            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <Icon Name="check" Class="h-4 w-4" />
+                            <span>@(confirmRemoval ? "Save and delete values" : editing != null ? "Save Changes" : "Create Record Type")</span>
+                        }
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (pendingDelete != null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4">
+        <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-slate-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Delete record type</h3>
+            </div>
+            <div class="space-y-3 px-6 py-5 text-sm text-gray-700 dark:text-slate-300">
+                <p>
+                    Delete <strong>@pendingDelete.Name</strong> with its @pendingDelete.Fields.Count @(pendingDelete.Fields.Count == 1 ? "field" : "fields")
+                    and @pendingDelete.RecordCount @(pendingDelete.RecordCount == 1 ? "record" : "records")? This cannot be undone.
+                </p>
+                @if (!string.IsNullOrEmpty(deleteError))
+                {
+                    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200">@deleteError</div>
+                }
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-slate-700">
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick="() => pendingDelete = null" disabled="@isBusy">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500" @onclick="DeleteType" disabled="@isBusy">
+                    <Icon Name="trash" Class="h-4 w-4" />
+                    <span>@(isBusy ? "Deleting…" : "Delete")</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly List<RecordTypeResponse> types = new();
+    private IList<TagGroupResponse>? groups;
+    private List<InputTypeDto>? inputTypes;
+    private IList<UnitResponse>? units;
+    private IList<TagOptionListResponse>? optionLists;
+    private RecordTypeRequest formModel = new() { Name = string.Empty };
+    private RecordTypeEditor? editor;
+
+    private string? loadError;
+    private string? formError;
+    private string? deleteError;
+    private bool isLoading;
+    private bool isBusy;
+    private bool showModal;
+    private bool confirmRemoval;
+    private RecordTypeResponse? editing;
+    private RecordTypeResponse? pendingDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Record types");
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var typesTask = RecordApi.GetRecordTypes();
+            var groupsTask = TagGroupApi.GetTagGroups();
+            var inputTypesTask = ActivityApi.GetInputTypesAsync();
+            var unitsTask = ActivityApi.GetUnitsAsync();
+            var optionListsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(typesTask, groupsTask, inputTypesTask, unitsTask, optionListsTask);
+
+            types.Clear();
+            types.AddRange(typesTask.Result);
+            groups = groupsTask.Result;
+            inputTypes = inputTypesTask.Result;
+            units = unitsTask.Result.OrderBy(u => u.QuantityKey).ThenBy(u => u.Key).ToList();
+            optionLists = optionListsTask.Result.OrderBy(l => l.Name).ToList();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            loadError = "You are not authorized to view record types.";
+        }
+        catch (Exception ex)
+        {
+            loadError = $"Failed to load record types: {ex.Message}";
+            Logger.LogError(ex, "Failed to load record types");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        editing = null;
+        formModel = new RecordTypeRequest
+        {
+            Name = string.Empty,
+            Fields = [new RecordFieldRequest { Name = string.Empty, TypeId = LogMyDay.Domain.Constants.InputTypeIds.Integer }]
+        };
+        OpenModal();
+    }
+
+    private void OpenEditModal(RecordTypeResponse type)
+    {
+        editing = type;
+        formModel = new RecordTypeRequest
+        {
+            Name = type.Name,
+            GroupId = type.GroupId,
+            OncePerDay = type.OncePerDay,
+            Fields = type.Fields.OrderBy(f => f.Order).Select(f => new RecordFieldRequest
+            {
+                TagId = f.TagId,
+                Name = f.Name,
+                Description = f.Description,
+                TypeId = f.InputTypeId ?? 0,
+                UnitId = f.UnitId,
+                MinValue = f.MinValue,
+                MaxValue = f.MaxValue,
+                Step = f.Step,
+                DefaultValue = f.DefaultValue,
+                OptionListId = f.OptionListId,
+                DayCombine = f.DayCombine
+            }).ToList()
+        };
+        OpenModal();
+    }
+
+    private void OpenModal()
+    {
+        formError = null;
+        confirmRemoval = false;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        formError = null;
+        confirmRemoval = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        formError = Validate();
+        if (formError is not null)
+        {
+            return;
+        }
+
+        // Removing fields that hold values deletes them: the first Save explains, the second confirms.
+        if (editor?.RemovedWithValues.Count > 0 && !confirmRemoval)
+        {
+            confirmRemoval = true;
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            if (editing != null)
+            {
+                await RecordApi.UpdateRecordType(editing.Id, formModel);
+            }
+            else
+            {
+                await RecordApi.CreateRecordType(formModel);
+            }
+
+            CloseModal();
+            await LoadDataAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+        {
+            // The server explains what is wrong in plain words.
+            formError = string.IsNullOrWhiteSpace(ex.Content) ? "The record type could not be saved." : ex.Content.Trim('"');
+            confirmRemoval = false;
+        }
+        catch (Exception ex)
+        {
+            formError = $"Failed to save: {ex.Message}";
+            Logger.LogError(ex, "Failed to save record type");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.Name))
+        {
+            return "Give the record type a name.";
+        }
+
+        if (formModel.Fields.Count == 0)
+        {
+            return "Add at least one field.";
+        }
+
+        if (formModel.Fields.Any(f => string.IsNullOrWhiteSpace(f.Name)))
+        {
+            return "Give every field a name.";
+        }
+
+        if (formModel.Fields.Any(f => f.TypeId == 0))
+        {
+            return "Choose a type for every field.";
+        }
+
+        return null;
+    }
+
+    private async Task DeleteType()
+    {
+        if (pendingDelete == null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        deleteError = null;
+        try
+        {
+            await RecordApi.DeleteRecordType(pendingDelete.Id);
+            pendingDelete = null;
+            await LoadDataAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            deleteError = string.IsNullOrWhiteSpace(ex.Content) ? "The record type is in use." : ex.Content.Trim('"');
+        }
+        catch (Exception ex)
+        {
+            deleteError = $"Failed to delete: {ex.Message}";
+            Logger.LogError(ex, "Failed to delete record type {RecordTypeId}", pendingDelete?.Id);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string FieldList(RecordTypeResponse type)
+    {
+        return string.Join(" · ", type.Fields.OrderBy(f => f.Order).Select(f =>
+            string.IsNullOrEmpty(f.UnitSymbol) ? f.Name : $"{f.Name} ({f.UnitSymbol})"));
+    }
+}

@@ -67,7 +67,7 @@ public class ReminderService : IReminderService
         {
             completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId)
                 ?? throw new KeyNotFoundException("Tag not found");
-            EnsureNotComputed(completionTag);
+            EnsureLoggable(completionTag);
         }
 
         var item = new Domain.Entities.Reminder
@@ -97,12 +97,19 @@ public class ReminderService : IReminderService
         return MapItemToResponse(item);
     }
 
-    // A computed tag's values come from its rule; a reminder cannot log to it.
-    private static void EnsureNotComputed(Domain.Entities.Tag tag)
+    // A reminder logs only to a tag that takes values on their own: not a computed tag (its
+    // values come from its rule) and not a record field.
+    private static void EnsureLoggable(Domain.Entities.Tag tag)
     {
         if (tag.IsComputed)
         {
             throw new InvalidOperationException($"'{tag.TagName}' is computed by a rule and cannot be a reminder's completion tag.");
+        }
+
+        // A field is logged together with its record type's other fields, never on its own.
+        if (tag.RecordTypeId != null)
+        {
+            throw new InvalidOperationException($"'{tag.TagName}' is a field of a record type and cannot be a reminder's completion tag.");
         }
     }
 
@@ -121,7 +128,7 @@ public class ReminderService : IReminderService
         {
             var completionTag = await _context.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == request.CompletionTagId.Value && t.UserId == userId)
                 ?? throw new KeyNotFoundException("Tag not found");
-            EnsureNotComputed(completionTag);
+            EnsureLoggable(completionTag);
         }
 
         var oldNotifyAt = item.NotifyAt;
