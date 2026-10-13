@@ -34,9 +34,6 @@ public class TagResponse
     public int? RecordTypeId { get; set; }
     public string? RecordTypeName { get; set; }
 
-    /// <summary>For a field: how its values on one day become the day's value.</summary>
-    public DayCombine? DayCombine { get; set; }
-
     /// <summary>The title as analysis views show it: a computed tag is marked so a chart or
     /// comparison never passes a calculated value off as a logged one. Not serialized.</summary>
     [System.Text.Json.Serialization.JsonIgnore]

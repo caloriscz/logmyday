@@ -1,7 +1,6 @@
 using System.Globalization;
 using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
-using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Api.Application.Services;
 
@@ -18,21 +17,6 @@ public static class RecordFieldValues
         var prefix = recordTypeName + ": ";
 
         return tagName.StartsWith(prefix, StringComparison.Ordinal) ? tagName[prefix.Length..] : tagName;
-    }
-
-    /// <summary>A number field can add up or average its values over a day; any other field uses
-    /// the latest.</summary>
-    public static bool IsNumberField(int? inputTypeId, int? optionListId) =>
-        optionListId == null && TagRuleInputTypes.IsNumeric(inputTypeId);
-
-    public static DayCombine DayCombineFor(int? inputTypeId, int? optionListId, DayCombine? requested)
-    {
-        if (!IsNumberField(inputTypeId, optionListId))
-        {
-            return DayCombine.Latest;
-        }
-
-        return requested is DayCombine combine && Enum.IsDefined(combine) ? combine : DayCombine.Average;
     }
 
     /// <summary>The value as stored for the field, or null when it is empty (an empty value is

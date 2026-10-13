@@ -88,7 +88,7 @@
 @if (showModal)
 {
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/70 p-4" @onclick="() => { if (!isBusy) CloseModal(); }">
-        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto lg:max-w-5xl rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" @onclick:stopPropagation="true">
             <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">@(editing != null ? "Edit Record Type" : "New Record Type")</h2>
                 <button type="button" class="inline-flex items-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" @onclick="() => { if (!isBusy) CloseModal(); }" disabled="@isBusy">
@@ -259,8 +259,7 @@
                 MaxValue = f.MaxValue,
                 Step = f.Step,
                 DefaultValue = f.DefaultValue,
-                OptionListId = f.OptionListId,
-                DayCombine = f.DayCombine
+                OptionListId = f.OptionListId
             }).ToList()
         };
         OpenModal();

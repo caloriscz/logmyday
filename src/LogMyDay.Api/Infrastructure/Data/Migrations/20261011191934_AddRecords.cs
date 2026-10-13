@@ -12,12 +12,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<int>(
-                name: "DayCombine",
-                table: "LogMyDay_Tags",
-                type: "INTEGER",
-                nullable: true);
-
-            migrationBuilder.AddColumn<int>(
                 name: "RecordFieldOrder",
                 table: "LogMyDay_Tags",
                 type: "INTEGER",
@@ -134,10 +128,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
             migrationBuilder.DropIndex(
                 name: "IX_LogMyDay_Activities_RecordId",
                 table: "LogMyDay_Activities");
-
-            migrationBuilder.DropColumn(
-                name: "DayCombine",
-                table: "LogMyDay_Tags");
 
             migrationBuilder.DropColumn(
                 name: "RecordFieldOrder",

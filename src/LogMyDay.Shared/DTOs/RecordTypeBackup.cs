@@ -1,5 +1,3 @@
-using LogMyDay.Domain.Enums;
-
 namespace LogMyDay.Shared.DTOs;
 
 /// <summary>A record type with its fields and records. Fields are defined here rather than in the
@@ -28,7 +26,6 @@ public class RecordFieldBackup
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public string? OptionListKey { get; set; }
-    public DayCombine? DayCombine { get; set; }
 }
 
 public class RecordBackup

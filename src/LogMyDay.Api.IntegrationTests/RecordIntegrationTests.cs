@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LogMyDay.Domain.Constants;
-using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Serialization;
 
@@ -42,7 +41,7 @@ public class RecordIntegrationTests : IClassFixture<CustomWebApplicationFactory>
             Fields =
             [
                 new() { Name = "Systolic", TypeId = InputTypeIds.Integer },
-                new() { Name = "Pulse", TypeId = InputTypeIds.Integer, DayCombine = DayCombine.Average }
+                new() { Name = "Pulse", TypeId = InputTypeIds.Integer }
             ]
         }, Json);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);

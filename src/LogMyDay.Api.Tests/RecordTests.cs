@@ -37,7 +37,7 @@ public sealed class RecordTests : IDisposable
         var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
         _activities = new ActivityService(_context, new ActivityRepository(_context), eventLog, new TagDayLockService(_context), engine);
         _rules = new TagRuleService(_context, engine, eventLog);
-        _types = new RecordTypeService(_context, engine, eventLog);
+        _types = new RecordTypeService(_context, eventLog);
         _records = new RecordService(_context, eventLog, engine);
     }
 
@@ -49,8 +49,8 @@ public sealed class RecordTests : IDisposable
 
     private DateTime At(int hour, int daysAgo = 0) => _today.AddDays(-daysAgo).ToDateTime(new TimeOnly(hour, 0));
 
-    private static RecordFieldRequest Field(string name, int typeId = InputTypeIds.Integer, DayCombine? combine = null) =>
-        new() { Name = name, TypeId = typeId, DayCombine = combine };
+    private static RecordFieldRequest Field(string name, int typeId = InputTypeIds.Integer) =>
+        new() { Name = name, TypeId = typeId };
 
     private Task<RecordTypeResponse> BloodPressure(bool oncePerDay = false) =>
         _types.Create(new RecordTypeRequest
@@ -95,13 +95,11 @@ public sealed class RecordTests : IDisposable
         {
             Name = "Run",
             GroupId = group.Id,
-            Fields = [Field("Distance", InputTypeIds.Decimal, DayCombine.Sum), Field("Heart rate"), Field("Note", InputTypeIds.String, DayCombine.Sum)]
+            Fields = [Field("Distance", InputTypeIds.Decimal), Field("Heart rate"), Field("Note", InputTypeIds.String)]
         }, _userId);
 
         Assert.Equal(["Distance", "Heart rate", "Note"], type.Fields.Select(f => f.Name));
         Assert.Equal(["Run: Distance", "Run: Heart rate", "Run: Note"], type.Fields.Select(f => f.TagName));
-        // A number field keeps its choice or averages; any other field uses the latest value.
-        Assert.Equal([DayCombine.Sum, DayCombine.Average, DayCombine.Latest], type.Fields.Select(f => f.DayCombine));
 
         _context.ChangeTracker.Clear();
         var tags = await _context.Tags.Where(t => t.RecordTypeId == type.Id).OrderBy(t => t.RecordFieldOrder).ToListAsync();
@@ -260,31 +258,12 @@ public sealed class RecordTests : IDisposable
         Assert.Equal(record.Id, (await Values(type.Fields[0].TagId))[0].RecordId);
     }
 
-    [Theory]
-    [InlineData(DayCombine.Average, "125")]
-    [InlineData(DayCombine.Sum, "250")]
-    [InlineData(DayCombine.Latest, "130")]
-    public async Task ARule_ReadsAFieldsCombinedDayValue(DayCombine combine, string expected)
-    {
-        var type = await _types.Create(new RecordTypeRequest { Name = "Pressure", Fields = [Field("Systolic", InputTypeIds.Integer, combine)] }, _userId);
-        var result = await AddTag("Result");
-        await _rules.Create(new TagRuleRequest
-        {
-            Name = "Copy",
-            TargetTagId = result.Id,
-            Sources = [new() { SourceTagId = type.Fields[0].TagId, Factor = 1 }]
-        }, _userId);
-
-        await Log(type, At(19), "130");
-        await Log(type, At(7), "120");
-
-        Assert.Equal(expected, Assert.Single(await Values(result.Id)).Description);
-    }
-
     [Fact]
-    public async Task ChangingAFieldsDayCombine_RecomputesTheRulesReadingIt()
+    public async Task ARule_ReadsAFieldsValuesLikeAnyTags()
     {
-        var type = await _types.Create(new RecordTypeRequest { Name = "Run", Fields = [Field("Distance", InputTypeIds.Decimal, DayCombine.Average)] }, _userId);
+        // A field's values are not combined first: each record's value counts, as each entry of
+        // any other tag does.
+        var type = await _types.Create(new RecordTypeRequest { Name = "Run", Fields = [Field("Distance", InputTypeIds.Decimal)] }, _userId);
         var total = await AddTag("Distance total");
         await _rules.Create(new TagRuleRequest
         {
@@ -292,16 +271,9 @@ public sealed class RecordTests : IDisposable
             TargetTagId = total.Id,
             Sources = [new() { SourceTagId = type.Fields[0].TagId, Factor = 1 }]
         }, _userId);
+
         await Log(type, At(7), "5");
         await Log(type, At(18), "3");
-        Assert.Equal("4", Assert.Single(await Values(total.Id)).Description);
-
-        var field = type.Fields[0];
-        await _types.Update(type.Id, new RecordTypeRequest
-        {
-            Name = "Run",
-            Fields = [new() { TagId = field.TagId, Name = "Distance", TypeId = InputTypeIds.Decimal, DayCombine = DayCombine.Sum }]
-        }, _userId);
 
         Assert.Equal("8", Assert.Single(await Values(total.Id)).Description);
     }

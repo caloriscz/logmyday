@@ -72,7 +72,4 @@ public class Tag
 
     /// <summary>The field's position in its record type's form.</summary>
     public int? RecordFieldOrder { get; set; }
-
-    /// <summary>For a field: how its values on one day become the day's value.</summary>
-    public DayCombine? DayCombine { get; set; }
 }

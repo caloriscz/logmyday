@@ -1,6 +1,5 @@
 @using System.Globalization
 @using LogMyDay.Domain.Constants
-@using LogMyDay.Domain.Enums
 
 @* A record type and its fields, edited in place on Model. Each field is a new tag of its own; an
    existing field keeps its tag (TagId). A field removed here is deleted with its values on save,
@@ -74,7 +73,7 @@
                     </div>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="space-y-1">
                         <label class="@LabelClass" for="@($"{id}-unit")">Unit (optional)</label>
                         <select id="@($"{id}-unit")" class="@InputClass" value="@(field.UnitId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
@@ -112,20 +111,6 @@
                             <label class="@LabelClass" for="@($"{id}-max")">Maximum (optional)</label>
                             <input id="@($"{id}-max")" type="number" step="any" class="@InputClass" value="@Format(field.MaxValue)"
                                    @onchange="e => field.MaxValue = ParseNumber(e.Value)" disabled="@Disabled" />
-                        </div>
-                    }
-
-                    @if (field.OptionListId == null && TagRuleInputTypes.IsNumeric(field.TypeId))
-                    {
-                        <div class="space-y-1 sm:col-span-2">
-                            <label class="@LabelClass" for="@($"{id}-combine")">Two or more values on one day</label>
-                            <select id="@($"{id}-combine")" class="@InputClass" value="@((field.DayCombine ?? DayCombine.Average).ToString())"
-                                    @onchange="e => field.DayCombine = Enum.TryParse<DayCombine>(e.Value?.ToString(), out var c) ? c : DayCombine.Average" disabled="@Disabled">
-                                <option value="@DayCombine.Average">Average them (e.g. blood pressure, heart rate)</option>
-                                <option value="@DayCombine.Sum">Add them up (e.g. distance, duration)</option>
-                                <option value="@DayCombine.Latest">Use the latest (e.g. weight)</option>
-                            </select>
-                            <p class="text-xs text-gray-500 dark:text-slate-400">Used where one value per day is needed, e.g. by rules.</p>
                         </div>
                     }
                 </div>

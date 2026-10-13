@@ -205,18 +205,15 @@ public class TagRuleEngine : ITagRuleEngine
             .ToHashSet();
         var counted = rows.Where(r => !(rule.IgnoreZero && IsSkipMarker(r.Description, yesNoTags.Contains(r.TagId)))).ToList();
 
-        if (rule.Template == TagRuleTemplate.Aggregate && rule.AggregateKind == TagRuleAggregateKind.Count)
-        {
-            // Count takes entries of any type, so nothing it sees is skipped. A record field's
-            // entries are counted as logged: one per record.
-            return (counted.Count > 0 ? ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, counted.Count) : null, 0);
-        }
-
-        counted = CombineRecordFields(rule, counted);
-
         if (rule.Template == TagRuleTemplate.Conditional)
         {
             return (ConditionalValue(rule, counted), 0);
+        }
+
+        if (rule.Template == TagRuleTemplate.Aggregate && rule.AggregateKind == TagRuleAggregateKind.Count)
+        {
+            // Count takes entries of any type, so nothing it sees is skipped.
+            return (counted.Count > 0 ? ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, counted.Count) : null, 0);
         }
 
         var skipped = 0;
@@ -250,47 +247,6 @@ public class TagRuleEngine : ITagRuleEngine
         };
 
         return (ActivityValueCodec.WriteNumber(rule.TargetTag?.InputTypeId, result), skipped);
-    }
-
-    // A record field logged several times in a day becomes one value first, by its "combine per
-    // day" setting (sum, average or latest); the rule then works on that day value. Number values
-    // that do not parse are left as they are, so the template counts them as skipped.
-    private static List<SourceRow> CombineRecordFields(TagRule rule, List<SourceRow> counted)
-    {
-        var combines = rule.Sources
-            .Where(s => s.SourceTag?.DayCombine != null)
-            .ToDictionary(s => s.SourceTagId, s => s.SourceTag!.DayCombine!.Value);
-        if (combines.Count == 0)
-        {
-            return counted;
-        }
-
-        var result = counted.Where(r => !combines.ContainsKey(r.TagId)).ToList();
-        foreach (var group in counted.Where(r => combines.ContainsKey(r.TagId)).GroupBy(r => r.TagId))
-        {
-            var ordered = group.OrderBy(r => r.DateStarted).ThenBy(r => r.Id).ToList();
-            var latest = ordered[^1];
-            var combine = combines[group.Key];
-            if (combine == DayCombine.Latest)
-            {
-                result.Add(latest);
-                continue;
-            }
-
-            var numbers = ordered
-                .Select(r => ActivityValueCodec.TryReadNumber(r.Description, out var n) ? (double?)n : null)
-                .Where(n => n.HasValue)
-                .Select(n => n!.Value)
-                .ToList();
-            result.AddRange(ordered.Where(r => !ActivityValueCodec.TryReadNumber(r.Description, out _)));
-            if (numbers.Count > 0)
-            {
-                var value = combine == DayCombine.Sum ? numbers.Sum() : numbers.Average();
-                result.Add(latest with { Description = value.ToString(CultureInfo.InvariantCulture) });
-            }
-        }
-
-        return result;
     }
 
     // The first case whose condition holds on the day value gives the result; none → no value.

@@ -15,13 +15,11 @@ public class RecordTypeService : IRecordTypeService
     private const int MaxNameLength = 100;
 
     private readonly LogMyDayDbContext _context;
-    private readonly ITagRuleEngine _tagRuleEngine;
     private readonly IEventLogService _eventLogService;
 
-    public RecordTypeService(LogMyDayDbContext context, ITagRuleEngine tagRuleEngine, IEventLogService eventLogService)
+    public RecordTypeService(LogMyDayDbContext context, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
-        _tagRuleEngine = tagRuleEngine ?? throw new ArgumentNullException(nameof(tagRuleEngine));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
 
@@ -101,13 +99,6 @@ public class RecordTypeService : IRecordTypeService
             await EnsureNotRuleSource(removedIds);
         }
 
-        // A changed "combine per day" changes the day value every rule reading the field computes.
-        var combineChanged = fields
-            .Where(f => f.TagId != null)
-            .Where(f => type.Fields.First(t => t.Id == f.TagId).DayCombine != RecordFieldValues.DayCombineFor(f.TypeId, f.OptionListId, f.DayCombine))
-            .Select(f => f.TagId!.Value)
-            .ToList();
-
         await using var transaction = await BeginWriteTransaction();
 
         var removedValues = 0;
@@ -145,7 +136,6 @@ public class RecordTypeService : IRecordTypeService
         }
 
         await _context.SaveChangesAsync();
-        await RecomputeRulesReading(combineChanged, userId);
         await CommitIfOwned(transaction);
 
         var removedText = removed.Count > 0
@@ -318,7 +308,6 @@ public class RecordTypeService : IRecordTypeService
         tag.GroupId = type.GroupId;
         tag.RecordType = type;
         tag.RecordFieldOrder = order;
-        tag.DayCombine = RecordFieldValues.DayCombineFor(field.TypeId, field.OptionListId, field.DayCombine);
     }
 
     // A field a rule reads stays until the rule is changed or deleted (the database would refuse
@@ -333,27 +322,6 @@ public class RecordTypeService : IRecordTypeService
         {
             throw new InvalidOperationException(
                 $"Field '{use.TagName}' is in use by rule '{use.RuleName}'. Change or delete the rule first.");
-        }
-    }
-
-    // Rules reading a field whose day value changed are recomputed over their active range.
-    private async Task RecomputeRulesReading(List<int> tagIds, Guid userId)
-    {
-        if (tagIds.Count == 0)
-        {
-            return;
-        }
-
-        var rules = await _context.TagRules
-            .Include(r => r.Sources).ThenInclude(s => s.SourceTag)
-            .Include(r => r.Cases)
-            .Include(r => r.TargetTag)
-            .Where(r => r.UserId == userId && r.IsEnabled && r.Sources.Any(s => tagIds.Contains(s.SourceTagId)))
-            .ToListAsync();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
-        foreach (var rule in rules)
-        {
-            await _tagRuleEngine.Recompute(rule, rule.EffectiveFrom <= today ? rule.EffectiveFrom : today, today);
         }
     }
 
@@ -423,7 +391,6 @@ public class RecordTypeService : IRecordTypeService
                     Step = f.Step,
                     DefaultValue = f.DefaultValue,
                     OptionListId = f.OptionListId,
-                    DayCombine = f.DayCombine ?? DayCombine.Latest,
                     Order = f.RecordFieldOrder ?? 0,
                     ValueCount = valueCounts.GetValueOrDefault(f.Id)
                 })

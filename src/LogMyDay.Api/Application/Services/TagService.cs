@@ -274,8 +274,7 @@ public class TagService : ITagService
                 ColorSchemeId = t.ColorSchemeId,
                 IsComputed = t.IsComputed,
                 RecordTypeId = t.RecordTypeId,
-                RecordTypeName = t.RecordType != null ? t.RecordType.Name : null,
-                DayCombine = t.DayCombine
+                RecordTypeName = t.RecordType != null ? t.RecordType.Name : null
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -309,8 +308,7 @@ public class TagService : ITagService
             ColorSchemeId = tag.ColorSchemeId,
             IsComputed = tag.IsComputed,
             RecordTypeId = tag.RecordTypeId,
-            RecordTypeName = tag.RecordType?.Name,
-            DayCombine = tag.DayCombine
+            RecordTypeName = tag.RecordType?.Name
         };
     }
 }

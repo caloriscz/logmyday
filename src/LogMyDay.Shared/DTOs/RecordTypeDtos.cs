@@ -1,5 +1,3 @@
-using LogMyDay.Domain.Enums;
-
 namespace LogMyDay.Shared.DTOs;
 
 /// <summary>A record type and its fields, in form order. Each field is a tag of its own; an
@@ -27,10 +25,6 @@ public class RecordFieldRequest
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public int? OptionListId { get; set; }
-
-    /// <summary>Sum, average or latest for a number field (average when left out); other fields
-    /// always use latest.</summary>
-    public DayCombine? DayCombine { get; set; }
 }
 
 public class RecordTypeResponse
@@ -69,7 +63,6 @@ public class RecordFieldResponse
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public int? OptionListId { get; set; }
-    public DayCombine DayCombine { get; set; }
     public int Order { get; set; }
 
     /// <summary>How many values the field holds; removing the field deletes them.</summary>

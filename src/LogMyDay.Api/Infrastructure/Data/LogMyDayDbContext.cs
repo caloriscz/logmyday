@@ -444,7 +444,6 @@ public class LogMyDayDbContext : DbContext
 
         modelBuilder.Entity<Tag>(entity =>
         {
-            entity.Property(t => t.DayCombine).HasConversion<int?>();
             entity.HasIndex(t => t.RecordTypeId).HasDatabaseName("IX_LogMyDay_Tags_RecordTypeId");
         });
 

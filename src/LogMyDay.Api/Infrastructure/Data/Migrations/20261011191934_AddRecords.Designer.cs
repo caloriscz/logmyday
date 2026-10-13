@@ -730,9 +730,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Property<int?>("ColorSchemeId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("DayCombine")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("DefaultValue")
                         .HasColumnType("TEXT");
 

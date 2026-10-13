@@ -118,8 +118,7 @@ public class BackupService : IBackupService
                     MaxValue = f.MaxValue,
                     Step = f.Step,
                     DefaultValue = f.DefaultValue,
-                    OptionListKey = f.OptionList?.Name,
-                    DayCombine = f.DayCombine
+                    OptionListKey = f.OptionList?.Name
                 }).ToList(),
                 Records = records[t.Id].Select(r => new RecordBackup
                 {
@@ -210,8 +209,7 @@ public class BackupService : IBackupService
                     GroupId = type.GroupId,
                     UserId = owner,
                     RecordType = type,
-                    RecordFieldOrder = i,
-                    DayCombine = RecordFieldValues.DayCombineFor(inputTypeId, optionListId, field.DayCombine)
+                    RecordFieldOrder = i
                 };
                 _context.Tags.Add(tag);
                 fields[field.Name] = tag;
