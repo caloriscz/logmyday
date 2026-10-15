@@ -5,12 +5,13 @@ namespace LogMyDay.Api.Infrastructure.Specifications;
 public static class TagSpecifications
 {
     /// <summary>
-    /// Specification to get all tags for a specific user, ordered by TagName
+    /// Specification to get all tags for a specific user, ordered by TagName. Record types are
+    /// left out of tag lists: they hold no values and are listed as record types.
     /// </summary>
     public class TagsForUserSpec : BaseSpecification<Tag>
     {
         public TagsForUserSpec(Guid userId) 
-            : base(t => t.UserId == userId)
+            : base(t => t.UserId == userId && !t.IsRecordType)
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
@@ -48,7 +49,7 @@ public static class TagSpecifications
             string? filter = null,
             string? filterType = null,
             int? groupId = null)
-            : base(t => t.UserId == userId)
+            : base(t => t.UserId == userId && !t.IsRecordType)
         {
             AddInclude(t => t.Unit);
             AddInclude(t => t.OptionList);
@@ -115,7 +116,7 @@ public static class TagSpecifications
             string? filter = null,
             string? filterType = null,
             int? groupId = null)
-            : base(t => t.UserId == userId)
+            : base(t => t.UserId == userId && !t.IsRecordType)
         {
             // Apply filter if provided (same logic as PagedTagsSpec)
             if (!string.IsNullOrWhiteSpace(filter))

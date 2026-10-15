@@ -1,8 +1,9 @@
 namespace LogMyDay.Shared.DTOs;
 
-/// <summary>A record type and its fields, in form order. Each field is a tag of its own; an
-/// existing field is matched by <see cref="RecordFieldRequest.TagId"/>, a field without one is
-/// created, and a field left out is removed with its values.</summary>
+/// <summary>A record type and its fields, in form order. The record type is a tag that holds no
+/// values (its id is that tag's id), and each field is a tag of its own. An existing field is
+/// matched by <see cref="RecordFieldRequest.TagId"/>, a field without one is created, and a field
+/// left out is removed with its values.</summary>
 public class RecordTypeRequest
 {
     public required string Name { get; set; }
@@ -34,8 +35,6 @@ public class RecordTypeResponse
     public int? GroupId { get; set; }
     public string? GroupName { get; set; }
     public bool OncePerDay { get; set; }
-    public int DisplayOrder { get; set; }
-    public DateTime DateCreated { get; set; }
 
     /// <summary>How many records of this type exist.</summary>
     public int RecordCount { get; set; }

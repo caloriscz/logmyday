@@ -117,7 +117,7 @@ public class TagService : ITagService
             throw new KeyNotFoundException("Tag not found");
         }
 
-        EnsureNotRecordField(tag);
+        EnsureNotInRecordType(tag);
 
         // Apply InputType constraints for locked types
         var inputTypeId = model.TypeId == 0 ? (int?)null : model.TypeId;
@@ -182,7 +182,7 @@ public class TagService : ITagService
 
         if (link != null)
         {
-            EnsureNotRecordField(link);
+            EnsureNotInRecordType(link);
 
             // A tag a Tag Activity Relations rule uses (as source or target) stays until the rule
             // is changed or deleted; the database would refuse it anyway (Restrict).
@@ -201,13 +201,20 @@ public class TagService : ITagService
         }
     }
 
-    // A field's name, type and group follow its record type, so it is changed or removed there.
-    private static void EnsureNotRecordField(Tag tag)
+    // A record type and its fields are changed or removed in the record type: a field's name,
+    // type and group follow it.
+    private static void EnsureNotInRecordType(Tag tag)
     {
+        if (tag.IsRecordType)
+        {
+            throw new InvalidOperationException(
+                $"Tag '{tag.TagName}' is a record type. Change or delete it in Record types.");
+        }
+
         if (tag.RecordTypeId != null)
         {
             throw new InvalidOperationException(
-                $"Tag '{tag.TagName}' is a field of the record type '{tag.RecordType?.Name}'. Change or remove it in the record type.");
+                $"Tag '{tag.TagName}' is a field of the record type '{tag.RecordType?.TagName}'. Change or remove it in the record type.");
         }
     }
 
@@ -274,7 +281,8 @@ public class TagService : ITagService
                 ColorSchemeId = t.ColorSchemeId,
                 IsComputed = t.IsComputed,
                 RecordTypeId = t.RecordTypeId,
-                RecordTypeName = t.RecordType != null ? t.RecordType.Name : null
+                RecordTypeName = t.RecordType != null ? t.RecordType.TagName : null,
+                IsRecordType = t.IsRecordType
             }).ToList(),
             TotalCount = totalCount,
             PageNumber = pageNumber,
@@ -308,7 +316,8 @@ public class TagService : ITagService
             ColorSchemeId = tag.ColorSchemeId,
             IsComputed = tag.IsComputed,
             RecordTypeId = tag.RecordTypeId,
-            RecordTypeName = tag.RecordType?.Name
+            RecordTypeName = tag.RecordType?.TagName,
+            IsRecordType = tag.IsRecordType
         };
     }
 }

@@ -98,7 +98,7 @@ public class ReminderService : IReminderService
     }
 
     // A reminder logs only to a tag that takes values on their own: not a computed tag (its
-    // values come from its rule) and not a record field.
+    // values come from its rule), not a record type and not a record field.
     private static void EnsureLoggable(Domain.Entities.Tag tag)
     {
         if (tag.IsComputed)
@@ -107,9 +107,11 @@ public class ReminderService : IReminderService
         }
 
         // A field is logged together with its record type's other fields, never on its own.
-        if (tag.RecordTypeId != null)
+        if (tag.IsRecordType || tag.RecordTypeId != null)
         {
-            throw new InvalidOperationException($"'{tag.TagName}' is a field of a record type and cannot be a reminder's completion tag.");
+            throw new InvalidOperationException(tag.IsRecordType
+                ? $"'{tag.TagName}' is a record type and cannot be a reminder's completion tag."
+                : $"'{tag.TagName}' is a field of a record type and cannot be a reminder's completion tag.");
         }
     }
 

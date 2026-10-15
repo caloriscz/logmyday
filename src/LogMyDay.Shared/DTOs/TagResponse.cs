@@ -34,13 +34,17 @@ public class TagResponse
     public int? RecordTypeId { get; set; }
     public string? RecordTypeName { get; set; }
 
+    /// <summary>True for a record type: a tag that holds no values of its own, only its fields do.
+    /// Tag lists leave record types out; they are listed with their fields as record types.</summary>
+    public bool IsRecordType { get; set; }
+
     /// <summary>The title as analysis views show it: a computed tag is marked so a chart or
     /// comparison never passes a calculated value off as a logged one. Not serialized.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string DisplayTitle => IsComputed ? $"{Title} (computed)" : Title;
 
-    /// <summary>Whether a value can be logged to this tag on its own: neither computed by a rule
-    /// nor a field of a record type. Not serialized.</summary>
+    /// <summary>Whether a value can be logged to this tag on its own: not computed by a rule, not
+    /// a record type and not a field of one. Not serialized.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsLoggable => !IsComputed && RecordTypeId == null;
+    public bool IsLoggable => !IsComputed && !IsRecordType && RecordTypeId == null;
 }

@@ -8,8 +8,6 @@ public class RecordTypeBackup
     public string Name { get; set; } = string.Empty;
     public string? GroupName { get; set; }
     public bool OncePerDay { get; set; }
-    public int DisplayOrder { get; set; }
-    public DateTime DateCreated { get; set; }
     public List<RecordFieldBackup> Fields { get; set; } = new();
     public List<RecordBackup> Records { get; set; } = new();
 }

@@ -59,7 +59,7 @@ public class ActivityService : IActivityService
             throw new TagComputedException(tag.Id);
         }
 
-        if (tag.RecordTypeId != null)
+        if (tag.IsRecordType || tag.RecordTypeId != null)
         {
             throw new TagInRecordException(tag.Id);
         }
@@ -515,7 +515,7 @@ public class ActivityService : IActivityService
             throw new TagInRecordException(activity.TagId);
         }
 
-        if (tag.RecordTypeId != null)
+        if (tag.IsRecordType || tag.RecordTypeId != null)
         {
             throw new TagInRecordException(tag.Id);
         }

@@ -64,7 +64,7 @@ public class RecordService : IRecordService
         await _context.SaveChangesAsync();
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record '{type.Name}' on {record.DateStarted:yyyy-MM-dd HH:mm} added: {Describe(type, values)}");
+            $"Record '{type.TagName}' on {record.DateStarted:yyyy-MM-dd HH:mm} added: {Describe(type, values)}");
 
         var day = DateOnly.FromDateTime(record.DateStarted);
         await _tagRuleEngine.OnSourcesChanged(userId, values.Select(v => (v.Field.Id, day)).ToList());
@@ -113,13 +113,13 @@ public class RecordService : IRecordService
 
         foreach (var (fieldId, value) in byField)
         {
-            _context.Activities.Add(NewValue(record, type.Fields.First(f => f.Id == fieldId), value));
+            _context.Activities.Add(NewValue(record, type.RecordFields.First(f => f.Id == fieldId), value));
         }
 
         await _context.SaveChangesAsync();
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record '{type.Name}' on {record.DateStarted:yyyy-MM-dd HH:mm} updated: {Describe(type, values)}");
+            $"Record '{type.TagName}' on {record.DateStarted:yyyy-MM-dd HH:mm} updated: {Describe(type, values)}");
 
         var day = DateOnly.FromDateTime(dateStarted);
         changes.AddRange(values.Select(v => (v.Field.Id, day)));
@@ -146,7 +146,7 @@ public class RecordService : IRecordService
         await _context.SaveChangesAsync();
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record '{record.RecordType?.Name ?? "?"}' on {record.DateStarted:yyyy-MM-dd HH:mm} deleted with {changes.Count} value(s)");
+            $"Record '{record.RecordType?.TagName ?? "?"}' on {record.DateStarted:yyyy-MM-dd HH:mm} deleted with {changes.Count} value(s)");
 
         await _tagRuleEngine.OnSourcesChanged(userId, changes);
         await CommitIfOwned(transaction);
@@ -154,7 +154,7 @@ public class RecordService : IRecordService
 
     // Each value must name a field of the type, at most once, and fit the field. Empty values are
     // left out; at least one must remain. The result is in the type's field order.
-    private async Task<List<(Tag Field, string Value)>> NormalizeValues(RecordType type, List<RecordValueRequest>? values)
+    private async Task<List<(Tag Field, string Value)>> NormalizeValues(Tag type, List<RecordValueRequest>? values)
     {
         var requested = values ?? [];
         if (requested.GroupBy(v => v.TagId).Any(g => g.Count() > 1))
@@ -162,8 +162,8 @@ public class RecordService : IRecordService
             throw new ArgumentException("A field appears twice.");
         }
 
-        var fields = type.Fields.ToDictionary(f => f.Id);
-        var listIds = type.Fields.Where(f => f.OptionListId != null).Select(f => f.OptionListId!.Value).Distinct().ToList();
+        var fields = type.RecordFields.ToDictionary(f => f.Id);
+        var listIds = type.RecordFields.Where(f => f.OptionListId != null).Select(f => f.OptionListId!.Value).Distinct().ToList();
         var options = (await _context.TagOptions.Where(o => listIds.Contains(o.OptionListId)).ToListAsync())
             .ToLookup(o => o.OptionListId);
 
@@ -172,10 +172,10 @@ public class RecordService : IRecordService
         {
             if (!fields.TryGetValue(value.TagId, out var field))
             {
-                throw new ArgumentException($"Tag {value.TagId} is not a field of '{type.Name}'.");
+                throw new ArgumentException($"Tag {value.TagId} is not a field of '{type.TagName}'.");
             }
 
-            var fieldName = RecordFieldValues.FieldName(type.Name, field.TagName);
+            var fieldName = RecordFieldValues.FieldName(type.TagName, field.TagName);
             var fieldOptions = field.OptionListId is int listId ? options[listId].ToList() : null;
             var stored = RecordFieldValues.Normalize(field, fieldName, value.Value, fieldOptions);
             if (stored != null)
@@ -192,9 +192,10 @@ public class RecordService : IRecordService
         return result.OrderBy(v => v.Field.RecordFieldOrder).ThenBy(v => v.Field.Id).ToList();
     }
 
-    private async Task EnsureOncePerDay(RecordType type, DateTime dateStarted, int? exceptRecordId)
+    // A record type that is not repeatable is logged once per day.
+    private async Task EnsureOncePerDay(Tag type, DateTime dateStarted, int? exceptRecordId)
     {
-        if (!type.OncePerDay)
+        if (type.IsRepeatable)
         {
             return;
         }
@@ -204,7 +205,7 @@ public class RecordService : IRecordService
         if (await _context.Records.AnyAsync(r => r.RecordTypeId == type.Id && r.Id != exceptRecordId
                 && r.DateStarted >= dayStart && r.DateStarted < dayEnd))
         {
-            throw new InvalidOperationException($"'{type.Name}' is logged once per day and already has a record on {dayStart:yyyy-MM-dd}.");
+            throw new InvalidOperationException($"'{type.TagName}' is logged once per day and already has a record on {dayStart:yyyy-MM-dd}.");
         }
     }
 
@@ -221,16 +222,16 @@ public class RecordService : IRecordService
         };
     }
 
-    private static string Describe(RecordType type, List<(Tag Field, string Value)> values)
+    private static string Describe(Tag type, List<(Tag Field, string Value)> values)
     {
-        return string.Join(", ", values.Select(v => $"{RecordFieldValues.FieldName(type.Name, v.Field.TagName)} {v.Value}"));
+        return string.Join(", ", values.Select(v => $"{RecordFieldValues.FieldName(type.TagName, v.Field.TagName)} {v.Value}"));
     }
 
-    private async Task<RecordType> LoadType(int id, Guid userId)
+    private async Task<Tag> LoadType(int id, Guid userId)
     {
-        return await _context.RecordTypes
-            .Include(t => t.Fields).ThenInclude(f => f.Unit)
-            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
+        return await _context.Tags
+            .Include(t => t.RecordFields).ThenInclude(f => f.Unit)
+            .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId && t.IsRecordType)
             ?? throw new KeyNotFoundException("Record type not found");
     }
 
@@ -273,15 +274,15 @@ public class RecordService : IRecordService
         }
     }
 
-    private static RecordResponse MapToResponse(Record record, RecordType type)
+    private static RecordResponse MapToResponse(Record record, Tag type)
     {
-        var fields = type.Fields.ToDictionary(f => f.Id);
+        var fields = type.RecordFields.ToDictionary(f => f.Id);
 
         return new RecordResponse
         {
             Id = record.Id,
             RecordTypeId = record.RecordTypeId,
-            RecordTypeName = type.Name,
+            RecordTypeName = type.TagName,
             DateStarted = record.DateStarted,
             DateCreated = record.DateCreated,
             Values = record.Values
@@ -293,7 +294,7 @@ public class RecordService : IRecordService
                 {
                     ActivityId = v.Value.Id,
                     TagId = v.Field.Id,
-                    FieldName = RecordFieldValues.FieldName(type.Name, v.Field.TagName),
+                    FieldName = RecordFieldValues.FieldName(type.TagName, v.Field.TagName),
                     InputTypeId = v.Field.InputTypeId,
                     UnitSymbol = v.Field.Unit?.Symbol,
                     Value = v.Value.Description ?? string.Empty

@@ -101,11 +101,68 @@ public sealed class RecordTests : IDisposable
         Assert.Equal(["Distance", "Heart rate", "Note"], type.Fields.Select(f => f.Name));
         Assert.Equal(["Run: Distance", "Run: Heart rate", "Run: Note"], type.Fields.Select(f => f.TagName));
 
+        // The record type itself is a tag that holds no values: no input type, in the same group.
         _context.ChangeTracker.Clear();
+        var typeTag = await _context.Tags.SingleAsync(t => t.Id == type.Id);
+        Assert.True(typeTag.IsRecordType);
+        Assert.Equal("Run", typeTag.TagName);
+        Assert.Equal(group.Id, typeTag.GroupId);
+        Assert.Null(typeTag.InputTypeId);
+        Assert.True(typeTag.IsRepeatable);
+
         var tags = await _context.Tags.Where(t => t.RecordTypeId == type.Id).OrderBy(t => t.RecordFieldOrder).ToListAsync();
         Assert.Equal(3, tags.Count);
         Assert.All(tags, t => Assert.Equal(group.Id, t.GroupId));
         Assert.All(tags, t => Assert.Equal(TimeGranularity.Exact, t.TimeGranularity));
+    }
+
+    [Fact]
+    public async Task ARecordType_IsLeftOutOfTagLists_AndTakesNoValuesOfItsOwn()
+    {
+        var type = await BloodPressure();
+        var plain = await AddTag("Plain");
+        var tags = new TagService(_context, new TagRepository(_context), NullLogger<TagService>.Instance);
+
+        var all = await tags.GetAll(_userId);
+        Assert.DoesNotContain(all, t => t.Id == type.Id);
+        Assert.Contains(all, t => t.Id == plain.Id);
+        Assert.Equal(3, all.Count(t => t.RecordTypeId == type.Id)); // its fields stay readable
+        var page = await tags.GetPaged(1, 50, "asc", _userId);
+        Assert.Equal(4, page.TotalCount);
+        Assert.DoesNotContain(page.Items, t => t.Id == type.Id);
+
+        var byId = await tags.GetTagById(type.Id, _userId);
+        Assert.True(byId.IsRecordType);
+        Assert.False(byId.IsLoggable);
+
+        await Assert.ThrowsAsync<TagInRecordException>(() => _activities.Create(new ActivityRequest
+        {
+            PrimaryTagId = type.Id,
+            DateStarted = At(8),
+            Description = "1"
+        }, _userId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => tags.Delete(type.Id, _userId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(type.Id, new TagRequest { Tag = "Renamed", TypeId = InputTypeIds.Integer }, _userId));
+        await Assert.ThrowsAsync<ArgumentException>(() => _rules.Create(new TagRuleRequest
+        {
+            Name = "From the type",
+            TargetTagId = plain.Id,
+            Sources = [new() { SourceTagId = type.Id, Factor = 1 }]
+        }, _userId));
+        await Assert.ThrowsAsync<ArgumentException>(() => _rules.Create(new TagRuleRequest
+        {
+            Name = "Into the type",
+            TargetTagId = type.Id,
+            Sources = [new() { SourceTagId = plain.Id, Factor = 1 }]
+        }, _userId));
+
+        var export = new ExportService(_context, NullLogger<ExportService>.Instance);
+        Assert.DoesNotContain(await export.GetAvailableTags(_userId), t => t.Id == type.Id);
+
+        _context.ChangeTracker.Clear();
+        Assert.Equal("Blood pressure", (await _context.Tags.SingleAsync(t => t.Id == type.Id)).TagName);
+        Assert.False(await _context.Activities.AnyAsync());
     }
 
     [Fact]
@@ -159,6 +216,7 @@ public sealed class RecordTests : IDisposable
     public async Task OncePerDay_AllowsOneRecordADay()
     {
         var type = await BloodPressure(oncePerDay: true);
+        Assert.False((await _context.Tags.SingleAsync(t => t.Id == type.Id)).IsRepeatable);
         await Log(type, At(7), "128");
         var yesterday = await Log(type, At(7, daysAgo: 1), "130");
 
@@ -350,7 +408,7 @@ public sealed class RecordTests : IDisposable
         await _types.Delete(type.Id, _userId);
 
         _context.ChangeTracker.Clear();
-        Assert.False(await _context.RecordTypes.AnyAsync());
+        Assert.False(await _context.Tags.AnyAsync(t => t.IsRecordType));
         Assert.False(await _context.Records.AnyAsync());
         Assert.False(await _context.Activities.AnyAsync());
         Assert.Equal(plain.Id, Assert.Single(await _context.Tags.ToListAsync()).Id);
@@ -395,6 +453,31 @@ public sealed class RecordTests : IDisposable
         var again = await backups.RestoreSecureBackup(secure, _userId);
         Assert.Equal(1, again.Statistics.RecordTypesSkipped);
         Assert.Equal(3, await _context.Records.CountAsync());
+    }
+
+    [Fact]
+    public async Task ARecordType_MayShareItsNameWithATag_AndBackupsKeepThemApart()
+    {
+        // Names are unique among record types only, so a backup must not mix the two up.
+        var plain = await AddTag("Blood pressure");
+        await _activities.Create(new ActivityRequest { PrimaryTagId = plain.Id, DateStarted = At(9), Description = "1" }, _userId);
+        var type = await BloodPressure();
+        await Log(type, At(7), "128", "82", "64");
+        var backups = new BackupService(_context, NullLogger<BackupService>.Instance, new TagRuleEngine(_context));
+
+        var export = await backups.ExportDataAsync(_userId);
+        Assert.Equal(["Blood pressure"], export.Tags.Select(t => t.TagName));
+        Assert.Equal("Blood pressure", Assert.Single(export.RecordTypes).Name);
+
+        await backups.ClearDataAsync(_userId);
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, _userId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors));
+
+        _context.ChangeTracker.Clear();
+        var restoredPlain = await _context.Tags.SingleAsync(t => t.TagName == "Blood pressure" && !t.IsRecordType);
+        Assert.Equal("1", Assert.Single(await Values(restoredPlain.Id)).Description);
+        var restoredType = Assert.Single(await _types.GetAll(_userId));
+        Assert.Equal(1, restoredType.RecordCount);
     }
 
     private async Task AssertRestored()

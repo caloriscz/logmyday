@@ -9,6 +9,9 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LogMyDay.Api.Application.Services;
 
+/// <summary>Record types: a record type is a tag (<see cref="Tag.IsRecordType"/>) that holds no
+/// values, and its fields are tags that point to it. "Once per day" is the type tag's
+/// <see cref="Tag.IsRepeatable"/> switched off.</summary>
 public class RecordTypeService : IRecordTypeService
 {
     private const int MaxFields = 20;
@@ -27,8 +30,7 @@ public class RecordTypeService : IRecordTypeService
     {
         var types = await TypesWithFields()
             .Where(t => t.UserId == userId)
-            .OrderBy(t => t.DisplayOrder)
-            .ThenBy(t => t.Name)
+            .OrderBy(t => t.TagName)
             .ToListAsync();
 
         var recordCounts = await _context.Records
@@ -56,17 +58,15 @@ public class RecordTypeService : IRecordTypeService
 
         await using var transaction = await BeginWriteTransaction();
 
-        var displayOrder = await _context.RecordTypes.Where(t => t.UserId == userId).MaxAsync(t => (int?)t.DisplayOrder) ?? 0;
-        var type = new RecordType
+        var type = new Tag
         {
+            TagName = name,
             UserId = userId,
-            Name = name,
+            IsRecordType = true,
             GroupId = request.GroupId,
-            OncePerDay = request.OncePerDay,
-            DisplayOrder = displayOrder + 1,
-            DateCreated = DateTime.UtcNow
+            IsRepeatable = !request.OncePerDay
         };
-        _context.RecordTypes.Add(type);
+        _context.Tags.Add(type);
         await _context.SaveChangesAsync();
 
         for (var i = 0; i < fields.Count; i++)
@@ -80,7 +80,7 @@ public class RecordTypeService : IRecordTypeService
         await CommitIfOwned(transaction);
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record type '{type.Name}' created with fields {string.Join(", ", fields.Select(f => $"'{f.Name}'"))}{(type.OncePerDay ? " (once per day)" : string.Empty)}");
+            $"Record type '{type.TagName}' created with fields {string.Join(", ", fields.Select(f => $"'{f.Name}'"))}{(type.IsRepeatable ? string.Empty : " (once per day)")}");
 
         return await GetById(type.Id, userId);
     }
@@ -92,7 +92,7 @@ public class RecordTypeService : IRecordTypeService
         var (fields, inputTypes) = await ValidateFields(request, name, userId, existing: type);
 
         var keptIds = fields.Where(f => f.TagId != null).Select(f => f.TagId!.Value).ToHashSet();
-        var removed = type.Fields.Where(f => !keptIds.Contains(f.Id)).ToList();
+        var removed = type.RecordFields.Where(f => !keptIds.Contains(f.Id)).ToList();
         var removedIds = removed.Select(f => f.Id).ToList();
         if (removedIds.Count > 0)
         {
@@ -117,14 +117,14 @@ public class RecordTypeService : IRecordTypeService
             _context.Records.RemoveRange(emptyRecords);
         }
 
-        type.Name = name;
+        type.TagName = name;
         type.GroupId = request.GroupId;
-        type.OncePerDay = request.OncePerDay;
+        type.IsRepeatable = !request.OncePerDay;
 
         for (var i = 0; i < fields.Count; i++)
         {
             var tag = fields[i].TagId is int tagId
-                ? type.Fields.First(f => f.Id == tagId)
+                ? type.RecordFields.First(f => f.Id == tagId)
                 : null;
             if (tag == null)
             {
@@ -142,7 +142,7 @@ public class RecordTypeService : IRecordTypeService
             ? $"; removed {string.Join(", ", removed.Select(f => $"'{RecordFieldValues.FieldName(name, f.TagName)}'"))} with {removedValues} value(s)"
             : string.Empty;
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record type '{type.Name}' updated: fields {string.Join(", ", fields.Select(f => $"'{f.Name}'"))}{removedText}");
+            $"Record type '{type.TagName}' updated: fields {string.Join(", ", fields.Select(f => $"'{f.Name}'"))}{removedText}");
 
         return await GetById(type.Id, userId);
     }
@@ -150,7 +150,7 @@ public class RecordTypeService : IRecordTypeService
     public async Task Delete(int id, Guid userId)
     {
         var type = await LoadType(id, userId);
-        var fieldIds = type.Fields.Select(f => f.Id).ToList();
+        var fieldIds = type.RecordFields.Select(f => f.Id).ToList();
         if (fieldIds.Count > 0)
         {
             await EnsureNotRuleSource(fieldIds);
@@ -162,13 +162,13 @@ public class RecordTypeService : IRecordTypeService
         var records = await _context.Records.Where(r => r.RecordTypeId == type.Id).ToListAsync();
         _context.Activities.RemoveRange(values);
         _context.Records.RemoveRange(records);
-        _context.Tags.RemoveRange(type.Fields);
-        _context.RecordTypes.Remove(type);
+        _context.Tags.RemoveRange(type.RecordFields);
+        _context.Tags.Remove(type);
         await _context.SaveChangesAsync();
         await CommitIfOwned(transaction);
 
         await _eventLogService.Log(userId, EventLogLevel.Info,
-            $"Record type '{type.Name}' deleted with {records.Count} record(s) and {values.Count} value(s)");
+            $"Record type '{type.TagName}' deleted with {records.Count} record(s) and {values.Count} value(s)");
     }
 
     // The type's name is unique among the user's record types; its group is the user's own.
@@ -180,9 +180,9 @@ public class RecordTypeService : IRecordTypeService
             throw new ArgumentException($"A record type needs a name of at most {MaxNameLength} characters.");
         }
 
-        var names = await _context.RecordTypes
-            .Where(t => t.UserId == userId && t.Id != typeId)
-            .Select(t => t.Name)
+        var names = await _context.Tags
+            .Where(t => t.UserId == userId && t.IsRecordType && t.Id != typeId)
+            .Select(t => t.TagName)
             .ToListAsync();
         if (names.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)))
         {
@@ -200,7 +200,7 @@ public class RecordTypeService : IRecordTypeService
     // Fields have unique names within the type, an input type, and an option list and unit that
     // exist. A field's tag name ("{type}: {field}") must not clash with another of the user's tags.
     private async Task<(List<RecordFieldRequest> Fields, Dictionary<int, InputType> InputTypes)> ValidateFields(
-        RecordTypeRequest request, string typeName, Guid userId, RecordType? existing)
+        RecordTypeRequest request, string typeName, Guid userId, Tag? existing)
     {
         var fields = request.Fields ?? [];
         if (fields.Count == 0)
@@ -221,7 +221,7 @@ public class RecordTypeService : IRecordTypeService
                 throw new ArgumentException($"Every field needs a name of at most {MaxNameLength} characters.");
             }
 
-            if (field.TagId is int tagId && existing?.Fields.Any(f => f.Id == tagId) != true)
+            if (field.TagId is int tagId && existing?.RecordFields.Any(f => f.Id == tagId) != true)
             {
                 throw new KeyNotFoundException($"Field '{field.Name}' does not belong to this record type.");
             }
@@ -268,7 +268,7 @@ public class RecordTypeService : IRecordTypeService
             throw new KeyNotFoundException("Unit not found");
         }
 
-        var ownFieldIds = existing?.Fields.Select(f => f.Id).ToList() ?? [];
+        var ownFieldIds = existing?.RecordFields.Select(f => f.Id).ToList() ?? [];
         var otherNames = (await _context.Tags
                 .Where(t => t.UserId == userId && !ownFieldIds.Contains(t.Id))
                 .Select(t => t.TagName)
@@ -285,14 +285,14 @@ public class RecordTypeService : IRecordTypeService
 
     // A field's tag follows its record type: its name, group and position. An input type whose
     // range or step cannot be edited keeps its fixed values, as for any tag.
-    private static void ApplyField(Tag tag, RecordType type, RecordFieldRequest field, int order, InputType inputType)
+    private static void ApplyField(Tag tag, Tag type, RecordFieldRequest field, int order, InputType inputType)
     {
         var constraints = InputTypeDefaults.GetConstraintsForType(field.TypeId);
         var minValue = inputType.IsMinimumEditable ? field.MinValue : constraints.MinValue;
         var maxValue = inputType.IsMaximumEditable ? field.MaxValue : constraints.MaxValue;
         var step = inputType.IsStepEditable ? field.Step : constraints.Step;
 
-        tag.TagName = RecordFieldValues.TagName(type.Name, field.Name);
+        tag.TagName = RecordFieldValues.TagName(type.TagName, field.Name);
         tag.Description = field.Description;
         tag.InputTypeId = field.TypeId;
         tag.IsRequired = false;
@@ -334,14 +334,15 @@ public class RecordTypeService : IRecordTypeService
             .ToDictionaryAsync(c => c.TagId, c => c.Count);
     }
 
-    private IQueryable<RecordType> TypesWithFields()
+    private IQueryable<Tag> TypesWithFields()
     {
-        return _context.RecordTypes
+        return _context.Tags
+            .Where(t => t.IsRecordType)
             .Include(t => t.Group)
-            .Include(t => t.Fields).ThenInclude(f => f.Unit);
+            .Include(t => t.RecordFields).ThenInclude(f => f.Unit);
     }
 
-    private async Task<RecordType> LoadType(int id, Guid userId)
+    private async Task<Tag> LoadType(int id, Guid userId)
     {
         return await TypesWithFields().FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
             ?? throw new KeyNotFoundException("Record type not found");
@@ -362,25 +363,23 @@ public class RecordTypeService : IRecordTypeService
         }
     }
 
-    private static RecordTypeResponse MapToResponse(RecordType type, int recordCount, IReadOnlyDictionary<int, int> valueCounts)
+    private static RecordTypeResponse MapToResponse(Tag type, int recordCount, IReadOnlyDictionary<int, int> valueCounts)
     {
         return new RecordTypeResponse
         {
             Id = type.Id,
-            Name = type.Name,
+            Name = type.TagName,
             GroupId = type.GroupId,
             GroupName = type.Group?.Name,
-            OncePerDay = type.OncePerDay,
-            DisplayOrder = type.DisplayOrder,
-            DateCreated = type.DateCreated,
+            OncePerDay = !type.IsRepeatable,
             RecordCount = recordCount,
-            Fields = type.Fields
+            Fields = type.RecordFields
                 .OrderBy(f => f.RecordFieldOrder)
                 .ThenBy(f => f.Id)
                 .Select(f => new RecordFieldResponse
                 {
                     TagId = f.Id,
-                    Name = RecordFieldValues.FieldName(type.Name, f.TagName),
+                    Name = RecordFieldValues.FieldName(type.TagName, f.TagName),
                     TagName = f.TagName,
                     Description = f.Description,
                     InputTypeId = f.InputTypeId,
