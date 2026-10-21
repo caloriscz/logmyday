@@ -49,7 +49,7 @@ public static class McpErrorMapper
 
             case TagInRecordException ex:
                 return Error(Conflict, ex.Message,
-                    new { tagId = ex.TagId, hint = "This tag is a field of a record type. Its values are logged together with the other fields as one record, in the app." });
+                    new { tagId = ex.TagId, hint = "This tag is a record type or a field of one. Log the whole record with log_record; list_record_types shows the fields." });
 
             case UnauthorizedAccessException ex:
                 return Error(Forbidden, ex.Message);

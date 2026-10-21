@@ -12,8 +12,7 @@ public interface IRecordTypeService
 
     /// <summary>Saves the type and its fields: a field with a tag id is updated, one without is
     /// created, and a field left out is removed with its values (records left without a value go
-    /// too). A field a rule reads cannot be removed. Rules reading a field whose "combine per day"
-    /// changed are recomputed over their active range.</summary>
+    /// too). A field a rule reads cannot be removed.</summary>
     Task<RecordTypeResponse> Update(int id, RecordTypeRequest request, Guid userId);
 
     /// <summary>Deletes the type with its records, their values and its field tags. Refused while a
