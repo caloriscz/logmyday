@@ -1,0 +1,248 @@
+@using LogMyDay.Shared.DTOs
+@using Refit
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
+@inject ILogger<RecordEditor> Logger
+
+@* Logs a new record or edits one: the record type (new records only), the time and a value per
+   field. Saving writes all values together; deleting asks once and removes the whole record. *@
+<form @onsubmit="Save" @onsubmit:preventDefault class="space-y-5">
+    @if (isLoading)
+    {
+        <p class="text-sm text-gray-500 dark:text-slate-400">Loading record…</p>
+    }
+    else
+    {
+        @if (RecordId == null)
+        {
+            <div class="space-y-1">
+                <label class="block text-sm font-medium text-gray-700 dark:text-slate-200" for="record-editor-type">Record type</label>
+                <select id="record-editor-type" class="@InputCss" value="@(type?.Id.ToString() ?? string.Empty)" @onchange="OnTypeChanged" disabled="@isBusy">
+                    <option value="">-- Record type --</option>
+                    @foreach (var t in RecordTypes)
+                    {
+                        <option value="@t.Id">@LogMyDay.UI.Formatting.RecordRows.Title(t)</option>
+                    }
+                </select>
+            </div>
+        }
+        else if (type != null)
+        {
+            <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">@LogMyDay.UI.Formatting.RecordRows.Title(type)</p>
+        }
+
+        @if (type != null)
+        {
+            <RecordForm Type="type" Values="values" @bind-DateStarted="dateStarted" OptionLists="OptionLists" Disabled="isBusy" IdPrefix="record-editor" InputClass="@InputCss" />
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-900/30 dark:text-red-200">@error</div>
+    }
+
+    @if (confirmDelete)
+    {
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+            Delete this record with all its values? This cannot be undone.
+        </div>
+    }
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div>
+            @if (RecordId != null)
+            {
+                <button type="button" class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium @(confirmDelete ? "bg-rose-600 text-white hover:bg-rose-700" : "text-rose-600 hover:bg-rose-500/10 dark:text-rose-400")" @onclick="Delete" disabled="@(isBusy || isLoading)">
+                    <Icon Name="trash" Class="h-4 w-4" />
+                    <span>@(confirmDelete ? "Delete record" : "Delete")</span>
+                </button>
+            }
+        </div>
+        <div class="flex items-center gap-3">
+            <button type="button" class="rounded-lg bg-gray-200 px-4 py-2 text-gray-900 transition-colors hover:bg-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600" @onclick="Cancel" disabled="@isBusy">
+                Cancel
+            </button>
+            <button type="submit" class="rounded-lg bg-primary-600 px-4 py-2 text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60" disabled="@(isBusy || isLoading || type == null || confirmDelete)">
+                @(isBusy ? "Saving…" : RecordId != null ? "Update" : "Save")
+            </button>
+        </div>
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired] public IList<RecordTypeResponse> RecordTypes { get; set; } = [];
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+
+    /// <summary>The record to edit; null logs a new one.</summary>
+    [Parameter] public int? RecordId { get; set; }
+
+    /// <summary>For a new record: its time.</summary>
+    [Parameter] public DateTime DefaultTime { get; set; } = DateTime.Now;
+
+    /// <summary>For a new record: the record type to start with.</summary>
+    [Parameter] public int? RecordTypeId { get; set; }
+
+    /// <summary>Open with the delete confirmation showing.</summary>
+    [Parameter] public bool StartWithDeleteConfirmation { get; set; }
+
+    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+
+    private const string InputCss = "mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs transition focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
+
+    private RecordTypeResponse? type;
+    private Dictionary<int, string?> values = new();
+    private DateTime dateStarted;
+    private int? loadedRecordId;
+    private bool isLoading;
+    private bool isBusy;
+    private bool confirmDelete;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RecordId == null)
+        {
+            if (loadedRecordId == null && dateStarted == default)
+            {
+                dateStarted = DefaultTime;
+                type = RecordTypes.FirstOrDefault(t => t.Id == RecordTypeId) ?? (RecordTypes.Count == 1 ? RecordTypes[0] : null);
+            }
+
+            return;
+        }
+
+        if (RecordId == loadedRecordId)
+        {
+            return;
+        }
+
+        loadedRecordId = RecordId;
+        confirmDelete = StartWithDeleteConfirmation;
+        isLoading = true;
+        try
+        {
+            var record = await RecordApi.GetRecordById(RecordId.Value);
+            type = RecordTypes.FirstOrDefault(t => t.Id == record.RecordTypeId);
+            values = record.Values.ToDictionary(v => v.TagId, v => (string?)v.Value);
+            dateStarted = record.DateStarted;
+            if (type == null)
+            {
+                error = "The record type of this record was not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not load the record: {ex.Message}";
+            Logger.LogError(ex, "Failed to load record {RecordId}", RecordId);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnTypeChanged(ChangeEventArgs e)
+    {
+        type = int.TryParse(e.Value?.ToString(), out var id) ? RecordTypes.FirstOrDefault(t => t.Id == id) : null;
+        values = new Dictionary<int, string?>();
+        error = null;
+    }
+
+    private async Task Save()
+    {
+        if (type == null)
+        {
+            return;
+        }
+
+        var request = new RecordRequest
+        {
+            RecordTypeId = type.Id,
+            DateStarted = dateStarted,
+            Values = type.Fields
+                .Select(f => new RecordValueRequest { TagId = f.TagId, Value = values.GetValueOrDefault(f.TagId) })
+                .ToList()
+        };
+        if (request.Values.All(v => string.IsNullOrWhiteSpace(v.Value)))
+        {
+            error = "Enter at least one value.";
+
+            return;
+        }
+
+        isBusy = true;
+        error = null;
+        try
+        {
+            if (RecordId is int id)
+            {
+                await RecordApi.UpdateRecord(id, request);
+            }
+            else
+            {
+                await RecordApi.CreateRecord(request);
+            }
+
+            await OnSaved.InvokeAsync();
+        }
+        catch (ApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.NotFound)
+        {
+            // The server names the field and what is wrong with it.
+            error = string.IsNullOrWhiteSpace(ex.Content) ? "The record could not be saved." : ex.Content.Trim('"');
+        }
+        catch (Exception ex)
+        {
+            error = "An unexpected error occurred while saving the record. Please try again.";
+            Logger.LogError(ex, "Failed to save record");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (RecordId is not int id)
+        {
+            return;
+        }
+
+        if (!confirmDelete)
+        {
+            confirmDelete = true;
+
+            return;
+        }
+
+        isBusy = true;
+        error = null;
+        try
+        {
+            await RecordApi.DeleteRecord(id);
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to delete the record: {ex.Message}";
+            Logger.LogError(ex, "Failed to delete record {RecordId}", id);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        if (confirmDelete && !StartWithDeleteConfirmation)
+        {
+            confirmDelete = false;
+
+            return;
+        }
+
+        await OnCanceled.InvokeAsync();
+    }
+}

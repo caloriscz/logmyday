@@ -16,6 +16,7 @@
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
 @inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 @using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Activities", "Browse and manage all logged activities")]
@@ -495,6 +496,12 @@
     </div>
 }
 
+@if (recordModalId != null)
+{
+    <RecordModal RecordTypes="recordTypes" OptionLists="optionLists" RecordId="recordModalId" StartWithDeleteConfirmation="recordModalDelete"
+                 OnSaved="OnRecordSaved" OnCanceled="() => recordModalId = null" />
+}
+
 <!-- Add Activity Modal -->
 @if (showActivityModal && isInitialized && tags != null && newActivity != null)
 {
@@ -614,6 +621,7 @@
             tags = await ActivityApi.GetTags();
             _schemes = new ColorSchemeIndex(await ColorSchemeApi.GetColorSchemes());
             optionLists = await ActivityApi.GetTagOptionListsAsync();
+            await LoadRecordTypes();
             
             if (optionLists is not null)
             {
@@ -653,6 +661,12 @@
                     descriptionFilter);
                     totalPages = (int)Math.Ceiling((double)(pagedResult?.TotalCount ?? 0) / monthsPerPage);
                     break;
+            }
+
+            // A record's values show as one row.
+            if (pagedResult != null)
+            {
+                pagedResult.Items = LogMyDay.UI.Formatting.RecordRows.Collapse(pagedResult.Items, recordFields, displayCulture, optionListLookup);
             }
         }
         catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -967,6 +981,14 @@
 
     private async Task DeleteActivity(int id)
     {
+        // A record is deleted as a whole, after a confirmation in its dialog.
+        if (pagedResult?.Items.FirstOrDefault(a => a.Id == id)?.RecordId is int recordId)
+        {
+            OpenRecord(recordId, confirmDelete: true);
+
+            return;
+        }
+
         try
         {
             await ActivityApi.Delete(id);
@@ -1133,6 +1155,37 @@
         return selectedDate.AddMonths(1) > nextMonth;
     }
 
+    // Records: their values arrive as one row each and are shown and edited as one record.
+    private IList<RecordTypeResponse> recordTypes = [];
+    private Dictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)> recordFields = new();
+    private int? recordModalId;
+    private bool recordModalDelete;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            recordTypes = await RecordApi.GetRecordTypes();
+            recordFields = LogMyDay.UI.Formatting.RecordRows.FieldIndex(recordTypes);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types; record values show one by one");
+        }
+    }
+
+    private void OpenRecord(int recordId, bool confirmDelete)
+    {
+        recordModalDelete = confirmDelete;
+        recordModalId = recordId;
+    }
+
+    private async Task OnRecordSaved()
+    {
+        recordModalId = null;
+        await LoadData();
+    }
+
     // Add Activity Modal Event Handlers
     private async Task OnActivityCreated(ActivityRequest activity)
     {
@@ -1206,6 +1259,13 @@
 
     private void OpenEditActivityModal(ActivityResponse activity)
     {
+        if (activity.RecordId is int recordId)
+        {
+            OpenRecord(recordId, confirmDelete: false);
+
+            return;
+        }
+
         isEditMode = true;
         editingActivityId = activity.Id;
 

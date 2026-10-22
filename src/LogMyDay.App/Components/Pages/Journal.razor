@@ -11,6 +11,7 @@
 @inject ILogger<Journal> Logger
 @inject IUserPreferencesService UserPreferencesService
 @inject LogMyDay.Shared.Interfaces.IColorSchemeApi ColorSchemeApi
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 @using LogMyDay.Shared.Coloring
 
 @attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("Journal", "Read activity journal entries")]
@@ -243,6 +244,12 @@
     </div>
 </div>
 
+@if (recordModalId != null)
+{
+    <RecordModal RecordTypes="recordTypes" OptionLists="optionLists" RecordId="recordModalId" StartWithDeleteConfirmation="recordModalDelete"
+                 OnSaved="OnRecordSaved" OnCanceled="() => recordModalId = null" />
+}
+
 @* Edit Activity Modal *@
 @if (showActivityModal && allTags != null && optionLists != null && newActivity != null)
 {
@@ -427,6 +434,9 @@
                 activities = yearActivities;
             }
 
+            // A record's values show as one entry.
+            activities = LogMyDay.UI.Formatting.RecordRows.Collapse(activities, await RecordFields(), displayCulture, optionListLookup);
+
             // Sort activities
             var sortedActivities = sortOrder == "desc" 
                 ? activities.OrderByDescending(a => a.DateStarted).ToList()
@@ -492,6 +502,13 @@
 
     private void EditActivity(ActivityResponse activity)
     {
+        if (activity.RecordId is int recordId)
+        {
+            OpenRecord(recordId, confirmDelete: false);
+
+            return;
+        }
+
         isEditMode = true;
         editingActivityId = activity.Id;
         preselectedDate = null;
@@ -512,6 +529,14 @@
 
     private async Task DeleteActivity(ActivityResponse activity)
     {
+        // A record is deleted as a whole, after a confirmation in its dialog.
+        if (activity.RecordId is int recordId)
+        {
+            OpenRecord(recordId, confirmDelete: true);
+
+            return;
+        }
+
         try
         {
             await ActivityApi.Delete(activity.Id);
@@ -522,6 +547,43 @@
             errorMessage = $"Failed to delete activity: {ex.Message}";
             Logger.LogError(ex, "Error deleting activity with ID {ActivityId}", activity.Id);
         }
+    }
+
+    // Records: loaded once; their values are shown and edited as one record.
+    private IList<RecordTypeResponse> recordTypes = [];
+    private Dictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)>? recordFields;
+    private int? recordModalId;
+    private bool recordModalDelete;
+
+    private async Task<Dictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)>> RecordFields()
+    {
+        if (recordFields == null)
+        {
+            try
+            {
+                recordTypes = await RecordApi.GetRecordTypes();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to load record types; record values show one by one");
+            }
+
+            recordFields = LogMyDay.UI.Formatting.RecordRows.FieldIndex(recordTypes);
+        }
+
+        return recordFields;
+    }
+
+    private void OpenRecord(int recordId, bool confirmDelete)
+    {
+        recordModalDelete = confirmDelete;
+        recordModalId = recordId;
+    }
+
+    private async Task OnRecordSaved()
+    {
+        recordModalId = null;
+        await LoadData();
     }
 
     private void CloseActivityModal()

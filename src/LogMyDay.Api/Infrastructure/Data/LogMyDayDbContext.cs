@@ -34,6 +34,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
     public DbSet<TagRuleCase> TagRuleCases => Set<TagRuleCase>();
+    public DbSet<Record> Records => Set<Record>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +67,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagRule>().ToTable("LogMyDay_TagRules");
         modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
         modelBuilder.Entity<TagRuleCase>().ToTable("LogMyDay_TagRuleCases");
+        modelBuilder.Entity<Record>().ToTable("LogMyDay_Records");
 
         // Configure Setting entity
         modelBuilder.Entity<Setting>(entity =>
@@ -387,6 +389,45 @@ public class LogMyDayDbContext : DbContext
 
             entity.HasIndex(a => new { a.UserId, a.TagId, a.DateStarted })
                 .HasDatabaseName("IX_LogMyDay_Activities_UserId_TagId_DateStarted");
+
+            entity.HasIndex(a => a.RecordId).HasDatabaseName("IX_LogMyDay_Activities_RecordId");
+        });
+
+        // Records. A record type is a tag (IsRecordType) and its fields are tags pointing to it.
+        // Like the rule columns, the foreign keys from the existing Tags and Activities tables
+        // live only in the model: adding them would force a full SQLite table rebuild, so the
+        // migration adds columns and indexes, and RecordService and RecordTypeService remove a
+        // record's values and a type's fields themselves.
+        modelBuilder.Entity<Record>(entity =>
+        {
+            entity.HasOne(r => r.RecordType)
+                .WithMany()
+                .HasForeignKey(r => r.RecordTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasMany(r => r.Values)
+                .WithOne()
+                .HasForeignKey(a => a.RecordId)
+                .OnDelete(DeleteBehavior.ClientCascade);
+
+            entity.HasIndex(r => new { r.UserId, r.DateStarted }).HasDatabaseName("IX_LogMyDay_Records_UserId_DateStarted");
+            entity.HasIndex(r => r.RecordTypeId).HasDatabaseName("IX_LogMyDay_Records_RecordTypeId");
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(r => r.DateStarted).HasColumnType("datetime2");
+                entity.Property(r => r.DateCreated).HasColumnType("datetime2");
+            }
+        });
+
+        modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.HasMany(t => t.RecordFields)
+                .WithOne(f => f.RecordType)
+                .HasForeignKey(f => f.RecordTypeId)
+                .OnDelete(DeleteBehavior.ClientCascade);
+
+            entity.HasIndex(t => t.RecordTypeId).HasDatabaseName("IX_LogMyDay_Tags_RecordTypeId");
         });
 
         modelBuilder.SeedData();

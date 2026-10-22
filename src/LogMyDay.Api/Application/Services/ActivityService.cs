@@ -59,6 +59,11 @@ public class ActivityService : IActivityService
             throw new TagComputedException(tag.Id);
         }
 
+        if (tag.IsRecordType || tag.RecordTypeId != null)
+        {
+            throw new TagInRecordException(tag.Id);
+        }
+
         await using var transaction = await BeginWriteTransaction();
 
         // TagDayLock enforcement: reject any activity for a locked (UserId, TagId, localDate)
@@ -242,6 +247,11 @@ public class ActivityService : IActivityService
         if (activity.RuleId != null || activity.Tag?.IsComputed == true)
         {
             throw new TagComputedException(activity.TagId);
+        }
+
+        if (activity.RecordId != null || activity.Tag?.RecordTypeId != null)
+        {
+            throw new TagInRecordException(activity.TagId);
         }
 
         await using var transaction = await BeginWriteTransaction();
@@ -500,6 +510,16 @@ public class ActivityService : IActivityService
             throw new TagComputedException(tag.Id);
         }
 
+        if (activity.RecordId != null || activity.Tag?.RecordTypeId != null)
+        {
+            throw new TagInRecordException(activity.TagId);
+        }
+
+        if (tag.IsRecordType || tag.RecordTypeId != null)
+        {
+            throw new TagInRecordException(tag.Id);
+        }
+
         request.DateStarted = await ToUserLocalTime(userId, request.DateStarted);
         request.DateFinished = request.DateFinished.HasValue
             ? await ToUserLocalTime(userId, request.DateFinished.Value)
@@ -584,6 +604,7 @@ public class ActivityService : IActivityService
             TagRequired = primaryTag?.Tag?.IsRequired ?? false,
             RuleId = calendar.RuleId,
             IsGenerated = calendar.RuleId != null,
+            RecordId = calendar.RecordId,
         };
     }
 
@@ -719,6 +740,7 @@ public class ActivityService : IActivityService
                 TagRequired = a.Tag?.IsRequired ?? false,
                 RuleId = a.RuleId,
                 IsGenerated = a.RuleId != null,
+                RecordId = a.RecordId,
             })];
     }
 

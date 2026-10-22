@@ -150,6 +150,14 @@ public class TodoListService : ITodoListService
         {
             throw new InvalidOperationException($"'{tag.TagName}' is computed by a rule and cannot be a todo list's completion tag.");
         }
+
+        // A field is logged together with its record type's other fields, never on its own.
+        if (tag.IsRecordType || tag.RecordTypeId != null)
+        {
+            throw new InvalidOperationException(tag.IsRecordType
+                ? $"'{tag.TagName}' is a record type and cannot be a todo list's completion tag."
+                : $"'{tag.TagName}' is a field of a record type and cannot be a todo list's completion tag.");
+        }
     }
 
     private static string Describe(int? value) => value?.ToString() ?? "none";

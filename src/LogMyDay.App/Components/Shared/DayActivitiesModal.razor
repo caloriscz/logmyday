@@ -3,6 +3,7 @@
 @using LogMyDay.Shared.Coloring
 @using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 
 @*
     The "activities for one day, one tag" dialog shared by Calendar, Calendar Linear and Timeline
@@ -107,6 +108,13 @@
     </div>
 }
 
+@if (_recordModalOpen)
+{
+    <RecordModal RecordTypes="_recordTypes" OptionLists="_optionLists" RecordId="_recordModalId" RecordTypeId="_recordModalTypeId"
+                 DefaultTime="@(_date.HasValue ? GetDefaultStartForDate(_date.Value) : DateTime.Now)" StartWithDeleteConfirmation="_recordModalDelete"
+                 OnSaved="OnRecordSaved" OnCanceled="() => _recordModalOpen = false" />
+}
+
 @if (_showEditor && Tags != null && _editorActivity != null)
 {
     <AddActivityModal
@@ -186,6 +194,7 @@
         _error = null;
 
         await EnsureOptionListsAsync();
+        await EnsureRecordTypesAsync();
 
         try
         {
@@ -252,9 +261,12 @@
             var end = start.AddDays(1).AddTicks(-1);
             var result = await ActivityApi.GetActivities(1, 200, OrderBy, _tagId, start, end, null);
 
-            _activities = string.Equals(OrderBy, OrderAscending, StringComparison.OrdinalIgnoreCase)
+            var ordered = string.Equals(OrderBy, OrderAscending, StringComparison.OrdinalIgnoreCase)
                 ? result.Items.OrderBy(a => a.DateStarted).ToList()
                 : result.Items.OrderByDescending(a => a.DateStarted).ToList();
+
+            // A record field's values are shown as their records.
+            _activities = LogMyDay.UI.Formatting.RecordRows.Collapse(ordered, _recordFields, DisplayCulture, _optionListLookup);
         }
         catch (Exception ex)
         {
@@ -321,6 +333,14 @@
             return;
         }
 
+        // A record field is logged with the rest of its record.
+        if (FindTag(_tagId)?.RecordTypeId is int recordTypeId)
+        {
+            OpenRecord(null, recordTypeId, confirmDelete: false);
+
+            return;
+        }
+
         _isEditMode = false;
         _editingActivityId = null;
         _editorActivity = new ActivityRequest
@@ -337,6 +357,13 @@
 
     private void StartEdit(ActivityResponse activity)
     {
+        if (activity.RecordId is int recordId)
+        {
+            OpenRecord(recordId, null, confirmDelete: false);
+
+            return;
+        }
+
         _isEditMode = true;
         _editingActivityId = activity.Id;
         _editorActivity = new ActivityRequest
@@ -355,6 +382,14 @@
 
     private async Task DeleteAsync(int activityId)
     {
+        // A record is deleted as a whole, after a confirmation in its dialog.
+        if (_activities.FirstOrDefault(a => a.Id == activityId)?.RecordId is int recordId)
+        {
+            OpenRecord(recordId, null, confirmDelete: true);
+
+            return;
+        }
+
         try
         {
             await ActivityApi.Delete(activityId);
@@ -364,6 +399,49 @@
         {
             _error = $"Error deleting activity: {ex.Message}";
         }
+    }
+
+    // --- Records ---
+
+    private IList<RecordTypeResponse> _recordTypes = [];
+    private Dictionary<int, (RecordTypeResponse Type, RecordFieldResponse Field)> _recordFields = new();
+    private bool _recordTypesLoaded;
+    private bool _recordModalOpen;
+    private int? _recordModalId;
+    private int? _recordModalTypeId;
+    private bool _recordModalDelete;
+
+    private async Task EnsureRecordTypesAsync()
+    {
+        if (_recordTypesLoaded)
+        {
+            return;
+        }
+
+        try
+        {
+            _recordTypes = await RecordApi.GetRecordTypes();
+            _recordFields = LogMyDay.UI.Formatting.RecordRows.FieldIndex(_recordTypes);
+            _recordTypesLoaded = true;
+        }
+        catch
+        {
+            // Without record types a record's values show one by one.
+        }
+    }
+
+    private void OpenRecord(int? recordId, int? recordTypeId, bool confirmDelete)
+    {
+        _recordModalId = recordId;
+        _recordModalTypeId = recordTypeId;
+        _recordModalDelete = confirmDelete;
+        _recordModalOpen = true;
+    }
+
+    private async Task OnRecordSaved()
+    {
+        _recordModalOpen = false;
+        await ReloadAndNotifyAsync();
     }
 
     private async Task OnEditorCreated(ActivityRequest _)

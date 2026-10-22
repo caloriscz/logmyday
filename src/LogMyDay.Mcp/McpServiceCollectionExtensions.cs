@@ -45,6 +45,7 @@ public static class McpServiceCollectionExtensions
             .WithTools<ServerInfoTools>(McpJson.Options)
             .WithTools<TagTools>(McpJson.Options)
             .WithTools<ActivityTools>(McpJson.Options)
+            .WithTools<RecordTools>(McpJson.Options)
             .WithTools<TagGroupTools>(McpJson.Options)
             .WithTools<OptionListTools>(McpJson.Options)
             .WithTools<UnitTools>(McpJson.Options)

@@ -158,7 +158,7 @@
             var listsTask = ActivityApi.GetTagOptionListsAsync();
             await Task.WhenAll(tagsTask, listsTask);
 
-            allTags = await tagsTask;
+            allTags = (await tagsTask).Where(t => t.IsLoggable).ToList();
             optionLists = await listsTask;
 
             if (optionLists is not null)

@@ -1,0 +1,118 @@
+@using System.Globalization
+@using LogMyDay.Domain.Constants
+
+@* One record: its time and a value per field. Values are kept as the API stores them (invariant
+   numbers, true/false, yyyy-MM-dd, HH:mm, an option's value); an empty value is not saved. *@
+<div class="space-y-4">
+    <div class="space-y-1">
+        <label class="@LabelClass" for="@($"{IdPrefix}-time")">Time</label>
+        <input id="@($"{IdPrefix}-time")" type="datetime-local" class="@InputClass"
+               value="@DateStarted.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture)"
+               @onchange="OnTimeChanged" disabled="@Disabled" />
+    </div>
+
+    @foreach (var field in Type.Fields.OrderBy(f => f.Order))
+    {
+        var id = $"{IdPrefix}-field-{field.TagId}";
+        var value = Values.GetValueOrDefault(field.TagId) ?? string.Empty;
+        <div class="space-y-1">
+            <label class="@LabelClass" for="@id">
+                @field.Name
+                @if (!string.IsNullOrEmpty(field.UnitSymbol))
+                {
+                    <span class="font-normal text-gray-500 dark:text-slate-400">(@field.UnitSymbol)</span>
+                }
+            </label>
+
+            @if (OptionsOf(field) is { } options)
+            {
+                <select id="@id" class="@InputClass" value="@value" @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled">
+                    <option value="">—</option>
+                    @foreach (var option in options)
+                    {
+                        <option value="@option.Value">@(string.IsNullOrWhiteSpace(option.DisplayName) ? option.Value : option.DisplayName)</option>
+                    }
+                </select>
+            }
+            else if (field.InputTypeId is InputTypeIds.StarRating or InputTypeIds.StarRating10)
+            {
+                <StarRating Value="@(int.TryParse(value, out var stars) ? stars : 0)" MaxStars="@(field.InputTypeId == InputTypeIds.StarRating10 ? 10 : 5)"
+                            ValueChanged="v => Set(field, v.ToString(CultureInfo.InvariantCulture))" />
+            }
+            else if (field.InputTypeId is InputTypeIds.Score or InputTypeIds.Score10)
+            {
+                <ScoreRating Value="@(int.TryParse(value, out var score) ? score : null)" MaxScore="@(field.InputTypeId == InputTypeIds.Score10 ? 10 : 5)"
+                             ValueChanged="v => Set(field, v?.ToString(CultureInfo.InvariantCulture))" />
+            }
+            else if (field.InputTypeId == InputTypeIds.Boolean)
+            {
+                <select id="@id" class="@InputClass" value="@value" @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled">
+                    <option value="">—</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
+            }
+            else if (field.InputTypeId is InputTypeIds.Integer or InputTypeIds.Decimal or InputTypeIds.Percentage)
+            {
+                <input id="@id" type="number" inputmode="decimal" class="@InputClass" value="@value"
+                       step="@StepOf(field)" min="@field.MinValue" max="@field.MaxValue"
+                       @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled" />
+            }
+            else if (field.InputTypeId == InputTypeIds.Date)
+            {
+                <input id="@id" type="date" class="@InputClass" value="@value" @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled" />
+            }
+            else if (field.InputTypeId == InputTypeIds.Time)
+            {
+                <input id="@id" type="time" class="@InputClass" value="@value" @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled" />
+            }
+            else
+            {
+                <input id="@id" type="text" class="@InputClass" value="@value" @onchange="e => Set(field, e.Value?.ToString())" disabled="@Disabled" />
+            }
+
+            @if (!string.IsNullOrWhiteSpace(field.Description))
+            {
+                <p class="text-xs text-gray-500 dark:text-slate-400">@field.Description</p>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RecordTypeResponse Type { get; set; } = null!;
+
+    /// <summary>Field tag id → value. Changed in place; <see cref="OnChange"/> follows each change.</summary>
+    [Parameter, EditorRequired] public Dictionary<int, string?> Values { get; set; } = new();
+
+    [Parameter] public DateTime DateStarted { get; set; }
+    [Parameter] public EventCallback<DateTime> DateStartedChanged { get; set; }
+    [Parameter] public EventCallback OnChange { get; set; }
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string IdPrefix { get; set; } = "record";
+    [Parameter] public string LabelClass { get; set; } = "block text-sm font-medium text-gray-700 dark:text-slate-200";
+    [Parameter] public string InputClass { get; set; } = "block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+
+    private IEnumerable<TagOptionResponse>? OptionsOf(RecordFieldResponse field) =>
+        field.OptionListId is int listId ? OptionLists?.FirstOrDefault(l => l.Id == listId)?.Options : null;
+
+    private static string StepOf(RecordFieldResponse field) =>
+        (field.Step ?? (field.InputTypeId == InputTypeIds.Decimal ? 0.01 : 1)).ToString(CultureInfo.InvariantCulture);
+
+    private async Task Set(RecordFieldResponse field, string? value)
+    {
+        Values[field.TagId] = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        await OnChange.InvokeAsync();
+    }
+
+    private async Task OnTimeChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParseExact(e.Value?.ToString(), ["yyyy-MM-ddTHH:mm", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var time))
+        {
+            DateStarted = time;
+            await DateStartedChanged.InvokeAsync(time);
+        }
+    }
+}

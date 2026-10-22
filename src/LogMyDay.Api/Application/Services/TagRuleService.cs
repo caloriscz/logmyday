@@ -365,12 +365,27 @@ public class TagRuleService : ITagRuleService
                 : $"The target tag '{target.TagName}' must be a number tag (Integer or Decimal).");
         }
 
+        // A field's values are logged as part of a record, so a rule cannot write to it; a record
+        // type holds no values.
+        if (target.IsRecordType || target.RecordTypeId != null)
+        {
+            throw new ArgumentException(target.IsRecordType
+                ? $"'{target.TagName}' is a record type and cannot hold a rule's results."
+                : $"'{target.TagName}' is a field of a record type and cannot hold a rule's results.");
+        }
+
         var sources = new Dictionary<int, Tag>();
         foreach (var sourceId in request.Sources.Select(s => s.SourceTagId))
         {
             if (!tags.TryGetValue(sourceId, out var source))
             {
                 throw new KeyNotFoundException("Source tag not found");
+            }
+
+            // A record type holds no values; its fields do.
+            if (source.IsRecordType)
+            {
+                throw new ArgumentException($"'{source.TagName}' is a record type and holds no values. Choose one of its fields.");
             }
 
             if (!TagRuleInputTypes.FitsSource(template, request.AggregateKind, source.InputTypeId))

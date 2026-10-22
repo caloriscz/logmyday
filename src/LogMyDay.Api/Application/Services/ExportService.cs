@@ -341,9 +341,10 @@ public class ExportService : IExcelExportService
 
     public async Task<List<TagResponse>> GetAvailableTags(Guid userId)
     {
+        // A record type holds no values, so it has nothing to export; its fields are listed.
         var tags = await _context.Tags
             .Include(t => t.Group)
-            .Where(t => t.UserId == userId)
+            .Where(t => t.UserId == userId && !t.IsRecordType)
             .ToListAsync();
 
         return tags

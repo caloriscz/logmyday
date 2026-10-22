@@ -35,6 +35,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("RecordId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("RuleId")
                         .HasColumnType("INTEGER");
 
@@ -49,6 +52,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RecordId")
+                        .HasDatabaseName("IX_LogMyDay_Activities_RecordId");
 
                     b.HasIndex("TagId");
 
@@ -460,6 +466,35 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Quantities", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Record", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateStarted")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RecordTypeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordTypeId")
+                        .HasDatabaseName("IX_LogMyDay_Records_RecordTypeId");
+
+                    b.HasIndex("UserId", "DateStarted")
+                        .HasDatabaseName("IX_LogMyDay_Records_UserId_DateStarted");
+
+                    b.ToTable("LogMyDay_Records", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
                 {
                     b.Property<int>("Id")
@@ -674,6 +709,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Property<bool>("IsRange")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsRecordType")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsRepeatable")
                         .HasColumnType("INTEGER");
 
@@ -690,6 +728,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("PatternId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RecordFieldOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RecordTypeId")
                         .HasColumnType("INTEGER");
 
                     b.Property<double?>("Step")
@@ -719,6 +763,9 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.HasIndex("OptionListId");
 
                     b.HasIndex("PatternId");
+
+                    b.HasIndex("RecordTypeId")
+                        .HasDatabaseName("IX_LogMyDay_Tags_RecordTypeId");
 
                     b.HasIndex("UnitId");
 
@@ -1141,6 +1188,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.Activity", b =>
                 {
+                    b.HasOne("LogMyDay.Domain.Entities.Record", null)
+                        .WithMany("Values")
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.ClientCascade);
+
                     b.HasOne("LogMyDay.Domain.Entities.TagRule", null)
                         .WithMany()
                         .HasForeignKey("RuleId")
@@ -1220,6 +1272,17 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("BaseUnit");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Record", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "RecordType")
+                        .WithMany()
+                        .HasForeignKey("RecordTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RecordType");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Tag", "CompletionTag")
@@ -1277,6 +1340,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .WithMany()
                         .HasForeignKey("PatternId");
 
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "RecordType")
+                        .WithMany("RecordFields")
+                        .HasForeignKey("RecordTypeId")
+                        .OnDelete(DeleteBehavior.ClientCascade);
+
                     b.HasOne("LogMyDay.Domain.Entities.Unit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
@@ -1291,6 +1359,8 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("OptionList");
 
                     b.Navigation("Pattern");
+
+                    b.Navigation("RecordType");
 
                     b.Navigation("Unit");
                 });
@@ -1407,9 +1477,19 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Detail");
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Record", b =>
+                {
+                    b.Navigation("Values");
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.Reminder", b =>
                 {
                     b.Navigation("Days");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.Tag", b =>
+                {
+                    b.Navigation("RecordFields");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagOptionList", b =>

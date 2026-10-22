@@ -1,0 +1,209 @@
+@using System.Globalization
+@using LogMyDay.Domain.Constants
+
+@* A record type and its fields, edited in place on Model. Each field is a new tag of its own; an
+   existing field keeps its tag (TagId). A field removed here is deleted with its values on save,
+   which the page confirms with the counts. *@
+<div class="space-y-5">
+    <div class="grid gap-4 sm:grid-cols-2">
+        <div class="space-y-1">
+            <label class="@LabelClass" for="@($"{IdPrefix}-name")">Name</label>
+            <input id="@($"{IdPrefix}-name")" type="text" class="@InputClass" maxlength="100" placeholder="e.g. Blood pressure"
+                   value="@Model.Name" @onchange="e => Model.Name = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" />
+        </div>
+        <div class="space-y-1">
+            <label class="@LabelClass" for="@($"{IdPrefix}-group")">Group (optional)</label>
+            <select id="@($"{IdPrefix}-group")" class="@InputClass" value="@(Model.GroupId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                    @onchange="e => Model.GroupId = ParseId(e.Value)" disabled="@Disabled">
+                <option value="">(None)</option>
+                @foreach (var group in Groups ?? [])
+                {
+                    <option value="@group.Id">@group.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-slate-200">
+        <input type="checkbox" class="mt-0.5 h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600"
+               checked="@Model.OncePerDay" @onchange="e => Model.OncePerDay = e.Value is true" disabled="@Disabled" />
+        <span>
+            <span class="font-medium">Once per day</span>
+            <span class="block text-xs text-gray-500 dark:text-slate-400">At most one record of this type a day. Leave off for measurements taken several times a day.</span>
+        </span>
+    </label>
+
+    <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-slate-100">Fields</h3>
+
+        @for (var i = 0; i < Model.Fields.Count; i++)
+        {
+            var index = i;
+            var field = Model.Fields[index];
+            var id = $"{IdPrefix}-field-{index}";
+            var inputType = InputTypes?.FirstOrDefault(t => t.Id == field.TypeId);
+            <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="min-w-40 flex-1 space-y-1">
+                        <label class="@LabelClass" for="@($"{id}-name")">Field name</label>
+                        <input id="@($"{id}-name")" type="text" class="@InputClass" maxlength="100" placeholder="e.g. Systolic"
+                               value="@field.Name" @onchange="e => field.Name = e.Value?.ToString() ?? string.Empty" disabled="@Disabled" />
+                    </div>
+                    <div class="min-w-36 flex-1 space-y-1">
+                        <label class="@LabelClass" for="@($"{id}-type")">Type</label>
+                        <select id="@($"{id}-type")" class="@InputClass" value="@(field.TypeId == 0 ? string.Empty : field.TypeId.ToString(CultureInfo.InvariantCulture))"
+                                @onchange="e => SetType(field, e.Value)" disabled="@Disabled">
+                            <option value="">-- Type --</option>
+                            @foreach (var type in InputTypes ?? [])
+                            {
+                                <option value="@type.Id">@type.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" class="@IconButtonClass" title="Move up" @onclick="() => Move(index, -1)" disabled="@(Disabled || index == 0)">
+                            <Icon Name="chevron-up" Class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="@IconButtonClass" title="Move down" @onclick="() => Move(index, 1)" disabled="@(Disabled || index == Model.Fields.Count - 1)">
+                            <Icon Name="chevron-down" Class="h-4 w-4" />
+                        </button>
+                        <button type="button" class="@IconButtonClass text-rose-600 dark:text-rose-400" title="Remove field" @onclick="() => Model.Fields.RemoveAt(index)" disabled="@(Disabled || Model.Fields.Count == 1)">
+                            <Icon Name="trash" Class="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="space-y-1">
+                        <label class="@LabelClass" for="@($"{id}-unit")">Unit (optional)</label>
+                        <select id="@($"{id}-unit")" class="@InputClass" value="@(field.UnitId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                @onchange="e => field.UnitId = ParseId(e.Value)" disabled="@Disabled">
+                            <option value="">(None)</option>
+                            @foreach (var unit in Units ?? [])
+                            {
+                                <option value="@unit.Id">@unit.Symbol (@unit.QuantityKey)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="@LabelClass" for="@($"{id}-list")">Option list (optional)</label>
+                        <select id="@($"{id}-list")" class="@InputClass" value="@(field.OptionListId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                                @onchange="e => field.OptionListId = ParseId(e.Value)" disabled="@Disabled">
+                            <option value="">(None)</option>
+                            @foreach (var list in OptionLists ?? [])
+                            {
+                                <option value="@list.Id">@list.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    @if (inputType?.IsMinimumEditable == true)
+                    {
+                        <div class="space-y-1">
+                            <label class="@LabelClass" for="@($"{id}-min")">Minimum (optional)</label>
+                            <input id="@($"{id}-min")" type="number" step="any" class="@InputClass" value="@Format(field.MinValue)"
+                                   @onchange="e => field.MinValue = ParseNumber(e.Value)" disabled="@Disabled" />
+                        </div>
+                    }
+                    @if (inputType?.IsMaximumEditable == true)
+                    {
+                        <div class="space-y-1">
+                            <label class="@LabelClass" for="@($"{id}-max")">Maximum (optional)</label>
+                            <input id="@($"{id}-max")" type="number" step="any" class="@InputClass" value="@Format(field.MaxValue)"
+                                   @onchange="e => field.MaxValue = ParseNumber(e.Value)" disabled="@Disabled" />
+                        </div>
+                    }
+                </div>
+
+                @if (field.TagId is int tagId && ValueCount(tagId) is > 0 and var count)
+                {
+                    <p class="text-xs text-gray-500 dark:text-slate-400">@count @(count == 1 ? "value" : "values") recorded.</p>
+                }
+            </div>
+        }
+
+        @if (RemovedWithValues.Count > 0)
+        {
+            <p class="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-300">
+                <Icon Name="warning" Class="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Saving removes @string.Join(", ", RemovedWithValues.Select(f => $"{f.Name} ({f.ValueCount} {(f.ValueCount == 1 ? "value" : "values")})")).</span>
+            </p>
+        }
+
+        <button type="button" class="inline-flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                @onclick="AddField" disabled="@(Disabled || Model.Fields.Count >= MaxFields)">
+            <Icon Name="plus" Class="h-4 w-4" />
+            Add field
+        </button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The server's limit on fields per record type.</summary>
+    public const int MaxFields = 20;
+
+    [Parameter, EditorRequired] public RecordTypeRequest Model { get; set; } = null!;
+
+    /// <summary>The saved type when editing: its fields' value counts.</summary>
+    [Parameter] public RecordTypeResponse? Existing { get; set; }
+
+    [Parameter] public IEnumerable<TagGroupResponse>? Groups { get; set; }
+    [Parameter] public IEnumerable<InputTypeDto>? InputTypes { get; set; }
+    [Parameter] public IEnumerable<UnitResponse>? Units { get; set; }
+    [Parameter] public IEnumerable<TagOptionListResponse>? OptionLists { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string IdPrefix { get; set; } = "record-type";
+    [Parameter] public string LabelClass { get; set; } = "block text-sm font-medium text-gray-700 dark:text-slate-200";
+    [Parameter] public string InputClass { get; set; } = "block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+
+    private const string IconButtonClass = "inline-flex items-center rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700";
+
+    /// <summary>Saved fields left out of the model that hold values: saving deletes them.</summary>
+    public IReadOnlyList<RecordFieldResponse> RemovedWithValues =>
+        Existing?.Fields
+            .Where(f => f.ValueCount > 0 && Model.Fields.All(m => m.TagId != f.TagId))
+            .ToList() ?? [];
+
+    private int ValueCount(int tagId) => Existing?.Fields.FirstOrDefault(f => f.TagId == tagId)?.ValueCount ?? 0;
+
+    private void AddField()
+    {
+        Model.Fields.Add(new RecordFieldRequest { Name = string.Empty, TypeId = InputTypeIds.Integer });
+    }
+
+    private void Move(int index, int offset)
+    {
+        var target = index + offset;
+        if (target < 0 || target >= Model.Fields.Count)
+        {
+            return;
+        }
+
+        (Model.Fields[index], Model.Fields[target]) = (Model.Fields[target], Model.Fields[index]);
+    }
+
+    // A type whose range is fixed (ratings, scores, percentage) or has none drops the limits the
+    // previous type had.
+    private void SetType(RecordFieldRequest field, object? value)
+    {
+        field.TypeId = int.TryParse(value?.ToString(), out var typeId) ? typeId : 0;
+        var inputType = InputTypes?.FirstOrDefault(t => t.Id == field.TypeId);
+        if (inputType?.IsMinimumEditable != true)
+        {
+            field.MinValue = null;
+        }
+
+        if (inputType?.IsMaximumEditable != true)
+        {
+            field.MaxValue = null;
+        }
+    }
+
+    private static int? ParseId(object? value) =>
+        int.TryParse(value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
+
+    private static double? ParseNumber(object? value) =>
+        double.TryParse(value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : null;
+
+    private static string Format(double? value) => value?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+}

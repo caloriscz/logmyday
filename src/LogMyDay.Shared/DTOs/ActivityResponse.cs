@@ -19,4 +19,8 @@ public class ActivityResponse
 
     /// <summary>True for a row a rule generated. It is read-only: edit the rule instead.</summary>
     public bool IsGenerated { get; set; }
+
+    /// <summary>The record this value belongs to, if any. Lists show a record's values together
+    /// as one entry; they are edited through the record.</summary>
+    public int? RecordId { get; set; }
 }

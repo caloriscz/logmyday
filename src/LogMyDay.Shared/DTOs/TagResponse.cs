@@ -29,8 +29,22 @@ public class TagResponse
     /// generated and it is not offered for manual logging.</summary>
     public bool IsComputed { get; set; }
 
+    /// <summary>The record type this tag is a field of: its values are written only as part of a
+    /// record, so it is not offered for logging on its own. Analysis views read it like any tag.</summary>
+    public int? RecordTypeId { get; set; }
+    public string? RecordTypeName { get; set; }
+
+    /// <summary>True for a record type: a tag that holds no values of its own, only its fields do.
+    /// Tag lists leave record types out; they are listed with their fields as record types.</summary>
+    public bool IsRecordType { get; set; }
+
     /// <summary>The title as analysis views show it: a computed tag is marked so a chart or
     /// comparison never passes a calculated value off as a logged one. Not serialized.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string DisplayTitle => IsComputed ? $"{Title} (computed)" : Title;
+
+    /// <summary>Whether a value can be logged to this tag on its own: not computed by a rule, not
+    /// a record type and not a field of one. Not serialized.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsLoggable => !IsComputed && !IsRecordType && RecordTypeId == null;
 }
