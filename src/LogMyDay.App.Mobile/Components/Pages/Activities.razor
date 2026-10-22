@@ -362,12 +362,14 @@
     OnCanceled="@HandleActivityCanceled"
     OnFormReset="@HandleActivityFormReset"
     OnError="@HandleActivityError"
-    ErrorMessage="@errorMessage" />
+    ErrorMessage="@errorMessage"
+    RecordTypes="recordTypes"
+    OnLogRecord="OpenNewRecord" />
 
-@if (recordModalId != null)
+@if (recordModalId != null || newRecordTime != null)
 {
-    <RecordModal RecordTypes="recordTypes" OptionLists="optionLists" RecordId="recordModalId" StartWithDeleteConfirmation="recordModalDelete"
-                 OnSaved="OnRecordSaved" OnCanceled="() => recordModalId = null" />
+    <RecordModal RecordTypes="recordTypes" OptionLists="optionLists" RecordId="recordModalId" DefaultTime="@(newRecordTime ?? DateTime.Now)"
+                 StartWithDeleteConfirmation="recordModalDelete" OnSaved="OnRecordSaved" OnCanceled="CloseRecord" />
 }
 
 @code {
@@ -443,7 +445,6 @@
             Logger.LogWarning(ex, "Failed to load filter preferences");
         }
 
-        await LoadRecordTypes();
         await LoadData();
     }
 
@@ -469,6 +470,7 @@
             // Start cached tag/option-list fetches in parallel with the activities query
             var tagsTask = SharedDataCache.GetTagsAsync();
             var optionListsTask = SharedDataCache.GetOptionListsAsync();
+            var recordTypesTask = LoadRecordTypes();
 
             DateTime? startDate = null;
             DateTime? endDate = null;
@@ -528,6 +530,7 @@
             }
 
             // A record's values show as one row.
+            await recordTypesTask;
             if (pagedResult != null)
             {
                 pagedResult.Items = LogMyDay.UI.Formatting.RecordRows.Collapse(pagedResult.Items, recordFields, CultureInfo.CurrentCulture, optionListLookup);
@@ -892,6 +895,7 @@
     private Dictionary<int, (LogMyDay.Shared.DTOs.RecordTypeResponse Type, LogMyDay.Shared.DTOs.RecordFieldResponse Field)> recordFields = new();
     private int? recordModalId;
     private bool recordModalDelete;
+    private DateTime? newRecordTime;
 
     private async Task LoadRecordTypes()
     {
@@ -908,13 +912,27 @@
 
     private void OpenRecord(int recordId, bool confirmDelete)
     {
+        newRecordTime = null;
         recordModalDelete = confirmDelete;
         recordModalId = recordId;
     }
 
-    private async Task OnRecordSaved()
+    private void OpenNewRecord(DateTime time)
     {
         recordModalId = null;
+        recordModalDelete = false;
+        newRecordTime = time;
+    }
+
+    private void CloseRecord()
+    {
+        recordModalId = null;
+        newRecordTime = null;
+    }
+
+    private async Task OnRecordSaved()
+    {
+        CloseRecord();
         await LoadData();
     }
 

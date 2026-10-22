@@ -170,7 +170,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDataAsync();
+        await LoadData();
     }
 
     /// <summary>Opens the dialog for a new record type, once the input types are loaded.</summary>
@@ -192,13 +192,13 @@
     }
 
     /// <summary>Loads the record types again.</summary>
-    public async Task ReloadAsync()
+    public async Task Reload()
     {
-        await LoadDataAsync();
+        await LoadData();
         StateHasChanged();
     }
 
-    private async Task LoadDataAsync()
+    private async Task LoadData()
     {
         isLoading = true;
         loadError = null;
@@ -302,7 +302,7 @@
             }
 
             CloseModal();
-            await LoadDataAsync();
+            await LoadData();
         }
         catch (ApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
         {
@@ -359,7 +359,7 @@
         {
             await RecordApi.DeleteRecordType(pendingDelete.Id);
             pendingDelete = null;
-            await LoadDataAsync();
+            await LoadData();
         }
         catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
         {

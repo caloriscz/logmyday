@@ -16,7 +16,7 @@
 <PageTitle>Quick Activities - LogMyDay</PageTitle>
 
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-    <TopBar Title="Quick Activities" ShowReload="true" OnReload="LoadQuickButtons" />
+    <TopBar Title="Quick Activities" ShowReload="true" OnReload="Reload" />
     <RemindersSectionNav />
 
     <div class="max-w-7xl mx-auto px-6 py-4">
@@ -150,10 +150,13 @@
                  OnSaved="OnRecordSaved" OnCanceled="() => recordTypeToLog = null" />
 }
 
-<!-- Floating Action Button -->
-<button type="button" class="fab" data-modal-show="addQuickActivityModal" title="Add Quick Activity">
-    <i class="bi bi-plus-lg"></i>
-</button>
+<!-- Floating Action Button: hidden while the record form is open, which it would cover -->
+@if (recordTypeToLog == null)
+{
+    <button type="button" class="fab" data-modal-show="addQuickActivityModal" title="Add Quick Activity">
+        <i class="bi bi-plus-lg"></i>
+    </button>
+}
 
 <!-- Add Quick Activity Modal - Full Screen Overlay -->
 <div id="addQuickActivityModal" data-modal class="hidden fixed inset-0 z-60 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="addQuickActivityModalLabel">
@@ -362,16 +365,29 @@
     private IList<TagOptionListResponse>? recordOptionLists;
     private int? recordTypeToLog;
 
+    private Task Reload() => Task.WhenAll(LoadQuickButtons(), LoadRecordTypes());
+
     private async Task LoadRecordTypes()
     {
+        var typesTask = RecordApi.GetRecordTypes();
+        var listsTask = SharedDataCache.GetOptionListsAsync();
+
         try
         {
-            recordTypes = await RecordApi.GetRecordTypes();
-            recordOptionLists = await SharedDataCache.GetOptionListsAsync();
+            recordTypes = await typesTask;
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to load record types; Quick shows no records");
+        }
+
+        try
+        {
+            recordOptionLists = await listsTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load option lists; record fields with options take free text");
         }
     }
 
