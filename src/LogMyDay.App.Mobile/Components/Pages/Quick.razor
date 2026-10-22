@@ -9,6 +9,8 @@
 @inject IActivityApi ActivityApi
 @inject LogMyDay.App.Mobile.Services.ISharedDataCache SharedDataCache
 @inject IWebViewInterop WebView
+@inject IRecordApi RecordApi
+@inject ILogger<Quick> Logger
 @implements IAsyncDisposable
 
 <PageTitle>Quick Activities - LogMyDay</PageTitle>
@@ -18,6 +20,23 @@
     <RemindersSectionNav />
 
     <div class="max-w-7xl mx-auto px-6 py-4">
+
+        @* Values measured together are logged as a record: one tap opens its form. *@
+        @if (recordTypes.Count > 0)
+        {
+            <div class="mb-4">
+                <h5 class="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-400">Records</h5>
+                <div class="grid grid-cols-2 gap-3">
+                    @foreach (var type in recordTypes)
+                    {
+                        <button type="button" class="card text-left hover:shadow-lg" @onclick="() => recordTypeToLog = type.Id">
+                            <span class="block font-semibold text-gray-900 dark:text-white">@type.Name</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">@LogMyDay.UI.Formatting.RecordRows.FieldList(type)</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        }
 
         @if (isLoading)
         {
@@ -124,6 +143,12 @@
         }
     </div>
 </div>
+
+@if (recordTypeToLog != null)
+{
+    <RecordModal RecordTypes="recordTypes" OptionLists="recordOptionLists" RecordTypeId="recordTypeToLog" DefaultTime="DateTime.Now"
+                 OnSaved="OnRecordSaved" OnCanceled="() => recordTypeToLog = null" />
+}
 
 <!-- Floating Action Button -->
 <button type="button" class="fab" data-modal-show="addQuickActivityModal" title="Add Quick Activity">
@@ -329,7 +354,32 @@
             return;
         }
 
-        await Task.WhenAll(LoadQuickButtons(), LoadTags());
+        await Task.WhenAll(LoadQuickButtons(), LoadTags(), LoadRecordTypes());
+    }
+
+    // Record types: one tap opens the record form.
+    private IList<RecordTypeResponse> recordTypes = [];
+    private IList<TagOptionListResponse>? recordOptionLists;
+    private int? recordTypeToLog;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            recordTypes = await RecordApi.GetRecordTypes();
+            recordOptionLists = await SharedDataCache.GetOptionListsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types; Quick shows no records");
+        }
+    }
+
+    private void OnRecordSaved()
+    {
+        var name = recordTypes.FirstOrDefault(t => t.Id == recordTypeToLog)?.Name;
+        recordTypeToLog = null;
+        ShowSuccess($"Record logged{(name != null ? $" for {name}" : string.Empty)}!");
     }
 
     public async ValueTask DisposeAsync()

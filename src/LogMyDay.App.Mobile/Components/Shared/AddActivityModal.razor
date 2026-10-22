@@ -7,6 +7,7 @@
 @using Microsoft.JSInterop
 @using Microsoft.Extensions.Logging
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 @inject IWebViewInterop WebView
 @inject ILogger<AddActivityModal> Logger
 
@@ -15,7 +16,7 @@
     <div data-modal-content class="w-full h-full flex flex-col">
         <!-- Modal Header - Fixed at top -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900">
-            <h5 class="text-xl font-semibold text-gray-900 dark:text-gray-100" id="@($"{modalId}Label")">@(IsEditMode ? "Edit Activity" : "Add New Activity")</h5>
+            <h5 class="text-xl font-semibold text-gray-900 dark:text-gray-100" id="@($"{modalId}Label")">@(IsEditMode ? "Edit Activity" : recordMode ? "Log Record" : "Add New Activity")</h5>
             <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-3 -mr-2" data-modal-hide="@modalId" @onclick="HandleCloseClicked" aria-label="Close">
                 <i class="bi bi-x-lg text-2xl"></i>
             </button>
@@ -23,6 +24,20 @@
         
         <!-- Modal Body - Scrollable content -->
     <div class="flex-1 overflow-y-auto px-6 py-6">
+        @* Values measured together are logged as a record: one form for all its fields. *@
+        @if (!IsEditMode && recordTypes.Count > 0)
+        {
+            <div class="mb-5 inline-flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600">
+                <button type="button" class="@ModeCss(!recordMode)" @onclick="() => recordMode = false">Activity</button>
+                <button type="button" class="@ModeCss(recordMode)" @onclick="() => recordMode = true">Record</button>
+            </div>
+        }
+        @if (recordMode)
+        {
+            <RecordEditor RecordTypes="recordTypes" OptionLists="OptionLists" DefaultTime="Activity.DateStarted" OnSaved="OnRecordSaved" OnCanceled="HandleCloseClicked" />
+        }
+        else
+        {
         <EditForm id="@($"{modalId}Form")" Model="Activity" OnValidSubmit="HandleValidSubmit">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="text-red-600 dark:text-red-400 mb-4" />
@@ -186,8 +201,11 @@
                         </div>
                     }
                 </EditForm>
+        }
             </div>
             
+            @if (!recordMode)
+            {
             <!-- Modal Footer - Fixed at bottom with safe area support -->
             <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900" style="padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));">
                 <div class="flex items-center justify-between gap-3">
@@ -227,6 +245,7 @@
                     </div>
                 </div>
             </div>
+            }
         </div>
 </div>
 
@@ -378,6 +397,7 @@
 
     private async Task HandleCloseClicked()
     {
+        recordMode = false;
         await HideModalAsync();
 
         if (OnCanceled.HasDelegate)
@@ -398,6 +418,35 @@
         {
             // Ignore JavaScript interop errors during static rendering
         }
+    }
+
+    // Records: the switch to the record form shows only when the user has record types. The
+    // form leaves the page when the dialog closes, so the next record starts empty.
+    private IList<RecordTypeResponse> recordTypes = [];
+    private bool recordMode;
+
+    private static string ModeCss(bool active) => active
+        ? "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white"
+        : "rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            recordTypes = await RecordApi.GetRecordTypes();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types; only activities can be logged");
+        }
+    }
+
+    // Hosts read the request they get (e.g. Scan names its tag), so a record passes an empty one.
+    private async Task OnRecordSaved()
+    {
+        recordMode = false;
+        await HideModalAsync();
+        await OnActivityCreated.InvokeAsync(new ActivityRequest { DateStarted = Activity.DateStarted });
     }
 
     private Task InvokeFormResetAsync()
