@@ -1,0 +1,31 @@
+@page "/record-types"
+
+@using LogMyDay.App.Mobile.Services
+@inject IPageTitleService PageTitleService
+
+<PageTitle>Record Types - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <TopBar Title="Record Types" ShowReload="true" OnReload="Reload" />
+    <TagSectionNav />
+
+    <div class="max-w-3xl mx-auto px-4 py-4 space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">Values measured together at one moment, logged with one form and kept together, e.g. blood pressure.</p>
+        <RecordTypesManager @ref="manager" />
+    </div>
+</div>
+
+<button type="button" class="fab" @onclick="() => manager?.OpenCreate()" title="New Record Type">
+    <i class="bi bi-plus-lg"></i>
+</button>
+
+@code {
+    private RecordTypesManager? manager;
+
+    protected override void OnInitialized()
+    {
+        PageTitleService.SetTitle("Record Types");
+    }
+
+    private Task Reload() => manager?.Reload() ?? Task.CompletedTask;
+}

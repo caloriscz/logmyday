@@ -1,8 +1,8 @@
 @using LogMyDay.Shared.DTOs
 
 @* A record in a dialog: edit or delete one from an activity list, or log a new one. *@
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-gray-600 bg-opacity-75" @onclick="OnCanceled"></div>
+<div class="fixed inset-0 z-60 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-gray-600/75" @onclick="OnCanceled"></div>
     <div class="relative z-10 w-full max-w-lg max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800">
         <div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">@(RecordId != null ? "Edit Record" : "Log Record")</h3>

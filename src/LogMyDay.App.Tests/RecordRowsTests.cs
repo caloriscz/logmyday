@@ -88,4 +88,10 @@ public class RecordRowsTests
 
         Assert.Equal("64,5 bpm", RecordRows.FormatValue(pulse, "64.50", CultureInfo.GetCultureInfo("cs-CZ")));
     }
+
+    [Fact]
+    public void FieldList_NamesTheFieldsInFormOrder_WithTheirUnits()
+    {
+        Assert.Equal("Systolic · Diastolic · Pulse (bpm) · Rested", RecordRows.FieldList(BloodPressure));
+    }
 }
