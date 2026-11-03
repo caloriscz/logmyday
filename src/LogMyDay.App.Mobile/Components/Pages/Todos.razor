@@ -8,6 +8,7 @@
 @implements IDisposable
 @inject ITodoApi TodoApi
 @inject IActivityApi ActivityApi
+@inject IRecordApi RecordApi
 @inject ILogger<Todos> Logger
 @inject ReminderNotificationScheduler ReminderScheduler
 
@@ -319,10 +320,11 @@
                                     <option value="@tag.Id">@tag.Title</option>
                                 }
                             }
+                            <RecordTypeOptions RecordTypes="_recordTypes" />
                         </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Completing any item in this list logs an activity to this tag.</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Completing any item in this list logs an activity to this tag, or opens the record form of a record type.</p>
                     </div>
-                    @if (_listForm.CompletionTagId.HasValue)
+                    @if (_listForm.CompletionTagId.HasValue && !IsRecordType(_listForm.CompletionTagId))
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
@@ -722,6 +724,12 @@
     </div>
 }
 
+@if (_recordFor != null)
+{
+    <RecordModal RecordTypes="_recordTypes" OptionLists="_recordOptionLists" RecordTypeId="_recordFor.CompletionTagId" DefaultTime="RecordTime()"
+                 OnSaved="CompleteWithRecord" OnCanceled="() => _recordFor = null" />
+}
+
 @code {
     private IList<TodoListResponse>? _lists;
     private IList<TagResponse>? _allTags;
@@ -838,6 +846,11 @@
 
             _lists = listsTask.Result.ToList();
             _allTags = tagsTask.Result;
+            if (!_recordTypesLoaded)
+            {
+                await LoadRecordTypes();
+            }
+
             _itemErrorPerList.Clear();
             EnsureValidSelection();
 
@@ -1128,8 +1141,70 @@
         }
     }
 
+    // Record types: a list's item on one completes through its record form, done when the record is
+    // saved; closing the form leaves it open.
+    private IList<RecordTypeResponse> _recordTypes = [];
+    private IList<TagOptionListResponse>? _recordOptionLists;
+    private bool _recordTypesLoaded;
+    private TodoItemResponse? _recordFor;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            _recordTypes = await RecordApi.GetRecordTypes();
+            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+            _recordTypesLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types");
+        }
+    }
+
+    private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
+
+    private DateTime RecordTime()
+    {
+        var day = DateTime.Today;
+
+        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
+    }
+
+    private async Task CompleteWithRecord(RecordResponse? record)
+    {
+        var item = _recordFor;
+        _recordFor = null;
+        if (item == null || record == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = record.Id });
+            ReminderScheduler.CancelItem(item.Id);
+            UpdateItemInList(updated);
+            _itemErrorPerList.Remove(item.ListId);
+            DiscardInFlightLoad();
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete todo item {ItemId} with record {RecordId}", item.Id, record.Id);
+            _itemErrorPerList[item.ListId] = SurfaceErrorMessage(ex, "The record was saved, but the item could not be completed. Please try again.");
+        }
+    }
+
     private async Task CompleteItemAsync(TodoItemResponse item, TodoListResponse list)
     {
+        // A record type completes through its record form: done when the record is saved.
+        if (item.CompletionIsRecordType)
+        {
+            _recordFor = item;
+
+            return;
+        }
+
         if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
         {
             var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);

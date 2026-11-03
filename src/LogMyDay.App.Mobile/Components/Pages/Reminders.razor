@@ -9,6 +9,7 @@
 @implements IDisposable
 @inject IReminderApi ReminderApi
 @inject IActivityApi ActivityApi
+@inject IRecordApi RecordApi
 @inject ILogger<Reminders> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
@@ -321,6 +322,7 @@
                                     <option value="@tag.Id">@tag.Title</option>
                                 }
                             }
+                            <RecordTypeOptions RecordTypes="_recordTypes" />
                         </select>
                         @if (_itemForm.CompletionTagId.HasValue && _allTags != null)
                         {
@@ -395,7 +397,7 @@
                             }
                         </div>
                     }
-                    @if (_itemForm.CompletionTagId.HasValue)
+                    @if (_itemForm.CompletionTagId.HasValue && !IsRecordType(_itemForm.CompletionTagId))
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-log mode</label>
@@ -483,6 +485,12 @@
             </div>
         </div>
     </div>
+}
+
+@if (_recordFor != null)
+{
+    <RecordModal RecordTypes="_recordTypes" OptionLists="_recordOptionLists" RecordTypeId="_recordFor.CompletionTagId" DefaultTime="RecordTime()"
+                 OnSaved="CompleteWithRecord" OnCanceled="() => _recordFor = null" />
 }
 
 @code {
@@ -594,6 +602,11 @@
                     _allTags = await ActivityApi.GetTags();
                 }
 
+                if (!_recordTypesLoaded)
+                {
+                    await LoadRecordTypes();
+                }
+
                 if (_selectedDate.Date == DateTime.Today)
                 {
                     ReminderScheduler.ScheduleAll(_reminders, "page-load");
@@ -644,6 +657,14 @@
 
     private async Task CompleteItemAsync(ReminderResponse item)
     {
+        // A record type completes through its record form: done when the record is saved.
+        if (item.CompletionIsRecordType)
+        {
+            _recordFor = item;
+
+            return;
+        }
+
         _completingItemId = item.Id;
         try
         {
@@ -787,6 +808,15 @@
     {
         var item = _reminders?.FirstOrDefault(i => i.Id == reminderId && !i.IsDone && !i.IsSkipped);
         if (item == null) return;
+
+        // "Mark Done" on a record type opens its record form; the reminder is done when it is saved.
+        if (item.CompletionIsRecordType)
+        {
+            _recordFor = item;
+            StateHasChanged();
+
+            return;
+        }
 
         try
         {
@@ -1107,6 +1137,61 @@
 
     private DateTime EffectiveDoneAt() =>
         DateTime.SpecifyKind(_selectedDate.Date.AddHours(12), DateTimeKind.Local).ToUniversalTime();
+
+    // Record types: a reminder on one completes through its record form, done when the record is
+    // saved; closing the form leaves it open.
+    private IList<RecordTypeResponse> _recordTypes = [];
+    private IList<TagOptionListResponse>? _recordOptionLists;
+    private bool _recordTypesLoaded;
+    private ReminderResponse? _recordFor;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            _recordTypes = await RecordApi.GetRecordTypes();
+            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+            _recordTypesLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types");
+        }
+    }
+
+    private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
+
+    private DateTime RecordTime()
+    {
+        var day = _selectedDate.Date;
+
+        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
+    }
+
+    private async Task CompleteWithRecord(RecordResponse? record)
+    {
+        var item = _recordFor;
+        _recordFor = null;
+        if (item == null || record == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            ReminderScheduler.CancelItem(item.Id);
+            ReminderScheduler.DismissItem(item.Id);
+            UpdateItem(updated);
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete reminder {ItemId} with record {RecordId}", item.Id, record.Id);
+            _itemError = SurfaceErrorMessage(ex, "The record was saved, but the reminder could not be completed. Please try again.");
+        }
+
+        await LoadDataAsync();
+    }
 
     private static bool IsQuickCompleteInputType(int? id) => id is
         InputTypeIds.Boolean or InputTypeIds.String or

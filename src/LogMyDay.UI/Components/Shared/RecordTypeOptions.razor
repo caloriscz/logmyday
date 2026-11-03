@@ -1,0 +1,17 @@
+@using LogMyDay.UI.Formatting
+
+@* The record types as completion targets in a tag picker: a reminder or todo on a record type
+   completes through its record form. *@
+@if (RecordTypes?.Count > 0)
+{
+    <optgroup label="Record types">
+        @foreach (var type in RecordTypes)
+        {
+            <option value="@type.Id">@RecordRows.Title(type)</option>
+        }
+    </optgroup>
+}
+
+@code {
+    [Parameter] public IList<RecordTypeResponse>? RecordTypes { get; set; }
+}

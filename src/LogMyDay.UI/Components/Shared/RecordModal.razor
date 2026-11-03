@@ -24,6 +24,6 @@
     [Parameter] public DateTime DefaultTime { get; set; } = DateTime.Now;
     [Parameter] public int? RecordTypeId { get; set; }
     [Parameter] public bool StartWithDeleteConfirmation { get; set; }
-    [Parameter] public EventCallback OnSaved { get; set; }
+    [Parameter] public EventCallback<RecordResponse?> OnSaved { get; set; }
     [Parameter] public EventCallback OnCanceled { get; set; }
 }

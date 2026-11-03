@@ -7,6 +7,7 @@
 
 @inject IReminderApi ReminderApi
 @inject IActivityApi ActivityApi
+@inject IRecordApi RecordApi
 @inject IJSRuntime JS
 @inject ILogger<RemindersPanel> Logger
 
@@ -145,6 +146,7 @@
                                     <option value="@tag.Id">@tag.Title</option>
                                 }
                             }
+                            <RecordTypeOptions RecordTypes="_recordTypes" />
                         </select>
                     </div>
                     @if (_itemForm.CompletionTagId.HasValue && _allTags?.FirstOrDefault(t => t.Id == _itemForm.CompletionTagId.Value) is { } _editTag && _editTag.InputTypeId.HasValue)
@@ -187,7 +189,7 @@
                             }
                         </div>
                     }
-                    @if (_itemForm.CompletionTagId.HasValue)
+                    @if (_itemForm.CompletionTagId.HasValue && !IsRecordType(_itemForm.CompletionTagId))
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
@@ -318,6 +320,12 @@
     </div>
 }
 
+@if (_recordFor != null)
+{
+    <RecordModal RecordTypes="_recordTypes" OptionLists="_recordOptionLists" RecordTypeId="_recordFor.CompletionTagId" DefaultTime="RecordTime()"
+                 OnSaved="CompleteWithRecord" OnCanceled="() => _recordFor = null" />
+}
+
 @code {
     [Parameter] public bool HomepageOnly { get; set; }
     [Parameter] public string? Title { get; set; }
@@ -404,7 +412,8 @@
             var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
             var remindersTask = ReminderApi.GetReminders(dateParam);
             var tagsTask = ActivityApi.GetTags();
-            await Task.WhenAll(remindersTask, tagsTask);
+            var recordTypesTask = LoadRecordTypes();
+            await Task.WhenAll(remindersTask, tagsTask, recordTypesTask);
 
             if (gen != _loadGeneration) return;
 
@@ -508,6 +517,14 @@
 
     private async Task CompleteItemAsync(ReminderResponse item)
     {
+        // A record type completes through its record form: done when the record is saved.
+        if (item.CompletionIsRecordType)
+        {
+            _recordFor = item;
+
+            return;
+        }
+
         var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
         var effectiveInputTypeId = item.CompletionTagInputTypeId ?? completionTag?.InputTypeId;
 
@@ -531,12 +548,12 @@
         OpenEditItemModal(item);
     }
 
-    private async Task CompleteDirectAsync(ReminderResponse item, string? completionValue)
+    private async Task CompleteDirectAsync(ReminderResponse item, string? completionValue, int? recordId = null)
     {
         _isBusy = true;
         try
         {
-            await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = completionValue });
+            await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = completionValue, RecordId = recordId });
         }
         catch (ApiException ex)
         {
@@ -660,6 +677,46 @@
 
     private DateTime EffectiveDoneAt() =>
         DateTime.SpecifyKind((SelectedDate?.Date ?? DateTime.Today).AddHours(12), DateTimeKind.Local).ToUniversalTime();
+
+    // Record types: a reminder on one completes through its record form, done when the record is
+    // saved; closing the form leaves it open.
+    private IList<RecordTypeResponse> _recordTypes = [];
+    private IList<TagOptionListResponse>? _recordOptionLists;
+    private ReminderResponse? _recordFor;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            _recordTypes = await RecordApi.GetRecordTypes();
+            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types");
+        }
+    }
+
+    private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
+
+    private DateTime RecordTime()
+    {
+        var day = SelectedDate?.Date ?? DateTime.Today;
+
+        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
+    }
+
+    private async Task CompleteWithRecord(RecordResponse? record)
+    {
+        var item = _recordFor;
+        _recordFor = null;
+        if (item == null || record == null)
+        {
+            return;
+        }
+
+        await CompleteDirectAsync(item, null, record.Id);
+    }
 
     private static bool IsQuickCompleteInputType(int? id) => id is
         InputTypeIds.Boolean or InputTypeIds.String or

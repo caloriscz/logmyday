@@ -121,6 +121,24 @@ public class McpRecordToolsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AReminderOnARecordType_CompletesWithTheRecordLoggedForIt()
+    {
+        await using var client = await WriteClient();
+        var name = Unique("Check");
+        var type = Ok(await client.CallAsync("create_record_type", new { name, fields = new object[] { new { name = "Pulse", inputTypeId = InputTypeIds.Integer } } }));
+        var typeId = type.GetProperty("id").GetInt32();
+        var reminder = Ok(await client.CallAsync("create_reminder", new { title = Unique("Measure"), completionTagId = typeId }));
+        var reminderId = reminder.GetProperty("id").GetInt32();
+        Assert.True(reminder.GetProperty("completionIsRecordType").GetBoolean());
+
+        Assert.Equal(McpErrorMapper.Invalid, ErrorCode(await client.CallAsync("complete_reminder", new { reminderId })));
+
+        var record = Ok(await client.CallAsync("log_record", new { recordType = name, values = new object[] { new { field = "Pulse", value = (object)61 } } }));
+        var done = Ok(await client.CallAsync("complete_reminder", new { reminderId, recordId = record.GetProperty("id").GetInt32() }));
+        Assert.True(done.GetProperty("isDone").GetBoolean());
+    }
+
+    [Fact]
     public async Task ReadOnlyKey_CannotCreateARecordType()
     {
         await using var client = await McpTestClient.ConnectAsync(_factory, CustomWebApplicationFactory.ReadOnlyKeyToken);
