@@ -707,6 +707,7 @@ public class BackupService : IBackupService
                     RecurrenceType = i.RecurrenceType,
                     AutoLogMode = i.AutoLogMode,
                     CompletionTagName = i.CompletionTag != null ? i.CompletionTag.TagName : null,
+                    CompletionIsRecordType = i.CompletionTag != null && i.CompletionTag.IsRecordType,
                     MonitorFromDate = i.MonitorFromDate,
                     MonitorToDate = i.MonitorToDate,
                     AllowUnfilled = i.AllowUnfilled,
@@ -1536,6 +1537,14 @@ public class BackupService : IBackupService
             .Where(t => (userId == null || t.UserId == userId) && !t.IsRecordType)
             .ToDictionaryAsync(t => t.TagName, t => t.Id);
 
+        // A record type may share its name with a tag, so the backup says which one it means.
+        // Record types are restored before reminders.
+        var recordTypeLookup = (await _context.Tags
+                .Where(t => (userId == null || t.UserId == userId) && t.IsRecordType)
+                .ToListAsync())
+            .GroupBy(t => t.TagName)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
         var existingTitles = await _context.Reminders
             .Where(r => userId == null || r.UserId == userId)
             .Select(r => r.Title)
@@ -1550,9 +1559,10 @@ public class BackupService : IBackupService
             }
 
             int? completionTagId = null;
-            if (!string.IsNullOrEmpty(item.CompletionTagName) && tagLookup.ContainsKey(item.CompletionTagName))
+            var completionLookup = item.CompletionIsRecordType ? recordTypeLookup : tagLookup;
+            if (!string.IsNullOrEmpty(item.CompletionTagName) && completionLookup.TryGetValue(item.CompletionTagName, out var lookedUpId))
             {
-                completionTagId = tagLookup[item.CompletionTagName];
+                completionTagId = lookedUpId;
             }
 
             var itemEntity = new Reminder

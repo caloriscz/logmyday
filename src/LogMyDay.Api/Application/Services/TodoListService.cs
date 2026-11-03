@@ -151,12 +151,11 @@ public class TodoListService : ITodoListService
             throw new InvalidOperationException($"'{tag.TagName}' is computed by a rule and cannot be a todo list's completion tag.");
         }
 
-        // A field is logged together with its record type's other fields, never on its own.
-        if (tag.IsRecordType || tag.RecordTypeId != null)
+        // A field is logged together with its record type's other fields, never on its own. A
+        // record type itself is a valid target: completing an item opens its record form.
+        if (tag.RecordTypeId != null)
         {
-            throw new InvalidOperationException(tag.IsRecordType
-                ? $"'{tag.TagName}' is a record type and cannot be a todo list's completion tag."
-                : $"'{tag.TagName}' is a field of a record type and cannot be a todo list's completion tag.");
+            throw new InvalidOperationException($"'{tag.TagName}' is a field of a record type and cannot be a todo list's completion tag.");
         }
     }
 
@@ -188,6 +187,7 @@ public class TodoListService : ITodoListService
             CompletionTagId = list.CompletionTagId,
             CompletionTagName = list.CompletionTag?.TagName,
             CompletionTagInputTypeId = list.CompletionTag?.InputTypeId,
+            CompletionIsRecordType = list.CompletionTag?.IsRecordType == true,
             AutoLogMode = list.AutoLogMode,
             Items = list.Items
                 .OrderBy(i => i.DisplayOrder)
@@ -218,7 +218,8 @@ public class TodoListService : ITodoListService
             AutoLogMode = list.AutoLogMode,
             CompletionTagId = list.CompletionTagId,
             CompletionTagName = list.CompletionTag?.TagName,
-            CompletionTagInputTypeId = list.CompletionTag?.InputTypeId
+            CompletionTagInputTypeId = list.CompletionTag?.InputTypeId,
+            CompletionIsRecordType = list.CompletionTag?.IsRecordType == true
         };
 
     private static bool ComputeEffectiveIsSkipped(TodoItem item, User? user, DateOnly? date = null)

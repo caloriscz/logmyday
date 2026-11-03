@@ -97,8 +97,9 @@ public class ReminderService : IReminderService
         return MapItemToResponse(item);
     }
 
-    // A reminder logs only to a tag that takes values on their own: not a computed tag (its
-    // values come from its rule), not a record type and not a record field.
+    // A reminder logs to a tag that takes values on their own, or to a record type, which
+    // completes through its record form. Not to a computed tag (its values come from its rule)
+    // and not to a record field.
     private static void EnsureLoggable(Domain.Entities.Tag tag)
     {
         if (tag.IsComputed)
@@ -107,11 +108,9 @@ public class ReminderService : IReminderService
         }
 
         // A field is logged together with its record type's other fields, never on its own.
-        if (tag.IsRecordType || tag.RecordTypeId != null)
+        if (tag.RecordTypeId != null)
         {
-            throw new InvalidOperationException(tag.IsRecordType
-                ? $"'{tag.TagName}' is a record type and cannot be a reminder's completion tag."
-                : $"'{tag.TagName}' is a field of a record type and cannot be a reminder's completion tag.");
+            throw new InvalidOperationException($"'{tag.TagName}' is a field of a record type and cannot be a reminder's completion tag.");
         }
     }
 
@@ -220,6 +219,13 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
+        // A record type completes with the record its form saved; completing logs nothing more.
+        var completesWithRecord = item.CompletionTag?.IsRecordType == true;
+        if (completesWithRecord)
+        {
+            await RecordCompletion.EnsureLogged(_context, request.RecordId, item.CompletionTag!.Id, item.CompletionTag.TagName, userId);
+        }
+
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
         // Legacy scalars kept in sync for rollback safety; the read path uses the day row.
@@ -240,7 +246,7 @@ public class ReminderService : IReminderService
             "[reminder-diag] event=complete reminderId={ItemId} userId={UserId} doneAt={DoneAt:o} notifyAt={NotifyAt} recurrence={Recurrence}",
             item.Id, userId, request.DoneAt, item.NotifyAt?.ToString("HH:mm") ?? "null", item.RecurrenceType);
 
-        if (item.CompletionTagId.HasValue)
+        if (item.CompletionTagId.HasValue && !completesWithRecord)
         {
             await LogActivityAsync(item, request.CompletionValue, doneLocal, userId);
         }
@@ -354,8 +360,14 @@ public class ReminderService : IReminderService
         // A skip records a value so an otherwise empty day has an explicit data point instead of a
         // gap: 0 for numeric/rating types, false for Boolean, empty for string. It is written only
         // when the tag has nothing on that local day and the day is not locked, so re-skipping the
-        // same day is idempotent and a skip never contradicts a value that is already logged.
-        if (item.CompletionTagId.HasValue)
+        // same day is idempotent and a skip never contradicts a value that is already logged. A
+        // record type has no placeholder value, so a skip logs nothing for it.
+        if (item.CompletionTag?.IsRecordType == true)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Reminder '{item.Title}' skipped — nothing logged, '{item.CompletionTag.TagName}' is a record type");
+        }
+        else if (item.CompletionTagId.HasValue)
         {
             var tagId = item.CompletionTagId.Value;
             var zeroValue = ZeroValueForInputType(item.CompletionTag?.InputTypeId);
@@ -437,6 +449,7 @@ public class ReminderService : IReminderService
     private async Task<Domain.Entities.Reminder> LoadItemForUser(int id, Guid userId)
     {
         var item = await _context.Reminders
+            .Include(i => i.CompletionTag)
             .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
 
         if (item == null)
@@ -529,6 +542,7 @@ public class ReminderService : IReminderService
             CompletionTagId = item.CompletionTagId,
             CompletionTagName = item.CompletionTag?.TagName,
             CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
+            CompletionIsRecordType = item.CompletionTag?.IsRecordType == true,
             AllowUnfilled = item.AllowUnfilled
         };
     }
