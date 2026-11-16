@@ -77,6 +77,13 @@ public static class RecordRows
         return result;
     }
 
+    /// <summary>The fields in form order with their units, e.g. "Distance (km) · Duration (min)".</summary>
+    public static string FieldList(RecordTypeResponse type)
+    {
+        return string.Join(" · ", type.Fields.OrderBy(f => f.Order).Select(f =>
+            string.IsNullOrEmpty(f.UnitSymbol) ? f.Name : $"{f.Name} ({f.UnitSymbol})"));
+    }
+
     /// <summary>The record type's name as lists show a tag: with its group.</summary>
     public static string Title(RecordTypeResponse type) =>
         type.GroupName != null ? $"{type.GroupName}: {type.Name}" : type.Name;

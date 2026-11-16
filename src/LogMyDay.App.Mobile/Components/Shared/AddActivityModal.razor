@@ -23,6 +23,14 @@
         
         <!-- Modal Body - Scrollable content -->
     <div class="flex-1 overflow-y-auto px-6 py-6">
+        @* Values measured together are logged as a record, in the host's own record dialog. *@
+        @if (!IsEditMode && OnLogRecord.HasDelegate && RecordTypes?.Count > 0)
+        {
+            <div class="mb-5 inline-flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600">
+                <button type="button" class="@ModeCss(true)">Activity</button>
+                <button type="button" class="@ModeCss(false)" @onclick="SwitchToRecord">Record</button>
+            </div>
+        }
         <EditForm id="@($"{modalId}Form")" Model="Activity" OnValidSubmit="HandleValidSubmit">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="text-red-600 dark:text-red-400 mb-4" />
@@ -251,6 +259,13 @@
     [Parameter] public int? ActivityId { get; set; }
     [Parameter] public EventCallback OnActivityUpdated { get; set; }
 
+    /// <summary>The user's record types. With <see cref="OnLogRecord"/>, a switch hands over to the
+    /// host's record dialog.</summary>
+    [Parameter] public IList<RecordTypeResponse>? RecordTypes { get; set; }
+
+    /// <summary>Opens the host's record dialog for this dialog's time; this dialog closes.</summary>
+    [Parameter] public EventCallback<DateTime> OnLogRecord { get; set; }
+
     private TagResponse? selectedTag;
     private TagOptionListResponse? selectedOptionList;
     private string? selectedOptionValue;
@@ -398,6 +413,18 @@
         {
             // Ignore JavaScript interop errors during static rendering
         }
+    }
+
+    private static string ModeCss(bool active) => active
+        ? "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white"
+        : "rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700";
+
+    // This dialog stays on the page and is shown and hidden by script, so it keeps no record
+    // state: the record is logged in the host's dialog, which starts empty each time.
+    private async Task SwitchToRecord()
+    {
+        await HideModalAsync();
+        await OnLogRecord.InvokeAsync(Activity.DateStarted);
     }
 
     private Task InvokeFormResetAsync()

@@ -86,6 +86,8 @@ public static class MauiProgram
             builder.Services.AddTransient<ITagDayLockApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagDayLock);
             builder.Services.AddTransient<IColorSchemeApi>(sp => sp.GetRequiredService<IApiClientProvider>().ColorScheme);
             builder.Services.AddTransient<ITagRuleApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagRule);
+            builder.Services.AddTransient<ITagGroupApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagGroup);
+            builder.Services.AddTransient<IRecordApi>(sp => sp.GetRequiredService<IApiClientProvider>().Record);
 
             // Register app settings
             builder.Services.AddSingleton<AppSettings>(provider =>
