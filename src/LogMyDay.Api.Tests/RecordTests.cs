@@ -480,6 +480,193 @@ public sealed class RecordTests : IDisposable
         Assert.Equal(1, restoredType.RecordCount);
     }
 
+    private ReminderService Reminders() =>
+        new(_context, _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<ReminderService>.Instance);
+
+    private TodoListService TodoLists() =>
+        new(_context, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoListService>.Instance);
+
+    private TodoItemService TodoItems() =>
+        new(_context, _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoItemService>.Instance);
+
+    [Fact]
+    public async Task AReminderOnARecordType_CompletesOnlyWithARecordOfThatType()
+    {
+        var type = await BloodPressure();
+        var run = await _types.Create(new RecordTypeRequest { Name = "Run", Fields = [Field("Distance", InputTypeIds.Decimal)] }, _userId);
+        var reminders = Reminders();
+        var reminder = await reminders.Create(new ReminderRequest { Title = "Measure blood pressure", CompletionTagId = type.Id }, _userId);
+        Assert.True(reminder.CompletionIsRecordType);
+        _context.ChangeTracker.Clear(); // each call is its own request
+
+        // The record form saves the record first and the completion names it.
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow }, _userId));
+        var otherRecord = await Log(run, At(6), "5");
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = otherRecord.Id }, _userId));
+        // A record of another day does not complete today.
+        var yesterday = await Log(type, At(7, daysAgo: 1), "130");
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = yesterday.Id }, _userId));
+
+        var record = await Log(type, At(7), "128", "82", "64");
+        var done = await reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = record.Id }, _userId);
+
+        Assert.True(done.IsDone);
+        _context.ChangeTracker.Clear();
+        // The three records' values only: completing logs nothing of its own.
+        Assert.Equal(5, await _context.Activities.CountAsync());
+    }
+
+    [Fact]
+    public async Task SkippingAReminderOnARecordType_LogsNothing()
+    {
+        var type = await BloodPressure();
+        var reminders = Reminders();
+        var reminder = await reminders.Create(new ReminderRequest { Title = "Measure blood pressure", CompletionTagId = type.Id }, _userId);
+        _context.ChangeTracker.Clear();
+
+        var skipped = await reminders.Skip(reminder.Id, _userId);
+
+        Assert.True(skipped.IsSkipped);
+        _context.ChangeTracker.Clear();
+        Assert.False(await _context.Activities.AnyAsync());
+        Assert.False(await _context.Records.AnyAsync());
+    }
+
+    [Fact]
+    public async Task ATodoItemInAListOnARecordType_CompletesWithARecord()
+    {
+        var type = await BloodPressure();
+        var list = await TodoLists().Create(new TodoListRequest { Name = "Health checks", CompletionTagId = type.Id }, _userId);
+        Assert.True(list.CompletionIsRecordType);
+        var items = TodoItems();
+        var item = await items.Create(new TodoItemRequest { ListId = list.Id, Title = "Morning reading" }, _userId);
+        _context.ChangeTracker.Clear();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            items.Complete(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow }, _userId));
+        var record = await Log(type, At(7), "128");
+        var done = await items.Complete(item.Id, new TodoItemCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = record.Id }, _userId);
+
+        Assert.True(done.IsDone);
+        Assert.True(done.CompletionIsRecordType);
+        _context.ChangeTracker.Clear();
+        Assert.Equal(1, await _context.Activities.CountAsync());
+    }
+
+    [Fact]
+    public async Task AFieldIsStillNoCompletionTarget()
+    {
+        var type = await BloodPressure();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Reminders().Create(new ReminderRequest { Title = "Systolic", CompletionTagId = type.Fields[0].TagId }, _userId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            TodoLists().Create(new TodoListRequest { Name = "Checks", CompletionTagId = type.Fields[0].TagId }, _userId));
+    }
+
+    [Fact]
+    public async Task ABackupKeepsAReminderOnARecordType_EvenWhenATagSharesItsName()
+    {
+        await AddTag("Blood pressure");
+        var type = await BloodPressure();
+        await Reminders().Create(new ReminderRequest { Title = "Measure blood pressure", CompletionTagId = type.Id }, _userId);
+        await TodoLists().Create(new TodoListRequest { Name = "Health checks", CompletionTagId = type.Id }, _userId);
+        _context.ChangeTracker.Clear();
+        var backups = new BackupService(_context, NullLogger<BackupService>.Instance, new TagRuleEngine(_context));
+
+        var export = await backups.ExportDataAsync(_userId);
+        Assert.True(Assert.Single(export.Reminders).CompletionIsRecordType);
+        Assert.True(export.TodoLists.Single(l => l.Name == "Health checks").CompletionIsRecordType);
+
+        // Clearing keeps reminders, so the old one goes by hand before the restore.
+        await backups.ClearDataAsync(_userId);
+        _context.Reminders.RemoveRange(_context.Reminders);
+        await _context.SaveChangesAsync();
+        var imported = await backups.ImportDataAsync(export, clearExistingData: false, _userId);
+        Assert.True(imported.Success, string.Join("; ", imported.Errors));
+
+        _context.ChangeTracker.Clear();
+        var restoredType = Assert.Single(await _types.GetAll(_userId));
+        Assert.Equal(restoredType.Id, (await _context.Reminders.SingleAsync()).CompletionTagId);
+        Assert.Equal(restoredType.Id, (await _context.TodoLists.SingleAsync(l => l.Name == "Health checks")).CompletionTagId);
+    }
+
+    [Fact]
+    public async Task TheExcelReport_WorksForARecordTypeNamedLikeItsSummarySheet()
+    {
+        var type = await _types.Create(new RecordTypeRequest { Name = "Summary", Fields = [Field("Score")] }, _userId);
+        await Log(type, At(7), "3");
+        var export = new ExportService(_context, NullLogger<ExportService>.Instance);
+
+        var result = await export.GenerateExcelReport(new ExcelExportRequest { UserId = _userId, TagIds = [type.Fields[0].TagId] });
+
+        Assert.True(result.Success, result.Message);
+        using var workbook = new ClosedXML.Excel.XLWorkbook(new MemoryStream(result.FileContent!));
+        Assert.Equal(3, workbook.Worksheet("Summary (2)").Cell(2, 3).GetDouble());
+        Assert.Equal("LogMyDay Activities Overview Report", workbook.Worksheet("Summary").Cell(1, 1).GetString());
+    }
+
+    [Fact]
+    public async Task ListingRecords_FiltersByTypeAndTime_NewestFirst()
+    {
+        var pressure = await BloodPressure();
+        var run = await _types.Create(new RecordTypeRequest { Name = "Run", Fields = [Field("Distance", InputTypeIds.Decimal)] }, _userId);
+        var morning = await Log(pressure, At(7), "128");
+        var evening = await Log(pressure, At(19), "120");
+        await Log(pressure, At(7, daysAgo: 2), "130");
+        await Log(run, At(6), "5");
+
+        var today = await _records.GetPaged(_userId, pressure.Id, At(0), At(23), 1, 50);
+
+        Assert.Equal(2, today.TotalCount);
+        Assert.Equal([evening.Id, morning.Id], today.Items.Select(r => r.Id));
+        Assert.Equal(["Systolic"], today.Items[0].Values.Select(v => v.FieldName));
+        Assert.Equal(4, (await _records.GetPaged(_userId, null, null, null, 1, 50)).TotalCount);
+        var firstPage = await _records.GetPaged(_userId, null, null, null, 1, 3);
+        Assert.Equal(3, firstPage.Items.Count);
+        Assert.Equal(4, firstPage.TotalCount);
+    }
+
+    [Fact]
+    public async Task TheExcelReport_HasASheetPerRecordType_WithARowPerRecord()
+    {
+        var type = await _types.Create(new RecordTypeRequest
+        {
+            Name = "Blood pressure",
+            Fields = [Field("Systolic"), Field("Note", InputTypeIds.String)]
+        }, _userId);
+        await Log(type, At(19), "120", null);
+        await Log(type, At(7), "128", "after coffee");
+        var plain = await AddTag("Plain");
+        await _activities.Create(new ActivityRequest { PrimaryTagId = plain.Id, DateStarted = At(9), Description = "1" }, _userId);
+        var export = new ExportService(_context, NullLogger<ExportService>.Instance);
+
+        var result = await export.GenerateExcelReport(new ExcelExportRequest
+        {
+            UserId = _userId,
+            TagIds = [type.Fields[0].TagId, plain.Id]
+        });
+
+        Assert.True(result.Success, result.Message);
+        using var workbook = new ClosedXML.Excel.XLWorkbook(new MemoryStream(result.FileContent!));
+        Assert.True(workbook.Worksheets.Contains("Blood pressure"));
+        var sheet = workbook.Worksheet("Blood pressure");
+        Assert.Equal(["Date", "Time", "Systolic", "Note"], Enumerable.Range(1, 4).Select(c => sheet.Cell(1, c).GetString()));
+        Assert.Equal("07:00", sheet.Cell(2, 2).GetString());
+        Assert.Equal(128, sheet.Cell(2, 3).GetDouble());
+        Assert.Equal("after coffee", sheet.Cell(2, 4).GetString());
+        Assert.Equal("19:00", sheet.Cell(3, 2).GetString());
+        Assert.True(sheet.Cell(3, 4).IsEmpty());
+        Assert.True(sheet.Cell(4, 1).IsEmpty());
+
+        var rows = await export.GetActivitiesForExport(new ExcelExportRequest { UserId = _userId, TagIds = [type.Fields[0].TagId, plain.Id] });
+        Assert.All(rows.Where(r => r.Tag.StartsWith("Blood pressure", StringComparison.Ordinal)), r => Assert.StartsWith("Blood pressure #", r.Record));
+        Assert.Null(rows.Single(r => r.Tag == "Plain").Record);
+    }
+
     private async Task AssertRestored()
     {
         _context.ChangeTracker.Clear();

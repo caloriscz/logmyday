@@ -7,6 +7,7 @@
 
 @inject ITodoApi TodoApi
 @inject IActivityApi ActivityApi
+@inject IRecordApi RecordApi
 @inject IJSRuntime JS
 @inject ILogger<TodoListsPanel> Logger
 
@@ -498,10 +499,11 @@ else
                                     <option value="@tag.Id">@tag.Title</option>
                                 }
                             }
+                            <RecordTypeOptions RecordTypes="_recordTypes" />
                         </select>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Completing any item in this list logs an activity to this tag.</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">Completing any item in this list logs an activity to this tag, or opens the record form of a record type.</p>
                     </div>
-                    @if (_listForm.CompletionTagId.HasValue)
+                    @if (_listForm.CompletionTagId.HasValue && !IsRecordType(_listForm.CompletionTagId))
                     {
                         <div>
                             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-300">Auto-log mode</label>
@@ -936,6 +938,12 @@ else
     </div>
 }
 
+@if (_recordFor != null)
+{
+    <RecordModal RecordTypes="_recordTypes" OptionLists="_recordOptionLists" RecordTypeId="_recordFor.CompletionTagId" DefaultTime="RecordTime()"
+                 OnSaved="CompleteWithRecord" OnCanceled="() => _recordFor = null" />
+}
+
 @code {
     [Parameter] public bool HomepageOnly { get; set; }
     [Parameter] public TodoListType? FilterType { get; set; }
@@ -1112,7 +1120,8 @@ else
             var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
             var listsTask = TodoApi.GetTodoLists(dateParam);
             var tagsTask = ActivityApi.GetTags();
-            await Task.WhenAll(listsTask, tagsTask);
+            var recordTypesTask = _recordTypesLoaded ? Task.CompletedTask : LoadRecordTypes();
+            await Task.WhenAll(listsTask, tagsTask, recordTypesTask);
 
             if (myGeneration != _loadGeneration)
             {
@@ -1440,6 +1449,19 @@ else
 
     private async Task CompleteItemAsync(TodoItemResponse item, TodoListResponse list)
     {
+        // A record type completes through its record form: done when the record is saved.
+        if (item.CompletionIsRecordType)
+        {
+            if (!IsRecordType(item.CompletionTagId))
+            {
+                await LoadRecordTypes();
+            }
+
+            _recordFor = item;
+
+            return;
+        }
+
         if (list.ListType == TodoListType.Reminder && item.CompletionTagId.HasValue)
         {
             var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
@@ -1877,6 +1899,63 @@ else
 
     private DateTime EffectiveDoneAt() =>
         DateTime.SpecifyKind((SelectedDate?.Date ?? DateTime.Today).AddHours(12), DateTimeKind.Local).ToUniversalTime();
+
+    // Record types: a list's item on one completes through its record form, done when the record is
+    // saved; closing the form leaves it open.
+    private IList<RecordTypeResponse> _recordTypes = [];
+    private IList<TagOptionListResponse>? _recordOptionLists;
+    private bool _recordTypesLoaded;
+    private TodoItemResponse? _recordFor;
+
+    private async Task LoadRecordTypes()
+    {
+        try
+        {
+            var typesTask = RecordApi.GetRecordTypes();
+            var listsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(typesTask, listsTask);
+            _recordTypes = typesTask.Result;
+            _recordOptionLists = listsTask.Result;
+            _recordTypesLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load record types");
+        }
+    }
+
+    private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
+
+    private DateTime RecordTime()
+    {
+        var day = SelectedDate?.Date ?? DateTime.Today;
+
+        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
+    }
+
+    private async Task CompleteWithRecord(RecordResponse? record)
+    {
+        var item = _recordFor;
+        _recordFor = null;
+        if (item == null || record == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            UpdateItemInList(updated);
+            _notificationsNeedUpdate = true;
+        }
+        catch (ApiException ex)
+        {
+            Logger.LogWarning(ex, "Failed to complete todo item {ItemId} with record {RecordId}", item.Id, record.Id);
+            _itemErrorPerList[item.ListId] = SurfaceErrorMessage(ex, "The record was saved, but the item could not be completed. Please try again.");
+        }
+
+        await LoadDataAsync();
+    }
 
     private static bool IsQuickCompleteInputType(int? id) => id is
         InputTypeIds.Boolean or InputTypeIds.String or

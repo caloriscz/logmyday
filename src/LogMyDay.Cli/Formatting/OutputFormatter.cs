@@ -118,8 +118,10 @@ public static class OutputFormatter
             table.AddRow(
                 a.Id.ToString(),
                 a.DateStarted.ToString("yyyy-MM-dd"),
-                // A value a Tag Activity Relations rule calculated is marked; it is read-only.
-                Markup.Escape(a.PrimaryTagName ?? "") + (a.IsGenerated ? " [grey](computed)[/]" : string.Empty),
+                // A value a Tag Activity Relations rule calculated is marked; it is read-only. A
+                // record field's value names its record, whose values belong together.
+                Markup.Escape(a.PrimaryTagName ?? "") + (a.IsGenerated ? " [grey](computed)[/]" : string.Empty)
+                    + (a.RecordId is int recordId ? $" [grey](record {recordId})[/]" : string.Empty),
                 Markup.Escape(a.PrimaryTagValue ?? ""),
                 Markup.Escape(a.Description ?? ""));
         }

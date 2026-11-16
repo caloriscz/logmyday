@@ -1,3 +1,4 @@
+@using System.Globalization
 @using LogMyDay.Shared.DTOs
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
@@ -12,7 +13,7 @@
     }
     else
     {
-        @if (RecordId == null)
+        @if (RecordId == null && RecordTypeId == null)
         {
             <div class="space-y-1">
                 <label class="block text-sm font-medium text-gray-700 dark:text-slate-200" for="record-editor-type">Record type</label>
@@ -28,6 +29,11 @@
         else if (type != null)
         {
             <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">@LogMyDay.UI.Formatting.RecordRows.Title(type)</p>
+        }
+
+        @if (type != null && editingRecordId != null)
+        {
+            <p class="text-xs text-amber-700 dark:text-amber-300">@LogMyDay.UI.Formatting.RecordRows.Title(type) is logged once per day and this day already has a record: saving updates it.</p>
         }
 
         @if (type != null)
@@ -79,13 +85,14 @@
     /// <summary>For a new record: its time.</summary>
     [Parameter] public DateTime DefaultTime { get; set; } = DateTime.Now;
 
-    /// <summary>For a new record: the record type to start with.</summary>
+    /// <summary>For a new record: its record type, which then cannot be changed in the form.</summary>
     [Parameter] public int? RecordTypeId { get; set; }
 
     /// <summary>Open with the delete confirmation showing.</summary>
     [Parameter] public bool StartWithDeleteConfirmation { get; set; }
 
-    [Parameter] public EventCallback OnSaved { get; set; }
+    /// <summary>After a save, with the saved record; after a delete, with null.</summary>
+    [Parameter] public EventCallback<RecordResponse?> OnSaved { get; set; }
     [Parameter] public EventCallback OnCanceled { get; set; }
 
     private const string InputCss = "mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs transition focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100";
@@ -94,6 +101,7 @@
     private Dictionary<int, string?> values = new();
     private DateTime dateStarted;
     private int? loadedRecordId;
+    private int? editingRecordId;
     private bool isLoading;
     private bool isBusy;
     private bool confirmDelete;
@@ -106,7 +114,15 @@
             if (loadedRecordId == null && dateStarted == default)
             {
                 dateStarted = DefaultTime;
-                type = RecordTypes.FirstOrDefault(t => t.Id == RecordTypeId) ?? (RecordTypes.Count == 1 ? RecordTypes[0] : null);
+                type = RecordTypeId is int typeId
+                    ? RecordTypes.FirstOrDefault(t => t.Id == typeId)
+                    : RecordTypes.Count == 1 ? RecordTypes[0] : null;
+                if (RecordTypeId != null && type == null)
+                {
+                    error = "This record type was not found. Reload the page and try again.";
+                }
+
+                await UseTheDaysRecord();
             }
 
             return;
@@ -142,11 +158,39 @@
         }
     }
 
-    private void OnTypeChanged(ChangeEventArgs e)
+    private async Task OnTypeChanged(ChangeEventArgs e)
     {
         type = int.TryParse(e.Value?.ToString(), out var id) ? RecordTypes.FirstOrDefault(t => t.Id == id) : null;
         values = new Dictionary<int, string?>();
+        editingRecordId = null;
         error = null;
+        await UseTheDaysRecord();
+    }
+
+    // A "once per day" type has at most one record a day: when the day already has one, the form
+    // edits it instead of failing on save.
+    private async Task UseTheDaysRecord()
+    {
+        if (type is not { OncePerDay: true })
+        {
+            return;
+        }
+
+        try
+        {
+            var day = dateStarted.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var existing = (await RecordApi.GetRecords(type.Id, day, day, 1, 1)).Items.FirstOrDefault();
+            if (existing != null)
+            {
+                editingRecordId = existing.Id;
+                values = existing.Values.ToDictionary(v => v.TagId, v => (string?)v.Value);
+                dateStarted = existing.DateStarted;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to look up the day's record of record type {RecordTypeId}", type.Id);
+        }
     }
 
     private async Task Save()
@@ -175,16 +219,11 @@
         error = null;
         try
         {
-            if (RecordId is int id)
-            {
-                await RecordApi.UpdateRecord(id, request);
-            }
-            else
-            {
-                await RecordApi.CreateRecord(request);
-            }
+            var saved = (RecordId ?? editingRecordId) is int id
+                ? await RecordApi.UpdateRecord(id, request)
+                : await RecordApi.CreateRecord(request);
 
-            await OnSaved.InvokeAsync();
+            await OnSaved.InvokeAsync(saved);
         }
         catch (ApiException ex) when (ex.StatusCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Conflict or System.Net.HttpStatusCode.NotFound)
         {
@@ -221,7 +260,7 @@
         try
         {
             await RecordApi.DeleteRecord(id);
-            await OnSaved.InvokeAsync();
+            await OnSaved.InvokeAsync(null);
         }
         catch (Exception ex)
         {

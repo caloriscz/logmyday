@@ -8,6 +8,13 @@ public class TodoListBackup
     public int DisplayOrder { get; set; }
     public bool ShowOnHomepage { get; set; }
     public DateTime DateCreated { get; set; }
+
+    /// <summary>The list's completion target: a tag, or a record type of that name when
+    /// <see cref="CompletionIsRecordType"/> is set.</summary>
+    public string? CompletionTagName { get; set; }
+    public bool CompletionIsRecordType { get; set; }
+    public AutoLogMode AutoLogMode { get; set; }
+
     public List<TodoItemBackup> Items { get; set; } = new();
 }
 

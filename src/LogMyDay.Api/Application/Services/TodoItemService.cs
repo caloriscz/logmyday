@@ -103,21 +103,35 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
-        item.IsDone = true;
-        item.DoneAt = request.DoneAt;
-
         // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
         var doneLocal = ToUserLocalTime(request.DoneAt, user);
 
+        // A record type completes with the record its form saved that day; completing logs nothing more.
+        var listTag = item.List.CompletionTag;
+        var completesWithRecord = listTag?.IsRecordType == true;
+        if (completesWithRecord)
+        {
+            await RecordCompletion.EnsureLogged(_context, request.RecordId, listTag!.Id, listTag.TagName, DateOnly.FromDateTime(doneLocal), userId);
+        }
+
+        item.IsDone = true;
+        item.DoneAt = request.DoneAt;
+
         // Auto-log against the parent list's tag, in the list's mode.
         var tagId = item.List.CompletionTagId;
-        if (tagId.HasValue)
+        if (tagId.HasValue && !completesWithRecord)
         {
             await LogActivityAsync(item, tagId.Value, doneLocal, userId);
         }
 
         await _context.SaveChangesAsync();
+
+        if (completesWithRecord)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Todo item '{item.Title}' completed with record {request.RecordId} of '{listTag!.TagName}'");
+        }
 
         return MapToResponse(item);
     }
@@ -286,6 +300,7 @@ public class TodoItemService : ITodoItemService
             AutoLogMode = item.List?.AutoLogMode ?? AutoLogMode.Add,
             CompletionTagId = item.List?.CompletionTagId,
             CompletionTagName = item.List?.CompletionTag?.TagName,
-            CompletionTagInputTypeId = item.List?.CompletionTag?.InputTypeId
+            CompletionTagInputTypeId = item.List?.CompletionTag?.InputTypeId,
+            CompletionIsRecordType = item.List?.CompletionTag?.IsRecordType == true
         };
 }

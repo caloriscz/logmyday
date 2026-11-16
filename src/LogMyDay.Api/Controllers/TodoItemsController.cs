@@ -117,6 +117,13 @@ public class TodoItemsController : BaseApiController
 
             return Conflict(new { code = "tag-day-locked", tagId = ex.TagId, date = ex.Date.ToString("yyyy-MM-dd") });
         }
+        catch (ArgumentException ex)
+        {
+            // A record type completes only with a saved record of that type from that day.
+            _logger.LogInformation("Todo item {ItemId} completion rejected for user {UserId}: {Reason}", id, userId, ex.Message);
+
+            return BadRequest(ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Cannot complete todo item {ItemId} for user {UserId}", id, userId);

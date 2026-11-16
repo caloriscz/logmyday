@@ -31,6 +31,38 @@ public class RecordIntegrationTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task RecordsAreListedByTypeAndDay_AndARecordTypeReminderNeedsOne()
+    {
+        var http = Client();
+        var name = $"Check {Guid.NewGuid():N}"[..14];
+        var created = await http.PostAsJsonAsync("/api/record-types", new RecordTypeRequest
+        {
+            Name = name,
+            Fields = [new() { Name = "Pulse", TypeId = InputTypeIds.Integer }]
+        }, Json);
+        var type = (await created.Content.ReadFromJsonAsync<RecordTypeResponse>(Json))!;
+        var logged = await http.PostAsJsonAsync("/api/records", new RecordRequest
+        {
+            RecordTypeId = type.Id,
+            DateStarted = new DateTime(2026, 5, 6, 7, 0, 0),
+            Values = [new() { TagId = type.Fields[0].TagId, Value = "61" }]
+        }, Json);
+        Assert.Equal(HttpStatusCode.Created, logged.StatusCode);
+
+        var day = await http.GetFromJsonAsync<PagedResult<RecordResponse>>($"/api/records?recordTypeId={type.Id}&from=2026-05-06&to=2026-05-06", Json);
+        Assert.Equal(1, day!.TotalCount);
+        var otherDay = await http.GetFromJsonAsync<PagedResult<RecordResponse>>($"/api/records?recordTypeId={type.Id}&from=2026-05-07&to=2026-05-07", Json);
+        Assert.Equal(0, otherDay!.TotalCount);
+        Assert.Equal(HttpStatusCode.BadRequest, (await http.GetAsync("/api/records?from=6.5.2026")).StatusCode);
+
+        // A reminder on the record type is refused with a 400 until a record of that day is named.
+        var reminder = await http.PostAsJsonAsync("/api/reminders", new ReminderRequest { Title = name, CompletionTagId = type.Id }, Json);
+        var reminderId = (await reminder.Content.ReadFromJsonAsync<ReminderResponse>(Json))!.Id;
+        var refused = await http.PostAsJsonAsync($"/api/reminders/{reminderId}/complete", new ReminderCompleteRequest { DoneAt = DateTime.UtcNow }, Json);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+    }
+
+    [Fact]
     public async Task ARecord_IsLoggedAsAWhole_AndItsFieldsRefuseWritesOfTheirOwn()
     {
         var http = Client();

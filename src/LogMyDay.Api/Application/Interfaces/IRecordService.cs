@@ -6,6 +6,10 @@ public interface IRecordService
 {
     Task<RecordResponse> GetById(int id, Guid userId);
 
+    /// <summary>The user's records, newest first, optionally of one record type and within a
+    /// time range (both ends inclusive).</summary>
+    Task<PagedResult<RecordResponse>> GetPaged(Guid userId, int? recordTypeId, DateTime? from, DateTime? to, int pageNumber, int pageSize);
+
     /// <summary>Saves the record and its values in one transaction and updates the rules that read
     /// its fields. Empty values are not stored; at least one value is required.</summary>
     Task<RecordResponse> Create(RecordRequest request, Guid userId);

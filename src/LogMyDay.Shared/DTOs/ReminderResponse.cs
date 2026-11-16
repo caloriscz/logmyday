@@ -20,6 +20,10 @@ public class ReminderResponse
     public int? CompletionTagId { get; set; }
     public string? CompletionTagName { get; set; }
     public int? CompletionTagInputTypeId { get; set; }
+
+    /// <summary>The completion target is a record type: completing opens its record form, and the
+    /// completion names the saved record.</summary>
+    public bool CompletionIsRecordType { get; set; }
     public bool AllowUnfilled { get; set; }
 
     public bool IsTagDayLocked { get; set; }

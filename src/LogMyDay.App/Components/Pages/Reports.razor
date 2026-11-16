@@ -455,6 +455,7 @@ private string GenerateHtmlContent(List<ActivityExportRow> activities)
         sb.AppendLine("        .activity-tag { color: #3730a3; font-weight: 600; }");
         sb.AppendLine("        .activity-desc { color: #475569; }");
         sb.AppendLine("        .activity-separator { color: #94a3b8; margin: 0 4px; }");
+        sb.AppendLine("        .activity-record { color: #94a3b8; margin-left: 6px; font-size: 0.85em; }");
         sb.AppendLine("        .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 0.85em; }");
         
         if (state.HtmlFormat == HtmlExportFormat.Table)
@@ -480,6 +481,8 @@ private string GenerateHtmlContent(List<ActivityExportRow> activities)
         sb.AppendLine("        <h1>LogMyDay Activity Report</h1>");
         sb.AppendLine($"        <div class='subtitle'>Generated on {DateTime.Now:MMMM dd, yyyy 'at' HH:mm}</div>");
 
+        // Record fields' values name their record; the table gets a Record column only when some do.
+        var hasRecords = activities.Any(a => a.Record != null);
         var years = activities.Select(a => a.DateStarted.Year).Distinct().OrderBy(y => y).ToList();
         if (years.Count > 0)
         {
@@ -521,6 +524,11 @@ private string GenerateHtmlContent(List<ActivityExportRow> activities)
                             sb.Append("<span class='activity-separator'>-</span>");
                             sb.Append($"<span class='activity-desc'>{System.Net.WebUtility.HtmlEncode(activity.Description)}</span>");
                         }
+
+                        if (activity.Record != null)
+                        {
+                            sb.Append($"<span class='activity-record'>({System.Net.WebUtility.HtmlEncode(activity.Record)})</span>");
+                        }
                         
                         sb.AppendLine("</div>");
                     }
@@ -537,6 +545,11 @@ private string GenerateHtmlContent(List<ActivityExportRow> activities)
                 sb.AppendLine("                    <th class='col-date'>Date</th>");
                 sb.AppendLine("                    <th class='col-tag'>Tag</th>");
                 sb.AppendLine("                    <th class='col-desc'>Description</th>");
+                if (hasRecords)
+                {
+                    sb.AppendLine("                    <th class='col-tag'>Record</th>");
+                }
+
                 sb.AppendLine("                </tr>");
                 sb.AppendLine("            </thead>");
                 sb.AppendLine("            <tbody>");
@@ -550,6 +563,11 @@ private string GenerateHtmlContent(List<ActivityExportRow> activities)
                     sb.AppendLine($"                    <td class='col-date'>{activity.DateStarted.ToString(dateFormat)}</td>");
                     sb.AppendLine($"                    <td class='col-tag'>{System.Net.WebUtility.HtmlEncode(activity.Tag)}</td>");
                     sb.AppendLine($"                    <td class='col-desc'>{System.Net.WebUtility.HtmlEncode(activity.Description)}</td>");
+                    if (hasRecords)
+                    {
+                        sb.AppendLine($"                    <td class='col-tag'>{System.Net.WebUtility.HtmlEncode(activity.Record ?? string.Empty)}</td>");
+                    }
+
                     sb.AppendLine("                </tr>");
                 }
 

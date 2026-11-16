@@ -22,6 +22,10 @@ public class TodoItemResponse
     public string? CompletionTagName { get; set; }
     public int? CompletionTagInputTypeId { get; set; }
 
+    /// <summary>The completion target is a record type: completing opens its record form, and the
+    /// completion names the saved record.</summary>
+    public bool CompletionIsRecordType { get; set; }
+
     // Compat shims — Reminder-only fields moved to ReminderResponse. These properties
     // remain as source-compat for razor markup not yet stripped; the server never sets them.
     public int? MonitorDaysBack { get; set; }

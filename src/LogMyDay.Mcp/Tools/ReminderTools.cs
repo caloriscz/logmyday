@@ -142,11 +142,12 @@ public sealed class ReminderTools(
 
     [McpServerTool(Name = "complete_reminder", Title = "Complete reminder", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Marks a reminder done for the day containing doneAt (default now). SIDE EFFECT: when the reminder has a completion tag, an activity is logged to it — completionValue (encoded for the tag) or, if omitted, the reminder's notes as the value; autoLogMode ResetIfExists replaces that day's row instead of adding. A backfilled doneAt in the past is fine. Fails with tag-day-locked when the tag is locked for that day.")]
+    [Description("Marks a reminder done for the day containing doneAt (default now). SIDE EFFECT: when the reminder has a completion tag, an activity is logged to it — completionValue (encoded for the tag) or, if omitted, the reminder's notes as the value; autoLogMode ResetIfExists replaces that day's row instead of adding. A backfilled doneAt in the past is fine. Fails with tag-day-locked when the tag is locked for that day. When the completion target is a record type (completionIsRecordType), nothing is logged here: log the record with log_record first and pass its recordId.")]
     public async Task<ReminderResponse> CompleteReminder(
         [Description("Reminder id.")] int reminderId,
         [Description("When it was done: yyyy-MM-ddTHH:mm in the user's local time, or ISO-8601 with offset; default now.")] string? doneAt = null,
-        [Description("Value to log to the completion tag (number, string or boolean).")] JsonElement? completionValue = null)
+        [Description("Value to log to the completion tag (number, string or boolean).")] JsonElement? completionValue = null,
+        [Description("For a record type target: the id of the record logged for this reminder.")] int? recordId = null)
     {
         var zone = await clock.Zone(user.UserId);
         var doneUtc = doneAt == null ? DateTime.UtcNow : DateArguments.ParseUtc(doneAt, "doneAt", zone);
@@ -165,7 +166,7 @@ public sealed class ReminderTools(
             encoded = ValueEncoder.Encode(tag, value, options);
         }
 
-        return await reminders.Complete(reminderId, new ReminderCompleteRequest { DoneAt = doneUtc, CompletionValue = encoded }, user.UserId);
+        return await reminders.Complete(reminderId, new ReminderCompleteRequest { DoneAt = doneUtc, CompletionValue = encoded, RecordId = recordId }, user.UserId);
     }
 
     [McpServerTool(Name = "reopen_reminder", Title = "Reopen reminder", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]

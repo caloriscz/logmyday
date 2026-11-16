@@ -1,6 +1,8 @@
+using System.Globalization;
 using ClosedXML.Excel;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
+using LogMyDay.Domain.Constants;
 using LogMyDay.Shared.DTOs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -251,7 +253,12 @@ public class ExportService : IExcelExportService
             if (request.FreezeFirstRow && rowIndex > 1)
             {
                 worksheet.SheetView.FreezeRows(1);
-            }// Create summary sheet
+            }
+
+            // Records: values measured together stay on one row of their record type's sheet.
+            await AddRecordSheets(workbook, request, selectedTags.Select(t => t.Id).ToList());
+
+            // Create summary sheet
             var summarySheet = workbook.Worksheets.Add("Summary");
 
             summarySheet.Cell(1, 1).Value = "LogMyDay Activities Overview Report";
@@ -337,6 +344,98 @@ public class ExportService : IExcelExportService
             result.Message = $"Failed to generate Excel report: {ex.Message}";
             return result;
         }
+    }
+
+    // One sheet per record type with a selected field: a row per record (date, time) and a column
+    // per field in form order, so values measured together stay together.
+    private async Task AddRecordSheets(XLWorkbook workbook, ExcelExportRequest request, IReadOnlyCollection<int> selectedTagIds)
+    {
+        var types = await _context.Tags
+            .AsNoTracking()
+            .Include(t => t.RecordFields).ThenInclude(f => f.Unit)
+            .Where(t => t.UserId == request.UserId && t.IsRecordType && t.RecordFields.Any(f => selectedTagIds.Contains(f.Id)))
+            .OrderBy(t => t.TagName)
+            .ToListAsync();
+
+        foreach (var type in types)
+        {
+            var fields = type.RecordFields.OrderBy(f => f.RecordFieldOrder).ThenBy(f => f.Id).ToList();
+            var recordsQuery = _context.Records
+                .AsNoTracking()
+                .Include(r => r.Values)
+                .Where(r => r.UserId == request.UserId && r.RecordTypeId == type.Id);
+            if (request.StartDate.HasValue && request.EndDate.HasValue)
+            {
+                recordsQuery = recordsQuery.Where(r => r.DateStarted.Date >= request.StartDate.Value.Date && r.DateStarted.Date <= request.EndDate.Value.Date);
+            }
+
+            var records = await recordsQuery.OrderBy(r => r.DateStarted).ThenBy(r => r.Id).ToListAsync();
+
+            var sheet = workbook.Worksheets.Add(SheetName(workbook, type.TagName));
+            sheet.Cell(1, 1).Value = "Date";
+            sheet.Cell(1, 2).Value = "Time";
+            for (var i = 0; i < fields.Count; i++)
+            {
+                var unit = fields[i].Unit?.Symbol;
+                sheet.Cell(1, i + 3).Value = RecordFieldValues.FieldName(type.TagName, fields[i].TagName) + (unit != null ? $" ({unit})" : string.Empty);
+            }
+
+            var header = sheet.Range(1, 1, 1, fields.Count + 2);
+            header.Style.Font.Bold = true;
+            header.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            var row = 2;
+            foreach (var record in records)
+            {
+                sheet.Cell(row, 1).Value = record.DateStarted.Date;
+                sheet.Cell(row, 1).Style.NumberFormat.Format = "dd/mm/yyyy";
+                sheet.Cell(row, 2).Value = record.DateStarted.ToString("HH:mm", CultureInfo.InvariantCulture);
+                for (var i = 0; i < fields.Count; i++)
+                {
+                    var value = record.Values.FirstOrDefault(v => v.TagId == fields[i].Id)?.Description;
+                    if (value == null)
+                    {
+                        continue;
+                    }
+
+                    if (fields[i].OptionListId == null && TagRuleInputTypes.IsNumeric(fields[i].InputTypeId)
+                        && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+                    {
+                        sheet.Cell(row, i + 3).Value = number;
+                    }
+                    else
+                    {
+                        sheet.Cell(row, i + 3).Value = value;
+                    }
+                }
+
+                row++;
+            }
+
+            sheet.ColumnsUsed().AdjustToContents();
+            if (request.FreezeFirstRow)
+            {
+                sheet.SheetView.FreezeRows(1);
+            }
+        }
+    }
+
+    // Excel sheet names have at most 31 characters, none of : \ / ? * [ ], no apostrophe at either
+    // end, and are unique. "Summary" is added after the record sheets, so it is kept free.
+    private static string SheetName(XLWorkbook workbook, string name)
+    {
+        var clean = new string(name.Where(c => !":\\/?*[]".Contains(c)).ToArray()).Trim().Trim('\'');
+        clean = clean.Length == 0 ? "Record" : clean;
+        clean = clean.Length > 31 ? clean[..31].TrimEnd('\'') : clean;
+
+        var candidate = clean;
+        for (var n = 2; workbook.Worksheets.Contains(candidate) || string.Equals(candidate, "Summary", StringComparison.OrdinalIgnoreCase); n++)
+        {
+            var suffix = $" ({n})";
+            candidate = (clean.Length + suffix.Length > 31 ? clean[..(31 - suffix.Length)] : clean) + suffix;
+        }
+
+        return candidate;
     }
 
     public async Task<List<TagResponse>> GetAvailableTags(Guid userId)
@@ -465,6 +564,8 @@ public class ExportService : IExcelExportService
             var rawActivities = await query
                 .Include(a => a.Tag)
                     .ThenInclude(t => t.Group)
+                .Include(a => a.Tag)
+                    .ThenInclude(t => t.RecordType)
                 .OrderByDescending(a => a.DateStarted)
                 .ToListAsync();
 
@@ -475,7 +576,8 @@ public class ExportService : IExcelExportService
                     Tag = a.Tag.Group != null ? $"{a.Tag.Group.Name}: {a.Tag.TagName}" : a.Tag.TagName,
                     Description = a.Description ?? "",
                     TimeGranularity = (int)a.Tag.TimeGranularity,
-                    Generated = a.RuleId != null
+                    Generated = a.RuleId != null,
+                    Record = a.RecordId is int recordId ? $"{a.Tag.RecordType?.TagName ?? "Record"} #{recordId}" : null
                 })
                 .ToList();
 

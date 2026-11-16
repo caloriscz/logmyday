@@ -198,14 +198,15 @@ public sealed class TodoTools(
 
     [McpServerTool(Name = "complete_todo_item", Title = "Complete todo item", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Marks an item done at doneAt (default now). SIDE EFFECT: when the list has a completion tag, an activity with the item's TITLE as its value is logged to that tag (ResetIfExists reuses the day's row). There is no separate completion value. Fails with tag-day-locked when the tag is locked for that day.")]
+    [Description("Marks an item done at doneAt (default now). SIDE EFFECT: when the list has a completion tag, an activity with the item's TITLE as its value is logged to that tag (ResetIfExists reuses the day's row). There is no separate completion value. Fails with tag-day-locked when the tag is locked for that day. When the list's completion target is a record type (completionIsRecordType), nothing is logged here: log the record with log_record first and pass its recordId.")]
     public async Task<TodoItemResponse> CompleteTodoItem(
         [Description("Item id.")] int itemId,
-        [Description("yyyy-MM-ddTHH:mm in the user's local time, or ISO-8601 with offset; default now.")] string? doneAt = null)
+        [Description("yyyy-MM-ddTHH:mm in the user's local time, or ISO-8601 with offset; default now.")] string? doneAt = null,
+        [Description("For a record type target: the id of the record logged for this item.")] int? recordId = null)
     {
         var doneUtc = doneAt == null ? DateTime.UtcNow : DateArguments.ParseUtc(doneAt, "doneAt", await clock.Zone(user.UserId));
 
-        return await items.Complete(itemId, new TodoItemCompleteRequest { DoneAt = doneUtc }, user.UserId);
+        return await items.Complete(itemId, new TodoItemCompleteRequest { DoneAt = doneUtc, RecordId = recordId }, user.UserId);
     }
 
     [McpServerTool(Name = "reopen_todo_item", Title = "Reopen todo item", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]

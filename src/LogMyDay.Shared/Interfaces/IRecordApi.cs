@@ -21,6 +21,11 @@ public interface IRecordApi
     [Delete("/api/record-types/{id}")]
     Task DeleteRecordType(int id);
 
+    /// <summary>Records, newest first, optionally of one record type and between two days
+    /// (yyyy-MM-dd, inclusive).</summary>
+    [Get("/api/records")]
+    Task<PagedResult<RecordResponse>> GetRecords(int? recordTypeId = null, string? from = null, string? to = null, int page = 1, int pageSize = 50);
+
     [Get("/api/records/{id}")]
     Task<RecordResponse> GetRecordById(int id);
 
