@@ -8,6 +8,7 @@
 @inject ILogger<TagRules> Logger
 @inject IPageTitleService PageTitleService
 @inject IUserPreferencesService UserPreferencesService
+@inject NavigationManager Navigation
 
 <PageTitle>Rules - LogMyDay</PageTitle>
 
@@ -84,6 +85,24 @@
                 </div>
             }
         }
+    </section>
+
+    <section class="space-y-3 pt-2">
+        <div class="space-y-1">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Checks</h2>
+                <p class="text-sm text-gray-600 dark:text-slate-400">What should hold on a day, e.g. Fasting and Breakfast are not on the same day. Checks change nothing; the Rule review lists the days that break them.</p>
+        </div>
+        <div class="flex gap-2">
+            <button type="button" class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 disabled:opacity-60" @onclick="() => checksManager?.OpenCreate()">
+                <Icon Name="plus" Class="h-4 w-4" />
+                New Check
+            </button>
+            <button type="button" class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700" @onclick='() => Navigation.NavigateTo("/tag-rules/review")'>
+                <Icon Name="search" Class="h-4 w-4" />
+                Rule review
+            </button>
+        </div>
+        <TagChecksManager @ref="checksManager" />
     </section>
     </div>
 </div>
@@ -258,6 +277,7 @@
     private int? editingId;
     private bool showModal;
     private TagRuleResponse? pendingDelete;
+    private TagChecksManager? checksManager;
     private System.Globalization.CultureInfo displayCulture = System.Globalization.CultureInfo.CurrentCulture;
 
     // Past-days recompute dialog

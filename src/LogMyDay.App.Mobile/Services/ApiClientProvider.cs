@@ -15,6 +15,7 @@ public interface IApiClientProvider
     ITagGroupApi TagGroup { get; }
     IColorSchemeApi ColorScheme { get; }
     ITagRuleApi TagRule { get; }
+    ITagCheckApi TagCheck { get; }
     IRecordApi Record { get; }
     IAiApi Ai { get; }
     ITodoApi Todo { get; }
@@ -36,6 +37,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     private ITagGroupApi? _tagGroup;
     private IColorSchemeApi? _colorScheme;
     private ITagRuleApi? _tagRule;
+    private ITagCheckApi? _tagCheck;
     private IRecordApi? _record;
     private IAiApi? _ai;
     private ITodoApi? _todo;
@@ -58,6 +60,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
     public ITagGroupApi TagGroup => _tagGroup ??= Build<ITagGroupApi>();
     public IColorSchemeApi ColorScheme => _colorScheme ??= Build<IColorSchemeApi>();
     public ITagRuleApi TagRule => _tagRule ??= Build<ITagRuleApi>();
+    public ITagCheckApi TagCheck => _tagCheck ??= Build<ITagCheckApi>();
     public IRecordApi Record => _record ??= Build<IRecordApi>();
     public IAiApi Ai => _ai ??= Build<IAiApi>();
     public ITodoApi Todo => _todo ??= Build<ITodoApi>();
@@ -92,6 +95,7 @@ public class ApiClientProvider : IApiClientProvider, IDisposable
         _tagGroup = null;
         _colorScheme = null;
         _tagRule = null;
+        _tagCheck = null;
         _record = null;
         _ai = null;
         _todo = null;

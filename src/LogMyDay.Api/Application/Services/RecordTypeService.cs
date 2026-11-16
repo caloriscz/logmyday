@@ -96,7 +96,7 @@ public class RecordTypeService : IRecordTypeService
         var removedIds = removed.Select(f => f.Id).ToList();
         if (removedIds.Count > 0)
         {
-            await EnsureNotRuleSource(removedIds);
+            await EnsureNotReadByRulesOrChecks(removedIds);
         }
 
         await using var transaction = await BeginWriteTransaction();
@@ -153,7 +153,7 @@ public class RecordTypeService : IRecordTypeService
         var fieldIds = type.RecordFields.Select(f => f.Id).ToList();
         if (fieldIds.Count > 0)
         {
-            await EnsureNotRuleSource(fieldIds);
+            await EnsureNotReadByRulesOrChecks(fieldIds);
         }
 
         await using var transaction = await BeginWriteTransaction();
@@ -310,9 +310,9 @@ public class RecordTypeService : IRecordTypeService
         tag.RecordFieldOrder = order;
     }
 
-    // A field a rule reads stays until the rule is changed or deleted (the database would refuse
-    // it anyway: Restrict), as for any tag.
-    private async Task EnsureNotRuleSource(List<int> tagIds)
+    // A field a rule or a check reads stays until the rule or check is changed or deleted (the
+    // database would refuse it anyway: Restrict), as for any tag.
+    private async Task EnsureNotReadByRulesOrChecks(List<int> tagIds)
     {
         var use = await _context.TagRuleSources
             .Where(s => tagIds.Contains(s.SourceTagId))
@@ -322,6 +322,17 @@ public class RecordTypeService : IRecordTypeService
         {
             throw new InvalidOperationException(
                 $"Field '{use.TagName}' is in use by rule '{use.RuleName}'. Change or delete the rule first.");
+        }
+
+        var check = await _context.TagChecks
+            .Where(c => tagIds.Contains(c.IfTagId) || tagIds.Contains(c.ThenTagId))
+            .Select(c => new { c.Name, c.IfTagId, IfName = c.IfTag!.TagName, ThenName = c.ThenTag!.TagName })
+            .FirstOrDefaultAsync();
+        if (check != null)
+        {
+            var field = tagIds.Contains(check.IfTagId) ? check.IfName : check.ThenName;
+            throw new InvalidOperationException(
+                $"Field '{field}' is in use by check '{check.Name}'. Change or delete the check first.");
         }
     }
 

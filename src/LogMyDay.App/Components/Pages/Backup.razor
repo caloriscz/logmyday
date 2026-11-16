@@ -55,6 +55,10 @@
                                 <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTagRules</dd>
                             </div>
                             <div>
+                                <dt class="font-medium text-gray-600 dark:text-slate-400">Checks</dt>
+                                <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalTagChecks</dd>
+                            </div>
+                            <div>
                                 <dt class="font-medium text-gray-600 dark:text-slate-400">Input Types</dt>
                                 <dd class="text-gray-900 dark:text-slate-200">@backupInfo.Metadata.TotalInputTypes</dd>
                             </div>
@@ -301,6 +305,10 @@
                                     <div class="flex justify-between">
                                         <dt class="font-medium text-gray-600 dark:text-slate-400">Rules:</dt>
                                         <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TagRulesImported imported, @importResult.Statistics.TagRulesSkipped skipped, @importResult.Statistics.TagRuleValuesComputed values calculated</dd>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <dt class="font-medium text-gray-600 dark:text-slate-400">Checks:</dt>
+                                        <dd class="text-gray-900 dark:text-slate-200">@importResult.Statistics.TagChecksImported imported, @importResult.Statistics.TagChecksSkipped skipped</dd>
                                     </div>
                                     <div class="flex justify-between">
                                         <dt class="font-medium text-gray-600 dark:text-slate-400">Todo Lists:</dt>

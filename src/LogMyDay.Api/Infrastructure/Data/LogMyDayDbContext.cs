@@ -34,6 +34,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
     public DbSet<TagRuleCase> TagRuleCases => Set<TagRuleCase>();
+    public DbSet<TagCheck> TagChecks => Set<TagCheck>();
     public DbSet<Record> Records => Set<Record>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -67,6 +68,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagRule>().ToTable("LogMyDay_TagRules");
         modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
         modelBuilder.Entity<TagRuleCase>().ToTable("LogMyDay_TagRuleCases");
+        modelBuilder.Entity<TagCheck>().ToTable("LogMyDay_TagChecks");
         modelBuilder.Entity<Record>().ToTable("LogMyDay_Records");
 
         // Configure Setting entity
@@ -370,6 +372,35 @@ public class LogMyDayDbContext : DbContext
             entity.Property(c => c.Operator).HasConversion<int>();
             entity.Property(c => c.Operand).HasMaxLength(500);
             entity.Property(c => c.ResultValue).HasMaxLength(500).IsRequired();
+        });
+
+        // Checks read two tags and write nothing. Like rule tags, a checked tag cannot be deleted
+        // while the check exists (Restrict); TagService checks first and names the check.
+        modelBuilder.Entity<TagCheck>(entity =>
+        {
+            entity.HasOne(c => c.IfTag)
+                .WithMany()
+                .HasForeignKey(c => c.IfTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(c => c.ThenTag)
+                .WithMany()
+                .HasForeignKey(c => c.ThenTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(c => c.UserId).HasDatabaseName("IX_LogMyDay_TagChecks_UserId");
+            entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
+            entity.Property(c => c.Severity).HasConversion<int>();
+            entity.Property(c => c.IfOperator).HasConversion<int>();
+            entity.Property(c => c.IfOperand).HasMaxLength(500);
+            entity.Property(c => c.ThenOperator).HasConversion<int>();
+            entity.Property(c => c.ThenOperand).HasMaxLength(500);
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(c => c.DateCreated).HasColumnType("datetime2");
+                entity.Property(c => c.DateUpdated).HasColumnType("datetime2");
+            }
         });
 
         // Generated rows: one per (RuleId, WindowKey). The FK to TagRule lives only in the model;

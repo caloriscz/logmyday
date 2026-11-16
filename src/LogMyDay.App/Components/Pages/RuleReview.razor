@@ -1,0 +1,45 @@
+@page "/tag-rules/review"
+
+@using LogMyDay.App.Services
+@inject ILogger<RuleReview> Logger
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+
+@attribute [LogMyDay.Shared.Attributes.AiNavigableRoute("RuleReview", "Review the days that break one of the user's checks")]
+
+<div class="mx-auto max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <PageHeader Title="Rule review" Subtitle="The days that break one of your checks. Nothing is changed.">
+        <Actions>
+            <a href="/tag-rules" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                <Icon Name="arrow-left" Class="h-4 w-4" />
+                Rules
+            </a>
+        </Actions>
+    </PageHeader>
+
+    @if (cultureLoaded)
+    {
+        <TagCheckReview Culture="displayCulture" />
+    }
+</div>
+
+@code {
+    private System.Globalization.CultureInfo displayCulture = System.Globalization.CultureInfo.CurrentCulture;
+    private bool cultureLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Rule review");
+
+        try
+        {
+            displayCulture = (await UserPreferencesService.GetAsync()).Culture;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load user preferences; using the server culture");
+        }
+
+        cultureLoaded = true;
+    }
+}

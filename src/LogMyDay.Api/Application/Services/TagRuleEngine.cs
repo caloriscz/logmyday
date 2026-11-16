@@ -203,7 +203,7 @@ public class TagRuleEngine : ITagRuleEngine
             .Where(s => s.SourceTag is { InputTypeId: InputTypeIds.Boolean, OptionListId: null })
             .Select(s => s.SourceTagId)
             .ToHashSet();
-        var counted = rows.Where(r => !(rule.IgnoreZero && IsSkipMarker(r.Description, yesNoTags.Contains(r.TagId)))).ToList();
+        var counted = rows.Where(r => !(rule.IgnoreZero && TagDayValue.IsSkipMarker(r.Description, yesNoTags.Contains(r.TagId)))).ToList();
 
         if (rule.Template == TagRuleTemplate.Conditional)
         {
@@ -250,9 +250,8 @@ public class TagRuleEngine : ITagRuleEngine
     }
 
     // The first case whose condition holds on the day value gives the result; none → no value.
-    // The day value is the day total for a number source, the day average for a rating, score or
-    // percentage, and the latest entry otherwise (an option-list tag is compared by its option).
-    // A day without a counted entry has no value at all, so "otherwise" applies only to logged days.
+    // The day value is read as TagDayValue reads it for checks too. A day without a counted entry
+    // has no value at all, so "otherwise" applies only to logged days.
     private static string? ConditionalValue(TagRule rule, List<SourceRow> counted)
     {
         if (counted.Count == 0)
@@ -264,94 +263,17 @@ public class TagRuleEngine : ITagRuleEngine
         var kind = source != null
             ? TagRuleInputTypes.ConditionKind(source.InputTypeId, source.OptionListId != null)
             : TagRuleValueKind.Text;
-
-        double? dayNumber = null;
-        string? dayText = null;
-        if (kind is TagRuleValueKind.Number or TagRuleValueKind.Scale)
-        {
-            var numbers = counted
-                .Select(r => ActivityValueCodec.TryReadNumber(r.Description, out var n) ? (double?)n : null)
-                .Where(n => n.HasValue)
-                .Select(n => n!.Value)
-                .ToList();
-            if (numbers.Count > 0)
-            {
-                dayNumber = kind == TagRuleValueKind.Scale ? numbers.Average() : numbers.Sum();
-            }
-        }
-        else
-        {
-            // Entries at the same moment resolve by id, so a recompute always picks the same one.
-            dayText = counted.OrderBy(r => r.DateStarted).ThenBy(r => r.Id).Last().Description?.Trim();
-        }
+        var day = TagDayValue.Read(kind, counted.Select(r => new TagDayValue.Entry(r.Id, r.DateStarted, r.Description)).ToList());
 
         foreach (var ruleCase in rule.Cases.OrderBy(c => c.SortOrder))
         {
-            if (Holds(ruleCase, kind, dayNumber, dayText))
+            if (TagDayValue.Holds(ruleCase.Operator, ruleCase.Operand, kind, day))
             {
                 return ruleCase.ResultValue;
             }
         }
 
         return null;
-    }
-
-    // Day totals and averages carry binary rounding (0.1 + 0.2 is not exactly 0.3), so equality
-    // allows a relative tolerance far below any value a person logs.
-    private const double Tolerance = 1e-9;
-
-    private static bool Holds(TagRuleCase ruleCase, TagRuleValueKind kind, double? dayNumber, string? dayText)
-    {
-        switch (ruleCase.Operator)
-        {
-            case TagRuleOperator.IsLogged:
-            case TagRuleOperator.Otherwise:
-                return true;
-            case TagRuleOperator.IsYes:
-                return ActivityValueCodec.TryReadYesNo(dayText, out var yes) && yes;
-            case TagRuleOperator.IsNo:
-                return ActivityValueCodec.TryReadYesNo(dayText, out var no) && !no;
-        }
-
-        if (kind is TagRuleValueKind.Number or TagRuleValueKind.Scale)
-        {
-            if (dayNumber is not double day || !ActivityValueCodec.TryReadNumber(ruleCase.Operand, out var operand))
-            {
-                return false;
-            }
-
-            var equal = Math.Abs(day - operand) <= Tolerance * Math.Max(1, Math.Max(Math.Abs(day), Math.Abs(operand)));
-
-            return ruleCase.Operator switch
-            {
-                TagRuleOperator.Equal => equal,
-                TagRuleOperator.NotEqual => !equal,
-                TagRuleOperator.Greater => !equal && day > operand,
-                TagRuleOperator.GreaterOrEqual => equal || day > operand,
-                TagRuleOperator.Less => !equal && day < operand,
-                TagRuleOperator.LessOrEqual => equal || day < operand,
-                _ => false
-            };
-        }
-
-        var matches = string.Equals(dayText, ruleCase.Operand?.Trim(), StringComparison.OrdinalIgnoreCase);
-
-        return ruleCase.Operator switch
-        {
-            TagRuleOperator.Equal => matches,
-            TagRuleOperator.NotEqual => !matches,
-            _ => false
-        };
-    }
-
-    private static bool IsSkipMarker(string? description, bool yesNoTag)
-    {
-        if (yesNoTag)
-        {
-            return ActivityValueCodec.TryReadYesNo(description, out var yes) && !yes;
-        }
-
-        return ActivityValueCodec.TryReadNumber(description, out var number) && number == 0;
     }
 
     private static string WindowKey(DateOnly day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

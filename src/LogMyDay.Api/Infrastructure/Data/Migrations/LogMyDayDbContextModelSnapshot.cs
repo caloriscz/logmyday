@@ -772,6 +772,64 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Tags", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagCheck", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateUpdated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IfOperand")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("IfOperator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("IfTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Severity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ThenOperand")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ThenOperator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ThenTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IfTagId");
+
+                    b.HasIndex("ThenTagId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_TagChecks_UserId");
+
+                    b.ToTable("LogMyDay_TagChecks", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagDayLock", b =>
                 {
                     b.Property<int>("Id")
@@ -1363,6 +1421,25 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("RecordType");
 
                     b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagCheck", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "IfTag")
+                        .WithMany()
+                        .HasForeignKey("IfTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "ThenTag")
+                        .WithMany()
+                        .HasForeignKey("ThenTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("IfTag");
+
+                    b.Navigation("ThenTag");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TagDayLock", b =>

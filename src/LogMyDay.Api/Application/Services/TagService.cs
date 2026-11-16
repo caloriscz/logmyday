@@ -196,6 +196,16 @@ public class TagService : ITagService
                     $"Tag '{link.TagName}' is in use by rule {string.Join(", ", ruleNames.Select(n => $"'{n}'"))}. Change or delete the rule first.");
             }
 
+            var checkNames = await _context.TagChecks
+                .Where(c => c.IfTagId == id || c.ThenTagId == id)
+                .Select(c => c.Name)
+                .ToListAsync();
+            if (checkNames.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Tag '{link.TagName}' is in use by check {string.Join(", ", checkNames.Select(n => $"'{n}'"))}. Change or delete the check first.");
+            }
+
             _context.Tags.Remove(link);
             await _context.SaveChangesAsync();
         }

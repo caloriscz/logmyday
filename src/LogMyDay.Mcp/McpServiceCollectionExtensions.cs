@@ -51,6 +51,7 @@ public static class McpServiceCollectionExtensions
             .WithTools<UnitTools>(McpJson.Options)
             .WithTools<ColorSchemeTools>(McpJson.Options)
             .WithTools<TagRuleTools>(McpJson.Options)
+            .WithTools<TagCheckTools>(McpJson.Options)
             .WithTools<InputTypeTools>(McpJson.Options)
             .WithTools<ReminderTools>(McpJson.Options)
             .WithTools<TodoTools>(McpJson.Options)

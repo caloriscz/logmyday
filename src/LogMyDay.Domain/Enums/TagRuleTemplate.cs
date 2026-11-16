@@ -40,7 +40,11 @@ public enum TagRuleOperator
     Less = 6,
     LessOrEqual = 7,
     IsYes = 8,
-    IsNo = 9
+    IsNo = 9,
+
+    /// <summary>The tag has no entry that happened that day (skip markers do not count). Only
+    /// on a check's expectation; rules refuse it.</summary>
+    IsNotLogged = 10
 }
 
 /// <summary>How a conditional rule reads its source tag's day value and which tests apply.</summary>

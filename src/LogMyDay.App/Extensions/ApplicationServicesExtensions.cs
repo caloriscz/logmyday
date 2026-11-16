@@ -35,6 +35,7 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IColorSchemeService, ColorSchemeService>();
         services.AddScoped<ITagRuleEngine, TagRuleEngine>();
         services.AddScoped<ITagRuleService, TagRuleService>();
+        services.AddScoped<ITagCheckService, TagCheckService>();
         services.AddScoped<IRecordTypeService, RecordTypeService>();
         services.AddScoped<IRecordService, RecordService>();
         services.AddScoped<IApiKeyService, ApiKeyService>();
