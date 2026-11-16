@@ -587,6 +587,64 @@ public sealed class RecordTests : IDisposable
         Assert.Equal(restoredType.Id, (await _context.Reminders.SingleAsync()).CompletionTagId);
     }
 
+    [Fact]
+    public async Task ListingRecords_FiltersByTypeAndTime_NewestFirst()
+    {
+        var pressure = await BloodPressure();
+        var run = await _types.Create(new RecordTypeRequest { Name = "Run", Fields = [Field("Distance", InputTypeIds.Decimal)] }, _userId);
+        var morning = await Log(pressure, At(7), "128");
+        var evening = await Log(pressure, At(19), "120");
+        await Log(pressure, At(7, daysAgo: 2), "130");
+        await Log(run, At(6), "5");
+
+        var today = await _records.GetPaged(_userId, pressure.Id, At(0), At(23), 1, 50);
+
+        Assert.Equal(2, today.TotalCount);
+        Assert.Equal([evening.Id, morning.Id], today.Items.Select(r => r.Id));
+        Assert.Equal(["Systolic"], today.Items[0].Values.Select(v => v.FieldName));
+        Assert.Equal(4, (await _records.GetPaged(_userId, null, null, null, 1, 50)).TotalCount);
+        var firstPage = await _records.GetPaged(_userId, null, null, null, 1, 3);
+        Assert.Equal(3, firstPage.Items.Count);
+        Assert.Equal(4, firstPage.TotalCount);
+    }
+
+    [Fact]
+    public async Task TheExcelReport_HasASheetPerRecordType_WithARowPerRecord()
+    {
+        var type = await _types.Create(new RecordTypeRequest
+        {
+            Name = "Blood pressure",
+            Fields = [Field("Systolic"), Field("Note", InputTypeIds.String)]
+        }, _userId);
+        await Log(type, At(19), "120", null);
+        await Log(type, At(7), "128", "after coffee");
+        var plain = await AddTag("Plain");
+        await _activities.Create(new ActivityRequest { PrimaryTagId = plain.Id, DateStarted = At(9), Description = "1" }, _userId);
+        var export = new ExportService(_context, NullLogger<ExportService>.Instance);
+
+        var result = await export.GenerateExcelReport(new ExcelExportRequest
+        {
+            UserId = _userId,
+            TagIds = [type.Fields[0].TagId, plain.Id]
+        });
+
+        Assert.True(result.Success, result.Message);
+        using var workbook = new ClosedXML.Excel.XLWorkbook(new MemoryStream(result.FileContent!));
+        Assert.True(workbook.Worksheets.Contains("Blood pressure"));
+        var sheet = workbook.Worksheet("Blood pressure");
+        Assert.Equal(["Date", "Time", "Systolic", "Note"], Enumerable.Range(1, 4).Select(c => sheet.Cell(1, c).GetString()));
+        Assert.Equal("07:00", sheet.Cell(2, 2).GetString());
+        Assert.Equal(128, sheet.Cell(2, 3).GetDouble());
+        Assert.Equal("after coffee", sheet.Cell(2, 4).GetString());
+        Assert.Equal("19:00", sheet.Cell(3, 2).GetString());
+        Assert.True(sheet.Cell(3, 4).IsEmpty());
+        Assert.True(sheet.Cell(4, 1).IsEmpty());
+
+        var rows = await export.GetActivitiesForExport(new ExcelExportRequest { UserId = _userId, TagIds = [type.Fields[0].TagId, plain.Id] });
+        Assert.All(rows.Where(r => r.Tag.StartsWith("Blood pressure", StringComparison.Ordinal)), r => Assert.StartsWith("Blood pressure #", r.Record));
+        Assert.Null(rows.Single(r => r.Tag == "Plain").Record);
+    }
+
     private async Task AssertRestored()
     {
         _context.ChangeTracker.Clear();

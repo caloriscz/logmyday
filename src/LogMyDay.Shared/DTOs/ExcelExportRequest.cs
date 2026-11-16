@@ -46,4 +46,8 @@ public class ActivityExportRow
 
     /// <summary>True for a value a Tag Activity Relations rule calculated.</summary>
     public bool Generated { get; set; }
+
+    /// <summary>For a record field's value: its record, e.g. "Workout #4". Values of one record
+    /// were measured together.</summary>
+    public string? Record { get; set; }
 }

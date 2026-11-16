@@ -37,6 +37,49 @@ public class RecordService : IRecordService
         return MapToResponse(record, type);
     }
 
+    public async Task<PagedResult<RecordResponse>> GetPaged(Guid userId, int? recordTypeId, DateTime? from, DateTime? to, int pageNumber, int pageSize)
+    {
+        var query = _context.Records.AsNoTracking().Where(r => r.UserId == userId);
+        if (recordTypeId is int typeId)
+        {
+            query = query.Where(r => r.RecordTypeId == typeId);
+        }
+
+        if (from is DateTime start)
+        {
+            query = query.Where(r => r.DateStarted >= start);
+        }
+
+        if (to is DateTime end)
+        {
+            query = query.Where(r => r.DateStarted <= end);
+        }
+
+        var totalCount = await query.CountAsync();
+        var records = await query
+            .Include(r => r.Values)
+            .OrderByDescending(r => r.DateStarted)
+            .ThenByDescending(r => r.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var typeIds = records.Select(r => r.RecordTypeId).Distinct().ToList();
+        var types = await _context.Tags
+            .AsNoTracking()
+            .Include(t => t.RecordFields).ThenInclude(f => f.Unit)
+            .Where(t => typeIds.Contains(t.Id) && t.UserId == userId && t.IsRecordType)
+            .ToDictionaryAsync(t => t.Id);
+
+        return new PagedResult<RecordResponse>
+        {
+            Items = records.Where(r => types.ContainsKey(r.RecordTypeId)).Select(r => MapToResponse(r, types[r.RecordTypeId])).ToList(),
+            TotalCount = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+    }
+
     public async Task<RecordResponse> Create(RecordRequest request, Guid userId)
     {
         var type = await LoadType(request.RecordTypeId, userId);

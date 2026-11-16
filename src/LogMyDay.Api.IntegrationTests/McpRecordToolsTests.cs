@@ -139,6 +139,69 @@ public class McpRecordToolsTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Records_CanBeListedChangedAndDeleted()
+    {
+        await using var client = await WriteClient();
+        var name = Unique("Pressure");
+        Ok(await client.CallAsync("create_record_type", new
+        {
+            name,
+            fields = new object[] { new { name = "Systolic", inputTypeId = InputTypeIds.Integer }, new { name = "Pulse", inputTypeId = InputTypeIds.Integer } }
+        }));
+        var first = Ok(await client.CallAsync("log_record", new { recordType = name, dateTime = "2026-10-20T07:00", values = new object[] { new { field = "Systolic", value = (object)128 }, new { field = "Pulse", value = (object)64 } } }));
+        Ok(await client.CallAsync("log_record", new { recordType = name, dateTime = "2026-10-21T07:00", values = new object[] { new { field = "Systolic", value = (object)122 } } }));
+
+        var listed = Ok(await client.CallAsync("list_records", new { recordType = name, from = "2026-10-20", to = "2026-10-20" }));
+        Assert.Equal(1, listed.GetProperty("totalCount").GetInt32());
+        var firstId = first.GetProperty("id").GetInt32();
+        Assert.Equal(firstId, listed.GetProperty("items")[0].GetProperty("id").GetInt32());
+
+        // Only the fields given change: Systolic is new, Pulse is emptied, and the time moves.
+        var updated = Ok(await client.CallAsync("update_record", new
+        {
+            recordId = firstId,
+            dateTime = "2026-10-20T08:30",
+            values = new object[] { new { field = "Systolic", value = (object)130 }, new { field = "Pulse", value = (object?)null } }
+        }));
+        Assert.Equal(["130"], updated.GetProperty("values").EnumerateArray().Select(v => v.GetProperty("value").GetString()));
+        Assert.Equal(new DateTime(2026, 10, 20, 8, 30, 0), updated.GetProperty("dateStarted").GetDateTime());
+
+        // A field's value names its record.
+        var activities = Ok(await client.CallAsync("list_activities", new { from = "2026-10-20", to = "2026-10-20", tag = $"{name}: Systolic" }));
+        Assert.Equal(firstId, activities.GetProperty("items")[0].GetProperty("recordId").GetInt32());
+
+        Ok(await client.CallAsync("delete_record", new { recordId = firstId }));
+        Assert.Equal(McpErrorMapper.NotFound, ErrorCode(await client.CallAsync("get_record", new { recordId = firstId })));
+    }
+
+    [Fact]
+    public async Task ChangingOrDeletingARecordType_AsksBeforeValuesGo()
+    {
+        await using var client = await WriteClient();
+        var name = Unique("Ride");
+        var type = Ok(await client.CallAsync("create_record_type", new
+        {
+            name,
+            fields = new object[] { new { name = "Distance", inputTypeId = InputTypeIds.Decimal }, new { name = "Effort", inputTypeId = InputTypeIds.StarRating } }
+        }));
+        var typeId = type.GetProperty("id").GetInt32();
+        var distanceId = type.GetProperty("fields")[0].GetProperty("tagId").GetInt32();
+        Ok(await client.CallAsync("log_record", new { recordType = name, values = new object[] { new { field = "Distance", value = (object)12.5 }, new { field = "Effort", value = (object)4 } } }));
+
+        // Renaming keeps the fields; leaving Effort out would delete its value, so it asks first.
+        var renamed = Ok(await client.CallAsync("update_record_type", new { recordType = typeId.ToString(), name = name + " bike" }));
+        Assert.Equal(2, renamed.GetProperty("fields").GetArrayLength());
+        var dropEffort = new { recordType = typeId.ToString(), fields = new object[] { new { tagId = distanceId, name = "Distance", inputTypeId = InputTypeIds.Decimal } } };
+        Assert.Equal(McpErrorMapper.ConfirmationRequired, ErrorCode(await client.CallAsync("update_record_type", dropEffort)));
+        var dropped = Ok(await client.CallAsync("update_record_type", new { dropEffort.recordType, dropEffort.fields, confirm = $"UPDATE_RECORD_TYPE_{typeId}" }));
+        Assert.Equal(["Distance"], dropped.GetProperty("fields").EnumerateArray().Select(f => f.GetProperty("name").GetString()));
+
+        Assert.Equal(McpErrorMapper.ConfirmationRequired, ErrorCode(await client.CallAsync("delete_record_type", new { recordType = typeId.ToString() })));
+        Ok(await client.CallAsync("delete_record_type", new { recordType = typeId.ToString(), confirm = $"DELETE_RECORD_TYPE_{typeId}" }));
+        Assert.DoesNotContain(Ok(await client.CallAsync("list_record_types")).EnumerateArray(), t => t.GetProperty("id").GetInt32() == typeId);
+    }
+
+    [Fact]
     public async Task ReadOnlyKey_CannotCreateARecordType()
     {
         await using var client = await McpTestClient.ConnectAsync(_factory, CustomWebApplicationFactory.ReadOnlyKeyToken);

@@ -22,7 +22,8 @@ public class McpToolContractTests
     private static readonly string[] SentinelTools =
     [
         "delete_tag", "delete_unit", "delete_todo_list", "admin_delete_user",
-        "restore_secure_backup", "clear_user_data", "admin_clear_all_data", "purge_event_log"
+        "restore_secure_backup", "clear_user_data", "admin_clear_all_data", "purge_event_log",
+        "delete_record_type"
     ];
 
     private static readonly Regex SnakeCaseVerbNoun = new("^[a-z]+(_[a-z0-9]+)+$", RegexOptions.Compiled);
