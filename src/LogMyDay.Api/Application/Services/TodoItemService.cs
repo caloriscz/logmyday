@@ -103,20 +103,20 @@ public class TodoItemService : ITodoItemService
             throw new KeyNotFoundException("Todo item not found");
         }
 
-        // A record type completes with the record its form saved; completing logs nothing more.
+        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var doneLocal = ToUserLocalTime(request.DoneAt, user);
+
+        // A record type completes with the record its form saved that day; completing logs nothing more.
         var listTag = item.List.CompletionTag;
         var completesWithRecord = listTag?.IsRecordType == true;
         if (completesWithRecord)
         {
-            await RecordCompletion.EnsureLogged(_context, request.RecordId, listTag!.Id, listTag.TagName, userId);
+            await RecordCompletion.EnsureLogged(_context, request.RecordId, listTag!.Id, listTag.TagName, DateOnly.FromDateTime(doneLocal), userId);
         }
 
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
-
-        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-        var doneLocal = ToUserLocalTime(request.DoneAt, user);
 
         // Auto-log against the parent list's tag, in the list's mode.
         var tagId = item.List.CompletionTagId;
@@ -126,6 +126,12 @@ public class TodoItemService : ITodoItemService
         }
 
         await _context.SaveChangesAsync();
+
+        if (completesWithRecord)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Todo item '{item.Title}' completed with record {request.RecordId} of '{listTag!.TagName}'");
+        }
 
         return MapToResponse(item);
     }

@@ -30,14 +30,14 @@ public sealed class RecordTools(
 
     public sealed record FieldInput(
         [property: Description("Field name within the record type, e.g. \"Systolic\"; its tag is named \"{record type}: {field}\".")] string Name,
-        [property: Description("Input type id, as for create_tag.")] int InputTypeId,
+        [property: Description("Input type id, as for create_tag; required for a new field.")] int? InputTypeId,
         [property: Description("Unit id (units are global).")] int? UnitId = null,
         [property: Description("Option list id; the value must then be one of its options.")] int? OptionListId = null,
         [property: Description("Minimum for numeric types.")] double? MinValue = null,
         [property: Description("Maximum for numeric types.")] double? MaxValue = null,
         [property: Description("Step for numeric types.")] double? Step = null,
         [property: Description("Optional description.")] string? Description = null,
-        [property: Description("The field's tag id, to keep an existing field (update_record_type only); omit for a new field. A kept field keeps any setting left out here; 0 removes its unit or option list.")] int? TagId = null);
+        [property: Description("The field's tag id, to keep an existing field (update_record_type only); omit for a new field. A kept field keeps any setting left out here; 0 removes its unit or option list, other settings cannot be cleared here.")] int? TagId = null);
 
     public sealed record ValueInput(
         [property: Description("The field: its name within the record type (e.g. \"Systolic\") or its tag id.")] string Field,
@@ -64,7 +64,7 @@ public sealed class RecordTools(
             Fields = (fields ?? []).Select(f => new RecordFieldRequest
             {
                 Name = f.Name,
-                TypeId = f.InputTypeId,
+                TypeId = f.InputTypeId ?? 0,
                 UnitId = f.UnitId,
                 OptionListId = f.OptionListId,
                 MinValue = f.MinValue,
@@ -193,7 +193,7 @@ public sealed class RecordTools(
                     {
                         TagId = f.TagId,
                         Name = f.Name,
-                        TypeId = f.InputTypeId,
+                        TypeId = f.InputTypeId ?? 0,
                         UnitId = f.UnitId,
                         OptionListId = f.OptionListId,
                         MinValue = f.MinValue,

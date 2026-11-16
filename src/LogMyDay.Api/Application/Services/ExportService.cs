@@ -398,9 +398,15 @@ public class ExportService : IExcelExportService
                         continue;
                     }
 
-                    var isNumber = fields[i].OptionListId == null && TagRuleInputTypes.IsNumeric(fields[i].InputTypeId)
-                        && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
-                    sheet.Cell(row, i + 3).Value = isNumber ? double.Parse(value, CultureInfo.InvariantCulture) : value;
+                    if (fields[i].OptionListId == null && TagRuleInputTypes.IsNumeric(fields[i].InputTypeId)
+                        && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+                    {
+                        sheet.Cell(row, i + 3).Value = number;
+                    }
+                    else
+                    {
+                        sheet.Cell(row, i + 3).Value = value;
+                    }
                 }
 
                 row++;
@@ -414,15 +420,16 @@ public class ExportService : IExcelExportService
         }
     }
 
-    // Excel sheet names have at most 31 characters, none of : \ / ? * [ ], and are unique.
+    // Excel sheet names have at most 31 characters, none of : \ / ? * [ ], no apostrophe at either
+    // end, and are unique. "Summary" is added after the record sheets, so it is kept free.
     private static string SheetName(XLWorkbook workbook, string name)
     {
-        var clean = new string(name.Where(c => !":\\/?*[]".Contains(c)).ToArray()).Trim();
+        var clean = new string(name.Where(c => !":\\/?*[]".Contains(c)).ToArray()).Trim().Trim('\'');
         clean = clean.Length == 0 ? "Record" : clean;
-        clean = clean.Length > 31 ? clean[..31] : clean;
+        clean = clean.Length > 31 ? clean[..31].TrimEnd('\'') : clean;
 
         var candidate = clean;
-        for (var n = 2; workbook.Worksheets.Contains(candidate); n++)
+        for (var n = 2; workbook.Worksheets.Contains(candidate) || string.Equals(candidate, "Summary", StringComparison.OrdinalIgnoreCase); n++)
         {
             var suffix = $" ({n})";
             candidate = (clean.Length + suffix.Length > 31 ? clean[..(31 - suffix.Length)] : clean) + suffix;

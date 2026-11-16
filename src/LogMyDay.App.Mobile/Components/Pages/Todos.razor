@@ -1152,8 +1152,11 @@
     {
         try
         {
-            _recordTypes = await RecordApi.GetRecordTypes();
-            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+            var typesTask = RecordApi.GetRecordTypes();
+            var listsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(typesTask, listsTask);
+            _recordTypes = typesTask.Result;
+            _recordOptionLists = listsTask.Result;
             _recordTypesLoaded = true;
         }
         catch (Exception ex)
@@ -1164,12 +1167,8 @@
 
     private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
 
-    private DateTime RecordTime()
-    {
-        var day = DateTime.Today;
-
-        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
-    }
+    // Todo items complete now, so their record is logged now too.
+    private static DateTime RecordTime() => DateTime.Now;
 
     private async Task CompleteWithRecord(RecordResponse? record)
     {
@@ -1200,6 +1199,11 @@
         // A record type completes through its record form: done when the record is saved.
         if (item.CompletionIsRecordType)
         {
+            if (!IsRecordType(item.CompletionTagId))
+            {
+                await LoadRecordTypes();
+            }
+
             _recordFor = item;
 
             return;

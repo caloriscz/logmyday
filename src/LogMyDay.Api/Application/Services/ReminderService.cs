@@ -219,21 +219,22 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
-        // A record type completes with the record its form saved; completing logs nothing more.
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+
+        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
+        var doneLocal = ToUserLocalTime(request.DoneAt, user);
+
+        // A record type completes with the record its form saved that day; completing logs nothing more.
         var completesWithRecord = item.CompletionTag?.IsRecordType == true;
         if (completesWithRecord)
         {
-            await RecordCompletion.EnsureLogged(_context, request.RecordId, item.CompletionTag!.Id, item.CompletionTag.TagName, userId);
+            await RecordCompletion.EnsureLogged(_context, request.RecordId, item.CompletionTag!.Id, item.CompletionTag.TagName, DateOnly.FromDateTime(doneLocal), userId);
         }
-
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
 
         // Legacy scalars kept in sync for rollback safety; the read path uses the day row.
         item.IsDone = true;
         item.DoneAt = request.DoneAt;
 
-        // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
-        var doneLocal = ToUserLocalTime(request.DoneAt, user);
         var doneLocalDate = DateOnly.FromDateTime(doneLocal);
         var day = await GetOrCreateDay(item.Id, userId, PeriodDate(item, doneLocalDate, user));
         day.IsDone = true;
@@ -253,6 +254,12 @@ public class ReminderService : IReminderService
 
         await PruneOldDays(item, user);
         await _context.SaveChangesAsync();
+
+        if (completesWithRecord)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Info,
+                $"Reminder '{item.Title}' completed with record {request.RecordId} of '{item.CompletionTag!.TagName}'");
+        }
 
         return MapItemToResponse(item, day);
     }

@@ -664,6 +664,9 @@ public class BackupService : IBackupService
                     DisplayOrder = l.DisplayOrder,
                     ShowOnHomepage = l.ShowOnHomepage,
                     DateCreated = l.DateCreated,
+                    CompletionTagName = l.CompletionTag != null ? l.CompletionTag.TagName : null,
+                    CompletionIsRecordType = l.CompletionTag != null && l.CompletionTag.IsRecordType,
+                    AutoLogMode = l.AutoLogMode,
                     Items = l.Items.Select(i => new TodoItemBackup
                     {
                         Title = i.Title,
@@ -1470,6 +1473,14 @@ public class BackupService : IBackupService
             .Where(t => (userId == null || t.UserId == userId) && !t.IsRecordType)
             .ToDictionaryAsync(t => t.TagName, t => t.Id);
 
+        // A record type may share its name with a tag, so the backup says which one it means.
+        // Record types are restored before todo lists.
+        var recordTypeLookup = (await _context.Tags
+                .Where(t => (userId == null || t.UserId == userId) && t.IsRecordType)
+                .ToListAsync())
+            .GroupBy(t => t.TagName)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
         var existingListNames = await _context.TodoLists
             .Where(l => userId == null || l.UserId == userId)
             .Select(l => l.Name)
@@ -1484,12 +1495,21 @@ public class BackupService : IBackupService
                 continue;
             }
 
+            int? listTagId = null;
+            var listLookup = list.CompletionIsRecordType ? recordTypeLookup : tagLookup;
+            if (!string.IsNullOrEmpty(list.CompletionTagName) && listLookup.TryGetValue(list.CompletionTagName, out var foundListTagId))
+            {
+                listTagId = foundListTagId;
+            }
+
             var listEntity = new TodoList
             {
                 Name = list.Name,
                 DisplayOrder = list.DisplayOrder,
                 ShowOnHomepage = list.ShowOnHomepage,
                 DateCreated = list.DateCreated,
+                CompletionTagId = listTagId,
+                AutoLogMode = list.AutoLogMode,
                 UserId = userId ?? Guid.Empty
             };
 

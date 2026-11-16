@@ -1,3 +1,4 @@
+using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,41 @@ public class RecordsController : BaseApiController
     {
         _recordService = recordService;
         _logger = logger;
+    }
+
+    /// <summary>Records, newest first, optionally of one record type and between two days
+    /// (yyyy-MM-dd, inclusive).</summary>
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<RecordResponse>>> GetRecords(int? recordTypeId, string? from, string? to, int page = 1, int pageSize = 50)
+    {
+        if (!TryParseDay(from, out var fromDay) || !TryParseDay(to, out var toDay))
+        {
+            return BadRequest("Use yyyy-MM-dd for from and to.");
+        }
+
+        var userId = GetCurrentUserId();
+        var start = fromDay?.ToDateTime(TimeOnly.MinValue);
+        var end = toDay?.ToDateTime(TimeOnly.MaxValue);
+
+        return Ok(await _recordService.GetPaged(userId, recordTypeId, start, end, Math.Max(page, 1), Math.Clamp(pageSize, 1, 200)));
+    }
+
+    private static bool TryParseDay(string? value, out DateOnly? day)
+    {
+        day = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            return false;
+        }
+
+        day = parsed;
+
+        return true;
     }
 
     [HttpGet("{id:int}")]

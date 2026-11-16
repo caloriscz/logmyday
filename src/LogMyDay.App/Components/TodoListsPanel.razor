@@ -1120,7 +1120,7 @@ else
             var dateParam = SelectedDate?.ToString("yyyy-MM-dd");
             var listsTask = TodoApi.GetTodoLists(dateParam);
             var tagsTask = ActivityApi.GetTags();
-            var recordTypesTask = LoadRecordTypes();
+            var recordTypesTask = _recordTypesLoaded ? Task.CompletedTask : LoadRecordTypes();
             await Task.WhenAll(listsTask, tagsTask, recordTypesTask);
 
             if (myGeneration != _loadGeneration)
@@ -1452,6 +1452,11 @@ else
         // A record type completes through its record form: done when the record is saved.
         if (item.CompletionIsRecordType)
         {
+            if (!IsRecordType(item.CompletionTagId))
+            {
+                await LoadRecordTypes();
+            }
+
             _recordFor = item;
 
             return;
@@ -1899,14 +1904,19 @@ else
     // saved; closing the form leaves it open.
     private IList<RecordTypeResponse> _recordTypes = [];
     private IList<TagOptionListResponse>? _recordOptionLists;
+    private bool _recordTypesLoaded;
     private TodoItemResponse? _recordFor;
 
     private async Task LoadRecordTypes()
     {
         try
         {
-            _recordTypes = await RecordApi.GetRecordTypes();
-            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+            var typesTask = RecordApi.GetRecordTypes();
+            var listsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(typesTask, listsTask);
+            _recordTypes = typesTask.Result;
+            _recordOptionLists = listsTask.Result;
+            _recordTypesLoaded = true;
         }
         catch (Exception ex)
         {

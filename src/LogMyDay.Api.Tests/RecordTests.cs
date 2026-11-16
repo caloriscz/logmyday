@@ -505,14 +505,18 @@ public sealed class RecordTests : IDisposable
         var otherRecord = await Log(run, At(6), "5");
         await Assert.ThrowsAsync<ArgumentException>(() =>
             reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = otherRecord.Id }, _userId));
+        // A record of another day does not complete today.
+        var yesterday = await Log(type, At(7, daysAgo: 1), "130");
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = yesterday.Id }, _userId));
 
         var record = await Log(type, At(7), "128", "82", "64");
         var done = await reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, RecordId = record.Id }, _userId);
 
         Assert.True(done.IsDone);
         _context.ChangeTracker.Clear();
-        // The two records' values only: completing logs nothing of its own.
-        Assert.Equal(4, await _context.Activities.CountAsync());
+        // The three records' values only: completing logs nothing of its own.
+        Assert.Equal(5, await _context.Activities.CountAsync());
     }
 
     [Fact]
@@ -569,11 +573,13 @@ public sealed class RecordTests : IDisposable
         await AddTag("Blood pressure");
         var type = await BloodPressure();
         await Reminders().Create(new ReminderRequest { Title = "Measure blood pressure", CompletionTagId = type.Id }, _userId);
+        await TodoLists().Create(new TodoListRequest { Name = "Health checks", CompletionTagId = type.Id }, _userId);
         _context.ChangeTracker.Clear();
         var backups = new BackupService(_context, NullLogger<BackupService>.Instance, new TagRuleEngine(_context));
 
         var export = await backups.ExportDataAsync(_userId);
         Assert.True(Assert.Single(export.Reminders).CompletionIsRecordType);
+        Assert.True(export.TodoLists.Single(l => l.Name == "Health checks").CompletionIsRecordType);
 
         // Clearing keeps reminders, so the old one goes by hand before the restore.
         await backups.ClearDataAsync(_userId);
@@ -585,6 +591,22 @@ public sealed class RecordTests : IDisposable
         _context.ChangeTracker.Clear();
         var restoredType = Assert.Single(await _types.GetAll(_userId));
         Assert.Equal(restoredType.Id, (await _context.Reminders.SingleAsync()).CompletionTagId);
+        Assert.Equal(restoredType.Id, (await _context.TodoLists.SingleAsync(l => l.Name == "Health checks")).CompletionTagId);
+    }
+
+    [Fact]
+    public async Task TheExcelReport_WorksForARecordTypeNamedLikeItsSummarySheet()
+    {
+        var type = await _types.Create(new RecordTypeRequest { Name = "Summary", Fields = [Field("Score")] }, _userId);
+        await Log(type, At(7), "3");
+        var export = new ExportService(_context, NullLogger<ExportService>.Instance);
+
+        var result = await export.GenerateExcelReport(new ExcelExportRequest { UserId = _userId, TagIds = [type.Fields[0].TagId] });
+
+        Assert.True(result.Success, result.Message);
+        using var workbook = new ClosedXML.Excel.XLWorkbook(new MemoryStream(result.FileContent!));
+        Assert.Equal(3, workbook.Worksheet("Summary (2)").Cell(2, 3).GetDouble());
+        Assert.Equal("LogMyDay Activities Overview Report", workbook.Worksheet("Summary").Cell(1, 1).GetString());
     }
 
     [Fact]

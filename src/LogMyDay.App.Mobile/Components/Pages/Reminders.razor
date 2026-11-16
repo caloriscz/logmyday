@@ -660,6 +660,11 @@
         // A record type completes through its record form: done when the record is saved.
         if (item.CompletionIsRecordType)
         {
+            if (!IsRecordType(item.CompletionTagId))
+            {
+                await LoadRecordTypes();
+            }
+
             _recordFor = item;
 
             return;
@@ -812,6 +817,11 @@
         // "Mark Done" on a record type opens its record form; the reminder is done when it is saved.
         if (item.CompletionIsRecordType)
         {
+            if (!IsRecordType(item.CompletionTagId))
+            {
+                await LoadRecordTypes();
+            }
+
             _recordFor = item;
             StateHasChanged();
 
@@ -1149,8 +1159,11 @@
     {
         try
         {
-            _recordTypes = await RecordApi.GetRecordTypes();
-            _recordOptionLists = await ActivityApi.GetTagOptionListsAsync();
+            var typesTask = RecordApi.GetRecordTypes();
+            var listsTask = ActivityApi.GetTagOptionListsAsync();
+            await Task.WhenAll(typesTask, listsTask);
+            _recordTypes = typesTask.Result;
+            _recordOptionLists = listsTask.Result;
             _recordTypesLoaded = true;
         }
         catch (Exception ex)
