@@ -70,12 +70,12 @@
                 </select>
                 <span class="text-sm text-gray-600 dark:text-slate-300">after it</span>
             </div>
-            <p class="text-xs text-gray-500 dark:text-slate-400">Counted from the latest entry of the day; between 5 minutes and 24 hours.</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400">Counted from when the entry is saved, or from its time for a tag with exact times; between 5 minutes and 24 hours.</p>
         }
         else
         {
             <input type="time" class="w-32 @SmallInputCss" value="@(Model.AtTime?.ToString("HH:mm", CultureInfo.InvariantCulture))" @onchange="SetAtTime" disabled="@Disabled" aria-label="Time of the reminder" />
-            <p class="text-xs text-gray-500 dark:text-slate-400">The first such time after the entry: that day, or the next day if it has passed.</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400">The first such time after the entry is saved (or after its time, for a tag with exact times): that day, or the next day if it has passed.</p>
         }
     </div>
 
@@ -91,7 +91,7 @@
         <span>Active <span class="text-gray-500 dark:text-slate-400">— a paused trigger sets no reminders</span></span>
     </label>
 
-    <p class="text-xs text-gray-500 dark:text-slate-400">At most one reminder a day. It is withdrawn when the condition stops holding (an entry edited or deleted) and closes itself when you log the tag. A time already past sets nothing. "Is logged" means it happened: zeros and "no" entries (e.g. skipped reminders) do not count. The phone rings once it has loaded the Reminders list.</p>
+    <p class="text-xs text-gray-500 dark:text-slate-400">At most one reminder a day. It is withdrawn when the condition stops holding (an entry edited or deleted) and closes itself when you log the tag. An entry for another day sets nothing once its time has passed. "Is logged" means it happened: zeros and "no" entries (e.g. skipped reminders) do not count. The phone rings once it has loaded the Reminders list.</p>
 </div>
 
 @code {

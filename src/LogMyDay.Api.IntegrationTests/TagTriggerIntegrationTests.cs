@@ -23,10 +23,11 @@ public class TagTriggerIntegrationTests : IClassFixture<CustomWebApplicationFact
 
     private static string Unique(string prefix) => $"{prefix} {Guid.NewGuid():N}"[..(prefix.Length + 9)];
 
+    // Exact times, so the reminder counts from the logged time and the test can name it.
     private static async Task<(int Id, string Name)> CreateTag(McpClient client, string prefix, int inputTypeId)
     {
         var name = Unique(prefix);
-        var result = await client.CallAsync("create_tag", new { name, inputTypeId, isRepeatable = true });
+        var result = await client.CallAsync("create_tag", new { name, inputTypeId, isRepeatable = true, timeGranularity = "Exact" });
         Assert.NotEqual(true, result.IsError);
 
         return (McpTestClient.Json(result).GetProperty("tag").GetProperty("id").GetInt32(), name);

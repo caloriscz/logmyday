@@ -52,14 +52,15 @@ public sealed class TagTriggerTests : IDisposable
 
     private static DateTime Minute(DateTime at) => new(at.Year, at.Month, at.Day, at.Hour, at.Minute, 0);
 
-    private async Task<Tag> AddTag(string name, int inputTypeId, bool repeatable = true)
+    // Exact by default, so a reminder counts from the entry's own time and the tests can name it.
+    private async Task<Tag> AddTag(string name, int inputTypeId, bool repeatable = true, TimeGranularity granularity = TimeGranularity.Exact)
     {
         var tag = new Tag
         {
             TagName = name,
             InputTypeId = inputTypeId,
             IsRepeatable = repeatable,
-            TimeGranularity = TimeGranularity.Daily,
+            TimeGranularity = granularity,
             UserId = _userId
         };
         _context.Tags.Add(tag);
@@ -122,6 +123,26 @@ public sealed class TagTriggerTests : IDisposable
         var listed = Assert.Single(await reminders.GetAll(_userId, DateOnly.FromDateTime(fire)));
         Assert.Equal((trigger.Id, "Log the effect"), (listed.TriggerId, listed.TriggerName));
         Assert.Equal(1, (await _triggers.GetById(trigger.Id, _userId)).OpenReminderCount);
+    }
+
+    [Fact]
+    public async Task ATagWithoutExactTimes_CountsFromTheSave_ForAnEntryToday()
+    {
+        var dose = await AddTag("Dose", InputTypeIds.Integer, granularity: TimeGranularity.Daily);
+        var effect = await AddTag("Effect", InputTypeIds.String);
+        var trigger = await Trigger(dose, effect, offsetMinutes: 180);
+
+        // Completing a reminder stores today's entry at noon; the reminder counts from the save.
+        var before = Minute(Now);
+        await Log(dose, DateOnly.FromDateTime(Now).ToDateTime(new TimeOnly(12, 0)), "100");
+        var after = Now;
+        var reminder = Assert.Single(await RemindersOf(trigger));
+        var fire = reminder.MonitorFromDate!.Value.ToDateTime(reminder.NotifyAt!.Value);
+        Assert.InRange(fire, before.AddMinutes(180), after.AddMinutes(180));
+
+        // An entry for another day keeps its own time, long past: nothing more.
+        await Log(dose, DateOnly.FromDateTime(Now).AddDays(-2).ToDateTime(new TimeOnly(12, 0)), "100");
+        Assert.Single(await RemindersOf(trigger));
     }
 
     [Fact]

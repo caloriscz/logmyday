@@ -137,7 +137,7 @@ public class TagTriggerEngine : ITagTriggerEngine
             return;
         }
 
-        var anchor = await AnchorOf(trigger, day, entries);
+        var anchor = await AnchorOf(trigger, day, entries, now);
         var fire = FireTime(trigger, anchor);
 
         // A first tag logged after the fact (its reminder time already past) reminds of nothing.
@@ -249,29 +249,47 @@ public class TagTriggerEngine : ITagTriggerEngine
         return rows.Select(r => new TagDayValue.Entry(r.Id, r.DateStarted, r.Description)).ToList();
     }
 
-    // The entry the reminder counts from: the latest real one of the day, or the latest of any
-    // when the condition holds on skip markers only (e.g. "= 0"). A computed tag's value is
-    // stored at the start of its day, so for it the latest entry of its rule's sources counts.
-    private async Task<DateTime> AnchorOf(TagTrigger trigger, DateOnly day, IReadOnlyCollection<TagDayValue.Entry> entries)
+    // When the reminder counts from. Only a tag with exact times (TimeGranularity.Exact) carries
+    // a real time: others store a placeholder (a reminder completion writes 12:00 of the day), so
+    // an entry of theirs for today counts from the moment it is saved. Otherwise the latest real
+    // entry of the day counts, or the latest of any when the condition holds on skip markers only
+    // (e.g. "= 0"). A computed tag's value sits at the start of its day, so its rule's sources
+    // stand in for it.
+    private async Task<DateTime> AnchorOf(TagTrigger trigger, DateOnly day, IReadOnlyCollection<TagDayValue.Entry> entries, DateTime now)
     {
-        if (trigger.IfTag!.IsComputed)
+        var ifTag = trigger.IfTag!;
+        DateTime? latest = null;
+        bool timed;
+        if (ifTag.IsComputed)
         {
             var sources = await _context.TagRules
                 .Where(r => r.TargetTagId == trigger.IfTagId)
-                .SelectMany(r => r.Sources.Select(s => s.SourceTagId))
+                .SelectMany(r => r.Sources.Select(s => new { s.SourceTagId, s.SourceTag!.TimeGranularity }))
                 .ToListAsync();
+            timed = sources.Count > 0 && sources.All(s => s.TimeGranularity == TimeGranularity.Exact);
+            var ids = sources.Select(s => s.SourceTagId).ToList();
             var start = day.ToDateTime(TimeOnly.MinValue);
             var end = day.AddDays(1).ToDateTime(TimeOnly.MinValue);
-            var latest = await _context.Activities
-                .Where(a => a.UserId == trigger.UserId && sources.Contains(a.TagId) && a.DateStarted >= start && a.DateStarted < end)
+            latest = await _context.Activities
+                .Where(a => a.UserId == trigger.UserId && ids.Contains(a.TagId) && a.DateStarted >= start && a.DateStarted < end)
                 .MaxAsync(a => (DateTime?)a.DateStarted);
-            if (latest is DateTime at)
-            {
-                return at;
-            }
+        }
+        else
+        {
+            timed = ifTag.TimeGranularity == TimeGranularity.Exact;
         }
 
-        var real = entries.Where(e => TagCheckEvaluator.IsReal(trigger.IfTag, e)).ToList();
+        if (!timed && day == DateOnly.FromDateTime(now))
+        {
+            return now;
+        }
+
+        if (latest is DateTime sourceTime)
+        {
+            return sourceTime;
+        }
+
+        var real = entries.Where(e => TagCheckEvaluator.IsReal(ifTag, e)).ToList();
 
         return (real.Count > 0 ? real : entries).Max(e => e.DateStarted);
     }
