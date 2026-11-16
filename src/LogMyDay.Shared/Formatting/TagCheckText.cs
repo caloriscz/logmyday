@@ -64,7 +64,8 @@ public static class TagCheckText
         _ => op
     };
 
-    private static string Condition(string tag, string op, string? operand) => op switch
+    /// <summary>A condition on a tag, e.g. "Coffees ≥ 3" or "Alcohol is yes".</summary>
+    public static string Condition(string tag, string op, string? operand) => op switch
     {
         "IsLogged" => $"{tag} is logged",
         "IsYes" => $"{tag} is yes",
@@ -83,7 +84,7 @@ public static class TagCheckText
 
     // Yes/no values are stored as true/false, older rows and some edits as True/False; people
     // read them as yes/no.
-    private static string Value(string value) => value.ToLowerInvariant() switch
+    public static string Value(string value) => value.ToLowerInvariant() switch
     {
         "true" => "yes",
         "false" => "no",

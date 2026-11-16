@@ -36,6 +36,8 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<ITagRuleEngine, TagRuleEngine>();
         services.AddScoped<ITagRuleService, TagRuleService>();
         services.AddScoped<ITagCheckService, TagCheckService>();
+        services.AddScoped<ITagTriggerEngine, TagTriggerEngine>();
+        services.AddScoped<ITagTriggerService, TagTriggerService>();
         services.AddScoped<IRecordTypeService, RecordTypeService>();
         services.AddScoped<IRecordService, RecordService>();
         services.AddScoped<IApiKeyService, ApiKeyService>();

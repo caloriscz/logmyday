@@ -42,7 +42,9 @@ public static class TagCheckValidator
             Side("Expectation", thenOperator, thenOperand, thenTag, thenOptions, expectation: true));
     }
 
-    private static string? Side(string position, TagRuleOperator op, string? operand, Tag tag, IReadOnlyList<TagOption>? options, bool expectation)
+    /// <summary>One side of a check, also a trigger's condition: the test fits the tag and the
+    /// compared value is normalised to its stored encoding.</summary>
+    internal static string? Side(string position, TagRuleOperator op, string? operand, Tag tag, IReadOnlyList<TagOption>? options, bool expectation)
     {
         if (!Enum.IsDefined(op))
         {

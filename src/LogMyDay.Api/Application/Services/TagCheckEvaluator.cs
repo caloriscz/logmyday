@@ -35,15 +35,7 @@ public static class TagCheckEvaluator
             return new DayResult(TagCheckOutcome.NotApplicable, null, null);
         }
 
-        var ifKind = TagRuleInputTypes.ConditionKind(ifTag.InputTypeId, ifTag.OptionListId != null);
-        var ifDay = TagDayValue.Read(ifKind, ifEntries);
-        var ifValue = Show(ifDay);
-
-        // "Is logged" means it happened: a skip marker (0, or "no" on a yes/no tag) does not count.
-        // A value condition compares the day value of every entry.
-        var applies = check.IfOperator == TagRuleOperator.IsLogged
-            ? Happened(ifTag, ifEntries)
-            : TagDayValue.Holds(check.IfOperator, check.IfOperand, ifKind, ifDay);
+        var (applies, ifValue) = Condition(check.IfOperator, check.IfOperand, ifTag, ifEntries);
         if (!applies)
         {
             return new DayResult(TagCheckOutcome.NotApplicable, ifValue, null);
@@ -69,6 +61,33 @@ public static class TagCheckEvaluator
         var outcome = check.ThenOperator == TagRuleOperator.IsLogged && isToday ? TagCheckOutcome.Pending : TagCheckOutcome.Broken;
 
         return new DayResult(outcome, ifValue, thenValue);
+    }
+
+    /// <summary>Whether a condition on a tag holds on a day, and the tag's day value as shown.
+    /// Shared by a check's If side and a trigger. "Is logged" means it happened: a skip marker (0,
+    /// or "no" on a yes/no tag) does not count. A value condition compares the day value of every
+    /// entry.</summary>
+    public static (bool Holds, string? Value) Condition(TagRuleOperator op, string? operand, Tag tag,
+        IReadOnlyCollection<TagDayValue.Entry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            return (false, null);
+        }
+
+        var kind = TagRuleInputTypes.ConditionKind(tag.InputTypeId, tag.OptionListId != null);
+        var day = TagDayValue.Read(kind, entries);
+        var holds = op == TagRuleOperator.IsLogged
+            ? Happened(tag, entries)
+            : TagDayValue.Holds(op, operand, kind, day);
+
+        return (holds, Show(day));
+    }
+
+    /// <summary>A real entry: not a skip marker (0, or "no" on a yes/no tag).</summary>
+    public static bool IsReal(Tag tag, TagDayValue.Entry entry)
+    {
+        return !TagDayValue.IsSkipMarker(entry.Description, TagDayValue.IsYesNo(tag.InputTypeId, tag.OptionListId));
     }
 
     private static bool Happened(Tag tag, IReadOnlyCollection<TagDayValue.Entry> entries)

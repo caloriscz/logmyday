@@ -32,6 +32,7 @@ public class ReminderService : IReminderService
         var reminders = await _context.Reminders
             .AsNoTracking()
             .Include(i => i.CompletionTag)
+            .Include(i => i.Trigger)
             .Where(i => i.UserId == userId)
             .ToListAsync();
 
@@ -550,6 +551,8 @@ public class ReminderService : IReminderService
             CompletionTagName = item.CompletionTag?.TagName,
             CompletionTagInputTypeId = item.CompletionTag?.InputTypeId,
             CompletionIsRecordType = item.CompletionTag?.IsRecordType == true,
+            TriggerId = item.TriggerId,
+            TriggerName = item.Trigger?.Name,
             AllowUnfilled = item.AllowUnfilled
         };
     }

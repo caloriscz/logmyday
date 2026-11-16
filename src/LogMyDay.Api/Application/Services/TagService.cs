@@ -206,6 +206,16 @@ public class TagService : ITagService
                     $"Tag '{link.TagName}' is in use by check {string.Join(", ", checkNames.Select(n => $"'{n}'"))}. Change or delete the check first.");
             }
 
+            var triggerNames = await _context.TagTriggers
+                .Where(t => t.IfTagId == id || t.PromptTagId == id)
+                .Select(t => t.Name)
+                .ToListAsync();
+            if (triggerNames.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Tag '{link.TagName}' is in use by trigger {string.Join(", ", triggerNames.Select(n => $"'{n}'"))}. Change or delete the trigger first.");
+            }
+
             _context.Tags.Remove(link);
             await _context.SaveChangesAsync();
         }

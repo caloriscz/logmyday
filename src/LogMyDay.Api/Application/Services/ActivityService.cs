@@ -18,19 +18,30 @@ public class ActivityService : IActivityService
     private readonly IEventLogService _eventLogService;
     private readonly ITagDayLockService _tagDayLockService;
     private readonly ITagRuleEngine _tagRuleEngine;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
 
     public ActivityService(
         LogMyDayDbContext context,
         IActivityRepository activityRepository,
         IEventLogService eventLogService,
         ITagDayLockService tagDayLockService,
-        ITagRuleEngine? tagRuleEngine = null)
+        ITagRuleEngine? tagRuleEngine = null,
+        ITagTriggerEngine? tagTriggerEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _activityRepository = activityRepository ?? throw new ArgumentNullException(nameof(activityRepository));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _tagDayLockService = tagDayLockService ?? throw new ArgumentNullException(nameof(tagDayLockService));
         _tagRuleEngine = tagRuleEngine ?? new TagRuleEngine(context);
+        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, eventLogService);
+    }
+
+    // Rules first, so a trigger on a computed tag sees the tag's new value; both inside the
+    // save's transaction.
+    private async Task OnTagsChanged(Guid userId, IReadOnlyCollection<(int TagId, DateOnly Day)> changes)
+    {
+        await _tagRuleEngine.OnSourcesChanged(userId, changes);
+        await _tagTriggerEngine.OnTagsChanged(userId, changes);
     }
 
     private static async Task CommitIfOwned(IDbContextTransaction? transaction)
@@ -128,7 +139,7 @@ public class ActivityService : IActivityService
                     await _eventLogService.Log(userId, EventLogLevel.Info,
                         $"Activity '{tag.TagName}' increased by {ActivityValueCodec.WriteNumber(tag.InputTypeId, increment)} to {existing.Description}");
 
-                    await _tagRuleEngine.OnSourcesChanged(userId, [(tag.Id, DateOnly.FromDateTime(existing.DateStarted))]);
+                    await OnTagsChanged(userId, [(tag.Id, DateOnly.FromDateTime(existing.DateStarted))]);
                     await CommitIfOwned(transaction);
 
                     return MapToResponse(existing);
@@ -195,7 +206,7 @@ public class ActivityService : IActivityService
             : $" of value {reloadedActivity.Description}";
         await _eventLogService.Log(userId, EventLogLevel.Info, $"Activity '{tagName}'{desc} added");
 
-        await _tagRuleEngine.OnSourcesChanged(userId, [(tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
+        await OnTagsChanged(userId, [(tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
         await CommitIfOwned(transaction);
 
         // TagDayLock is intentionally user-driven only — no auto-lock here. Non-repeatable
@@ -263,7 +274,7 @@ public class ActivityService : IActivityService
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Activity '{activity.Tag?.TagName ?? "unknown"}'{desc} on {activity.DateStarted:yyyy-MM-dd} deleted");
 
-        await _tagRuleEngine.OnSourcesChanged(userId, [(activity.TagId, DateOnly.FromDateTime(activity.DateStarted))]);
+        await OnTagsChanged(userId, [(activity.TagId, DateOnly.FromDateTime(activity.DateStarted))]);
         await CommitIfOwned(transaction);
 
         return true;
@@ -579,7 +590,7 @@ public class ActivityService : IActivityService
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Activity '{tag.TagName}' on {activity.DateStarted:yyyy-MM-dd} updated{desc}");
 
-        await _tagRuleEngine.OnSourcesChanged(userId, [previous, (tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
+        await OnTagsChanged(userId, [previous, (tag.Id, DateOnly.FromDateTime(activity.DateStarted))]);
         await CommitIfOwned(transaction);
 
         return MapToResponse(activity);

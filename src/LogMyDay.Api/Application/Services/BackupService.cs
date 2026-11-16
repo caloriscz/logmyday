@@ -197,6 +197,154 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    // Triggers travel by tag name like checks. The reminders they created are passing nudges and
+    // are not carried.
+    private async Task<List<TagTriggerBackup>> ExportTagTriggersAsync(Guid? userId)
+    {
+        return await _context.TagTriggers
+            .Where(t => userId == null || t.UserId == userId)
+            .OrderBy(t => t.Name)
+            .Select(t => new TagTriggerBackup
+            {
+                Name = t.Name,
+                IsEnabled = t.IsEnabled,
+                IfTagName = t.IfTag!.TagName,
+                IfOperator = t.IfOperator,
+                IfOperand = t.IfOperand,
+                PromptTagName = t.PromptTag!.TagName,
+                Timing = t.Timing,
+                OffsetMinutes = t.OffsetMinutes,
+                AtTime = t.AtTime,
+                DateCreated = t.DateCreated
+            })
+            .ToListAsync();
+    }
+
+    // Restores triggers by tag name with the same conditions as creating one, like checks: one
+    // whose tags are missing or no longer fit is skipped with a warning, one whose name the user
+    // already has is skipped quietly. Nothing fires here; triggers act on later saves only.
+    private async Task ImportTagTriggersAsync(List<TagTriggerBackup> triggers, BackupImportResult result, Guid? userId)
+    {
+        if (triggers.Count == 0)
+        {
+            return;
+        }
+
+        // A prompted tag may be a record type, so record types are looked up too; the validator
+        // refuses one as the watched tag.
+        var tagsByName = (await _context.Tags
+                .Where(t => userId == null || t.UserId == userId)
+                .ToListAsync())
+            .GroupBy(t => t.TagName)
+            .ToDictionary(g => g.Key, g => g.OrderBy(t => t.IsRecordType).First());
+        var existingNames = (await _context.TagTriggers
+                .Where(t => userId == null || t.UserId == userId)
+                .Select(t => t.Name)
+                .ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var backup in triggers)
+        {
+            var name = backup.Name?.Trim() ?? string.Empty;
+            if (existingNames.Contains(name))
+            {
+                result.Statistics.TagTriggersSkipped++;
+                continue;
+            }
+
+            tagsByName.TryGetValue(backup.IfTagName, out var ifTag);
+            tagsByName.TryGetValue(backup.PromptTagName, out var promptTag);
+            string? reason = null;
+            string? ifOperand = null;
+            if (name.Length == 0 || name.Length > TagTriggerValidator.MaxNameLength)
+            {
+                reason = "its name is empty or too long";
+            }
+            else if (ifTag == null || promptTag == null)
+            {
+                reason = $"tag '{(ifTag == null ? backup.IfTagName : backup.PromptTagName)}' is missing";
+            }
+            else
+            {
+                try
+                {
+                    var options = ifTag.OptionListId is int listId
+                        ? await _context.TagOptions.Where(o => o.OptionListId == listId).ToListAsync()
+                        : null;
+                    ifOperand = TagTriggerValidator.Validate(backup.IfOperator, backup.IfOperand, ifTag, promptTag, options,
+                        backup.Timing, backup.OffsetMinutes, backup.AtTime);
+                }
+                catch (ArgumentException ex)
+                {
+                    reason = ex.Message;
+                }
+            }
+
+            if (reason != null || ifTag == null || promptTag == null)
+            {
+                result.Statistics.TagTriggersSkipped++;
+                result.Warnings.Add($"Trigger '{backup.Name}' was not restored: {reason}");
+                continue;
+            }
+
+            var now = DateTime.UtcNow;
+            _context.TagTriggers.Add(new TagTrigger
+            {
+                UserId = userId ?? ifTag.UserId ?? Guid.Empty,
+                Name = name,
+                IsEnabled = backup.IsEnabled,
+                IfTagId = ifTag.Id,
+                IfOperator = backup.IfOperator,
+                IfOperand = ifOperand,
+                PromptTagId = promptTag.Id,
+                Timing = backup.Timing,
+                OffsetMinutes = backup.Timing == LogMyDay.Domain.Enums.TagTriggerTiming.AfterEntry ? backup.OffsetMinutes : null,
+                AtTime = backup.Timing == LogMyDay.Domain.Enums.TagTriggerTiming.AtTime ? backup.AtTime : null,
+                DateCreated = backup.DateCreated == default ? now : backup.DateCreated,
+                DateUpdated = now
+            });
+            existingNames.Add(name);
+            result.Statistics.TagTriggersImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    // Clearing triggers takes their reminders still to come with them; done ones stay as history
+    // without the link, as when a trigger is deleted.
+    private async Task<int> RemoveTagTriggersAsync(Guid? userId)
+    {
+        var triggers = await _context.TagTriggers
+            .Where(t => userId == null || t.UserId == userId)
+            .ToListAsync();
+        if (triggers.Count == 0)
+        {
+            return 0;
+        }
+
+        var ids = triggers.Select(t => t.Id).ToList();
+        var reminders = await _context.Reminders
+            .Include(r => r.Days)
+            .Where(r => r.TriggerId != null && ids.Contains(r.TriggerId.Value))
+            .ToListAsync();
+        foreach (var reminder in reminders)
+        {
+            if (reminder.Days.Any(d => d.IsDone))
+            {
+                reminder.TriggerId = null;
+                reminder.TriggerDay = null;
+            }
+            else
+            {
+                _context.Reminders.Remove(reminder);
+            }
+        }
+
+        _context.TagTriggers.RemoveRange(triggers);
+
+        return triggers.Count;
+    }
+
     // Record types travel whole: their fields' definitions and their records with values by field
     // name. Field tags and record values are left out of the tag and activity lists.
     private async Task<List<RecordTypeBackup>> ExportRecordTypesAsync(Guid? userId)
@@ -811,9 +959,11 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
-            // Reminders are flat (UserId-scoped) — no list container.
+            // Reminders are flat (UserId-scoped) — no list container. A trigger's reminders are
+            // passing nudges and are not backed up.
             var remindersQuery = _context.Reminders
                 .Include(i => i.CompletionTag)
+                .Where(i => i.TriggerId == null)
                 .AsQueryable();
 
             if (userId.HasValue)
@@ -853,6 +1003,7 @@ public class BackupService : IBackupService
 
             var tagRules = await ExportTagRulesAsync(userId);
             var tagChecks = await ExportTagChecksAsync(userId);
+            var tagTriggers = await ExportTagTriggersAsync(userId);
             var recordTypes = await ExportRecordTypesAsync(userId);
 
             var backupData = new BackupData
@@ -875,6 +1026,7 @@ public class BackupService : IBackupService
                     TotalReminders = reminders.Count,
                     TotalTagRules = tagRules.Count,
                     TotalTagChecks = tagChecks.Count,
+                    TotalTagTriggers = tagTriggers.Count,
                     TotalRecordTypes = recordTypes.Count,
                     TotalRecords = recordTypes.Sum(t => t.Records.Count)
                 },
@@ -891,6 +1043,7 @@ public class BackupService : IBackupService
                 Reminders = reminders,
                 TagRules = tagRules,
                 TagChecks = tagChecks,
+                TagTriggers = tagTriggers,
                 RecordTypes = recordTypes
             };
 
@@ -949,6 +1102,7 @@ public class BackupService : IBackupService
                 await ImportRemindersAsync(backupData.Reminders, result, userId);
                 var importedRules = await ImportTagRulesAsync(backupData.TagRules, result, userId);
                 await ImportTagChecksAsync(backupData.TagChecks, result, userId);
+                await ImportTagTriggersAsync(backupData.TagTriggers, result, userId);
 
                 await transaction.CommitAsync();
 
@@ -1034,8 +1188,10 @@ public class BackupService : IBackupService
             _context.TodoLists.RemoveRange(todoListsToDelete);
             recordsCleared += todoListsToDelete.Count;
 
-            // Tag Activity Relations rules and checks reference tags (Restrict), so they go before
-            // the tags.
+            // Tag Activity Relations rules, checks and triggers reference tags (Restrict), so they
+            // go before the tags.
+            recordsCleared += await RemoveTagTriggersAsync(userId);
+
             var tagChecksQuery = _context.TagChecks.AsQueryable();
             if (userId.HasValue)
             {
@@ -1868,6 +2024,7 @@ public class BackupService : IBackupService
                 ScanMappings = userScanMappings,
                 TagRules = await ExportTagRulesAsync(userId),
                 TagChecks = await ExportTagChecksAsync(userId),
+                TagTriggers = await ExportTagTriggersAsync(userId),
                 RecordTypes = await ExportRecordTypesAsync(userId)
             };
 
@@ -2096,6 +2253,7 @@ public class BackupService : IBackupService
                 // Step 8: Tag Activity Relations rules, by tag name
                 var importedRules = await ImportTagRulesAsync(backup.TagRules, result, userId);
                 await ImportTagChecksAsync(backup.TagChecks, result, userId);
+                await ImportTagTriggersAsync(backup.TagTriggers, result, userId);
 
                 await transaction.CommitAsync();
 
@@ -2163,8 +2321,10 @@ public class BackupService : IBackupService
                 _context.ScanMappings.RemoveRange(userScanMappings);
                 recordsCleared += userScanMappings.Count;
 
-                // Tag Activity Relations rules and checks reference tags (Restrict), so they go
-                // before the tags.
+                // Tag Activity Relations rules, checks and triggers reference tags (Restrict), so
+                // they go before the tags.
+                recordsCleared += await RemoveTagTriggersAsync(userId);
+
                 var userTagChecks = await _context.TagChecks
                     .Where(c => c.UserId == userId)
                     .ToListAsync();

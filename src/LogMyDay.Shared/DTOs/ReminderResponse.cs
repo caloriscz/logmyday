@@ -26,6 +26,10 @@ public class ReminderResponse
     public bool CompletionIsRecordType { get; set; }
     public bool AllowUnfilled { get; set; }
 
+    /// <summary>The trigger that created this reminder for one day, if any.</summary>
+    public int? TriggerId { get; set; }
+    public string? TriggerName { get; set; }
+
     public bool IsTagDayLocked { get; set; }
 
     /// <summary>

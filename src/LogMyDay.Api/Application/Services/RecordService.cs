@@ -17,12 +17,23 @@ public class RecordService : IRecordService
     private readonly LogMyDayDbContext _context;
     private readonly IEventLogService _eventLogService;
     private readonly ITagRuleEngine _tagRuleEngine;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
 
-    public RecordService(LogMyDayDbContext context, IEventLogService eventLogService, ITagRuleEngine tagRuleEngine)
+    public RecordService(LogMyDayDbContext context, IEventLogService eventLogService, ITagRuleEngine tagRuleEngine,
+        ITagTriggerEngine? tagTriggerEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _tagRuleEngine = tagRuleEngine ?? throw new ArgumentNullException(nameof(tagRuleEngine));
+        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, eventLogService);
+    }
+
+    // Rules first, so a trigger on a computed tag sees the tag's new value; both inside the
+    // save's transaction.
+    private async Task OnTagsChanged(Guid userId, IReadOnlyCollection<(int TagId, DateOnly Day)> changes)
+    {
+        await _tagRuleEngine.OnSourcesChanged(userId, changes);
+        await _tagTriggerEngine.OnTagsChanged(userId, changes);
     }
 
     public async Task<RecordResponse> GetById(int id, Guid userId)
@@ -110,7 +121,7 @@ public class RecordService : IRecordService
             $"Record '{type.TagName}' on {record.DateStarted:yyyy-MM-dd HH:mm} added: {Describe(type, values)}");
 
         var day = DateOnly.FromDateTime(record.DateStarted);
-        await _tagRuleEngine.OnSourcesChanged(userId, values.Select(v => (v.Field.Id, day)).ToList());
+        await OnTagsChanged(userId, values.Select(v => (v.Field.Id, day)).ToList());
         await CommitIfOwned(transaction);
 
         return await GetById(record.Id, userId);
@@ -166,7 +177,7 @@ public class RecordService : IRecordService
 
         var day = DateOnly.FromDateTime(dateStarted);
         changes.AddRange(values.Select(v => (v.Field.Id, day)));
-        await _tagRuleEngine.OnSourcesChanged(userId, changes);
+        await OnTagsChanged(userId, changes);
         await CommitIfOwned(transaction);
 
         return await GetById(record.Id, userId);
@@ -191,7 +202,7 @@ public class RecordService : IRecordService
         await _eventLogService.Log(userId, EventLogLevel.Info,
             $"Record '{record.RecordType?.TagName ?? "?"}' on {record.DateStarted:yyyy-MM-dd HH:mm} deleted with {changes.Count} value(s)");
 
-        await _tagRuleEngine.OnSourcesChanged(userId, changes);
+        await OnTagsChanged(userId, changes);
         await CommitIfOwned(transaction);
     }
 
