@@ -23,6 +23,8 @@ else
             @Body
         </div>
 
+        <CheckWarningNotice />
+
         @* Only show navigation if user is authenticated and not on login page *@
         @if (AuthService.IsAuthenticated && !IsLoginPage)
         {

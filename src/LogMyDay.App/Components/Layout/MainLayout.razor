@@ -6,6 +6,7 @@
 @inject NavigationManager Navigation
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JSRuntime
 @inject ILogger<MainLayout> Logger
@@ -43,6 +44,7 @@ else
     <DynamicPageTitle />
     <div class="min-h-screen bg-gray-50 dark:bg-slate-950">
         <NavMenu />
+        <CheckWarningNotice />
         <main class="mx-auto max-w-screen-2xl layout-constrained px-4 py-6 bg-gray-50 dark:bg-slate-950">
             @Body
         </main>
@@ -440,7 +442,8 @@ if (window.layoutKeyboardHandler) {
                 }
             }
 
-            await ActivityApi.CreateCalendarItem(newActivity);
+            var savedActivity = await ActivityApi.CreateCalendarItem(newActivity);
+            CheckWarnings.Show(savedActivity.Warnings);
             
             // Store current values for "Add Another" functionality
             var keepTagId = newActivity.PrimaryTagId;

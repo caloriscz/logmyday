@@ -9,6 +9,7 @@
 @using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject ILogger<AddActivityModal> Logger
+@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
 @inject IUserPreferencesService UserPreferencesService
 @inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
 
@@ -505,7 +506,8 @@
 
             if (IsEditMode && ActivityId.HasValue)
             {
-                await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+                var updatedActivity = await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+                CheckWarnings.Show(updatedActivity.Warnings);
 
                 if (OnActivityUpdated.HasDelegate)
                 {
@@ -525,7 +527,8 @@
                 return;
             }
 
-            await ActivityApi.CreateCalendarItem(Activity);
+            var createdActivity = await ActivityApi.CreateCalendarItem(Activity);
+            CheckWarnings.Show(createdActivity.Warnings);
             anyActivitiesCreated = true;
 
             if (saveAndAdvance)

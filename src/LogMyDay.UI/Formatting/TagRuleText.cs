@@ -1,5 +1,6 @@
 using System.Globalization;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Formatting;
 
 namespace LogMyDay.UI.Formatting;
 
@@ -54,16 +55,7 @@ public static class TagRuleText
     }
 
     /// <summary>The comparison symbol for a conditional operator name.</summary>
-    public static string Symbol(string op) => op switch
-    {
-        "Equal" => "=",
-        "NotEqual" => "≠",
-        "Greater" => ">",
-        "GreaterOrEqual" => "≥",
-        "Less" => "<",
-        "LessOrEqual" => "≤",
-        _ => op
-    };
+    public static string Symbol(string op) => TagCheckText.Symbol(op);
 
     // Yes/no results are stored as true/false; people read them as yes/no.
     private static string Quote(string result) => result switch

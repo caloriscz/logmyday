@@ -9,6 +9,7 @@
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject IWebViewInterop WebView
 @inject ILogger<AddActivityModal> Logger
+@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
 
 <!-- Add New Activity Modal - Full Screen Overlay -->
 <div id="@modalId" data-modal class="hidden fixed inset-0 z-60 bg-white dark:bg-slate-900 transition-opacity duration-300 opacity-0" aria-labelledby="@($"{modalId}Label")">
@@ -482,7 +483,8 @@
 
             if (IsEditMode && ActivityId.HasValue)
             {
-                await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+                var updatedActivity = await ActivityApi.UpdateCalendarItem(ActivityId.Value, Activity);
+                CheckWarnings.Show(updatedActivity.Warnings);
 
                 if (OnActivityUpdated.HasDelegate)
                 {
@@ -502,7 +504,8 @@
                 return;
             }
 
-            await ActivityApi.CreateCalendarItem(Activity);
+            var createdActivity = await ActivityApi.CreateCalendarItem(Activity);
+            CheckWarnings.Show(createdActivity.Warnings);
             await OnActivityCreated.InvokeAsync(Activity);
 
             // Close the modal after successful submission only if not adding another

@@ -1,4 +1,6 @@
-﻿namespace LogMyDay.Shared.DTOs;
+﻿using System.Text.Json.Serialization;
+
+namespace LogMyDay.Shared.DTOs;
 
 public class ActivityResponse
 {
@@ -23,4 +25,9 @@ public class ActivityResponse
     /// <summary>The record this value belongs to, if any. Lists show a record's values together
     /// as one entry; they are edited through the record.</summary>
     public int? RecordId { get; set; }
+
+    /// <summary>Warn checks this save left broken on its day; only on a create or update, and left
+    /// out of the JSON when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TagCheckWarning>? Warnings { get; set; }
 }

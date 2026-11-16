@@ -3,6 +3,7 @@ using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Formatting;
 using Microsoft.EntityFrameworkCore;
 
 namespace LogMyDay.Api.Application.Services;
@@ -129,31 +130,14 @@ public class TagCheckService : ITagCheckService
             return response;
         }
 
-        // Set-based: the range's entries of every tag the checks read, loaded once and grouped by
-        // tag and local day.
-        var tagIds = checks.SelectMany(c => new[] { c.IfTagId, c.ThenTagId }).Distinct().ToList();
-        var startAt = start.ToDateTime(TimeOnly.MinValue);
-        var endAt = end.AddDays(1).ToDateTime(TimeOnly.MinValue);
-        var rows = await _context.Activities
-            .AsNoTracking()
-            .Where(a => a.UserId == userId && tagIds.Contains(a.TagId) && a.DateStarted >= startAt && a.DateStarted < endAt)
-            .Select(a => new { a.Id, a.TagId, a.DateStarted, a.Description })
-            .ToListAsync();
-        var entries = rows
-            .GroupBy(r => (r.TagId, Day: DateOnly.FromDateTime(r.DateStarted)))
-            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<TagDayValue.Entry>)g
-                .Select(r => new TagDayValue.Entry(r.Id, r.DateStarted, r.Description))
-                .ToList());
-        IReadOnlyCollection<TagDayValue.Entry> EntriesOf(int tagId, DateOnly day) =>
-            entries.TryGetValue((tagId, day), out var found) ? found : [];
-
+        var entries = await LoadEntries(userId, checks, start, end);
         foreach (var check in checks)
         {
             var days = entries.Keys.Where(k => k.TagId == check.IfTagId).Select(k => k.Day);
             foreach (var day in days)
             {
                 var result = TagCheckEvaluator.Evaluate(check, check.IfTag!, check.ThenTag!,
-                    EntriesOf(check.IfTagId, day), EntriesOf(check.ThenTagId, day), day == today);
+                    EntriesOf(entries, check.IfTagId, day), EntriesOf(entries, check.ThenTagId, day), day == today);
                 if (result.Outcome is not (TagCheckOutcome.Broken or TagCheckOutcome.Pending))
                 {
                     continue;
@@ -180,6 +164,121 @@ public class TagCheckService : ITagCheckService
             .ToList();
 
         return response;
+    }
+
+    public Task<List<TagCheckWarning>?> WarningsAfterSave(Guid userId, ActivityResponse saved)
+    {
+        return Guarded(userId, () => saved.PrimaryTagId is int tagId
+            ? FindWarnings(userId, [tagId], DateOnly.FromDateTime(saved.DateStarted))
+            : Task.FromResult<List<TagCheckWarning>?>(null));
+    }
+
+    public Task<List<TagCheckWarning>?> WarningsAfterSave(Guid userId, RecordResponse saved)
+    {
+        return Guarded(userId, async () =>
+        {
+            var fields = await _context.Tags
+                .Where(t => t.RecordTypeId == saved.RecordTypeId && t.UserId == userId)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            return await FindWarnings(userId, fields, DateOnly.FromDateTime(saved.DateStarted));
+        });
+    }
+
+    // The save is already committed. A failure while looking for warnings must not report it as
+    // failed, or the client would save the value a second time.
+    private async Task<List<TagCheckWarning>?> Guarded(Guid userId, Func<Task<List<TagCheckWarning>?>> find)
+    {
+        try
+        {
+            return await find();
+        }
+        catch (Exception ex)
+        {
+            await _eventLogService.Log(userId, EventLogLevel.Error, "Check warnings could not be evaluated after a save", ex.Message);
+
+            return null;
+        }
+    }
+
+    private async Task<List<TagCheckWarning>?> FindWarnings(Guid userId, IReadOnlyCollection<int> tagIds, DateOnly day)
+    {
+        if (tagIds.Count == 0)
+        {
+            return null;
+        }
+
+        // A rule's result changes with its sources, so a check on the computed tag can break too.
+        var computed = await _context.TagRules
+            .Where(r => r.UserId == userId && r.IsEnabled && r.EffectiveFrom <= day && r.Sources.Any(s => tagIds.Contains(s.SourceTagId)))
+            .Select(r => r.TargetTagId)
+            .ToListAsync();
+        var read = tagIds.Concat(computed).Distinct().ToList();
+
+        var checks = await ChecksWithTags()
+            .Where(c => c.UserId == userId && c.IsEnabled && c.Severity == TagCheckSeverity.Warn
+                && (read.Contains(c.IfTagId) || read.Contains(c.ThenTagId)))
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+        if (checks.Count == 0)
+        {
+            return null;
+        }
+
+        var entries = await LoadEntries(userId, checks, day, day);
+        var isToday = day == await UserDay.Today(_context, userId);
+        var warnings = new List<TagCheckWarning>();
+        foreach (var check in checks)
+        {
+            // Only Broken warns: Requires on today is Pending, as B may still come later.
+            var result = TagCheckEvaluator.Evaluate(check, check.IfTag!, check.ThenTag!,
+                EntriesOf(entries, check.IfTagId, day), EntriesOf(entries, check.ThenTagId, day), isToday);
+            if (result.Outcome != TagCheckOutcome.Broken)
+            {
+                continue;
+            }
+
+            var ifName = TagTitle(check.IfTag);
+            var thenName = TagTitle(check.ThenTag);
+            warnings.Add(new TagCheckWarning
+            {
+                CheckId = check.Id,
+                CheckName = check.Name,
+                Sentence = TagCheckText.Sentence(ifName, check.IfOperator.ToString(), check.IfOperand,
+                    thenName, check.ThenOperator.ToString(), check.ThenOperand),
+                Found = TagCheckText.Found(ifName, result.IfValue, thenName, result.ThenValue)
+            });
+        }
+
+        return warnings.Count > 0 ? warnings : null;
+    }
+
+    // Set-based: the entries of every tag the checks read between two local days, loaded once and
+    // grouped by tag and day.
+    private async Task<Dictionary<(int TagId, DateOnly Day), IReadOnlyCollection<TagDayValue.Entry>>> LoadEntries(
+        Guid userId, IReadOnlyCollection<TagCheck> checks, DateOnly start, DateOnly end)
+    {
+        var tagIds = checks.SelectMany(c => new[] { c.IfTagId, c.ThenTagId }).Distinct().ToList();
+        var startAt = start.ToDateTime(TimeOnly.MinValue);
+        var endAt = end.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var rows = await _context.Activities
+            .AsNoTracking()
+            .Where(a => a.UserId == userId && tagIds.Contains(a.TagId) && a.DateStarted >= startAt && a.DateStarted < endAt)
+            .Select(a => new { a.Id, a.TagId, a.DateStarted, a.Description })
+            .ToListAsync();
+
+        return rows
+            .GroupBy(r => (r.TagId, Day: DateOnly.FromDateTime(r.DateStarted)))
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<TagDayValue.Entry>)g
+                .Select(r => new TagDayValue.Entry(r.Id, r.DateStarted, r.Description))
+                .ToList());
+    }
+
+    private static IReadOnlyCollection<TagDayValue.Entry> EntriesOf(
+        Dictionary<(int TagId, DateOnly Day), IReadOnlyCollection<TagDayValue.Entry>> entries, int tagId, DateOnly day)
+    {
+        return entries.TryGetValue((tagId, day), out var found) ? found : [];
     }
 
     // Both tags belong to the caller; the rest is checked by TagCheckValidator, shared with the

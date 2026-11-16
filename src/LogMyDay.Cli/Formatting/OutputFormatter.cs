@@ -92,6 +92,15 @@ public static class OutputFormatter
     public static void WriteError(string message) =>
         AnsiConsole.MarkupLine($"[red]Error:[/] {message}");
 
+    /// <summary>Warn checks a save left broken on its day; the value is saved anyway.</summary>
+    public static void WriteWarnings(IReadOnlyList<TagCheckWarning>? warnings)
+    {
+        foreach (var warning in warnings ?? [])
+        {
+            AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(warning.CheckName)}: {Markup.Escape(warning.Sentence)} ({Markup.Escape(warning.Found)})");
+        }
+    }
+
     public static void WriteActivities(IReadOnlyList<ActivityResponse> activities, bool json)
     {
         if (json)

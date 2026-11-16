@@ -9,6 +9,7 @@
 @using System.Linq
 @using LogMyDay.Shared.Preferences
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
+@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
 @inject LogMyDay.Shared.Interfaces.IUsersApi UsersApi
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject LogMyDay.App.Mobile.Services.AuthenticationService AuthService
@@ -1120,6 +1121,7 @@
             };
 
             var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+            CheckWarnings.Show(updated.Warnings);
 
             var returnedRaw = updated.PrimaryTagValue ?? updated.Description;
             _pendingBoolValues[activity.Id] = bool.TryParse(returnedRaw, out var returnedBool) ? returnedBool : null;
@@ -1156,6 +1158,7 @@
             };
 
             var updated = await ActivityApi.UpdateCalendarItem(activity.Id, request);
+            CheckWarnings.Show(updated.Warnings);
 
             var returnedRaw = updated.PrimaryTagValue ?? updated.Description ?? "0";
             if (int.TryParse(returnedRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var returnedInt))

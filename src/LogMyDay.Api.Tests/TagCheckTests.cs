@@ -77,11 +77,13 @@ public sealed class TagCheckTests : IDisposable
     }
 
     private Task<TagCheckResponse> Check(Tag ifTag, TagRuleOperator ifOperator, string? ifOperand,
-        Tag thenTag, TagRuleOperator thenOperator, string? thenOperand = null, string name = "Check", bool enabled = true) =>
+        Tag thenTag, TagRuleOperator thenOperator, string? thenOperand = null, string name = "Check", bool enabled = true,
+        TagCheckSeverity severity = TagCheckSeverity.Flag) =>
         _checks.Create(new TagCheckRequest
         {
             Name = name,
             IsEnabled = enabled,
+            Severity = severity,
             IfTagId = ifTag.Id,
             IfOperator = ifOperator,
             IfOperand = ifOperand,
@@ -408,5 +410,122 @@ public sealed class TagCheckTests : IDisposable
         var partial = await backups.ImportDataAsync(export, clearExistingData: false, _userId);
         Assert.Equal((0, 1), (partial.Statistics.TagChecksImported, partial.Statistics.TagChecksSkipped));
         Assert.Contains(partial.Warnings, w => w.Contains("'Hotel mood'") && w.Contains("'Missing'"));
+    }
+
+    // What a save of one entry returns: the warnings for its tag and day.
+    private Task<List<TagCheckWarning>?> WarningsAfter(Tag tag, int daysAgo) =>
+        _checks.WarningsAfterSave(_userId, new ActivityResponse { PrimaryTagId = tag.Id, DateStarted = Day(daysAgo).ToDateTime(new TimeOnly(9, 0)) });
+
+    [Fact]
+    public async Task ASave_WarnsOnlyAboutTheWarnChecksItBreaks()
+    {
+        var fasting = await AddTag("Fasting", InputTypeIds.Boolean);
+        var breakfast = await AddTag("Breakfast", InputTypeIds.Integer);
+        await Check(fasting, TagRuleOperator.IsLogged, null, breakfast, TagRuleOperator.IsNotLogged, name: "Fast", severity: TagCheckSeverity.Warn);
+        await Check(fasting, TagRuleOperator.IsLogged, null, breakfast, TagRuleOperator.IsNotLogged, name: "Fast (flag)");
+        await Check(fasting, TagRuleOperator.IsLogged, null, breakfast, TagRuleOperator.IsNotLogged, name: "Fast (paused)", enabled: false, severity: TagCheckSeverity.Warn);
+
+        await Log(fasting, 1, "true");
+        Assert.Null(await WarningsAfter(fasting, 1));
+
+        // Breakfast on the fasting day breaks all three; only the active Warn check warns, on
+        // either tag's save.
+        await Log(breakfast, 1, "1");
+        var warning = Assert.Single((await WarningsAfter(breakfast, 1))!);
+        Assert.Equal(("Fast", "Fasting and Breakfast are not on the same day", "Fasting: yes · Breakfast: 1"),
+            (warning.CheckName, warning.Sentence, warning.Found));
+        Assert.Single((await WarningsAfter(fasting, 1))!);
+
+        // A skipped breakfast (0) does not count as logged, so it does not warn.
+        await Log(fasting, 2, "true");
+        await Log(breakfast, 2, "0");
+        Assert.Null(await WarningsAfter(breakfast, 2));
+
+        // Another tag's save does not look at these checks.
+        var water = await AddTag("Water", InputTypeIds.Integer);
+        Assert.Null(await WarningsAfter(water, 1));
+    }
+
+    [Fact]
+    public async Task Requires_NeverWarnsAboutToday_ButDoesAboutAPastDay()
+    {
+        var shake = await AddTag("Shake", InputTypeIds.Boolean);
+        var exercise = await AddTag("Exercise", InputTypeIds.Integer);
+        await Check(shake, TagRuleOperator.IsLogged, null, exercise, TagRuleOperator.IsLogged, name: "Shake needs exercise", severity: TagCheckSeverity.Warn);
+
+        await Log(shake, 0, "true");
+        Assert.Null(await WarningsAfter(shake, 0));
+
+        await Log(shake, 1, "true");
+        var warning = Assert.Single((await WarningsAfter(shake, 1))!);
+        Assert.Equal(("Shake requires Exercise on the same day", "Shake: yes · Exercise: not logged"), (warning.Sentence, warning.Found));
+    }
+
+    [Fact]
+    public async Task ACheckOnAComputedTag_WarnsAfterASourceIsSaved()
+    {
+        var espresso = await AddTag("Espresso", InputTypeIds.Integer);
+        var total = await AddTag("Caffeine drinks", InputTypeIds.Integer);
+        var water = await AddTag("Water", InputTypeIds.Integer);
+        var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
+        var rules = new TagRuleService(_context, new TagRuleEngine(_context), eventLog);
+        await rules.Create(new TagRuleRequest
+        {
+            Name = "Caffeine",
+            TargetTagId = total.Id,
+            Sources = [new() { SourceTagId = espresso.Id, Factor = 1 }]
+        }, _userId);
+        await Check(total, TagRuleOperator.GreaterOrEqual, "3", water, TagRuleOperator.GreaterOrEqual, "2", name: "Water with coffee", severity: TagCheckSeverity.Warn);
+
+        await Log(water, 0, "1");
+        await Log(espresso, 0, "2");
+        await new TagRuleEngine(_context).OnSourcesChanged(_userId, [(espresso.Id, _today)]);
+        Assert.Null(await WarningsAfter(espresso, 0));
+
+        // The third espresso brings the computed total to 3 with only one glass of water.
+        await Log(espresso, 0, "1", hour: 11);
+        await new TagRuleEngine(_context).OnSourcesChanged(_userId, [(espresso.Id, _today)]);
+        var warning = Assert.Single((await WarningsAfter(espresso, 0))!);
+        Assert.Equal(("Water with coffee", "Caffeine drinks: 3 · Water: 1"), (warning.CheckName, warning.Found));
+    }
+
+    [Fact]
+    public async Task ARecordSave_WarnsForAnyFieldOfItsType()
+    {
+        var type = await _types.Create(new RecordTypeRequest
+        {
+            Name = "Run",
+            Fields = [new() { Name = "Distance", TypeId = InputTypeIds.Decimal }, new() { Name = "Note", TypeId = InputTypeIds.String }]
+        }, _userId);
+        var distance = await _context.Tags.SingleAsync(t => t.Id == type.Fields[0].TagId);
+        var note = await _context.Tags.SingleAsync(t => t.Id == type.Fields[1].TagId);
+        await Check(distance, TagRuleOperator.IsLogged, null, note, TagRuleOperator.IsLogged, name: "Runs have a note", severity: TagCheckSeverity.Warn);
+
+        var record = await _records.Create(new RecordRequest
+        {
+            RecordTypeId = type.Id,
+            DateStarted = Day(1).ToDateTime(new TimeOnly(7, 0)),
+            Values = [new() { TagId = distance.Id, Value = "5" }]
+        }, _userId);
+        var warning = Assert.Single((await _checks.WarningsAfterSave(_userId, record))!);
+        Assert.Equal("Runs have a note", warning.CheckName);
+
+        var withNote = await _records.Update(record.Id, new RecordRequest
+        {
+            RecordTypeId = type.Id,
+            DateStarted = record.DateStarted,
+            Values = [new() { TagId = distance.Id, Value = "5" }, new() { TagId = note.Id, Value = "Easy" }]
+        }, _userId);
+        Assert.Null(await _checks.WarningsAfterSave(_userId, withNote));
+    }
+
+    [Fact]
+    public void Responses_LeaveOutWarnings_WhenThereAreNone()
+    {
+        var options = LogMyDay.Shared.Serialization.JsonSerializationSettings.CreateDefault();
+
+        Assert.DoesNotContain("warnings", System.Text.Json.JsonSerializer.Serialize(new ActivityResponse(), options));
+        Assert.DoesNotContain("warnings", System.Text.Json.JsonSerializer.Serialize(new RecordResponse(), options));
+        Assert.Contains("\"warnings\":[", System.Text.Json.JsonSerializer.Serialize(new ActivityResponse { Warnings = [new()] }, options));
     }
 }

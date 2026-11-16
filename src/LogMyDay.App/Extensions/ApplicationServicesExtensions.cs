@@ -60,6 +60,7 @@ internal static class ApplicationServicesExtensions
 
         // UI services
         services.AddScoped<IPageTitleService, PageTitleService>();
+        services.AddScoped<LogMyDay.UI.Services.CheckWarningNotices>();
         services.AddScoped<IUserPreferencesService, UserPreferencesService>();
 
         // Chart services
