@@ -65,8 +65,9 @@ public static class TagCheckText
         _ => $"{tag} should be {TagRuleText.Symbol(op)} {operand}"
     };
 
-    // Yes/no values are stored as true/false; people read them as yes/no.
-    private static string Value(string value) => value switch
+    // Yes/no values are stored as true/false, older rows and some edits as True/False; people
+    // read them as yes/no.
+    private static string Value(string value) => value.ToLowerInvariant() switch
     {
         "true" => "yes",
         "false" => "no",
