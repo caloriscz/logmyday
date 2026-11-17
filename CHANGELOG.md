@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
-## Unreleased
+## v0.7.0 — 2026‑11‑17
 
 ### Added
 
