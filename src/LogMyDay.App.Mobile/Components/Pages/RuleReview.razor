@@ -1,0 +1,41 @@
+@page "/tag-rules/review"
+
+@inject ILogger<RuleReview> Logger
+@inject IPageTitleService PageTitleService
+@inject IUserPreferencesService UserPreferencesService
+
+<PageTitle>Rule review - LogMyDay</PageTitle>
+
+<div class="min-h-screen bg-gray-50 pb-20 dark:bg-gray-900">
+    <TopBar Title="Rule review" />
+    <TagSectionNav />
+
+    <div class="mx-auto max-w-7xl space-y-4 px-4 py-4">
+        <p class="text-sm text-gray-600 dark:text-slate-400">The days that break one of your checks. Nothing is changed.</p>
+        @if (cultureLoaded)
+        {
+            <TagCheckReview Culture="displayCulture" />
+        }
+    </div>
+</div>
+
+@code {
+    private System.Globalization.CultureInfo displayCulture = System.Globalization.CultureInfo.CurrentCulture;
+    private bool cultureLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageTitleService.SetTitle("Rule review");
+
+        try
+        {
+            displayCulture = (await UserPreferencesService.GetAsync()).Culture;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not load user preferences; using the device culture");
+        }
+
+        cultureLoaded = true;
+    }
+}

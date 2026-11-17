@@ -1,4 +1,3 @@
-using System.Globalization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Mvc;
@@ -39,24 +38,6 @@ public class RecordsController : BaseApiController
         var end = toDay?.ToDateTime(TimeOnly.MaxValue);
 
         return Ok(await _recordService.GetPaged(userId, recordTypeId, start, end, Math.Max(page, 1), Math.Clamp(pageSize, 1, 200)));
-    }
-
-    private static bool TryParseDay(string? value, out DateOnly? day)
-    {
-        day = null;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-        {
-            return false;
-        }
-
-        day = parsed;
-
-        return true;
     }
 
     [HttpGet("{id:int}")]

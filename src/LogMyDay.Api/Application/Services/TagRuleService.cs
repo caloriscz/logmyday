@@ -464,24 +464,9 @@ public class TagRuleService : ITagRuleService
             ?? throw new KeyNotFoundException("Rule not found");
     }
 
-    private async Task<DateOnly> UserToday(Guid userId)
+    private Task<DateOnly> UserToday(Guid userId)
     {
-        var timeZone = await _context.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.TimeZone)
-            .FirstOrDefaultAsync();
-
-        TimeZoneInfo tz;
-        try
-        {
-            tz = TimeZoneInfo.FindSystemTimeZoneById(timeZone ?? "UTC");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            tz = TimeZoneInfo.Utc;
-        }
-
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        return UserDay.Today(_context, userId);
     }
 
     private static string Describe(TagRule rule, Dictionary<int, Tag> sources)

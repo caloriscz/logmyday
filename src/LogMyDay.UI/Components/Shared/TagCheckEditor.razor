@@ -1,0 +1,297 @@
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Enums
+@using LogMyDay.UI.Formatting
+@* Form for a check: "if the first tag meets its condition, then the second tag meets its
+   expectation", with the shortcuts "Not on the same day" and "Requires". Presentational only: the
+   host loads the tags and option lists, owns the Model and saves it. Shared by web and mobile. *@
+<div class="space-y-5">
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="check-name">Name <span class="text-rose-500">*</span></label>
+        <input id="check-name" type="text" @bind="Model.Name" maxlength="100" placeholder="e.g., No breakfast while fasting"
+               class="@InputCss" disabled="@Disabled" />
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="check-kind">What the check expects</label>
+        @* A string-valued choice; a select is never bound to a bool or enum directly. *@
+        <select id="check-kind" class="@InputCss" value="@kind" @onchange="OnKindChanged" disabled="@Disabled">
+            <option value="@NotOnTheSameDay">Not on the same day — two tags exclude each other</option>
+            <option value="@Requires">Requires — a tag needs another one that day</option>
+            <option value="@IfThen">If … then … — a condition and what should follow</option>
+        </select>
+        <p class="text-xs text-gray-500 dark:text-slate-400">@KindHint</p>
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">@(kind == IfThen ? "If" : "First tag") <span class="text-rose-500">*</span></label>
+        <GroupedTagSelect Tags="candidates" Value="@(Model.IfTagId == 0 ? null : Model.IfTagId)" ValueChanged="SetIfTag" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Tag --" />
+        @if (kind == IfThen)
+        {
+            @SideInput(IfTag, Model.IfOperator, Model.IfOperand, expectation: false)
+        }
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">@(kind == IfThen ? "Then" : "Second tag") <span class="text-rose-500">*</span></label>
+        <GroupedTagSelect Tags="candidates" Value="@(Model.ThenTagId == 0 ? null : Model.ThenTagId)" ValueChanged="SetThenTag" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Tag --" />
+        @if (kind == IfThen)
+        {
+            @SideInput(ThenTag, Model.ThenOperator, Model.ThenOperand, expectation: true)
+            <p class="text-xs text-gray-500 dark:text-slate-400">A day without this tag is fine. To insist that it is logged, add a "Requires" check as well.</p>
+        }
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="check-severity">When it is broken</label>
+        <select id="check-severity" class="@InputCss" value="@Model.Severity.ToString()" @onchange="OnSeverityChanged" disabled="@Disabled">
+            <option value="@nameof(TagCheckSeverity.Flag)">Flag — show the day in the Rule review</option>
+            <option value="@nameof(TagCheckSeverity.Warn)">Warn — also warn right after a save that breaks it</option>
+        </select>
+        <p class="text-xs text-gray-500 dark:text-slate-400">A check never stops a save. Use Flag for checks with real exceptions.</p>
+    </div>
+
+    @if (Model.IfTagId != 0 && Model.ThenTagId != 0)
+    {
+        <p class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
+            Each day: @Sentence()
+        </p>
+    }
+
+    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
+        <input type="checkbox" @bind="Model.IsEnabled" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
+        <span>Active <span class="text-gray-500 dark:text-slate-400">— a paused check is left out of the review</span></span>
+    </label>
+
+    <p class="text-xs text-gray-500 dark:text-slate-400">"Is logged" means it happened: zeros and "no" entries (e.g. skipped reminders) do not count. A tag logged several times a day is compared by its day total (numbers), day average (ratings, scores, percentages) or latest entry (others).</p>
+</div>
+
+@code {
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string SmallInputCss = "rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string IfThen = "IfThen";
+    private const string NotOnTheSameDay = "NotOnTheSameDay";
+    private const string Requires = "Requires";
+
+    // The order tests are offered in; each tag kind shows the ones it allows.
+    private static readonly TagRuleOperator[] OperatorOrder =
+    [
+        TagRuleOperator.IsLogged, TagRuleOperator.IsNotLogged, TagRuleOperator.Equal, TagRuleOperator.NotEqual,
+        TagRuleOperator.Greater, TagRuleOperator.GreaterOrEqual, TagRuleOperator.Less, TagRuleOperator.LessOrEqual,
+        TagRuleOperator.IsYes, TagRuleOperator.IsNo
+    ];
+
+    /// <summary>The user's tags. Record types are left out; their fields are offered.</summary>
+    [Parameter, EditorRequired] public IList<TagResponse>? Tags { get; set; }
+
+    /// <summary>The user's option lists, for comparing an option-list tag.</summary>
+    [Parameter] public IList<TagOptionListResponse>? OptionLists { get; set; }
+
+    [Parameter, EditorRequired] public TagCheckRequest Model { get; set; } = default!;
+
+    [Parameter] public bool Disabled { get; set; }
+
+    // The chosen kind, read from the model only when a model arrives, so an "If … then …" check
+    // whose tests happen to match a shortcut keeps its own form while being edited.
+    private string kind = NotOnTheSameDay;
+    private TagCheckRequest? kindModel;
+
+    private IList<TagResponse>? candidates;
+    private IList<TagResponse>? candidatesSource;
+
+    private TagResponse? IfTag => TagById(Model.IfTagId);
+    private TagResponse? ThenTag => TagById(Model.ThenTagId);
+
+    private TagResponse? TagById(int tagId) => Tags?.FirstOrDefault(t => t.Id == tagId);
+
+    private string KindHint => kind switch
+    {
+        NotOnTheSameDay => "A day with both tags logged is shown, e.g. Fasting and Breakfast.",
+        Requires => "A day with the first tag but without the second is shown, e.g. a post-workout shake without Exercise. Today counts once the day is over.",
+        _ => "A day where the condition holds but the second tag's value does not fit is shown, e.g. if Coffees = 4, then Late coffee should be no."
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(Model, kindModel))
+        {
+            kindModel = Model;
+            kind = (Model.IfOperator, Model.ThenOperator) switch
+            {
+                (TagRuleOperator.IsLogged, TagRuleOperator.IsNotLogged) => NotOnTheSameDay,
+                (TagRuleOperator.IsLogged, TagRuleOperator.IsLogged) => Requires,
+                _ => IfThen
+            };
+        }
+
+        if (!ReferenceEquals(Tags, candidatesSource))
+        {
+            candidatesSource = Tags;
+            candidates = (Tags ?? []).Where(t => !t.IsRecordType).ToList();
+        }
+    }
+
+    // A test row: the test and, when it compares, the value input that fits the tag.
+    private RenderFragment SideInput(TagResponse? tag, TagRuleOperator op, string? operand, bool expectation) => __builder =>
+    {
+        var tagKind = KindOf(tag);
+        var numeric = tagKind is TagRuleValueKind.Number or TagRuleValueKind.Scale;
+        <div class="flex flex-wrap items-center gap-2">
+            <select class="@SmallInputCss" value="@op.ToString()" @onchange="e => SetOperator(expectation, e.Value?.ToString())" disabled="@(Disabled || tag == null)" aria-label="@(expectation ? "Expectation" : "Condition")">
+                @foreach (var choice in OperatorOrder.Where(o => TagRuleInputTypes.AllowsInCheck(tagKind, o, expectation)))
+                {
+                    <option value="@choice.ToString()">@TagCheckText.OperatorLabel(choice.ToString(), numeric)</option>
+                }
+            </select>
+            @if (TagRuleInputTypes.NeedsOperand(op))
+            {
+                @if (numeric)
+                {
+                    <input type="number" step="any" class="w-28 @SmallInputCss" value="@operand" @onchange="e => SetOperand(expectation, e.Value?.ToString())" disabled="@Disabled" aria-label="Compared value" />
+                }
+                else if (OptionListOf(tag) is { } options)
+                {
+                    <select class="@SmallInputCss" value="@operand" @onchange="e => SetOperand(expectation, e.Value?.ToString())" disabled="@Disabled" aria-label="Compared value">
+                        <option value="">-- Option --</option>
+                        @foreach (var option in options.Options)
+                        {
+                            <option value="@option.Value">@(option.DisplayName ?? option.Value)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input type="text" maxlength="500" class="w-40 @SmallInputCss" value="@operand" @onchange="e => SetOperand(expectation, e.Value?.ToString())" disabled="@Disabled" aria-label="Compared value" />
+                }
+            }
+        </div>
+    };
+
+    private static TagRuleValueKind KindOf(TagResponse? tag) =>
+        tag == null ? TagRuleValueKind.Text : TagRuleInputTypes.ConditionKind(tag.InputTypeId, tag.OptionListId != null);
+
+    private TagOptionListResponse? OptionListOf(TagResponse? tag) =>
+        tag?.OptionListId is int id ? OptionLists?.FirstOrDefault(l => l.Id == id) : null;
+
+    // A new If … then … side starts with a comparison the tag allows.
+    private static TagRuleOperator DefaultOperator(TagRuleValueKind tagKind) => tagKind switch
+    {
+        TagRuleValueKind.Number or TagRuleValueKind.Scale => TagRuleOperator.GreaterOrEqual,
+        TagRuleValueKind.YesNo => TagRuleOperator.IsYes,
+        _ => TagRuleOperator.Equal
+    };
+
+    private void OnKindChanged(ChangeEventArgs e)
+    {
+        kind = e.Value?.ToString() switch
+        {
+            Requires => Requires,
+            IfThen => IfThen,
+            _ => NotOnTheSameDay
+        };
+
+        switch (kind)
+        {
+            case NotOnTheSameDay:
+                SetTests(TagRuleOperator.IsLogged, TagRuleOperator.IsNotLogged);
+                break;
+            case Requires:
+                SetTests(TagRuleOperator.IsLogged, TagRuleOperator.IsLogged);
+                break;
+            default:
+                SetTests(DefaultOperator(KindOf(IfTag)), DefaultOperator(KindOf(ThenTag)));
+                break;
+        }
+    }
+
+    private void SetTests(TagRuleOperator ifOperator, TagRuleOperator thenOperator)
+    {
+        Model.IfOperator = ifOperator;
+        Model.IfOperand = null;
+        Model.ThenOperator = thenOperator;
+        Model.ThenOperand = null;
+    }
+
+    private void OnSeverityChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TagCheckSeverity>(e.Value?.ToString(), out var severity) && Enum.IsDefined(severity))
+        {
+            Model.Severity = severity;
+        }
+    }
+
+    private void SetIfTag(int? tagId)
+    {
+        var previous = IfTag;
+        Model.IfTagId = tagId ?? 0;
+        if (kind == IfThen)
+        {
+            (Model.IfOperator, Model.IfOperand) = FitTest(previous, IfTag, Model.IfOperator, Model.IfOperand, expectation: false);
+        }
+    }
+
+    private void SetThenTag(int? tagId)
+    {
+        var previous = ThenTag;
+        Model.ThenTagId = tagId ?? 0;
+        if (kind == IfThen)
+        {
+            (Model.ThenOperator, Model.ThenOperand) = FitTest(previous, ThenTag, Model.ThenOperator, Model.ThenOperand, expectation: true);
+        }
+    }
+
+    // A test the new tag does not allow goes back to its default. A compared value stays between
+    // tags of the same kind and option list, and is cleared otherwise.
+    private static (TagRuleOperator, string?) FitTest(TagResponse? previous, TagResponse? current, TagRuleOperator op, string? operand, bool expectation)
+    {
+        var currentKind = KindOf(current);
+        if (!TagRuleInputTypes.AllowsInCheck(currentKind, op, expectation))
+        {
+            op = DefaultOperator(currentKind);
+        }
+
+        var keep = KindOf(previous) == currentKind && previous?.OptionListId == current?.OptionListId;
+
+        return (op, keep && TagRuleInputTypes.NeedsOperand(op) ? operand : null);
+    }
+
+    private void SetOperator(bool expectation, string? value)
+    {
+        if (!Enum.TryParse<TagRuleOperator>(value, out var op) || !Enum.IsDefined(op))
+        {
+            return;
+        }
+
+        if (expectation)
+        {
+            Model.ThenOperator = op;
+            Model.ThenOperand = TagRuleInputTypes.NeedsOperand(op) ? Model.ThenOperand : null;
+        }
+        else
+        {
+            Model.IfOperator = op;
+            Model.IfOperand = TagRuleInputTypes.NeedsOperand(op) ? Model.IfOperand : null;
+        }
+    }
+
+    private void SetOperand(bool expectation, string? value)
+    {
+        if (expectation)
+        {
+            Model.ThenOperand = value;
+        }
+        else
+        {
+            Model.IfOperand = value;
+        }
+    }
+
+    private string Sentence()
+    {
+        return TagCheckText.Sentence(IfTag?.Title ?? "first tag", Model.IfOperator.ToString(), OperandLabel(IfTag, Model.IfOperand),
+            ThenTag?.Title ?? "second tag", Model.ThenOperator.ToString(), OperandLabel(ThenTag, Model.ThenOperand));
+    }
+
+    // An option reads better by its display name.
+    private string? OperandLabel(TagResponse? tag, string? operand) =>
+        OptionListOf(tag)?.Options.FirstOrDefault(o => o.Value == operand)?.DisplayName ?? operand;
+}

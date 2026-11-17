@@ -41,6 +41,11 @@ public static class TagRuleCaseValidator
                 throw new ArgumentException($"{position}: unknown condition.");
             }
 
+            if (op == TagRuleOperator.IsNotLogged)
+            {
+                throw new ArgumentException($"{position}: \"is not logged\" is only for checks.");
+            }
+
             if (op == TagRuleOperator.Otherwise && i != requests.Count - 1)
             {
                 throw new ArgumentException($"{position}: \"otherwise\" can only be the last case.");
@@ -75,7 +80,11 @@ public static class TagRuleCaseValidator
         return cases;
     }
 
-    private static string NormaliseOperand(string? value, TagRuleOperator op, TagRuleValueKind kind, bool ignoreZero, Tag source,
+    /// <summary>The compared value in its stored encoding: a number as entered, an option by its
+    /// value, or text. Shared with the checks.</summary>
+    /// <exception cref="ArgumentException">The value does not fit the tag; the message starts
+    /// with <paramref name="position"/>.</exception>
+    internal static string NormaliseOperand(string? value, TagRuleOperator op, TagRuleValueKind kind, bool ignoreZero, Tag source,
         IReadOnlyList<TagOption>? sourceOptions, string position)
     {
         var operand = value?.Trim() ?? string.Empty;

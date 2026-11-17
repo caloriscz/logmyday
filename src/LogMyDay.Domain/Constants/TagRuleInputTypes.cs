@@ -68,6 +68,15 @@ public static class TagRuleInputTypes
         _ => false
     };
 
+    /// <summary>The tests a check may use: the rules' tests without "otherwise", and "is not
+    /// logged" on the expectation side only.</summary>
+    public static bool AllowsInCheck(TagRuleValueKind kind, TagRuleOperator op, bool expectation) => op switch
+    {
+        TagRuleOperator.Otherwise => false,
+        TagRuleOperator.IsNotLogged => expectation,
+        _ => Allows(kind, op)
+    };
+
     /// <summary>Whether the case compares with an operand.</summary>
     public static bool NeedsOperand(TagRuleOperator op) =>
         op is TagRuleOperator.Equal or TagRuleOperator.NotEqual or TagRuleOperator.Greater

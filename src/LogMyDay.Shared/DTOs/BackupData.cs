@@ -16,6 +16,7 @@ public class BackupData
     public List<TodoListBackup> TodoLists { get; set; } = new();
     public List<ReminderBackup> Reminders { get; set; } = new();
     public List<TagRuleBackup> TagRules { get; set; } = new();
+    public List<TagCheckBackup> TagChecks { get; set; } = new();
     public List<RecordTypeBackup> RecordTypes { get; set; } = new();
 }
 
@@ -37,6 +38,7 @@ public class BackupMetadata
     public int TotalTodoItems { get; set; }
     public int TotalReminders { get; set; }
     public int TotalTagRules { get; set; }
+    public int TotalTagChecks { get; set; }
     public int TotalRecordTypes { get; set; }
     public int TotalRecords { get; set; }
 }

@@ -41,6 +41,8 @@ public class BackupImportStatistics
     public int TagRulesSkipped { get; set; }
     /// <summary>Values the restored rules calculated from the restored sources.</summary>
     public int TagRuleValuesComputed { get; set; }
+    public int TagChecksImported { get; set; }
+    public int TagChecksSkipped { get; set; }
     public int RecordTypesImported { get; set; }
     public int RecordTypesSkipped { get; set; }
 

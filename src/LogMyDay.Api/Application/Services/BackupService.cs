@@ -72,6 +72,131 @@ public class BackupService : IBackupService
         return rules.Select(r => r.Backup).ToList();
     }
 
+    // Checks travel by tag name, like rule sources. They write nothing, so there are no values to
+    // carry.
+    private async Task<List<TagCheckBackup>> ExportTagChecksAsync(Guid? userId)
+    {
+        return await _context.TagChecks
+            .Where(c => userId == null || c.UserId == userId)
+            .OrderBy(c => c.Name)
+            .Select(c => new TagCheckBackup
+            {
+                Name = c.Name,
+                Severity = c.Severity,
+                IsEnabled = c.IsEnabled,
+                IfTagName = c.IfTag!.TagName,
+                IfOperator = c.IfOperator,
+                IfOperand = c.IfOperand,
+                ThenTagName = c.ThenTag!.TagName,
+                ThenOperator = c.ThenOperator,
+                ThenOperand = c.ThenOperand,
+                DateCreated = c.DateCreated
+            })
+            .ToListAsync();
+    }
+
+    // Restores checks by tag name with the same conditions as creating one. A check whose tags are
+    // missing or no longer fit is skipped with a warning; one whose name the user already has is
+    // skipped quietly, so importing a backup twice does not double the checks. Nothing is
+    // evaluated here: checks are read on request.
+    private async Task ImportTagChecksAsync(List<TagCheckBackup> checks, BackupImportResult result, Guid? userId)
+    {
+        if (checks.Count == 0)
+        {
+            return;
+        }
+
+        var tagsByName = (await _context.Tags
+                .Where(t => (userId == null || t.UserId == userId) && !t.IsRecordType)
+                .ToListAsync())
+            .GroupBy(t => t.TagName)
+            .ToDictionary(g => g.Key, g => g.First());
+        var existingNames = (await _context.TagChecks
+                .Where(c => userId == null || c.UserId == userId)
+                .Select(c => c.Name)
+                .ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var optionsByList = new Dictionary<int, List<TagOption>>();
+
+        async Task<List<TagOption>?> OptionsOf(Tag tag)
+        {
+            if (tag.OptionListId is not int listId)
+            {
+                return null;
+            }
+
+            if (!optionsByList.TryGetValue(listId, out var options))
+            {
+                optionsByList[listId] = options = await _context.TagOptions.Where(o => o.OptionListId == listId).ToListAsync();
+            }
+
+            return options;
+        }
+
+        foreach (var backup in checks)
+        {
+            var name = backup.Name?.Trim() ?? string.Empty;
+            if (existingNames.Contains(name))
+            {
+                result.Statistics.TagChecksSkipped++;
+                continue;
+            }
+
+            tagsByName.TryGetValue(backup.IfTagName, out var ifTag);
+            tagsByName.TryGetValue(backup.ThenTagName, out var thenTag);
+            string? reason = null;
+            (string? IfOperand, string? ThenOperand) operands = default;
+            if (name.Length == 0 || name.Length > TagCheckValidator.MaxNameLength)
+            {
+                reason = "its name is empty or too long";
+            }
+            else if (ifTag == null || thenTag == null)
+            {
+                reason = $"tag '{(ifTag == null ? backup.IfTagName : backup.ThenTagName)}' is missing";
+            }
+            else
+            {
+                try
+                {
+                    operands = TagCheckValidator.Validate(backup.Severity, backup.IfOperator, backup.IfOperand,
+                        backup.ThenOperator, backup.ThenOperand, ifTag, thenTag, await OptionsOf(ifTag), await OptionsOf(thenTag));
+                }
+                catch (ArgumentException ex)
+                {
+                    reason = ex.Message;
+                }
+            }
+
+            if (reason != null || ifTag == null || thenTag == null)
+            {
+                result.Statistics.TagChecksSkipped++;
+                result.Warnings.Add($"Check '{backup.Name}' was not restored: {reason}");
+                continue;
+            }
+
+            var now = DateTime.UtcNow;
+            _context.TagChecks.Add(new TagCheck
+            {
+                UserId = userId ?? ifTag.UserId ?? Guid.Empty,
+                Name = name,
+                Severity = backup.Severity,
+                IsEnabled = backup.IsEnabled,
+                IfTagId = ifTag.Id,
+                IfOperator = backup.IfOperator,
+                IfOperand = operands.IfOperand,
+                ThenTagId = thenTag.Id,
+                ThenOperator = backup.ThenOperator,
+                ThenOperand = operands.ThenOperand,
+                DateCreated = backup.DateCreated == default ? now : backup.DateCreated,
+                DateUpdated = now
+            });
+            existingNames.Add(name);
+            result.Statistics.TagChecksImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     // Record types travel whole: their fields' definitions and their records with values by field
     // name. Field tags and record values are left out of the tag and activity lists.
     private async Task<List<RecordTypeBackup>> ExportRecordTypesAsync(Guid? userId)
@@ -727,6 +852,7 @@ public class BackupService : IBackupService
                 .ToListAsync();
 
             var tagRules = await ExportTagRulesAsync(userId);
+            var tagChecks = await ExportTagChecksAsync(userId);
             var recordTypes = await ExportRecordTypesAsync(userId);
 
             var backupData = new BackupData
@@ -748,6 +874,7 @@ public class BackupService : IBackupService
                     TotalTodoItems = todoLists.Sum(l => l.Items.Count),
                     TotalReminders = reminders.Count,
                     TotalTagRules = tagRules.Count,
+                    TotalTagChecks = tagChecks.Count,
                     TotalRecordTypes = recordTypes.Count,
                     TotalRecords = recordTypes.Sum(t => t.Records.Count)
                 },
@@ -763,6 +890,7 @@ public class BackupService : IBackupService
                 TodoLists = todoLists,
                 Reminders = reminders,
                 TagRules = tagRules,
+                TagChecks = tagChecks,
                 RecordTypes = recordTypes
             };
 
@@ -820,6 +948,7 @@ public class BackupService : IBackupService
                 await ImportTodoListsAsync(backupData.TodoLists, result, userId);
                 await ImportRemindersAsync(backupData.Reminders, result, userId);
                 var importedRules = await ImportTagRulesAsync(backupData.TagRules, result, userId);
+                await ImportTagChecksAsync(backupData.TagChecks, result, userId);
 
                 await transaction.CommitAsync();
 
@@ -905,7 +1034,17 @@ public class BackupService : IBackupService
             _context.TodoLists.RemoveRange(todoListsToDelete);
             recordsCleared += todoListsToDelete.Count;
 
-            // Tag Activity Relations rules reference tags (Restrict), so they go before the tags.
+            // Tag Activity Relations rules and checks reference tags (Restrict), so they go before
+            // the tags.
+            var tagChecksQuery = _context.TagChecks.AsQueryable();
+            if (userId.HasValue)
+            {
+                tagChecksQuery = tagChecksQuery.Where(c => c.UserId == userId);
+            }
+            var tagChecksToDelete = await tagChecksQuery.ToListAsync();
+            _context.TagChecks.RemoveRange(tagChecksToDelete);
+            recordsCleared += tagChecksToDelete.Count;
+
             var tagRulesQuery = _context.TagRules.Include(r => r.Sources).AsQueryable();
             if (userId.HasValue)
             {
@@ -1728,6 +1867,7 @@ public class BackupService : IBackupService
                 TagOptions = userTagOptions,
                 ScanMappings = userScanMappings,
                 TagRules = await ExportTagRulesAsync(userId),
+                TagChecks = await ExportTagChecksAsync(userId),
                 RecordTypes = await ExportRecordTypesAsync(userId)
             };
 
@@ -1955,6 +2095,7 @@ public class BackupService : IBackupService
 
                 // Step 8: Tag Activity Relations rules, by tag name
                 var importedRules = await ImportTagRulesAsync(backup.TagRules, result, userId);
+                await ImportTagChecksAsync(backup.TagChecks, result, userId);
 
                 await transaction.CommitAsync();
 
@@ -2022,7 +2163,15 @@ public class BackupService : IBackupService
                 _context.ScanMappings.RemoveRange(userScanMappings);
                 recordsCleared += userScanMappings.Count;
 
-                // Tag Activity Relations rules reference tags (Restrict), so they go before the tags.
+                // Tag Activity Relations rules and checks reference tags (Restrict), so they go
+                // before the tags.
+                var userTagChecks = await _context.TagChecks
+                    .Where(c => c.UserId == userId)
+                    .ToListAsync();
+
+                _context.TagChecks.RemoveRange(userTagChecks);
+                recordsCleared += userTagChecks.Count;
+
                 var userTagRules = await _context.TagRules
                     .Include(r => r.Sources)
                     .Where(r => r.UserId == userId)
