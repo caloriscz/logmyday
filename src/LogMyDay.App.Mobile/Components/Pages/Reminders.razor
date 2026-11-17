@@ -110,6 +110,10 @@
                                         {
                                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"><i class="bi bi-lock-fill me-1"></i>Tag locked</span>
                                         }
+                                        @if (item.TriggerId != null)
+                                        {
+                                            <span class="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-500/20 dark:text-violet-200" title="@($"Set by trigger '{item.TriggerName}' for this day only")"><i class="bi bi-link-45deg me-1"></i>Trigger</span>
+                                        }
                                     </div>
                                     @{
                                         // DEBUG: notification fire-time readout (matches web). Shows today's NotifyAt while
@@ -119,7 +123,7 @@
                                     @if (item.RecurrenceType != RecurrenceType.None || debugFireTime != null)
                                     {
                                         <div class="mt-1 flex items-center gap-2">
-                                            @if (item.RecurrenceType != RecurrenceType.None)
+                                            @if (item.RecurrenceType != RecurrenceType.None && item.TriggerId == null)
                                             {
                                                 <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><i class="bi bi-arrow-repeat me-1"></i>@item.RecurrenceType</span>
                                             }

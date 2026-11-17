@@ -1,0 +1,244 @@
+@using System.Globalization
+@using LogMyDay.Domain.Constants
+@using LogMyDay.Domain.Enums
+@using LogMyDay.UI.Formatting
+@using LogMyDay.Shared.Formatting
+@* Form for a trigger: "when the first tag meets its condition, remind me to log another tag", after
+   some time or at a time of day. Presentational only: the host loads the tags, record types and
+   option lists, owns the Model and saves it. Shared by web and mobile. *@
+<div class="space-y-5">
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="trigger-name">Name <span class="text-rose-500">*</span></label>
+        <input id="trigger-name" type="text" @bind="Model.Name" maxlength="100" placeholder="e.g., Log how the dose worked"
+               class="@InputCss" disabled="@Disabled" />
+        <p class="text-xs text-gray-500 dark:text-slate-400">The reminder is titled with it.</p>
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">When <span class="text-rose-500">*</span></label>
+        <GroupedTagSelect Tags="ifCandidates" Value="@(Model.IfTagId == 0 ? null : Model.IfTagId)" ValueChanged="SetIfTag" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Tag --" />
+        <div class="flex flex-wrap items-center gap-2">
+            <select class="@SmallInputCss" value="@Model.IfOperator.ToString()" @onchange="SetOperator" disabled="@(Disabled || IfTag == null)" aria-label="Condition">
+                @foreach (var choice in OperatorOrder.Where(o => TagRuleInputTypes.AllowsInCheck(IfKind, o, expectation: false)))
+                {
+                    <option value="@choice.ToString()">@TagCheckText.OperatorLabel(choice.ToString(), Numeric)</option>
+                }
+            </select>
+            @if (TagRuleInputTypes.NeedsOperand(Model.IfOperator))
+            {
+                @if (Numeric)
+                {
+                    <input type="number" step="any" class="w-28 @SmallInputCss" value="@Model.IfOperand" @onchange="e => Model.IfOperand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value" />
+                }
+                else if (OptionListOf(IfTag) is { } options)
+                {
+                    <select class="@SmallInputCss" value="@Model.IfOperand" @onchange="e => Model.IfOperand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value">
+                        <option value="">-- Option --</option>
+                        @foreach (var option in options.Options)
+                        {
+                            <option value="@option.Value">@(option.DisplayName ?? option.Value)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input type="text" maxlength="500" class="w-40 @SmallInputCss" value="@Model.IfOperand" @onchange="e => Model.IfOperand = e.Value?.ToString()" disabled="@Disabled" aria-label="Compared value" />
+                }
+            }
+        </div>
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200">Remind me to log <span class="text-rose-500">*</span></label>
+        <GroupedTagSelect Tags="promptCandidates" Value="@(Model.PromptTagId == 0 ? null : Model.PromptTagId)" ValueChanged="v => Model.PromptTagId = v ?? 0" SelectClass="@InputCss" Disabled="@Disabled" TagPlaceholder="-- Tag or record --" />
+    </div>
+
+    <div class="space-y-2">
+        <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="trigger-timing">Remind</label>
+        @* A string-valued choice; a select is never bound to an enum directly. *@
+        <select id="trigger-timing" class="@InputCss" value="@Model.Timing.ToString()" @onchange="SetTiming" disabled="@Disabled">
+            <option value="@nameof(TagTriggerTiming.AfterEntry)">Some time after the entry</option>
+            <option value="@nameof(TagTriggerTiming.AtTime)">At a time of day</option>
+        </select>
+        @if (Model.Timing == TagTriggerTiming.AfterEntry)
+        {
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="number" min="1" step="1" class="w-24 @SmallInputCss" value="@offsetAmount" @onchange="SetOffsetAmount" disabled="@Disabled" aria-label="Time after the entry" />
+                <select class="@SmallInputCss" value="@offsetUnit" @onchange="SetOffsetUnit" disabled="@Disabled" aria-label="Unit">
+                    <option value="@Minutes">minutes</option>
+                    <option value="@Hours">hours</option>
+                </select>
+                <span class="text-sm text-gray-600 dark:text-slate-300">after it</span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-slate-400">Counted from when the entry is saved, or from its time for a tag with exact times; between 5 minutes and 24 hours.</p>
+        }
+        else
+        {
+            <input type="time" class="w-32 @SmallInputCss" value="@(Model.AtTime?.ToString("HH:mm", CultureInfo.InvariantCulture))" @onchange="SetAtTime" disabled="@Disabled" aria-label="Time of the reminder" />
+            <p class="text-xs text-gray-500 dark:text-slate-400">The first such time after the entry is saved (or after its time, for a tag with exact times): that day, or the next day if it has passed.</p>
+        }
+    </div>
+
+    @if (Model.IfTagId != 0 && Model.PromptTagId != 0)
+    {
+        <p class="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-100">
+            @Sentence()
+        </p>
+    }
+
+    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-slate-200">
+        <input type="checkbox" @bind="Model.IsEnabled" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" disabled="@Disabled" />
+        <span>Active <span class="text-gray-500 dark:text-slate-400">— a paused trigger sets no reminders</span></span>
+    </label>
+
+    <p class="text-xs text-gray-500 dark:text-slate-400">At most one reminder a day. It is withdrawn when the condition stops holding (an entry edited or deleted) and closes itself when you log the tag. An entry for another day sets nothing once its time has passed. "Is logged" means it happened: zeros and "no" entries (e.g. skipped reminders) do not count. The phone rings once it has loaded the Reminders list.</p>
+</div>
+
+@code {
+    private const string InputCss = "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string SmallInputCss = "rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+    private const string Minutes = "minutes";
+    private const string Hours = "hours";
+
+    // The order tests are offered in; each tag kind shows the ones it allows.
+    private static readonly TagRuleOperator[] OperatorOrder =
+    [
+        TagRuleOperator.IsLogged, TagRuleOperator.Equal, TagRuleOperator.NotEqual,
+        TagRuleOperator.Greater, TagRuleOperator.GreaterOrEqual, TagRuleOperator.Less, TagRuleOperator.LessOrEqual,
+        TagRuleOperator.IsYes, TagRuleOperator.IsNo
+    ];
+
+    /// <summary>The user's tags (record fields included, record types not).</summary>
+    [Parameter, EditorRequired] public IList<TagResponse>? Tags { get; set; }
+
+    /// <summary>The user's record types, which a trigger can prompt for.</summary>
+    [Parameter] public IList<RecordTypeResponse>? RecordTypes { get; set; }
+
+    /// <summary>The user's option lists, for comparing an option-list tag.</summary>
+    [Parameter] public IList<TagOptionListResponse>? OptionLists { get; set; }
+
+    [Parameter, EditorRequired] public TagTriggerRequest Model { get; set; } = default!;
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private IList<TagResponse>? ifCandidates;
+    private IList<TagResponse>? promptCandidates;
+    private (IList<TagResponse>?, IList<RecordTypeResponse>?) candidatesSource;
+
+    // The offset as typed: minutes, or whole hours when it is a multiple of 60.
+    private string offsetAmount = "3";
+    private string offsetUnit = Hours;
+    private TagTriggerRequest? offsetModel;
+
+    private TagResponse? IfTag => Tags?.FirstOrDefault(t => t.Id == Model.IfTagId);
+    private TagRuleValueKind IfKind => IfTag == null ? TagRuleValueKind.Text : TagRuleInputTypes.ConditionKind(IfTag.InputTypeId, IfTag.OptionListId != null);
+    private bool Numeric => IfKind is TagRuleValueKind.Number or TagRuleValueKind.Scale;
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(Tags, candidatesSource.Item1) || !ReferenceEquals(RecordTypes, candidatesSource.Item2))
+        {
+            candidatesSource = (Tags, RecordTypes);
+            ifCandidates = (Tags ?? []).Where(t => !t.IsRecordType).ToList();
+
+            // A reminder logs a tag on its own or a record type through its form: not a computed
+            // tag, not a record field.
+            promptCandidates = (Tags ?? []).Where(t => !t.IsRecordType && !t.IsComputed && t.RecordTypeId == null)
+                .Concat(TagTriggerForm.RecordTypesAsTags(RecordTypes ?? []))
+                .ToList();
+        }
+
+        if (!ReferenceEquals(Model, offsetModel))
+        {
+            offsetModel = Model;
+            var minutes = Model.OffsetMinutes ?? 180;
+            (offsetAmount, offsetUnit) = minutes % 60 == 0
+                ? ((minutes / 60).ToString(CultureInfo.InvariantCulture), Hours)
+                : (minutes.ToString(CultureInfo.InvariantCulture), Minutes);
+            Model.OffsetMinutes ??= Model.Timing == TagTriggerTiming.AfterEntry ? minutes : null;
+        }
+    }
+
+    private TagOptionListResponse? OptionListOf(TagResponse? tag) =>
+        tag?.OptionListId is int id ? OptionLists?.FirstOrDefault(l => l.Id == id) : null;
+
+    private void SetIfTag(int? tagId)
+    {
+        var previous = IfTag;
+        Model.IfTagId = tagId ?? 0;
+
+        // A test the new tag does not allow goes back to "is logged"; a compared value stays only
+        // between tags of the same kind and option list.
+        if (!TagRuleInputTypes.AllowsInCheck(IfKind, Model.IfOperator, expectation: false))
+        {
+            Model.IfOperator = TagRuleOperator.IsLogged;
+        }
+
+        var previousKind = previous == null ? TagRuleValueKind.Text : TagRuleInputTypes.ConditionKind(previous.InputTypeId, previous.OptionListId != null);
+        var keep = previousKind == IfKind && previous?.OptionListId == IfTag?.OptionListId;
+        Model.IfOperand = keep && TagRuleInputTypes.NeedsOperand(Model.IfOperator) ? Model.IfOperand : null;
+    }
+
+    private void SetOperator(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<TagRuleOperator>(e.Value?.ToString(), out var op) && Enum.IsDefined(op))
+        {
+            Model.IfOperator = op;
+            Model.IfOperand = TagRuleInputTypes.NeedsOperand(op) ? Model.IfOperand : null;
+        }
+    }
+
+    private void SetTiming(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<TagTriggerTiming>(e.Value?.ToString(), out var timing) || !Enum.IsDefined(timing))
+        {
+            return;
+        }
+
+        Model.Timing = timing;
+        if (timing == TagTriggerTiming.AfterEntry)
+        {
+            Model.AtTime = null;
+            UpdateOffset();
+        }
+        else
+        {
+            Model.OffsetMinutes = null;
+            Model.AtTime ??= new TimeOnly(8, 0);
+        }
+    }
+
+    private void SetOffsetAmount(ChangeEventArgs e)
+    {
+        offsetAmount = e.Value?.ToString() ?? string.Empty;
+        UpdateOffset();
+    }
+
+    private void SetOffsetUnit(ChangeEventArgs e)
+    {
+        offsetUnit = e.Value?.ToString() == Minutes ? Minutes : Hours;
+        UpdateOffset();
+    }
+
+    // An amount that is not a whole number leaves no offset, and the server explains the range.
+    private void UpdateOffset()
+    {
+        Model.OffsetMinutes = int.TryParse(offsetAmount, NumberStyles.Integer, CultureInfo.InvariantCulture, out var amount) && amount > 0
+            ? (offsetUnit == Hours ? amount * 60 : amount)
+            : null;
+    }
+
+    private void SetAtTime(ChangeEventArgs e)
+    {
+        Model.AtTime = TimeOnly.TryParse(e.Value?.ToString(), CultureInfo.InvariantCulture, out var time) ? time : null;
+    }
+
+    private string Sentence()
+    {
+        var operand = OptionListOf(IfTag)?.Options.FirstOrDefault(o => o.Value == Model.IfOperand)?.DisplayName ?? Model.IfOperand;
+        var prompt = promptCandidates?.FirstOrDefault(t => t.Id == Model.PromptTagId)?.Title ?? "a tag";
+
+        return TagTriggerText.Sentence(IfTag?.Title ?? "a tag", Model.IfOperator.ToString(), operand, prompt,
+            Model.Timing.ToString(), Model.OffsetMinutes, Model.AtTime);
+    }
+}

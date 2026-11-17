@@ -87,6 +87,7 @@ public static class MauiProgram
             builder.Services.AddTransient<IColorSchemeApi>(sp => sp.GetRequiredService<IApiClientProvider>().ColorScheme);
             builder.Services.AddTransient<ITagRuleApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagRule);
             builder.Services.AddTransient<ITagCheckApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagCheck);
+            builder.Services.AddTransient<ITagTriggerApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagTrigger);
             builder.Services.AddTransient<ITagGroupApi>(sp => sp.GetRequiredService<IApiClientProvider>().TagGroup);
             builder.Services.AddTransient<IRecordApi>(sp => sp.GetRequiredService<IApiClientProvider>().Record);
 

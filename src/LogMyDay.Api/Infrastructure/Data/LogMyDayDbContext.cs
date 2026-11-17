@@ -35,6 +35,7 @@ public class LogMyDayDbContext : DbContext
     public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
     public DbSet<TagRuleCase> TagRuleCases => Set<TagRuleCase>();
     public DbSet<TagCheck> TagChecks => Set<TagCheck>();
+    public DbSet<TagTrigger> TagTriggers => Set<TagTrigger>();
     public DbSet<Record> Records => Set<Record>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -69,6 +70,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
         modelBuilder.Entity<TagRuleCase>().ToTable("LogMyDay_TagRuleCases");
         modelBuilder.Entity<TagCheck>().ToTable("LogMyDay_TagChecks");
+        modelBuilder.Entity<TagTrigger>().ToTable("LogMyDay_TagTriggers");
         modelBuilder.Entity<Record>().ToTable("LogMyDay_Records");
 
         // Configure Setting entity
@@ -401,6 +403,50 @@ public class LogMyDayDbContext : DbContext
                 entity.Property(c => c.DateCreated).HasColumnType("datetime2");
                 entity.Property(c => c.DateUpdated).HasColumnType("datetime2");
             }
+        });
+
+        // Triggers read one tag and prompt for another. Like checked tags, neither can be deleted
+        // while the trigger exists (Restrict); TagService checks first and names the trigger.
+        modelBuilder.Entity<TagTrigger>(entity =>
+        {
+            entity.HasOne(t => t.IfTag)
+                .WithMany()
+                .HasForeignKey(t => t.IfTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(t => t.PromptTag)
+                .WithMany()
+                .HasForeignKey(t => t.PromptTagId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(t => t.UserId).HasDatabaseName("IX_LogMyDay_TagTriggers_UserId");
+            entity.Property(t => t.Name).HasMaxLength(100).IsRequired();
+            entity.Property(t => t.IfOperator).HasConversion<int>();
+            entity.Property(t => t.IfOperand).HasMaxLength(500);
+            entity.Property(t => t.Timing).HasConversion<int>();
+
+            if (Database.IsSqlServer())
+            {
+                entity.Property(t => t.AtTime).HasColumnType("time");
+                entity.Property(t => t.DateCreated).HasColumnType("datetime2");
+                entity.Property(t => t.DateUpdated).HasColumnType("datetime2");
+            }
+        });
+
+        // A trigger's reminders: one per (TriggerId, TriggerDay). As for generated activity rows,
+        // the FK lives only in the model: adding it to the existing Reminders table would force a
+        // full SQLite table rebuild. Trigger delete handles its reminders itself.
+        modelBuilder.Entity<Reminder>(entity =>
+        {
+            entity.HasOne(r => r.Trigger)
+                .WithMany()
+                .HasForeignKey(r => r.TriggerId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasIndex(r => new { r.TriggerId, r.TriggerDay })
+                .IsUnique()
+                .HasFilter("[TriggerId] IS NOT NULL")
+                .HasDatabaseName("IX_LogMyDay_Reminders_TriggerId_TriggerDay");
         });
 
         // Generated rows: one per (RuleId, WindowKey). The FK to TagRule lives only in the model;

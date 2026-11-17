@@ -28,7 +28,7 @@ public sealed class ReminderTools(
     public sealed record ReorderItem([property: Description("Reminder id.")] int Id, [property: Description("New position; lower first.")] int DisplayOrder);
 
     [McpServerTool(Name = "list_reminders", Title = "List reminders", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("Lists reminders with their done/skipped state for a date (default today in the user's time zone), ordered by notify time. Reminders outside their monitoring window are hidden unless includeOutOfWindow is true. isSkipped is also true while the completion tag is day-locked.")]
+    [Description("Lists reminders with their done/skipped state for a date (default today in the user's time zone), ordered by notify time. Reminders outside their monitoring window are hidden unless includeOutOfWindow is true. isSkipped is also true while the completion tag is day-locked. triggerId and triggerName mark a one-day reminder a trigger created (see list_tag_triggers).")]
     public async Task<IList<ReminderResponse>> ListReminders(
         [Description("yyyy-MM-dd; default today.")] string? date = null,
         [Description("Also return reminders whose monitor window does not cover the date.")] bool includeOutOfWindow = false)

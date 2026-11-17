@@ -111,6 +111,20 @@
         </div>
         <TagChecksManager @ref="checksManager" />
     </section>
+
+    <section class="space-y-4">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div class="space-y-1">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-slate-100">Triggers</h2>
+                <p class="text-sm text-gray-600 dark:text-slate-400">Remind me to log one tag after another, e.g. how a dose worked a few hours after taking it. A trigger sets one reminder for the day; your phone rings once it has loaded the Reminders list.</p>
+            </div>
+            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" @onclick="() => triggersManager?.OpenCreate()">
+                <Icon Name="plus" Class="h-4 w-4" />
+                New Trigger
+            </button>
+        </div>
+        <TagTriggersManager @ref="triggersManager" />
+    </section>
 </div>
 
 @* Create/Edit Modal *@
@@ -284,6 +298,7 @@
     private bool showModal;
     private TagRuleResponse? pendingDelete;
     private TagChecksManager? checksManager;
+    private TagTriggersManager? triggersManager;
     private System.Globalization.CultureInfo displayCulture = System.Globalization.CultureInfo.CurrentCulture;
 
     // Past-days recompute dialog

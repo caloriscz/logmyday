@@ -16,6 +16,7 @@ public class SecureBackupDto
     public List<SecureScanMappingBackupDto> ScanMappings { get; set; } = new();
     public List<TagRuleBackup> TagRules { get; set; } = new();
     public List<TagCheckBackup> TagChecks { get; set; } = new();
+    public List<TagTriggerBackup> TagTriggers { get; set; } = new();
     public List<RecordTypeBackup> RecordTypes { get; set; } = new();
 }
 

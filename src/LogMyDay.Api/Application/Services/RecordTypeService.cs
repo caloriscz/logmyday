@@ -96,7 +96,7 @@ public class RecordTypeService : IRecordTypeService
         var removedIds = removed.Select(f => f.Id).ToList();
         if (removedIds.Count > 0)
         {
-            await EnsureNotReadByRulesOrChecks(removedIds);
+            await EnsureNotReadByRelations(removedIds);
         }
 
         await using var transaction = await BeginWriteTransaction();
@@ -153,7 +153,17 @@ public class RecordTypeService : IRecordTypeService
         var fieldIds = type.RecordFields.Select(f => f.Id).ToList();
         if (fieldIds.Count > 0)
         {
-            await EnsureNotReadByRulesOrChecks(fieldIds);
+            await EnsureNotReadByRelations(fieldIds);
+        }
+
+        var prompting = await _context.TagTriggers
+            .Where(t => t.PromptTagId == type.Id)
+            .Select(t => t.Name)
+            .FirstOrDefaultAsync();
+        if (prompting != null)
+        {
+            throw new InvalidOperationException(
+                $"Record type '{type.TagName}' is in use by trigger '{prompting}'. Change or delete the trigger first.");
         }
 
         await using var transaction = await BeginWriteTransaction();
@@ -310,9 +320,9 @@ public class RecordTypeService : IRecordTypeService
         tag.RecordFieldOrder = order;
     }
 
-    // A field a rule or a check reads stays until the rule or check is changed or deleted (the
+    // A field a rule, a check or a trigger reads stays until it is changed or deleted (the
     // database would refuse it anyway: Restrict), as for any tag.
-    private async Task EnsureNotReadByRulesOrChecks(List<int> tagIds)
+    private async Task EnsureNotReadByRelations(List<int> tagIds)
     {
         var use = await _context.TagRuleSources
             .Where(s => tagIds.Contains(s.SourceTagId))
@@ -333,6 +343,16 @@ public class RecordTypeService : IRecordTypeService
             var field = tagIds.Contains(check.IfTagId) ? check.IfName : check.ThenName;
             throw new InvalidOperationException(
                 $"Field '{field}' is in use by check '{check.Name}'. Change or delete the check first.");
+        }
+
+        var trigger = await _context.TagTriggers
+            .Where(t => tagIds.Contains(t.IfTagId))
+            .Select(t => new { t.Name, FieldName = t.IfTag!.TagName })
+            .FirstOrDefaultAsync();
+        if (trigger != null)
+        {
+            throw new InvalidOperationException(
+                $"Field '{trigger.FieldName}' is in use by trigger '{trigger.Name}'. Change or delete the trigger first.");
         }
     }
 

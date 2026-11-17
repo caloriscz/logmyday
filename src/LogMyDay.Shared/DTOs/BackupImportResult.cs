@@ -43,6 +43,8 @@ public class BackupImportStatistics
     public int TagRuleValuesComputed { get; set; }
     public int TagChecksImported { get; set; }
     public int TagChecksSkipped { get; set; }
+    public int TagTriggersImported { get; set; }
+    public int TagTriggersSkipped { get; set; }
     public int RecordTypesImported { get; set; }
     public int RecordTypesSkipped { get; set; }
 

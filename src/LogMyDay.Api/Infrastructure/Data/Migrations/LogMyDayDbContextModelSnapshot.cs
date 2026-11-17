@@ -549,6 +549,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("TriggerDay")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TriggerId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("TEXT");
 
@@ -558,6 +564,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_LogMyDay_Reminders_UserId");
+
+                    b.HasIndex("TriggerId", "TriggerDay")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LogMyDay_Reminders_TriggerId_TriggerDay")
+                        .HasFilter("[TriggerId] IS NOT NULL");
 
                     b.ToTable("LogMyDay_Reminders", (string)null);
                 });
@@ -1052,6 +1063,63 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_TagRuleSources", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagTrigger", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<TimeOnly?>("AtTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateUpdated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IfOperand")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("IfOperator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("IfTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("OffsetMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PromptTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Timing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IfTagId");
+
+                    b.HasIndex("PromptTagId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_TagTriggers_UserId");
+
+                    b.ToTable("LogMyDay_TagTriggers", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.TodoItem", b =>
                 {
                     b.Property<int>("Id")
@@ -1348,7 +1416,13 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasForeignKey("CompletionTagId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("LogMyDay.Domain.Entities.TagTrigger", "Trigger")
+                        .WithMany()
+                        .HasForeignKey("TriggerId");
+
                     b.Navigation("CompletionTag");
+
+                    b.Navigation("Trigger");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderDay", b =>
@@ -1503,6 +1577,25 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Rule");
 
                     b.Navigation("SourceTag");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagTrigger", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "IfTag")
+                        .WithMany()
+                        .HasForeignKey("IfTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "PromptTag")
+                        .WithMany()
+                        .HasForeignKey("PromptTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("IfTag");
+
+                    b.Navigation("PromptTag");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TodoItem", b =>

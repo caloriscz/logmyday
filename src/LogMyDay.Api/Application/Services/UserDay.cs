@@ -9,6 +9,12 @@ public static class UserDay
 {
     public static async Task<DateOnly> Today(LogMyDayDbContext context, Guid userId)
     {
+        return DateOnly.FromDateTime(await Now(context, userId));
+    }
+
+    /// <summary>The user's local wall-clock time, as activities store it (unspecified kind).</summary>
+    public static async Task<DateTime> Now(LogMyDayDbContext context, Guid userId)
+    {
         var timeZone = await context.Users
             .Where(u => u.Id == userId)
             .Select(u => u.TimeZone)
@@ -24,6 +30,6 @@ public static class UserDay
             tz = TimeZoneInfo.Utc;
         }
 
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz));
+        return DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz), DateTimeKind.Unspecified);
     }
 }

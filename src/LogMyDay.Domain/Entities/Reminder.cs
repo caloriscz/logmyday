@@ -45,5 +45,16 @@ public class Reminder
 
     public bool AllowUnfilled { get; set; } = false;
 
+    /// <summary>The trigger that created this reminder, if any. Such a reminder is limited to its
+    /// one day by the monitoring window.</summary>
+    public int? TriggerId { get; set; }
+
+    [ForeignKey(nameof(TriggerId))]
+    public TagTrigger? Trigger { get; set; }
+
+    /// <summary>The day of the trigger's first tag that created this reminder; one reminder per
+    /// trigger and day.</summary>
+    public DateOnly? TriggerDay { get; set; }
+
     public ICollection<ReminderDay> Days { get; set; } = new List<ReminderDay>();
 }
