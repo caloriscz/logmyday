@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LogMyDay.Shared.DTOs;
 
 /// <summary>One record: the time it was measured and a value per field. Empty values are not
@@ -28,6 +30,11 @@ public class RecordResponse
 
     /// <summary>The stored values, in the record type's field order.</summary>
     public List<RecordValueResponse> Values { get; set; } = new();
+
+    /// <summary>Warn checks this save left broken on its day; only on a create or update, and left
+    /// out of the JSON when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TagCheckWarning>? Warnings { get; set; }
 }
 
 public class RecordValueResponse

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Domain.Enums;
@@ -26,12 +27,20 @@ public sealed class ActivityTools(
     ITagService tags,
     TagLookup lookup,
     ITagOptionListService optionLists,
+    ITagCheckService checks,
     UserClock clock)
 {
     public const int MaxRowsPerYear = 5000;
     public const string ActionCreated = "created";
     public const string ActionAccumulated = "accumulated";
     public const string ActionReplaced = "replaced";
+
+    public sealed record LogValueResult(
+        ActivitySummary Activity,
+        string Action,
+        string Tag,
+        string? StoredValue,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<TagCheckWarning>? Warnings);
 
     [McpServerTool(Name = "list_activities", Title = "List activities", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists logged activities, newest first by default, paged. Filter by tag (id, or the find_tag syntax in tag), an inclusive date range (from/to as yyyy-MM-dd) and text the value must contain.")]
@@ -70,7 +79,7 @@ public sealed class ActivityTools(
 
     [McpServerTool(Name = "log_value", Title = "Log value", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Logs a value for a tag the easy way: resolves the tag (id, name, \"group:name\" or \":name\"), encodes the value for the tag's input type (see get_tag.valueEncoding) and applies the tag's rules. mode \"add\" (default) creates a row, or for a non-repeatable numeric tag adds to the period's existing value (action \"accumulated\"). mode \"set\" replaces the period's existing value on a non-repeatable tag (action \"replaced\"). Returns the resulting activity, the action taken and the tag. Fails with tag-day-locked when the user has locked that tag for the day — do not unlock on your own.")]
+    [Description("Logs a value for a tag the easy way: resolves the tag (id, name, \"group:name\" or \":name\"), encodes the value for the tag's input type (see get_tag.valueEncoding) and applies the tag's rules. mode \"add\" (default) creates a row, or for a non-repeatable numeric tag adds to the period's existing value (action \"accumulated\"). mode \"set\" replaces the period's existing value on a non-repeatable tag (action \"replaced\"). Returns the resulting activity, the action taken and the tag, plus warnings when the value leaves one of the user's Warn checks broken on its day (the value is saved anyway; tell the user). Fails with tag-day-locked when the user has locked that tag for the day — do not unlock on your own.")]
     public async Task<object> LogValue(
         [Description("Tag id, name, \"group:name\" or \":name\".")] string tag,
         [Description("The value: number, string or boolean, as the tag's input type expects.")] JsonElement value,
@@ -105,12 +114,14 @@ public sealed class ActivityTools(
             action = existing != null && activity.Id == existing.Id ? ActionAccumulated : ActionCreated;
         }
 
-        return new { activity = ActivitySummary.From(activity), action, tag = resolved.Title, storedValue = activity.Description };
+        var warnings = await checks.WarningsAfterSave(user.UserId, activity);
+
+        return new LogValueResult(ActivitySummary.From(activity), action, resolved.Title, activity.Description, warnings);
     }
 
     [McpServerTool(Name = "create_activity", Title = "Create activity", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Creates an activity row for a tag id with an already-encoded value (prefer log_value). Non-repeatable numeric tags accumulate within their period instead of adding a row; the response says whether that happened.")]
+    [Description("Creates an activity row for a tag id with an already-encoded value (prefer log_value). Non-repeatable numeric tags accumulate within their period instead of adding a row; the response says whether that happened. The activity carries warnings when it leaves one of the user's Warn checks broken on its day (it is saved anyway).")]
     public async Task<object> CreateActivity(
         [Description("Tag id (must belong to the user).")] int tagId,
         [Description("Value, encoded for the tag's input type. Optional for tags that take no value.")] JsonElement? value = null,
@@ -129,13 +140,14 @@ public sealed class ActivityTools(
 
         var existing = tag.IsRepeatable || tag.TimeGranularity == TimeGranularity.Exact ? null : await ExistingInPeriod(tag, at);
         var activity = await activities.Create(request, user.UserId);
+        activity.Warnings = await checks.WarningsAfterSave(user.UserId, activity);
 
         return new { activity, wasAccumulated = existing != null && activity.Id == existing.Id };
     }
 
     [McpServerTool(Name = "update_activity", Title = "Update activity", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Updates an activity; omitted arguments keep their current value. The value is re-encoded for the (possibly new) tag's input type.")]
+    [Description("Updates an activity; omitted arguments keep their current value. The value is re-encoded for the (possibly new) tag's input type. The result carries warnings when the change leaves one of the user's Warn checks broken on its day (it is saved anyway).")]
     public async Task<ActivityResponse> UpdateActivity(
         [Description("Activity id.")] int activityId,
         [Description("New value.")] JsonElement? value = null,
@@ -155,7 +167,10 @@ public sealed class ActivityTools(
             DateFinished = dateFinished == null ? current.DateFinished : DateArguments.ParseDateTime(dateFinished, "dateFinished", zone)
         };
 
-        return await activities.Update(activityId, request, user.UserId);
+        var updated = await activities.Update(activityId, request, user.UserId);
+        updated.Warnings = await checks.WarningsAfterSave(user.UserId, updated);
+
+        return updated;
     }
 
     [McpServerTool(Name = "delete_activity", Title = "Delete activity", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]

@@ -2,6 +2,7 @@
 @using LogMyDay.Shared.DTOs
 @using Refit
 @inject LogMyDay.Shared.Interfaces.IRecordApi RecordApi
+@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
 @inject ILogger<RecordEditor> Logger
 
 @* Logs a new record or edits one: the record type (new records only), the time and a value per
@@ -222,6 +223,7 @@
             var saved = (RecordId ?? editingRecordId) is int id
                 ? await RecordApi.UpdateRecord(id, request)
                 : await RecordApi.CreateRecord(request);
+            CheckWarnings.Show(saved.Warnings);
 
             await OnSaved.InvokeAsync(saved);
         }

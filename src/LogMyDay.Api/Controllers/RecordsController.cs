@@ -12,14 +12,17 @@ namespace LogMyDay.Api.Controllers;
 public class RecordsController : BaseApiController
 {
     private readonly IRecordService _recordService;
+    private readonly ITagCheckService _tagCheckService;
     private readonly ILogger<RecordsController> _logger;
 
     public RecordsController(
         IRecordService recordService,
+        ITagCheckService tagCheckService,
         IAuthService authService,
         ILogger<RecordsController> logger) : base(authService)
     {
         _recordService = recordService;
+        _tagCheckService = tagCheckService;
         _logger = logger;
     }
 
@@ -61,6 +64,7 @@ public class RecordsController : BaseApiController
         try
         {
             var record = await _recordService.Create(request, userId);
+            record.Warnings = await _tagCheckService.WarningsAfterSave(userId, record);
 
             return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
         }
@@ -86,7 +90,10 @@ public class RecordsController : BaseApiController
         var userId = GetCurrentUserId();
         try
         {
-            return Ok(await _recordService.Update(id, request, userId));
+            var record = await _recordService.Update(id, request, userId);
+            record.Warnings = await _tagCheckService.WarningsAfterSave(userId, record);
+
+            return Ok(record);
         }
         catch (KeyNotFoundException ex)
         {

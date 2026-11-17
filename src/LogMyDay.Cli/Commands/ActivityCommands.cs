@@ -134,6 +134,7 @@ public class ActivityCommands
         if (!json)
         {
             OutputFormatter.WriteSuccess($"Activity {created.Id} created.");
+            OutputFormatter.WriteWarnings(created.Warnings);
         }
     }
 
@@ -183,6 +184,7 @@ public class ActivityCommands
         if (!json)
         {
             OutputFormatter.WriteSuccess($"Activity {id} updated.");
+            OutputFormatter.WriteWarnings(updated.Warnings);
         }
     }
 
