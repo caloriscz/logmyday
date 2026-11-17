@@ -27,6 +27,21 @@ public class ApiErrorResponseTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task AnIdThatDoesNotExist_Returns404_WithTheServicesMessage()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CustomWebApplicationFactory.ReadWriteKeyToken);
+
+        // The units controller has no not-found branch of its own; the service throws.
+        var response = await client.GetAsync("/api/units/987654");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(("Unit not found", 404), (problem.GetProperty("title").GetString(), problem.GetProperty("status").GetInt32()));
+    }
+
+    [Fact]
     public async Task UnauthenticatedApiRequest_Returns401_AsProblemDetails()
     {
         var client = _factory.CreateClient();

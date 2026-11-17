@@ -34,6 +34,24 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             return false;
         }
 
+        if (IsNotFound(exception))
+        {
+            _logger.LogInformation("Not found for {Method} {Path}: {Message}", httpContext.Request.Method, path, exception.Message);
+            httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+
+            // The services' own messages ("Unit not found"), written for the caller.
+            return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                ProblemDetails =
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Title = exception.Message,
+                    Type = "https://tools.ietf.org/html/rfc9110#section-15.5.5"
+                }
+            });
+        }
+
         _logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, path);
 
         await RecordInEventLog(httpContext, path, exception);
@@ -51,6 +69,17 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.6.1"
             }
         });
+    }
+
+    /// <summary>
+    /// A service saying the id it was given does not exist (a missing tag, unit, reminder…). Only
+    /// a KeyNotFoundException our own code throws counts: one from a framework collection (a
+    /// dictionary missing a key) is a bug and stays a 500.
+    /// </summary>
+    private static bool IsNotFound(Exception exception)
+    {
+        return exception is KeyNotFoundException
+            && exception.TargetSite?.DeclaringType?.Namespace?.StartsWith("LogMyDay", StringComparison.Ordinal) == true;
     }
 
     private static PathString OriginalPath(HttpContext httpContext)
