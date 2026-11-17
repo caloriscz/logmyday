@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
@@ -58,8 +59,9 @@ public class TagTriggerIntegrationTests : IClassFixture<CustomWebApplicationFact
         });
         Assert.Equal(("IsLogged", "AfterEntry", 120), (trigger.IfOperator, trigger.Timing, trigger.OffsetMinutes));
 
-        // Logged over MCP a minute ago (the test host's user has no time zone: UTC).
-        var at = DateTime.UtcNow.AddMinutes(-1);
+        // Logged over MCP a minute ago on the user's wall clock (the default time zone, not UTC).
+        var zone = McpTestClient.Json(await mcp.CallAsync("server_info", new { })).GetProperty("user").GetProperty("timeZone").GetString()!;
+        var at = DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, zone), DateTimeKind.Unspecified).AddMinutes(-1);
         var logged = await mcp.CallAsync("log_value", new { tag = doseName, value = 100, dateTime = $"{at:yyyy-MM-ddTHH:mm}" });
         Assert.NotEqual(true, logged.IsError);
 
@@ -67,6 +69,28 @@ public class TagTriggerIntegrationTests : IClassFixture<CustomWebApplicationFact
         var reminders = McpTestClient.Json(await mcp.CallAsync("list_reminders", new { date = $"{fire:yyyy-MM-dd}" }));
         var reminder = Assert.Single(reminders.EnumerateArray(), r => r.TryGetProperty("triggerId", out var id) && id.ValueKind == System.Text.Json.JsonValueKind.Number && id.GetInt32() == trigger.Id);
         Assert.Equal((trigger.Name, $"{fire:HH:mm}:00"), (reminder.GetProperty("triggerName").GetString(), reminder.GetProperty("notifyAt").GetString()));
+
+        // The log_value result told about it.
+        var told = Assert.Single(McpTestClient.Json(logged).GetProperty("reminders").EnumerateArray());
+        Assert.Equal((reminder.GetProperty("id").GetInt32(), trigger.Id, $"{fire:HH:mm}:00", $"{fire:yyyy-MM-dd}"),
+            (told.GetProperty("reminderId").GetInt32(), told.GetProperty("triggerId").GetInt32(), told.GetProperty("time").GetString(), told.GetProperty("day").GetString()));
+
+        // A REST save reports only what it set: a second trigger's first reminder, not the first
+        // trigger's, which already has one today. A save that sets nothing leaves the field out.
+        var (laterId, _) = await CreateTag(mcp, "Later", InputTypeIds.String);
+        var second = await api.CreateTagTrigger(new TagTriggerRequest { Name = Unique("Later"), IfTagId = doseId, PromptTagId = laterId, OffsetMinutes = 60 });
+        async Task<System.Text.Json.JsonElement> PostDose()
+        {
+            var posted = await Http().PostAsJsonAsync("/api/activities", new ActivityRequest { PrimaryTagId = doseId, DateStarted = at, Description = "50" });
+            posted.EnsureSuccessStatusCode();
+
+            return System.Text.Json.JsonDocument.Parse(await posted.Content.ReadAsStringAsync()).RootElement;
+        }
+
+        var reported = Assert.Single((await PostDose()).GetProperty("reminders").EnumerateArray());
+        Assert.Equal(second.Id, reported.GetProperty("triggerId").GetInt32());
+        Assert.False((await PostDose()).TryGetProperty("reminders", out _));
+        await api.DeleteTagTrigger(second.Id);
 
         Assert.Equal(1, (await api.GetTagTriggerById(trigger.Id)).OpenReminderCount);
         var listed = McpTestClient.Json(await mcp.CallAsync("list_tag_triggers", new { }));

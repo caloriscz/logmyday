@@ -2,6 +2,7 @@ using Spectre.Console;
 using System.Text.Json;
 using LogMyDay.Cli.Services;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Formatting;
 
 namespace LogMyDay.Cli.Formatting;
 
@@ -98,6 +99,16 @@ public static class OutputFormatter
         foreach (var warning in warnings ?? [])
         {
             AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(warning.CheckName)}: {Markup.Escape(warning.Sentence)} ({Markup.Escape(warning.Found)})");
+        }
+    }
+
+    /// <summary>The reminders a save set through the user's triggers; the phone arms them the next
+    /// time the app loads its reminders.</summary>
+    public static void WriteReminders(IReadOnlyList<TriggeredReminder>? reminders)
+    {
+        foreach (var reminder in reminders ?? [])
+        {
+            AnsiConsole.MarkupLine($"[blue]Reminder set:[/] {Markup.Escape(TagTriggerText.ReminderSet(reminder))} ({Markup.Escape(reminder.TriggerName)})");
         }
     }
 

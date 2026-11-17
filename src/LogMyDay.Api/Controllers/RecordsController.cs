@@ -13,16 +13,19 @@ public class RecordsController : BaseApiController
 {
     private readonly IRecordService _recordService;
     private readonly ITagCheckService _tagCheckService;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
     private readonly ILogger<RecordsController> _logger;
 
     public RecordsController(
         IRecordService recordService,
         ITagCheckService tagCheckService,
+        ITagTriggerEngine tagTriggerEngine,
         IAuthService authService,
         ILogger<RecordsController> logger) : base(authService)
     {
         _recordService = recordService;
         _tagCheckService = tagCheckService;
+        _tagTriggerEngine = tagTriggerEngine;
         _logger = logger;
     }
 
@@ -65,6 +68,7 @@ public class RecordsController : BaseApiController
         {
             var record = await _recordService.Create(request, userId);
             record.Warnings = await _tagCheckService.WarningsAfterSave(userId, record);
+            record.Reminders = _tagTriggerEngine.TakeCreated();
 
             return CreatedAtAction(nameof(GetById), new { id = record.Id }, record);
         }
@@ -92,6 +96,7 @@ public class RecordsController : BaseApiController
         {
             var record = await _recordService.Update(id, request, userId);
             record.Warnings = await _tagCheckService.WarningsAfterSave(userId, record);
+            record.Reminders = _tagTriggerEngine.TakeCreated();
 
             return Ok(record);
         }

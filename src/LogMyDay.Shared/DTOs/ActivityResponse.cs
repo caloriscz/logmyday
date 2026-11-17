@@ -30,4 +30,9 @@ public class ActivityResponse
     /// out of the JSON when there are none.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<TagCheckWarning>? Warnings { get; set; }
+
+    /// <summary>Reminders this save set through the user's triggers; only on a create or update,
+    /// and left out of the JSON when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TriggeredReminder>? Reminders { get; set; }
 }

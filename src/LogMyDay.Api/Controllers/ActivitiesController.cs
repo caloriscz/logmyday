@@ -14,18 +14,21 @@ public class ActivitiesController : BaseApiController
     private readonly ILogger<ActivitiesController> _logger;
     private readonly IEventLogService _eventLogService;
     private readonly ITagCheckService _tagCheckService;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
 
     public ActivitiesController(
         IActivityService activityService, 
         ILogger<ActivitiesController> logger,
         IAuthService authService,
         IEventLogService eventLogService,
-        ITagCheckService tagCheckService) : base(authService)
+        ITagCheckService tagCheckService,
+        ITagTriggerEngine tagTriggerEngine) : base(authService)
     {
         _activityService = activityService;
         _logger = logger;
         _eventLogService = eventLogService;
         _tagCheckService = tagCheckService;
+        _tagTriggerEngine = tagTriggerEngine;
     }
 
     [HttpGet("{id}")]
@@ -59,6 +62,7 @@ public class ActivitiesController : BaseApiController
             var userId = GetCurrentUserId();
             var createdCalendar = await _activityService.Create(calendarRequest, userId);
             createdCalendar.Warnings = await _tagCheckService.WarningsAfterSave(userId, createdCalendar);
+            createdCalendar.Reminders = _tagTriggerEngine.TakeCreated();
 
             return Ok(createdCalendar);
         }
@@ -121,6 +125,7 @@ public class ActivitiesController : BaseApiController
             var userId = GetCurrentUserId();
             var updatedActivity = await _activityService.Update(id, request, userId);
             updatedActivity.Warnings = await _tagCheckService.WarningsAfterSave(userId, updatedActivity);
+            updatedActivity.Reminders = _tagTriggerEngine.TakeCreated();
 
             return Ok(updatedActivity);
         }

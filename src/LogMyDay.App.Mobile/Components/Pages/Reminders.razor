@@ -832,6 +832,22 @@
             return;
         }
 
+        // A notification cannot ask for a value. A reminder that needs one (as its checkbox would
+        // ask) opens the same dialog instead of logging an empty entry; a trigger's reminder,
+        // which has no prefilled value, always does.
+        if (item.CompletionTagId.HasValue && !item.AllowUnfilled)
+        {
+            var completionTag = _allTags?.FirstOrDefault(t => t.Id == item.CompletionTagId);
+            var inputTypeId = item.CompletionTagInputTypeId ?? completionTag?.InputTypeId;
+            if (IsQuickCompleteInputType(inputTypeId) && !HasValidPrefilledValue(inputTypeId, completionTag?.DefaultValue, item.Notes))
+            {
+                OpenQuickCompleteModal(item, inputTypeId);
+                StateHasChanged();
+
+                return;
+            }
+        }
+
         try
         {
             var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow });
@@ -839,6 +855,9 @@
             ReminderScheduler.DismissItem(item.Id);
             UpdateItem(updated);
             _showDone = true;
+
+            // Logging it may have set a trigger's reminder: reload so its alarm is armed now.
+            await LoadDataAsync();
         }
         catch (ApiException ex)
         {
@@ -947,6 +966,7 @@
         {
             await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
             ReminderScheduler.CancelItem(_quickItem.Id);
+            ReminderScheduler.DismissItem(_quickItem.Id);
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();

@@ -108,7 +108,7 @@ public static class MauiProgram
             builder.Services.AddSingleton<ISharedDataCache, SharedDataCache>();
             builder.Services.AddSingleton<IUserPreferencesService, UserPreferencesService>();
             builder.Services.AddSingleton<IPageTitleService, PageTitleService>();
-            builder.Services.AddSingleton<LogMyDay.UI.Services.CheckWarningNotices>();
+            builder.Services.AddSingleton<LogMyDay.UI.Services.SaveNotices>();
             builder.Services.AddSingleton<IWebViewInterop, WebViewInterop>();
             builder.Services.AddSingleton<INativeCallbackBridge, NativeCallbackBridge>();
             builder.Services.Add(new ServiceDescriptor(
@@ -125,6 +125,7 @@ public static class MauiProgram
 #endif
             builder.Services.AddSingleton<NotificationNavigationService>();
             builder.Services.AddSingleton<ReminderNotificationScheduler>();
+            builder.Services.AddSingleton<SavedReminderArming>();
             builder.Services.AddSingleton<NotificationService>();
 
             // Update App registration to include NotificationService dependency
@@ -183,6 +184,18 @@ public static class MauiProgram
         {
             System.Diagnostics.Debug.WriteLine($"MauiProgram: Error wiring up auth expiration handler: {ex.Message}");
         }
+
+#if ANDROID
+        // Created now so it listens from the first save: a reminder a trigger sets is armed at once.
+        try
+        {
+            app.Services.GetRequiredService<SavedReminderArming>();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MauiProgram: Error creating the saved-reminder arming: {ex.Message}");
+        }
+#endif
 
         return app;
     }

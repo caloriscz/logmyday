@@ -172,7 +172,8 @@ public class TagTriggerService : ITagTriggerService
             $"'{promptTag.TagName}'", trigger.Timing.ToString(), trigger.OffsetMinutes, trigger.AtTime);
     }
 
-    private static string TagTitle(Tag? tag)
+    /// <summary>"group: name", or the name of a tag outside a group.</summary>
+    internal static string TagTitle(Tag? tag)
     {
         if (tag == null)
         {
