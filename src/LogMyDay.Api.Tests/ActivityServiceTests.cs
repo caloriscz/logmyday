@@ -398,6 +398,30 @@ public class ActivityServiceTests
     }
 
     [Fact]
+    public async Task Create_Accumulate_DoesNotDependOnTheServersCulture()
+    {
+        var (service, context) = CreateService(nameof(Create_Accumulate_DoesNotDependOnTheServersCulture));
+        var userId = Guid.NewGuid();
+        var tag = await AddNumericTag(context, userId, inputTypeId: 6, repeatable: false);
+        var when = new DateTime(2026, 7, 1, 9, 0, 0);
+        await AddRow(context, userId, tag, when, "2.5");
+
+        // On a Czech server "2.5" is not a number in the current culture; the stored values are invariant.
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("cs-CZ");
+        try
+        {
+            var result = await service.Create(new ActivityRequest { PrimaryTagId = tag.Id, DateStarted = when.AddHours(1), Description = "2.5" }, userId);
+
+            Assert.Equal("5", result.Description);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+    }
+
+    [Fact]
     public async Task Create_Accumulate_RoundsIntegerAndUsesEarliestRow()
     {
         var (service, context) = CreateService(nameof(Create_Accumulate_RoundsIntegerAndUsesEarliestRow));

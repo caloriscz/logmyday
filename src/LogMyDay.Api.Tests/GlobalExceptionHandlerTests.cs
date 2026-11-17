@@ -116,6 +116,55 @@ public class GlobalExceptionHandlerTests
         problemDetails.Verify(p => p.TryWriteAsync(It.IsAny<ProblemDetailsContext>()), Times.Once);
     }
 
+    // --- A service's "not found" is a 404; a framework collection's missing key is still a bug ---
+
+    private static Exception Thrown(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            return ex;
+        }
+
+        throw new InvalidOperationException("Expected an exception.");
+    }
+
+    [Fact]
+    public async Task ANotFoundFromOurCode_Is404_WithItsMessage_AndNotAnEventLogError()
+    {
+        var (handler, problemDetails) = Create();
+        var events = new Mock<IEventLogService>();
+        var context = ContextWithUser(Guid.NewGuid(), events);
+        ProblemDetailsContext? written = null;
+        problemDetails.Setup(p => p.TryWriteAsync(It.IsAny<ProblemDetailsContext>()))
+            .Callback<ProblemDetailsContext>(c => written = c)
+            .Returns(new ValueTask<bool>(true));
+
+        var handled = await handler.TryHandleAsync(context, Thrown(() => throw new KeyNotFoundException("Unit not found")), CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+        Assert.Equal(("Unit not found", StatusCodes.Status404NotFound), (written!.ProblemDetails.Title, written.ProblemDetails.Status));
+        events.Verify(e => e.Log(It.IsAny<Guid>(), It.IsAny<EventLogLevel>(), It.IsAny<string>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AMissingDictionaryKey_StaysA500()
+    {
+        var (handler, _) = Create();
+        var events = new Mock<IEventLogService>();
+        var context = ContextWithUser(Guid.NewGuid(), events);
+        var lookup = new Dictionary<string, int>();
+
+        await handler.TryHandleAsync(context, Thrown(() => _ = lookup["missing"]), CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status500InternalServerError, context.Response.StatusCode);
+        events.Verify(e => e.Log(It.IsAny<Guid>(), EventLogLevel.Error, It.Is<string>(m => m.Contains("KeyNotFoundException")), It.IsAny<string?>()), Times.Once);
+    }
+
     // --- The middleware rewrites Request.Path to the fallback page before calling handlers ---
 
     private sealed class PathFeature(string path) : IExceptionHandlerPathFeature
