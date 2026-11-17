@@ -4,7 +4,7 @@
 @using LogMyDay.Shared.DTOs
 @using LogMyDay.Shared.Interfaces
 @inject AuthenticationService AuthService
-@inject LogMyDay.UI.Services.CheckWarningNotices CheckWarnings
+@inject LogMyDay.UI.Services.SaveNotices SaveNotices
 @inject NavigationManager Navigation
 @inject QuickActivityService QuickActivityService
 @inject IActivityApi ActivityApi
@@ -584,7 +584,7 @@
             };
 
             var savedActivity = await ActivityApi.CreateCalendarItem(activity);
-            CheckWarnings.Show(savedActivity.Warnings);
+            SaveNotices.Show(savedActivity.Warnings, savedActivity.Reminders);
             
             // Update button state (trigger cooldown)
             await QuickActivityService.UseButtonAsync(button.Id);

@@ -5,6 +5,7 @@ using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
+using LogMyDay.Shared.Formatting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -169,6 +170,51 @@ public sealed class TagTriggerTests : IDisposable
         await _activities.Update(entry.Id, new ActivityRequest { PrimaryTagId = alcohol.Id, DateStarted = anchor, Description = "false" }, _userId);
         Assert.Empty(await RemindersOf(trigger));
         Assert.True(await _context.EventLogs.AnyAsync(e => e.Message.Contains("withdrew its reminder")));
+    }
+
+    [Fact]
+    public async Task ASave_ReportsTheReminderItSet_Once_AndNotOneWithdrawnInTheSameRequest()
+    {
+        // One engine per request, shared by the service and the response, as in the host.
+        var engine = new TagTriggerEngine(_context, _eventLog);
+        var activities = new ActivityService(_context, new ActivityRepository(_context), _eventLog, new TagDayLockService(_context), tagTriggerEngine: engine);
+        var alcohol = await AddTag("Alcohol", InputTypeIds.Boolean);
+        var sleep = await AddTag("Sleep", InputTypeIds.Score);
+        var anchor = Minute(Now.AddMinutes(-10));
+        var at = TimeOnly.FromDateTime(anchor.AddHours(-1));
+        var trigger = await Trigger(alcohol, sleep, TagRuleOperator.IsYes, atTime: at, name: "Morning check");
+        Task<ActivityResponse> Save(int id, string value) =>
+            activities.Update(id, new ActivityRequest { PrimaryTagId = alcohol.Id, DateStarted = anchor, Description = value }, _userId);
+
+        // A save that sets nothing reports nothing.
+        var entry = await activities.Create(new ActivityRequest { PrimaryTagId = alcohol.Id, DateStarted = anchor, Description = "false" }, _userId);
+        Assert.Null(engine.TakeCreated());
+
+        await Save(entry.Id, "true");
+        var set = Assert.Single(engine.TakeCreated()!);
+        var reminder = Assert.Single(await RemindersOf(trigger));
+        Assert.Equal((reminder.Id, trigger.Id, "Morning check", "Sleep"), (set.ReminderId, set.TriggerId, set.TriggerName, set.PromptTagName));
+        Assert.Equal((DateOnly.FromDateTime(anchor), reminder.MonitorFromDate!.Value, at), (set.EntryDay, set.Day, set.Time));
+
+        // Taken once: the next response does not repeat it.
+        Assert.Null(engine.TakeCreated());
+
+        // Set again and withdrawn before the response: nothing to report.
+        await Save(entry.Id, "false");
+        await Save(entry.Id, "true");
+        await Save(entry.Id, "false");
+        Assert.Null(engine.TakeCreated());
+        Assert.Empty(await RemindersOf(trigger));
+    }
+
+    [Fact]
+    public void TheNotice_SaysWhatToLog_AndWhen_CountedFromTheEntrysDay()
+    {
+        var evening = new TriggeredReminder { PromptTagName = "Effect", EntryDay = new DateOnly(2026, 11, 16), Day = new DateOnly(2026, 11, 16), Time = new TimeOnly(21, 30) };
+        var morning = new TriggeredReminder { PromptTagName = "sleep: quality", EntryDay = new DateOnly(2026, 11, 16), Day = new DateOnly(2026, 11, 17), Time = new TimeOnly(8, 0) };
+
+        Assert.Equal("Log Effect at 21:30", TagTriggerText.ReminderSet(evening));
+        Assert.Equal("Log sleep: quality the next day at 08:00", TagTriggerText.ReminderSet(morning));
     }
 
     [Fact]

@@ -135,6 +135,7 @@ public class ActivityCommands
         {
             OutputFormatter.WriteSuccess($"Activity {created.Id} created.");
             OutputFormatter.WriteWarnings(created.Warnings);
+            OutputFormatter.WriteReminders(created.Reminders);
         }
     }
 
@@ -185,6 +186,7 @@ public class ActivityCommands
         {
             OutputFormatter.WriteSuccess($"Activity {id} updated.");
             OutputFormatter.WriteWarnings(updated.Warnings);
+            OutputFormatter.WriteReminders(updated.Reminders);
         }
     }
 

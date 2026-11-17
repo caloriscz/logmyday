@@ -24,6 +24,7 @@ public sealed class RecordTools(
     ITagService tags,
     ITagOptionListService optionLists,
     ITagCheckService checks,
+    ITagTriggerEngine triggers,
     UserClock clock)
 {
     public const string UpdateSentinelPrefix = "UPDATE_RECORD_TYPE_";
@@ -80,7 +81,7 @@ public sealed class RecordTools(
 
     [McpServerTool(Name = "log_record", Title = "Log record", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Logs one record: the values of a record type's fields measured together at one moment. Each value is encoded for its field's input type as in log_value; fields left out or null stay empty, and at least one value is needed. The result carries warnings when the record leaves one of the user's Warn checks broken on its day (it is saved anyway). Fails with conflict for a record type logged once per day that already has a record that day.")]
+    [Description("Logs one record: the values of a record type's fields measured together at one moment. Each value is encoded for its field's input type as in log_value; fields left out or null stay empty, and at least one value is needed. The result carries warnings when the record leaves one of the user's Warn checks broken on its day (it is saved anyway) and reminders when it set one of the user's trigger reminders. Fails with conflict for a record type logged once per day that already has a record that day.")]
     public async Task<RecordResponse> LogRecord(
         [Description("Record type id or name.")] string recordType,
         [Description("The values, one per field.")] List<ValueInput> values,
@@ -107,6 +108,7 @@ public sealed class RecordTools(
 
         var record = await records.Create(request, user.UserId);
         record.Warnings = await checks.WarningsAfterSave(user.UserId, record);
+        record.Reminders = triggers.TakeCreated();
 
         return record;
     }
@@ -133,7 +135,7 @@ public sealed class RecordTools(
 
     [McpServerTool(Name = "update_record", Title = "Update record", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Changes a record: its time and/or some of its values. Only the fields given change; a null value empties that field, and at least one value must remain. Changing the time moves every value. The result carries warnings when the change leaves one of the user's Warn checks broken on its day (it is saved anyway).")]
+    [Description("Changes a record: its time and/or some of its values. Only the fields given change; a null value empties that field, and at least one value must remain. Changing the time moves every value. The result carries warnings when the change leaves one of the user's Warn checks broken on its day (it is saved anyway) and reminders when it set one of the user's trigger reminders.")]
     public async Task<RecordResponse> UpdateRecord(
         [Description("Record id.")] int recordId,
         [Description("The values to change, one per field.")] List<ValueInput>? values = null,
@@ -159,6 +161,7 @@ public sealed class RecordTools(
 
         var record = await records.Update(recordId, request, user.UserId);
         record.Warnings = await checks.WarningsAfterSave(user.UserId, record);
+        record.Reminders = triggers.TakeCreated();
 
         return record;
     }

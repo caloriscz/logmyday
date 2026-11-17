@@ -1,3 +1,5 @@
+using LogMyDay.Shared.DTOs;
+
 namespace LogMyDay.Api.Application.Interfaces;
 
 /// <summary>Brings the reminders of the user's triggers in line with a save: creates the day's
@@ -9,4 +11,8 @@ public interface ITagTriggerEngine
 {
     /// <param name="changes">The tags and local days the save changed, as given to the rule engine.</param>
     Task OnTagsChanged(Guid userId, IReadOnlyCollection<(int TagId, DateOnly Day)> changes);
+
+    /// <summary>The reminders the saves of this request created and kept, for the save's response
+    /// (null when none); clears them, so each response reports its own.</summary>
+    List<TriggeredReminder>? TakeCreated();
 }

@@ -29,6 +29,15 @@ public static class TagTriggerText
         return offsetMinutes is int minutes ? $"{Duration(minutes)} later" : "later";
     }
 
+    /// <summary>"Log Effect at 21:30" or "Log Sleep quality the next day at 08:00", counted from
+    /// the day of the entry that set it (a reminder rings within a day of it).</summary>
+    public static string ReminderSet(TriggeredReminder reminder)
+    {
+        var day = reminder.Day > reminder.EntryDay ? " the next day" : string.Empty;
+
+        return $"Log {reminder.PromptTagName}{day} at {reminder.Time:HH\\:mm}";
+    }
+
     /// <summary>"45 min", "3 h", "1 h 30 min".</summary>
     public static string Duration(int minutes)
     {

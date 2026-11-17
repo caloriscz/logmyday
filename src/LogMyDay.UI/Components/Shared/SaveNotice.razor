@@ -1,0 +1,91 @@
+@using LogMyDay.Shared.Formatting
+@using LogMyDay.UI.Services
+@inject SaveNotices Notices
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@* What the latest save reported: Warn checks it left broken on its day (the value is saved; this
+   only says what the day now contradicts) and reminders its triggers set. Stays until dismissed. *@
+@if (Notices.IsOpen)
+{
+    var warned = Notices.Warnings.Count > 0;
+    <div class="fixed inset-x-0 top-0 z-70 flex justify-center p-3" role="status" aria-live="polite">
+        <div class="w-full max-w-lg rounded-xl border p-4 shadow-lg dark:bg-slate-900 @(warned ? "border-amber-300 bg-amber-50 dark:border-amber-500/40" : "border-sky-300 bg-sky-50 dark:border-sky-500/40")">
+            <div class="flex items-start gap-3">
+                @if (warned)
+                {
+                    <Icon Name="exclamation-triangle" Class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                }
+                else
+                {
+                    <Icon Name="bell" Class="mt-0.5 h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
+                }
+                <div class="min-w-0 flex-1 space-y-2">
+                    @if (warned)
+                    {
+                        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Saved, but @(Notices.Warnings.Count == 1 ? "a check is" : $"{Notices.Warnings.Count} checks are") broken on that day</p>
+                        @foreach (var warning in Notices.Warnings)
+                        {
+                            <div class="text-sm">
+                                <p class="font-medium text-gray-900 dark:text-slate-100">@warning.CheckName</p>
+                                <p class="text-gray-700 dark:text-slate-300">@warning.Sentence</p>
+                                <p class="text-xs text-gray-500 dark:text-slate-400">@warning.Found</p>
+                            </div>
+                        }
+                        <button type="button" class="text-sm font-medium text-amber-800 underline hover:no-underline dark:text-amber-300" @onclick="OpenReview">Rule review</button>
+                    }
+                    @if (Notices.Reminders.Count > 0)
+                    {
+                        <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">@(Notices.Reminders.Count == 1 ? "Reminder set" : "Reminders set")</p>
+                        @foreach (var reminder in Notices.Reminders)
+                        {
+                            <div class="flex items-start gap-2 text-sm">
+                                @if (warned)
+                                {
+                                    <Icon Name="bell" Class="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
+                                }
+                                <div class="min-w-0">
+                                    <p class="text-gray-700 dark:text-slate-300">@TagTriggerText.ReminderSet(reminder)</p>
+                                    <p class="text-xs text-gray-500 dark:text-slate-400">@reminder.TriggerName</p>
+                                </div>
+                            </div>
+                        }
+                        @if (PhoneHint)
+                        {
+                            <p class="text-xs text-gray-500 dark:text-slate-400">Your phone rings for it once the LogMyDay app there has loaded its reminders.</p>
+                        }
+                    }
+                </div>
+                <button type="button" class="inline-flex shrink-0 items-center rounded-full p-1.5 text-gray-500 transition-colors hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 @(warned ? "hover:bg-amber-100 focus-visible:ring-amber-500" : "hover:bg-sky-100 focus-visible:ring-sky-500")" @onclick="Notices.Dismiss" aria-label="Dismiss">
+                    <Icon Name="close" Class="h-4 w-4" />
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>On the web: says the phone arms the reminder only once its app loads reminders.</summary>
+    [Parameter] public bool PhoneHint { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Notices.Changed += OnChanged;
+    }
+
+    private void OnChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OpenReview()
+    {
+        Notices.Dismiss();
+        Navigation.NavigateTo("/tag-rules/review");
+    }
+
+    public void Dispose()
+    {
+        Notices.Changed -= OnChanged;
+    }
+}

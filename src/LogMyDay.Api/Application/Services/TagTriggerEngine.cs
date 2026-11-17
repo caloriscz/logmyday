@@ -2,6 +2,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
+using LogMyDay.Shared.DTOs;
 using LogMyDay.Shared.Formatting;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,9 @@ public class TagTriggerEngine : ITagTriggerEngine
 
     private readonly LogMyDayDbContext _context;
     private readonly IEventLogService _eventLogService;
+
+    // Reminders created in this request, until its response takes them.
+    private readonly List<(Reminder Reminder, TagTrigger Trigger)> _created = [];
 
     public TagTriggerEngine(LogMyDayDbContext context, IEventLogService eventLogService)
     {
@@ -61,6 +65,27 @@ public class TagTriggerEngine : ITagTriggerEngine
         {
             await _eventLogService.Log(userId, EventLogLevel.Info, message);
         }
+    }
+
+    public List<TriggeredReminder>? TakeCreated()
+    {
+        // Saved ones only; a reminder withdrawn later in the request has left the list.
+        var kept = _created
+            .Where(c => c.Reminder.Id > 0)
+            .Select(c => new TriggeredReminder
+            {
+                ReminderId = c.Reminder.Id,
+                TriggerId = c.Trigger.Id,
+                TriggerName = c.Trigger.Name,
+                PromptTagName = TagTriggerService.TagTitle(c.Trigger.PromptTag),
+                EntryDay = c.Reminder.TriggerDay!.Value,
+                Day = c.Reminder.MonitorFromDate!.Value,
+                Time = c.Reminder.NotifyAt!.Value
+            })
+            .ToList();
+        _created.Clear();
+
+        return kept.Count > 0 ? kept : null;
     }
 
     /// <summary>When a reminder for this trigger rings: the entry time plus the offset, or the
@@ -125,6 +150,7 @@ public class TagTriggerEngine : ITagTriggerEngine
             if (existing != null && !IsDone(existing))
             {
                 _context.Reminders.Remove(existing);
+                _created.RemoveAll(c => c.Reminder.Id == existing.Id);
                 log.Add($"Trigger '{trigger.Name}' withdrew its reminder for {day:yyyy-MM-dd}: {Condition(trigger)} no longer holds");
             }
 
@@ -147,7 +173,7 @@ public class TagTriggerEngine : ITagTriggerEngine
         }
 
         var fireDay = DateOnly.FromDateTime(fire);
-        _context.Reminders.Add(new Reminder
+        var reminder = new Reminder
         {
             UserId = trigger.UserId,
             Title = trigger.Name,
@@ -160,7 +186,9 @@ public class TagTriggerEngine : ITagTriggerEngine
             TriggerId = trigger.Id,
             TriggerDay = day,
             DateCreated = DateTime.UtcNow
-        });
+        };
+        _context.Reminders.Add(reminder);
+        _created.Add((reminder, trigger));
         log.Add($"Trigger '{trigger.Name}' set a reminder to log '{trigger.PromptTag!.TagName}' at {fire:yyyy-MM-dd HH:mm} ({Condition(trigger)}: {TagCheckText.Value(value ?? "logged")} at {anchor:HH:mm})");
 
         await RemoveOldReminders(trigger, DateOnly.FromDateTime(now));
