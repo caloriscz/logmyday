@@ -8,6 +8,7 @@
 @using Refit
 @implements IDisposable
 @inject IReminderApi ReminderApi
+@inject LogMyDay.UI.Services.SaveNotices SaveNotices
 @inject IActivityApi ActivityApi
 @inject IRecordApi RecordApi
 @inject ILogger<Reminders> Logger
@@ -690,6 +691,7 @@
                     try
                     {
                         var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                        SaveNotices.Show(null, updated.Reminders);
                         ReminderScheduler.CancelItem(item.Id);
                         UpdateItem(updated);
                     }
@@ -724,6 +726,7 @@
         try
         {
             var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+            SaveNotices.Show(null, updated.Reminders);
             ReminderScheduler.CancelItem(item.Id);
             UpdateItem(updated);
         }
@@ -851,12 +854,13 @@
         try
         {
             var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow });
+            SaveNotices.Show(null, updated.Reminders);
             ReminderScheduler.CancelItem(item.Id);
             ReminderScheduler.DismissItem(item.Id);
             UpdateItem(updated);
             _showDone = true;
 
-            // Logging it may have set a trigger's reminder: reload so its alarm is armed now.
+            // Logging it may have set a trigger's reminder: the notice arms its alarm; reload so the list shows it.
             await LoadDataAsync();
         }
         catch (ApiException ex)
@@ -964,7 +968,8 @@
         _quickError = null;
         try
         {
-            await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            var completed = await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            SaveNotices.Show(null, completed.Reminders);
             ReminderScheduler.CancelItem(_quickItem.Id);
             ReminderScheduler.DismissItem(_quickItem.Id);
             _showQuickModal = false;
@@ -1117,7 +1122,8 @@
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
             else
@@ -1126,7 +1132,8 @@
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
 
@@ -1217,6 +1224,7 @@
         try
         {
             var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            SaveNotices.Show(null, updated.Reminders);
             ReminderScheduler.CancelItem(item.Id);
             ReminderScheduler.DismissItem(item.Id);
             UpdateItem(updated);

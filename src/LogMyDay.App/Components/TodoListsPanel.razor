@@ -6,6 +6,7 @@
 @implements IDisposable
 
 @inject ITodoApi TodoApi
+@inject LogMyDay.UI.Services.SaveNotices SaveNotices
 @inject IActivityApi ActivityApi
 @inject IRecordApi RecordApi
 @inject IJSRuntime JS
@@ -1395,7 +1396,8 @@ else
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await TodoApi.CompleteItem(_editingItemId, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
             else
@@ -1404,7 +1406,8 @@ else
 
                 if (isBooleanType && _booleanBoolValue.HasValue)
                 {
-                    await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await TodoApi.CompleteItem(created.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
 
@@ -1475,6 +1478,7 @@ else
                     try
                     {
                         var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+                        SaveNotices.Show(null, updated.Reminders);
                         UpdateItemInList(updated);
                         _notificationsNeedUpdate = true;
                     }
@@ -1511,6 +1515,7 @@ else
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt() });
+            SaveNotices.Show(null, updated.Reminders);
             UpdateItemInList(updated);
             _notificationsNeedUpdate = true;
         }
@@ -1578,7 +1583,8 @@ else
         _quickError = null;
         try
         {
-            await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            var completed = await TodoApi.CompleteItem(_quickItem.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            SaveNotices.Show(null, completed.Reminders);
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();
@@ -1945,6 +1951,7 @@ else
         try
         {
             var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            SaveNotices.Show(null, updated.Reminders);
             UpdateItemInList(updated);
             _notificationsNeedUpdate = true;
         }

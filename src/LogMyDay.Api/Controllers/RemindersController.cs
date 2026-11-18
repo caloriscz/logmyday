@@ -13,17 +13,20 @@ public class RemindersController : BaseApiController
 {
     private readonly IReminderService _service;
     private readonly IEventLogService _eventLogService;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
     private readonly ILogger<RemindersController> _logger;
 
     public RemindersController(
         IReminderService service,
         IAuthService authService,
         IEventLogService eventLogService,
+        ITagTriggerEngine tagTriggerEngine,
         ILogger<RemindersController> logger)
         : base(authService)
     {
         _service = service;
         _eventLogService = eventLogService;
+        _tagTriggerEngine = tagTriggerEngine;
         _logger = logger;
     }
 
@@ -79,7 +82,10 @@ public class RemindersController : BaseApiController
         var userId = GetCurrentUserId();
         try
         {
-            return Ok(await _service.Complete(id, request, userId));
+            var item = await _service.Complete(id, request, userId);
+            item.Reminders = _tagTriggerEngine.TakeCreated();
+
+            return Ok(item);
         }
         catch (KeyNotFoundException ex)
         {

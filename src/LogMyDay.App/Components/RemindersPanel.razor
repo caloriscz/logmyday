@@ -6,6 +6,7 @@
 @implements IDisposable
 
 @inject IReminderApi ReminderApi
+@inject LogMyDay.UI.Services.SaveNotices SaveNotices
 @inject IActivityApi ActivityApi
 @inject IRecordApi RecordApi
 @inject IJSRuntime JS
@@ -491,7 +492,8 @@
                 await ReminderApi.UpdateReminder(_editingItemId, _itemForm);
                 if (isBoolean && _booleanBoolValue.HasValue)
                 {
-                    await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await ReminderApi.CompleteReminder(_editingItemId, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
             else
@@ -499,7 +501,8 @@
                 var created = await ReminderApi.CreateReminder(_itemForm);
                 if (isBoolean && _booleanBoolValue.HasValue)
                 {
-                    await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    var completed = await ReminderApi.CompleteReminder(created.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt() });
+                    SaveNotices.Show(null, completed.Reminders);
                 }
             }
 
@@ -558,7 +561,8 @@
         _isBusy = true;
         try
         {
-            await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = completionValue, RecordId = recordId });
+            var completed = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = completionValue, RecordId = recordId });
+            SaveNotices.Show(null, completed.Reminders);
         }
         catch (ApiException ex)
         {
@@ -605,7 +609,8 @@
         _quickError = null;
         try
         {
-            await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            var completed = await ReminderApi.CompleteReminder(_quickItem.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = notes });
+            SaveNotices.Show(null, completed.Reminders);
             _showQuickModal = false;
             _quickItem = null;
             await LoadDataAsync();

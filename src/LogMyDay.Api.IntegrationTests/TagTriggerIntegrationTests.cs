@@ -114,4 +114,35 @@ public class TagTriggerIntegrationTests : IClassFixture<CustomWebApplicationFact
         Assert.DoesNotContain(after.EnumerateArray(), r => r.GetProperty("title").GetString() == trigger.Name);
         Assert.Equal(HttpStatusCode.NotFound, (await Http().GetAsync($"/api/tag-triggers/{trigger.Id}")).StatusCode);
     }
+
+    [Fact]
+    public async Task CompletingAReminderOrATodo_ReportsTheReminderItsLoggedValueSet()
+    {
+        await using var mcp = await McpTestClient.ConnectAsync(_factory, CustomWebApplicationFactory.ReadWriteKeyToken);
+        var (doseId, _) = await CreateTag(mcp, "Dose", InputTypeIds.Integer);
+        var (effectId, _) = await CreateTag(mcp, "Effect", InputTypeIds.String);
+        var (walkedId, _) = await CreateTag(mcp, "Walked", InputTypeIds.String);
+        var (moodId, _) = await CreateTag(mcp, "Mood", InputTypeIds.String);
+        var triggers = RestService.For<ITagTriggerApi>(Http());
+        var afterDose = await triggers.CreateTagTrigger(new TagTriggerRequest { Name = Unique("Effect later"), IfTagId = doseId, PromptTagId = effectId, OffsetMinutes = 120 });
+        var afterWalk = await triggers.CreateTagTrigger(new TagTriggerRequest { Name = Unique("Mood later"), IfTagId = walkedId, PromptTagId = moodId, OffsetMinutes = 60 });
+
+        // Over REST: completing a reminder logs its notes to the dose tag.
+        var reminders = RestService.For<IReminderApi>(Http());
+        var reminder = await reminders.CreateReminder(new ReminderRequest { Title = Unique("Dose"), Notes = "100", CompletionTagId = doseId });
+        var completed = await reminders.CompleteReminder(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow });
+        Assert.Equal(afterDose.Id, Assert.Single(completed.Reminders!).TriggerId);
+
+        // Over MCP: completing a todo item logs its title to the list's tag.
+        var todos = RestService.For<ITodoApi>(Http());
+        var list = await todos.CreateTodoList(new TodoListRequest { Name = Unique("Walks"), CompletionTagId = walkedId });
+        var item = await todos.CreateTodoItem(new TodoItemRequest { ListId = list.Id, Title = "Park" });
+        var done = await mcp.CallAsync("complete_todo_item", new { itemId = item.Id });
+        Assert.NotEqual(true, done.IsError);
+        var told = Assert.Single(McpTestClient.Json(done).GetProperty("reminders").EnumerateArray());
+        Assert.Equal(afterWalk.Id, told.GetProperty("triggerId").GetInt32());
+
+        await triggers.DeleteTagTrigger(afterDose.Id);
+        await triggers.DeleteTagTrigger(afterWalk.Id);
+    }
 }
