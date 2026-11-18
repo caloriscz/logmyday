@@ -1932,12 +1932,7 @@ else
 
     private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
 
-    private DateTime RecordTime()
-    {
-        var day = SelectedDate?.Date ?? DateTime.Today;
-
-        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
-    }
+    private DateTime RecordTime() => LogMyDay.UI.Services.RecordCompletionTime.RecordTime(SelectedDate?.Date ?? DateTime.Today);
 
     private async Task CompleteWithRecord(RecordResponse? record)
     {
@@ -1950,7 +1945,8 @@ else
 
         try
         {
-            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            var doneAt = LogMyDay.UI.Services.RecordCompletionTime.DoneAt(SelectedDate?.Date ?? DateTime.Today);
+            var updated = await TodoApi.CompleteItem(item.Id, new TodoItemCompleteRequest { DoneAt = doneAt, RecordId = record.Id });
             SaveNotices.Show(null, updated.Reminders);
             UpdateItemInList(updated);
             _notificationsNeedUpdate = true;

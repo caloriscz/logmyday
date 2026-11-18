@@ -1205,12 +1205,7 @@
 
     private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
 
-    private DateTime RecordTime()
-    {
-        var day = _selectedDate.Date;
-
-        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
-    }
+    private DateTime RecordTime() => LogMyDay.UI.Services.RecordCompletionTime.RecordTime(_selectedDate);
 
     private async Task CompleteWithRecord(RecordResponse? record)
     {
@@ -1223,7 +1218,7 @@
 
         try
         {
-            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), RecordId = record.Id });
+            var updated = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = LogMyDay.UI.Services.RecordCompletionTime.DoneAt(_selectedDate), RecordId = record.Id });
             SaveNotices.Show(null, updated.Reminders);
             ReminderScheduler.CancelItem(item.Id);
             ReminderScheduler.DismissItem(item.Id);

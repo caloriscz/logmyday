@@ -561,7 +561,8 @@
         _isBusy = true;
         try
         {
-            var completed = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = EffectiveDoneAt(), CompletionValue = completionValue, RecordId = recordId });
+            var doneAt = recordId == null ? EffectiveDoneAt() : LogMyDay.UI.Services.RecordCompletionTime.DoneAt(SelectedDate?.Date ?? DateTime.Today);
+            var completed = await ReminderApi.CompleteReminder(item.Id, new ReminderCompleteRequest { DoneAt = doneAt, CompletionValue = completionValue, RecordId = recordId });
             SaveNotices.Show(null, completed.Reminders);
         }
         catch (ApiException ex)
@@ -714,12 +715,7 @@
 
     private bool IsRecordType(int? tagId) => tagId is int id && _recordTypes.Any(t => t.Id == id);
 
-    private DateTime RecordTime()
-    {
-        var day = SelectedDate?.Date ?? DateTime.Today;
-
-        return day == DateTime.Today ? DateTime.Now : day.AddHours(12);
-    }
+    private DateTime RecordTime() => LogMyDay.UI.Services.RecordCompletionTime.RecordTime(SelectedDate?.Date ?? DateTime.Today);
 
     private async Task CompleteWithRecord(RecordResponse? record)
     {
