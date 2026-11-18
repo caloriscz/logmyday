@@ -425,6 +425,21 @@ public sealed class TagTriggerTests : IDisposable
     }
 
     [Fact]
+    public async Task TagUpdate_KeepsTheTypeWhileATriggerUsesTheTag()
+    {
+        var dose = await AddTag("Dose", InputTypeIds.Integer);
+        var effect = await AddTag("Effect", InputTypeIds.String);
+        await Trigger(dose, effect, TagRuleOperator.GreaterOrEqual, "50", name: "Effect later");
+        var tags = new TagService(_context, new TagRepository(_context), NullLogger<TagService>.Instance);
+
+        var watched = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(dose.Id, new TagRequest { Tag = "Dose", TypeId = InputTypeIds.String }, _userId));
+        Assert.Contains("'Effect later'", watched.Message);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(effect.Id, new TagRequest { Tag = "Effect", TypeId = InputTypeIds.Integer }, _userId));
+    }
+
+    [Fact]
     public async Task ATriggerWhosePromptedTagIsComputed_SetsNoReminder()
     {
         var dose = await AddTag("Dose", InputTypeIds.Integer);

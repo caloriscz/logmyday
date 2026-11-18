@@ -344,6 +344,11 @@
             await ActivityApi.UpdateTag(Id, editTag!);
             Navigation.NavigateTo("/tags");
         }
+        catch (Refit.ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict && !string.IsNullOrWhiteSpace(ex.Content))
+        {
+            // The server says why, e.g. which rule still needs the tag's type.
+            errorMessage = ex.Content.Trim('"');
+        }
         catch (Exception ex)
         {
             errorMessage = $"Error saving tag: {ex.Message}";

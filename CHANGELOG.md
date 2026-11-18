@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file. The format 
 ### Fixed
 
   - A tag a trigger reminds you to log can no longer become the computed tag of a rule, also not through a backup import. Completing or skipping that trigger's reminders failed with a server error. A trigger whose tag is already computed sets no reminder and says so in the Event Log.
+  - A tag or record field that a rule, check or trigger uses keeps its type and option list; changing either is refused with the name of the relation, as deleting the tag is. Before, the change went through and the relation stopped working without a word. The tag edit pages on the web and mobile show the reason.
 
 ## v0.7.0 — 2026‑11‑17
 
