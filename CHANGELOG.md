@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## v0.7.1 — unreleased
+
+### Fixed
+
+  - A tag a trigger reminds you to log can no longer become the computed tag of a rule, also not through a backup import. Completing or skipping that trigger's reminders failed with a server error. A trigger whose tag is already computed sets no reminder and says so in the Event Log.
+
 ## v0.7.0 — 2026‑11‑17
 
 ### Added

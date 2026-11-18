@@ -395,6 +395,53 @@ public sealed class TagTriggerTests : IDisposable
     }
 
     [Fact]
+    public async Task APromptedTag_CannotBecomeARuleTarget_BeforeTheTriggerFires()
+    {
+        var dose = await AddTag("Dose", InputTypeIds.Integer);
+        var effect = await AddTag("Effect", InputTypeIds.Integer);
+        await Trigger(dose, effect, name: "Effect later");
+        var rules = new TagRuleService(_context, new TagRuleEngine(_context), _eventLog);
+
+        var refusal = await Assert.ThrowsAsync<ArgumentException>(() => rules.Create(new TagRuleRequest
+        {
+            Name = "Effect total",
+            TargetTagId = effect.Id,
+            Sources = [new() { SourceTagId = dose.Id, Factor = 1 }]
+        }, _userId));
+        Assert.Contains("'Effect later'", refusal.Message);
+
+        // The backup import skips such a rule with a warning.
+        var backups = new BackupService(_context, NullLogger<BackupService>.Instance, new TagRuleEngine(_context));
+        var result = await backups.ImportDataAsync(new BackupData
+        {
+            Metadata = new BackupMetadata(),
+            TagRules = [new TagRuleBackup { Name = "Effect total", TargetTagName = "Effect", Sources = [new() { SourceTagName = "Dose", Factor = 1 }] }]
+        }, clearExistingData: false, _userId);
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(1, result.Statistics.TagRulesSkipped);
+        Assert.Contains(result.Warnings, w => w.Contains("'Effect total'") && w.Contains("trigger"));
+        Assert.False(await _context.TagRules.AnyAsync());
+        Assert.False((await _context.Tags.SingleAsync(t => t.Id == effect.Id)).IsComputed);
+    }
+
+    [Fact]
+    public async Task ATriggerWhosePromptedTagIsComputed_SetsNoReminder()
+    {
+        var dose = await AddTag("Dose", InputTypeIds.Integer);
+        var effect = await AddTag("Effect", InputTypeIds.Integer);
+        var trigger = await Trigger(dose, effect);
+
+        // Data saved before rule validation refused this order.
+        effect.IsComputed = true;
+        await _context.SaveChangesAsync();
+
+        await Log(dose, Minute(Now.AddMinutes(-10)), "100");
+
+        Assert.Empty(await RemindersOf(trigger));
+        Assert.True(await _context.EventLogs.AnyAsync(e => e.Message.Contains("set no reminder") && e.Message.Contains("computed")));
+    }
+
+    [Fact]
     public async Task TagsATriggerUses_CannotBeDeleted_AndDeletingTheTrigger_TakesItsOpenReminders()
     {
         var dose = await AddTag("Dose", InputTypeIds.Integer);

@@ -539,11 +539,14 @@ public class BackupService : IBackupService
             .ToListAsync();
         var tagsByName = tags.GroupBy(t => t.TagName).ToDictionary(g => g.Key, g => g.First());
         var claimedTargets = await _context.TagRules.Select(r => r.TargetTagId).ToHashSetAsync();
+        // Triggers restored later refuse a computed prompt tag themselves; these are the ones
+        // already in the account.
+        var promptedTags = await _context.TagTriggers.Select(t => t.PromptTagId).ToHashSetAsync();
         var pausedValues = new List<(TagRule Rule, List<TagRuleValueBackup> Values)>();
 
         foreach (var backup in rules)
         {
-            var (reason, cases) = await RejectRule(backup, tagsByName, claimedTargets);
+            var (reason, cases) = await RejectRule(backup, tagsByName, claimedTargets, promptedTags);
             if (reason != null)
             {
                 result.Statistics.TagRulesSkipped++;
@@ -613,7 +616,7 @@ public class BackupService : IBackupService
         return imported;
     }
 
-    private async Task<(string? Reason, List<TagRuleCase> Cases)> RejectRule(TagRuleBackup backup, Dictionary<string, Tag> tagsByName, HashSet<int> claimedTargets)
+    private async Task<(string? Reason, List<TagRuleCase> Cases)> RejectRule(TagRuleBackup backup, Dictionary<string, Tag> tagsByName, HashSet<int> claimedTargets, HashSet<int> promptedTags)
     {
         var noCases = new List<TagRuleCase>();
         if (!Enum.IsDefined(backup.Template)
@@ -640,6 +643,11 @@ public class BackupService : IBackupService
         if (target.RecordTypeId != null)
         {
             return ($"'{target.TagName}' is a field of a record type", noCases);
+        }
+
+        if (promptedTags.Contains(target.Id))
+        {
+            return ($"'{target.TagName}' is the tag a trigger reminds you to log", noCases);
         }
 
         if (backup.Sources.Count == 0)
