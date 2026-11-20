@@ -250,8 +250,8 @@
         </div>
         <div class="p-6 space-y-4">
             <p class="text-sm text-gray-700 dark:text-slate-200">
-                <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> This action will permanently delete all your data.
-                Make sure to export your data first if you want to keep it.
+                <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> This action will permanently delete your tags and activities with the data that depends on them.
+                Other users' data is not affected. Make sure to export your data first if you want to keep it.
             </p>
 
             <button type="button"
@@ -428,8 +428,8 @@
                     </button>
                 </div>
                 <div class="px-6 py-5 space-y-4">
-                    <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">Are you sure you want to delete ALL data?</p>
-                    <p class="text-sm text-gray-700 dark:text-slate-200">This action cannot be undone. All tags, activities, notifications, tag options, tag option lists, input types, and patterns will be permanently deleted.</p>
+                    <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">Are you sure you want to delete your data?</p>
+                    <p class="text-sm text-gray-700 dark:text-slate-200">This action cannot be undone. Your tags, activities, records, scan mappings, todo lists, rules, checks, triggers, tag groups and option lists will be permanently deleted. Other users' data and the shared input types, patterns and units stay.</p>
                     <div class="space-y-2">
                         <p class="text-sm text-gray-700 dark:text-slate-200">Type <code class="rounded-sm bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">DELETE</code> to confirm:</p>
                         <input type="text"
@@ -728,8 +728,17 @@
 
         try
         {
-            var recordsCleared = await BackupService.ClearDataAsync();
-            SetStatus($"All data cleared successfully! {recordsCleared} records removed.", false);
+            // Only the signed-in user's data: without a user id the service clears every user.
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            if (currentUser == null)
+            {
+                SetStatus("Clear operation failed: the signed-in user could not be determined.", true);
+
+                return;
+            }
+
+            var recordsCleared = await BackupService.ClearDataAsync(currentUser.Id);
+            SetStatus($"Your data was cleared: {recordsCleared} records removed.", false);
             await LoadBackupInfo(); // Refresh statistics
         }
         catch (Exception ex)

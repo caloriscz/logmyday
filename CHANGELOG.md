@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## v0.7.2 — 2026‑11‑20
+
+### Fixed
+
+  - The Backup page's **Danger Zone** clears only your own data. Before, it deleted the data of every user on the installation, together with the shared input types and patterns. The warning and the confirmation now say what is deleted and that other users' data stays.
+  - The version in the navigation menu shows the app's real version; it had stayed at 0.7.0.
+
+### Removed
+
+  - The GitHub Actions deployment that ran on every tag. It built without the server's configuration and deleted `appsettings.json` on the hosting, so the site failed to start. Deployment runs locally with the Cake build (`build/README.md`).
+
 ## v0.7.1 — 2026‑11‑20
 
 ### Fixed
