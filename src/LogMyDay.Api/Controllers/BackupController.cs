@@ -47,6 +47,23 @@ public class BackupController : BaseApiController
     }
 
     /// <summary>
+    /// Admin only: export the whole database (all users, their accounts and data) as a SQLite
+    /// file that LogMyDay can run on as it is.
+    /// </summary>
+    /// <returns>SQLite database file</returns>
+    [HttpGet("export/sqlite")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> ExportSqlite([FromServices] ISqliteExportService sqliteExportService, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("SQLite export request received from admin: {UserId}", GetCurrentUserId());
+
+        var export = await sqliteExportService.ExportDatabase(cancellationToken);
+
+        // The result disposes the stream after sending it, which deletes the temporary file.
+        return File(export.Content, "application/vnd.sqlite3", export.FileName);
+    }
+
+    /// <summary>
     /// Import data from JSON backup file
     /// </summary>
     /// <param name="file">JSON backup file</param>

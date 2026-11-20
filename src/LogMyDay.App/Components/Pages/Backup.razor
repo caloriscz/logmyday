@@ -5,7 +5,10 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using LogMyDay.App.Services
 @using LogMyDay.App.Components.Shared
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IBackupService BackupService
+@inject ISqliteExportService SqliteExportService
+@inject AuthenticationStateProvider AuthStateProvider
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @inject ILogger<Backup> Logger
@@ -199,6 +202,43 @@
             </div>
         </div>
     </div>
+
+    @if (isAdmin)
+    {
+        <!-- Whole-database SQLite export (admins only) -->
+        <div class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
+            <div class="border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <Icon Name="database" Class="h-5 w-5" />
+                    Export Whole Database (SQLite)
+                </h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-700 dark:text-slate-200">
+                    Exports every user, with their account and all their data, as a SQLite database file.
+                    LogMyDay can run on this file as it is, so it also serves to move an installation to SQLite.
+                </p>
+                <p class="text-sm text-gray-700 dark:text-slate-200">
+                    <strong class="text-rose-700 dark:text-rose-400">Keep the file private:</strong> it contains password and API key hashes.
+                </p>
+                <button type="button"
+                        class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        @onclick="ExportSqlite"
+                        disabled="@isExportingSqlite">
+                    @if (isExportingSqlite)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Exporting...</span>
+                    }
+                    else
+                    {
+                        <Icon Name="download" Class="h-4 w-4" />
+                        <span>Export SQLite</span>
+                    }
+                </button>
+            </div>
+        </div>
+    }
 
     <!-- Danger Zone Section -->
     <div class="rounded-xl border border-rose-200 bg-white shadow-xs dark:border-rose-800/40 dark:bg-slate-900">
@@ -422,6 +462,8 @@
 
 @code {
     private bool isExporting = false;
+    private bool isExportingSqlite = false;
+    private bool isAdmin = false;
     private bool isImporting = false;
     private bool isValidating = false;
     private bool isClearing = false;
@@ -445,6 +487,9 @@
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Backup & Restore");
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.Identity?.IsAuthenticated == true && authState.User.HasClaim("is_admin", "true");
 
         await LoadBackupInfo();
     }
@@ -500,6 +545,42 @@
         finally
         {
             isExporting = false;
+        }
+    }
+
+    private async Task ExportSqlite()
+    {
+        if (!isAdmin)
+        {
+            return;
+        }
+
+        isExportingSqlite = true;
+        ClearStatus();
+
+        try
+        {
+            await using var export = await SqliteExportService.ExportDatabase(CancellationToken.None);
+
+            // Disposing the export deletes its temporary file, so the reference must not close it.
+            using var streamReference = new DotNetStreamReference(export.Content, leaveOpen: true);
+
+            // A large database takes longer to send than the default one-minute interop timeout.
+            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", TimeSpan.FromMinutes(10), export.FileName, streamReference, "application/vnd.sqlite3");
+
+            var leftOut = export.UnknownMigrations.Count == 0
+                ? ""
+                : $" Left out whatever these migrations, unknown to this version, added: {string.Join(", ", export.UnknownMigrations)}.";
+            SetStatus($"Database exported: {export.TotalRows:N0} rows in {export.RowCounts.Count} tables.{leftOut}", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "SQLite export failed");
+            SetStatus($"SQLite export failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isExportingSqlite = false;
         }
     }
 
@@ -694,5 +775,19 @@
         a.click();
 document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+    };
+
+    window.downloadFileFromStream = async (filename, contentStreamReference, contentType) => {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: contentType });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
     };
 </script>
