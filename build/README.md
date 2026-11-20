@@ -1,277 +1,123 @@
 # LogMyDay Build System
 
-This directory contains the Cake build system for automated deployment using Web Deploy. It contains cake build system for automated deployment using Web Deploy instead of FTP.This directory contains the Cake build system for automated deployment using Web Deploy instead of FTP.
+This directory holds the Cake build that tests, publishes and deploys the web app to the hosting with Web Deploy. Deployment runs **locally only**, from a machine that has the production configuration.
 
-- **build.cake**: Main build script with Web Deploy functionality and test integration
+## Files
+
+- **build.cake**: the build script, with the test gate and the Web Deploy deployment
 - **build.ps1**: PowerShell bootstrapper for Windows
-- **build.sh**: Bash bootstrapper for Linux/macOS## Files## Files
-- **tools/packages.config**: NuGet packages for Cake build system
+- **build.sh**: Bash bootstrapper for Linux/macOS
+- **local.env**: deployment credentials (gitignored; see `local.env.example`)
+- **tools/packages.config**: NuGet packages for the Cake build system
 
-## Available Build Targets
+## ⚠️ Deploy only from a working copy with the production appsettings
 
-- **build.cake**: Main build script with Web Deploy functionality
+Web Deploy **syncs** the publish folder to the site: files that are missing from the publish output are **deleted on the server**. `src/LogMyDay.App/appsettings.json` is gitignored, so it is in the publish output only on a machine that has it. Deploying without it removes the server's `appsettings.json`, and the app then fails to start (HTTP 500.30).
 
-### 🛡️ Recommended Deployment Targets
+For this reason there is no GitHub Actions deployment: the former tag-triggered workflow built without the appsettings and took the site down twice (v0.7.0, v0.7.1). Only the `DataProtection-Keys` folder is protected from the sync.
 
-- **build.ps1**: PowerShell bootstrapper for Windows- **build.ps1**: PowerShell bootstrapper for Windows
+## Targets
 
-#### `Default` - Full Safe Deployment
+### 🛡️ Deployment targets
 
-```powershell- **build.sh**: Bash bootstrapper for Linux/macOS- **build.sh**: Bash bootstrapper for Linux/macOS
+#### `Default` - full deployment
 
+```powershell
 .\build\build.ps1
+```
 
-```- **tools/packages.config**: NuGet packages for Cake build system- **tools/packages.config**: NuGet packages for Cake build system
+- Pipeline: Clean → Restore → Build → **Test** → Build Tailwind → Publish → Package → Deploy
+- Deployment is blocked if any test fails.
 
-- **Pipeline**: Clean → Restore → Build → **Test** → Publish → Package → Deploy
-
-- ✅ **Runs all unit tests before deployment**
-- ✅ **Deployment blocked if ANY test fails**
-- ✅ **Use for all production deployments**## Available Build Targets## Available Build Targets
-
-
-#### `FastDeploy` - Quick Safe Deployment (RECOMMENDED)
+#### `FastDeploy` - deployment without packaging (recommended)
 
 ```powershell
-
 .\build\build.ps1 -Target FastDeploy
-
 ```
 
-- ✅ **Runs all unit tests before deployment**
+- Pipeline: Clean → Restore → Build → **Test** → Publish → Deploy
+- Runs the same tests as `Default` and skips the zip package.
 
-- ✅ Skips packaging step for faster deployment- `CI`: Continuous integration build (Clean → Restore → Build → Test → Package)- `CI`: Continuous integration build (Clean → Restore → Build → Test → Package)
+### Build-only targets
 
-- ✅ **RECOMMENDED for pre-production deployments**
-
-- **~30% faster than Default while maintaining test protection**- `FastDeploy`: Quick deployment without tests (Clean → Restore → Build → Publish → Package → Deploy)- `FastDeploy`: Quick deployment without tests (Clean → Restore → Build → Publish → Package → Deploy)
-
-#### `CI` - Continuous Integration Build
+#### `CI` - build, test and package, no deployment
 
 ```powershell
-
-.\build\build.ps1 -Target CI### Individual Tasks### Individual Tasks
-
+.\build\build.ps1 -Target CI
 ```
 
-- **Pipeline**: Clean → Restore → Build → **Test** → Package- `Clean`: Clean build output and temporary directories- `Clean`: Clean build output and temporary directories
+- Pipeline: Clean → Restore → Build → **Test** → Build Tailwind → Publish → Package
 
-- ✅ Runs all tests and creates package
-- ❌ Does not deploy- `Restore`: Restore NuGet packages- `Restore`: Restore NuGet packages
-- ✅ Use for CI/CD pipelines
+### ⚠️ Emergency-only target
 
-- `Build`: Build the solution- `Build`: Build the solution
+#### `DeployUnsafe` - deployment WITHOUT tests
 
-### ⚠️ Emergency-Only Targets
-
-- `Test`: Run unit tests- `Test`: Run unit tests
-
-#### `DeployUnsafe` - Emergency Deployment WITHOUT Tests
-
-```powershell- `Publish`: Publish the application for deployment- `Publish`: Publish the application for deployment
-
+```powershell
 .\build\build.ps1 -Target DeployUnsafe
-
-```- `Package`: Create deployment package- `Package`: Create deployment package
-
-- **Pipeline**: Clean → Restore → Build → Publish → Deploy
-
-- ❌ **BYPASSES ALL TESTS**- `Deploy`: Deploy using Web Deploy- `Deploy`: Deploy using Web Deploy
-- ⚠️ **Use ONLY for emergency hotfixes**
-- ⚠️ **Manual verification required after deployment**
-- 🚨 **Big warning messages displayed during execution**
-
-## Required Environment Variables (GitHub Secrets)## Required Environment Variables (GitHub Secrets)
-
-### Individual Tasks
-
-- `Clean`: Clean build output and temporary directories
-- `Restore`: Restore NuGet packagesThe build script expects the following environment variables to be set with GitHub secrets:The build script expects the following environment variables to be set with GitHub secrets:
-- `Build`: Build the solution
-- `Test`: Run all 57 unit tests (security, data integrity, performance)
-- `Publish`: Publish the application for deployment
-- `Package`: Create deployment package (zip)- `LMD_SERVER`: Web Deploy server hostname/IP (e.g., site28117.siteasp.net)- `LMD_SERVER`: Web Deploy server hostname/IP (e.g., site28117.siteasp.net)
-- `Deploy`: Deploy using Web Deploy
-- `ValidateDeploymentConfig`: Verify environment variables are set- `LMD_PORT`: Web Deploy port (default: 8172)- `LMD_PORT`: Web Deploy port (default: 8172)
-
-## Test Protection- `LMD_SITE`: Target site name (e.g., site28117)- `LMD_SITE`: Target site name (e.g., site28117)
-
-**NEW**: All deployment targets now run the full test suite (57 tests) before deployment:- `LMD_LOGIN`: Web Deploy username (e.g., site28117)- `LMD_LOGIN`: Web Deploy username (e.g., site28117)
-
-### Test Categories- `LMD_PASSWORD`: Web Deploy password- `LMD_PASSWORD`: Web Deploy password
-
-- **Authentication Security** (13 tests): Password hashing, duplicate prevention, authorization
-- **Rate Limiting** (13 tests): Brute-force protection, progressive lockout
-- **Data Integrity** (4 tests): User isolation, backup/restore validation
-- **Performance** (8 tests): Query optimization, LEFT JOIN validation## Usage## Usage
-- **Service Logic** (19 tests): Activity, Tag, Unit service logic
-
-### Test Failure Behavior
-
-```### Local Development### Local Development
-
-🧪 RUNNING TESTS - Deployment will be blocked if tests fail
-
-========================================```powershell```powershell
-
-... test output ...
-
-========================================# Full deployment# Full deployment
-
-❌ TESTS FAILED - DEPLOYMENT ABORTED
-
-========================================.\build\build.ps1.build`build`ps1
-
-Error: dotnet test failed - fix the failing tests before deploying
-
 ```
 
+- Pipeline: Clean → Restore → Build → Publish → Deploy
+- ❌ Bypasses all tests. Use only for a true emergency hotfix and verify the site by hand afterwards.
 
+### Individual tasks
 
-**Deployment will NEVER proceed if tests fail.**# Specific target# Specific target
+- `Clean`: clean the build output and temporary directories
+- `Restore`: restore NuGet packages
+- `Build`: build the solution and the integration tests
+- `Test`: run the unit tests (`LogMyDay.Api.Tests`) and the integration tests (`LogMyDay.Api.IntegrationTests`)
+- `BuildTailwind`: build the Tailwind CSS
+- `Publish`: publish `LogMyDay.App` to `build/publish`
+- `Package`: zip the publish output
+- `ValidateDeploymentConfig`: check that the deployment variables are set
+- `Deploy`: sync the publish output to the site with Web Deploy
 
-## Required Environment Variables.\build\build.ps1 -Target Build.buildbuild.ps1 -Target Build
+## Test protection
 
-The build script expects the following environment variables:
+Every deployment target except `DeployUnsafe` runs the full test suite first. If a test fails, the build stops with `TESTS FAILED - DEPLOYMENT ABORTED` and nothing is deployed.
 
-### Web Deploy Configuration# Fast deployment without tests# Fast deployment without tests
+## Deployment variables
 
-- `LMD_SERVER`: Web Deploy server hostname/IP (e.g., site28117.siteasp.net)
-- `LMD_PORT`: Web Deploy port (default: 8172).\build\build.ps1 -Target FastDeploy.buildbuild.ps1 -Target FastDeploy
-- `LMD_SITE`: Target site name (e.g., site28117)
+The build reads these from `build/local.env` (gitignored) or from the environment:
+
+```bash
+LMD_SERVER=your-server-address.com
+LMD_PORT=8172
+LMD_SITE=your-site-name
+LMD_LOGIN=your-username
+LMD_PASSWORD=your-password
+```
+
+- `LMD_SERVER`: Web Deploy server hostname
+- `LMD_PORT`: Web Deploy port (default 8172)
+- `LMD_SITE`: target site name
 - `LMD_LOGIN`: Web Deploy username
 - `LMD_PASSWORD`: Web Deploy password
 
-# CI build only (no deployment)# CI build only (no deployment)
+## Web Deploy
 
-### Local Development Setup
-
-.\build\build.ps1 -Target CI.buildbuild.ps1 -Target CI
-
-Create a `local.env` file in the `build/` directory (gitignored):
-
-``````
-
-```bash
-
-LMD_SERVER=your-server.com
-
-LMD_PORT=8172
-
-LMD_SITE=your-site-name### GitHub Actions### GitHub Actions
-
-LMD_LOGIN=your-username
-
-LMD_PASSWORD=your-passwordThe build script is designed to work with GitHub Actions where environment variables are populated from GitHub Secrets.The build script is designed to work with GitHub Actions where environment variables are populated from GitHub Secrets.
-
-```
-
-The build script will automatically load these variables.
-
-## Web Deploy Benefits## Web Deploy Benefits
-
-## Usage Examples
-
-### Local Development
-
-- **Speed**: Much faster than FTP transfers- **Speed**: Much faster than FTP transfers
-
-```powershell
-
-# Recommended: Fast deployment with test protection- **Reliability**: Built-in retry logic and error handling- **Reliability**: Built-in retry logic and error handling
-
-.\build\build.ps1 -Target FastDeploy
-
-- **Atomicity**: Changes are applied atomically- **Atomicity**: Changes are applied atomically
-
-# Full deployment with packaging
-
-.\build\build.ps1- **Incremental**: Only deploys changed files- **Incremental**: Only deploys changed files
-
-
-# Run tests only (no deployment)- **Integration**: Native integration with IIS and Azure- **Integration**: Native integration with IIS and Azure
-
-.\build\build.ps1 -Target Test
-
-# Build and package only (for CI)
-
-.\build\build.ps1 -Target CI## Troubleshooting## Troubleshooting
-
-# Emergency deployment (TESTS BYPASSED - USE WITH CAUTION)
-
-.\build\build.ps1 -Target DeployUnsafe
-
-```If deployment fails, check:If deployment fails, check:
-
-
-### GitHub Actions1. Web Deploy is installed on target server1. Web Deploy is installed on target server
-
-The build script is designed to work with GitHub Actions where environment variables are populated from GitHub Secrets.2. Management Service is running on target server2. Management Service is running on target server
-
-Example workflow:3. Firewall allows connections on specified port3. Firewall allows connections on specified port
-
-```yaml
-
-- name: Deploy to Pre-Production4. Deployment credentials have sufficient permissions4. Deployment credentials have sufficient permissions
-
-  run: ./build/build.ps1 -Target FastDeploy
-
-  env:5. Target site exists and is properly configured5. Target site exists and is properly configured
-
-    LMD_SERVER: ${{ secrets.LMD_SERVER }}
-
-    LMD_SITE: ${{ secrets.LMD_SITE }}
-
-    LMD_LOGIN: ${{ secrets.LMD_LOGIN }}
-
-    LMD_PASSWORD: ${{ secrets.LMD_PASSWORD }}The build script provides detailed error messages and troubleshooting tips when deployment fails.The build script provides detailed error messages and troubleshooting tips when deployment fails.
-
-```
-
-## Web Deploy Benefits
-
-- **Speed**: Much faster than FTP transfers
-- **Reliability**: Built-in retry logic and error handling
-- **Atomicity**: Changes are applied atomically
-- **Incremental**: Only deploys changed files
-- **Integration**: Native integration with IIS and Azure
-- **App Offline**: Automatically takes app offline during deployment
+- Only changed files are transferred.
+- The `AppOffline` rule takes the app offline during the deployment.
+- The `DataProtection-Keys` folder on the server is skipped, so its keys survive every deployment.
 
 ## Troubleshooting
 
-### Deployment Fails
+### Deployment fails
 
-If deployment fails, check:
-1. Web Deploy is installed on target server
-2. Management Service is running on target server
-3. Firewall allows connections on specified port (usually 8172)
-4. Deployment credentials have sufficient permissions
-5. Target site exists and is properly configured
-6. msdeploy.exe is installed locally and in PATH
+Check that:
+1. Web Deploy is installed on the target server and its Management Service is running
+2. The firewall allows the Web Deploy port (usually 8172)
+3. The deployment credentials have sufficient permissions
+4. The target site exists and is configured
+5. `msdeploy.exe` is installed locally (the script looks in the usual Web Deploy folders and in PATH)
 
-The build script provides detailed error messages and troubleshooting tips when deployment fails.
+### The site returns HTTP 500.30 after a deployment
 
-### Tests Fail
+The app failed to start. The usual cause is a missing `appsettings.json` on the server (see the warning above). Deploy again from a working copy that has the production `src/LogMyDay.App/appsettings.json`.
 
-If tests fail and block deployment:
-1. Run tests locally: `dotnet test src/LogMyDay.Api.Tests/LogMyDay.Api.Tests.csproj`
+### Tests fail
+
+1. Run them locally: `dotnet test src/LogMyDay.Api.Tests` and `dotnet test src/LogMyDay.Api.IntegrationTests`
 2. Fix the failing tests
-3. Commit and retry deployment
-4. **Never use `DeployUnsafe` to bypass tests unless it's a true emergency**
+3. Commit and deploy again
 
-### Build Performance
-
-- **Default**: ~60-90 seconds (full pipeline with packaging)
-- **FastDeploy**: ~40-60 seconds (skips packaging)
-- **Test**: ~5-10 seconds (just the test suite)
-- **DeployUnsafe**: ~30-40 seconds (no tests - NOT RECOMMENDED)
-
-## Migration Notes
-
-**BREAKING CHANGE**: The `FastDeploy` target now includes test execution (previously it bypassed tests).
-
-- **Old behavior**: `FastDeploy` skipped tests entirely
-- **New behavior**: `FastDeploy` runs all tests before deployment
-- **Migration**: If you were using `FastDeploy` to skip tests, use `DeployUnsafe` (but understand the risks!)
-
-**Rationale**: Test protection is critical. The old `FastDeploy` behavior allowed broken code to reach production. The new behavior maintains safety while still being faster than the full `Default` pipeline.
+Don't use `DeployUnsafe` to get around failing tests unless it is a true emergency.
