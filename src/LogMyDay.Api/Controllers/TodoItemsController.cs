@@ -13,16 +13,19 @@ public class TodoItemsController : BaseApiController
 {
     private readonly ITodoItemService _todoItemService;
     private readonly IEventLogService _eventLogService;
+    private readonly ITagTriggerEngine _tagTriggerEngine;
     private readonly ILogger<TodoItemsController> _logger;
 
     public TodoItemsController(
         ITodoItemService todoItemService,
         IAuthService authService,
         IEventLogService eventLogService,
+        ITagTriggerEngine tagTriggerEngine,
         ILogger<TodoItemsController> logger) : base(authService)
     {
         _todoItemService = todoItemService;
         _eventLogService = eventLogService;
+        _tagTriggerEngine = tagTriggerEngine;
         _logger = logger;
     }
 
@@ -99,6 +102,7 @@ public class TodoItemsController : BaseApiController
         try
         {
             var item = await _todoItemService.Complete(id, request, userId);
+            item.Reminders = _tagTriggerEngine.TakeCreated();
 
             return Ok(item);
         }

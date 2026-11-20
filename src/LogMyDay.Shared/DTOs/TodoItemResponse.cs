@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Shared.DTOs;
@@ -32,4 +33,9 @@ public class TodoItemResponse
     public DateOnly? MonitorFromDate { get; set; }
     public DateOnly? MonitorToDate { get; set; }
     public bool AllowUnfilled { get; set; }
+
+    /// <summary>Reminders the user's triggers set when completing logged its value; only on a
+    /// completion, and left out of the JSON when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TriggeredReminder>? Reminders { get; set; }
 }

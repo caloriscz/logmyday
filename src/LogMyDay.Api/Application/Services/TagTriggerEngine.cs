@@ -163,6 +163,15 @@ public class TagTriggerEngine : ITagTriggerEngine
             return;
         }
 
+        // A computed tag refuses the value its reminder would log; a rule made it computed after
+        // the trigger was set up (validation refuses that order now, older data may have it).
+        if (trigger.PromptTag!.IsComputed)
+        {
+            log.Add($"Trigger '{trigger.Name}' set no reminder: '{trigger.PromptTag.TagName}' is computed by a rule");
+
+            return;
+        }
+
         var anchor = await AnchorOf(trigger, day, entries, now);
         var fire = FireTime(trigger, anchor);
 

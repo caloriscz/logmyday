@@ -1,6 +1,7 @@
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Infrastructure.Repositories;
+using LogMyDay.Domain.Constants;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Domain.Enums;
 using LogMyDay.Shared.DTOs;
@@ -1032,6 +1033,29 @@ public class TagRuleTests
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => tags.Delete(a.Id, f.UserId));
         Assert.Contains("'Total'", ex.Message);
+    }
+
+    [Fact]
+    public async Task TagUpdate_KeepsTheTypeAndOptionListWhileARuleUsesTheTag()
+    {
+        var f = CreateFixture(nameof(TagUpdate_KeepsTheTypeAndOptionListWhileARuleUsesTheTag));
+        var a = await f.AddTag("A", inputTypeId: InputTypeIds.Decimal);
+        var total = await f.AddTag("Total", inputTypeId: InputTypeIds.Decimal);
+        await f.CreateRule(total, (a, 1));
+        var tags = new TagService(f.Context, new TagRepository(f.Context), NullLogger<TagService>.Instance);
+
+        // Source and target alike: no other type, no option list.
+        var source = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(a.Id, new TagRequest { Tag = "A", TypeId = InputTypeIds.Boolean }, f.UserId));
+        Assert.Contains("'Total'", source.Message);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(total.Id, new TagRequest { Tag = "Total", TypeId = InputTypeIds.Decimal, OptionListId = 1 }, f.UserId));
+        var stored = await f.Context.Tags.AsNoTracking().SingleAsync(t => t.Id == total.Id);
+        Assert.Equal(((int?)InputTypeIds.Decimal, (int?)null), (stored.InputTypeId, stored.OptionListId));
+
+        // Anything else may change.
+        await tags.Update(a.Id, new TagRequest { Tag = "A renamed", TypeId = InputTypeIds.Decimal, IsRepeatable = true }, f.UserId);
+        Assert.Equal("A renamed", (await f.Context.Tags.SingleAsync(t => t.Id == a.Id)).TagName);
     }
 
     [Fact]
