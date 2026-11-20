@@ -265,6 +265,35 @@ public class BackupServiceTests
         Assert.Single(await context.Tags.Where(t => t.UserId == user2Id).ToListAsync());
     }
 
+    /// <summary>
+    /// The Backup page clears the signed-in user's data this way, so the shared reference data and
+    /// everything of the other users must survive it.
+    /// </summary>
+    [Fact]
+    public async Task ClearDataAsync_WithUserId_KeepsSharedDataAndOtherUsersTodoLists()
+    {
+        using var context = CreateContext();
+        var service = new BackupService(context, new Mock<ILogger<BackupService>>().Object);
+        var user1Id = Guid.NewGuid();
+        var user2Id = Guid.NewGuid();
+
+        context.InputTypes.Add(new Domain.Entities.InputType { Name = "Integer" });
+        context.Patterns.Add(new Domain.Entities.Pattern { Name = "Digits", PatternValue = "^[0-9]+$" });
+        context.TagOptionLists.Add(new Domain.Entities.TagOptionList { Name = "Shared moods", UserId = null, Options = { new Domain.Entities.TagOption { Value = "good" } } });
+        context.TodoLists.Add(new Domain.Entities.TodoList { Name = "User1 errands", UserId = user1Id, Items = { new Domain.Entities.TodoItem { Title = "Buy milk" } } });
+        context.TodoLists.Add(new Domain.Entities.TodoList { Name = "User2 errands", UserId = user2Id, Items = { new Domain.Entities.TodoItem { Title = "Buy bread" } } });
+        await context.SaveChangesAsync();
+
+        await service.ClearDataAsync(userId: user1Id);
+
+        Assert.Equal(1, await context.InputTypes.CountAsync());
+        Assert.Equal(1, await context.Patterns.CountAsync());
+        Assert.Equal(1, await context.TagOptionLists.CountAsync(l => l.UserId == null));
+        Assert.Equal(1, await context.TagOptions.CountAsync());
+        Assert.Equal("User2 errands", (await context.TodoLists.SingleAsync()).Name);
+        Assert.Equal("Buy bread", (await context.TodoItems.SingleAsync()).Title);
+    }
+
     [Fact]
     public async Task ImportDataAsync_WithClearTrue_DoesNotAffectOtherUsers()
     {
