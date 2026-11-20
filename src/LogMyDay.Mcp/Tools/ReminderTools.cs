@@ -23,6 +23,7 @@ public sealed class ReminderTools(
     IReminderService reminders,
     ITagService tags,
     ITagOptionListService optionLists,
+    ITagTriggerEngine triggers,
     UserClock clock)
 {
     public sealed record ReorderItem([property: Description("Reminder id.")] int Id, [property: Description("New position; lower first.")] int DisplayOrder);
@@ -142,7 +143,7 @@ public sealed class ReminderTools(
 
     [McpServerTool(Name = "complete_reminder", Title = "Complete reminder", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Marks a reminder done for the day containing doneAt (default now). SIDE EFFECT: when the reminder has a completion tag, an activity is logged to it — completionValue (encoded for the tag) or, if omitted, the reminder's notes as the value; autoLogMode ResetIfExists replaces that day's row instead of adding. A backfilled doneAt in the past is fine. Fails with tag-day-locked when the tag is locked for that day. When the completion target is a record type (completionIsRecordType), nothing is logged here: log the record with log_record first and pass its recordId.")]
+    [Description("Marks a reminder done for the day containing doneAt (default now). SIDE EFFECT: when the reminder has a completion tag, an activity is logged to it — completionValue (encoded for the tag) or, if omitted, the reminder's notes as the value; autoLogMode ResetIfExists replaces that day's row instead of adding. A backfilled doneAt in the past is fine. Fails with tag-day-locked when the tag is locked for that day. When the completion target is a record type (completionIsRecordType), nothing is logged here: log the record with log_record first and pass its recordId. The result carries reminders when the logged value set one of the user's trigger reminders (say what it asks to log and when it rings).")]
     public async Task<ReminderResponse> CompleteReminder(
         [Description("Reminder id.")] int reminderId,
         [Description("When it was done: yyyy-MM-ddTHH:mm in the user's local time, or ISO-8601 with offset; default now.")] string? doneAt = null,
@@ -166,7 +167,10 @@ public sealed class ReminderTools(
             encoded = ValueEncoder.Encode(tag, value, options);
         }
 
-        return await reminders.Complete(reminderId, new ReminderCompleteRequest { DoneAt = doneUtc, CompletionValue = encoded, RecordId = recordId }, user.UserId);
+        var completed = await reminders.Complete(reminderId, new ReminderCompleteRequest { DoneAt = doneUtc, CompletionValue = encoded, RecordId = recordId }, user.UserId);
+        completed.Reminders = triggers.TakeCreated();
+
+        return completed;
     }
 
     [McpServerTool(Name = "reopen_reminder", Title = "Reopen reminder", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]

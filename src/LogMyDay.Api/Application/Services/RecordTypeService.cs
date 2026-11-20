@@ -99,6 +99,18 @@ public class RecordTypeService : IRecordTypeService
             await EnsureNotReadByRelations(removedIds);
         }
 
+        // A kept field a rule, check or trigger reads keeps its type and option list, as any tag does.
+        var retypedIds = fields
+            .Where(f => f.TagId != null)
+            .Select(f => (Request: f, Field: type.RecordFields.First(r => r.Id == f.TagId)))
+            .Where(p => p.Field.InputTypeId != p.Request.TypeId || p.Field.OptionListId != p.Request.OptionListId)
+            .Select(p => p.Field.Id)
+            .ToList();
+        if (retypedIds.Count > 0)
+        {
+            await EnsureNotReadByRelations(retypedIds);
+        }
+
         await using var transaction = await BeginWriteTransaction();
 
         var removedValues = 0;

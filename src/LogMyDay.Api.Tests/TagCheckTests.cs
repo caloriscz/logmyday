@@ -348,6 +348,20 @@ public sealed class TagCheckTests : IDisposable
     }
 
     [Fact]
+    public async Task TagUpdate_KeepsTheTypeWhileACheckUsesTheTag()
+    {
+        var a = await AddTag("A", InputTypeIds.Integer);
+        var b = await AddTag("B", InputTypeIds.Integer);
+        await Check(a, TagRuleOperator.Greater, "140", b, TagRuleOperator.IsLogged, name: "High needs B");
+        var tags = new TagService(_context, new TagRepository(_context), NullLogger<TagService>.Instance);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            tags.Update(a.Id, new TagRequest { Tag = "A", TypeId = InputTypeIds.String }, _userId));
+        Assert.Contains("'High needs B'", ex.Message);
+        Assert.Equal(InputTypeIds.Integer, (await _context.Tags.AsNoTracking().SingleAsync(t => t.Id == a.Id)).InputTypeId);
+    }
+
+    [Fact]
     public async Task Rules_RefuseIsNotLogged()
     {
         var a = await AddTag("A", InputTypeIds.Integer);

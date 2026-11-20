@@ -121,6 +121,14 @@ public class TagService : ITagService
 
         // Apply InputType constraints for locked types
         var inputTypeId = model.TypeId == 0 ? (int?)null : model.TypeId;
+
+        // Rules, checks and triggers were validated against the tag's type and option list, so
+        // those stay while one uses the tag. A tag without a type may get one: the edit form
+        // always sends a type.
+        if ((tag.InputTypeId != null && tag.InputTypeId != inputTypeId) || tag.OptionListId != model.OptionListId)
+        {
+            await EnsureNotUsedByRelations(tag);
+        }
         double? minValue = model.MinValue;
         double? maxValue = model.MaxValue;
         double? step = model.Step;
@@ -184,40 +192,47 @@ public class TagService : ITagService
         {
             EnsureNotInRecordType(link);
 
-            // A tag a Tag Activity Relations rule uses (as source or target) stays until the rule
-            // is changed or deleted; the database would refuse it anyway (Restrict).
-            var ruleNames = await _context.TagRules
-                .Where(r => r.TargetTagId == id || r.Sources.Any(s => s.SourceTagId == id))
-                .Select(r => r.Name)
-                .ToListAsync();
-            if (ruleNames.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Tag '{link.TagName}' is in use by rule {string.Join(", ", ruleNames.Select(n => $"'{n}'"))}. Change or delete the rule first.");
-            }
-
-            var checkNames = await _context.TagChecks
-                .Where(c => c.IfTagId == id || c.ThenTagId == id)
-                .Select(c => c.Name)
-                .ToListAsync();
-            if (checkNames.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Tag '{link.TagName}' is in use by check {string.Join(", ", checkNames.Select(n => $"'{n}'"))}. Change or delete the check first.");
-            }
-
-            var triggerNames = await _context.TagTriggers
-                .Where(t => t.IfTagId == id || t.PromptTagId == id)
-                .Select(t => t.Name)
-                .ToListAsync();
-            if (triggerNames.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Tag '{link.TagName}' is in use by trigger {string.Join(", ", triggerNames.Select(n => $"'{n}'"))}. Change or delete the trigger first.");
-            }
+            // The database would refuse it anyway (Restrict).
+            await EnsureNotUsedByRelations(link);
 
             _context.Tags.Remove(link);
             await _context.SaveChangesAsync();
+        }
+    }
+
+    // A tag a Tag Activity Relations rule (as source or target), check or trigger uses stays,
+    // with its type and option list, until the relation is changed or deleted.
+    private async Task EnsureNotUsedByRelations(Tag tag)
+    {
+        var id = tag.Id;
+        var ruleNames = await _context.TagRules
+            .Where(r => r.TargetTagId == id || r.Sources.Any(s => s.SourceTagId == id))
+            .Select(r => r.Name)
+            .ToListAsync();
+        if (ruleNames.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Tag '{tag.TagName}' is in use by rule {string.Join(", ", ruleNames.Select(n => $"'{n}'"))}. Change or delete the rule first.");
+        }
+
+        var checkNames = await _context.TagChecks
+            .Where(c => c.IfTagId == id || c.ThenTagId == id)
+            .Select(c => c.Name)
+            .ToListAsync();
+        if (checkNames.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Tag '{tag.TagName}' is in use by check {string.Join(", ", checkNames.Select(n => $"'{n}'"))}. Change or delete the check first.");
+        }
+
+        var triggerNames = await _context.TagTriggers
+            .Where(t => t.IfTagId == id || t.PromptTagId == id)
+            .Select(t => t.Name)
+            .ToListAsync();
+        if (triggerNames.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Tag '{tag.TagName}' is in use by trigger {string.Join(", ", triggerNames.Select(n => $"'{n}'"))}. Change or delete the trigger first.");
         }
     }
 

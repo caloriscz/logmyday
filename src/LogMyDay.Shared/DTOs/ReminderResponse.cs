@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using LogMyDay.Domain.Enums;
 
 namespace LogMyDay.Shared.DTOs;
@@ -31,6 +32,11 @@ public class ReminderResponse
     public string? TriggerName { get; set; }
 
     public bool IsTagDayLocked { get; set; }
+
+    /// <summary>Reminders the user's triggers set when completing logged its value; only on a
+    /// completion, and left out of the JSON when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TriggeredReminder>? Reminders { get; set; }
 
     /// <summary>
     /// True when <paramref name="date"/> falls inside the reminder's monitoring window. Both bounds

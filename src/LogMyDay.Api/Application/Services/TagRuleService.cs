@@ -418,6 +418,16 @@ public class TagRuleService : ITagRuleService
             {
                 throw new ArgumentException($"'{target.TagName}' is logged by a reminder or todo list. A rule needs its own tag.");
             }
+
+            // A trigger's reminders log its prompted tag, which a computed tag refuses.
+            var prompting = await _context.TagTriggers
+                .Where(t => t.PromptTagId == target.Id)
+                .Select(t => t.Name)
+                .FirstOrDefaultAsync();
+            if (prompting != null)
+            {
+                throw new ArgumentException($"'{target.TagName}' is the tag trigger '{prompting}' reminds you to log. A rule needs its own tag.");
+            }
         }
 
         var cases = request.Template == TagRuleTemplate.Conditional

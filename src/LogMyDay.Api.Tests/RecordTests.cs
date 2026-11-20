@@ -396,6 +396,24 @@ public sealed class RecordTests : IDisposable
             Fields = [new() { TagId = type.Fields[0].TagId, Name = "Systolic", TypeId = InputTypeIds.Integer }]
         }, _userId));
         await Assert.ThrowsAsync<InvalidOperationException>(() => _types.Delete(type.Id, _userId));
+
+        // It keeps its type and option list as well; a rename is fine.
+        RecordTypeRequest WithPulse(string name, int typeId) => new()
+        {
+            Name = "Blood pressure",
+            Fields =
+            [
+                new() { TagId = type.Fields[0].TagId, Name = "Systolic", TypeId = InputTypeIds.Integer },
+                new() { TagId = type.Fields[1].TagId, Name = "Diastolic", TypeId = InputTypeIds.Integer },
+                new() { TagId = type.Fields[2].TagId, Name = name, TypeId = typeId }
+            ]
+        };
+        var retyped = await Assert.ThrowsAsync<InvalidOperationException>(() => _types.Update(type.Id, WithPulse("Pulse", InputTypeIds.Decimal), _userId));
+        Assert.Contains("rule 'Pulse'", retyped.Message);
+        Assert.Equal(InputTypeIds.Integer, (await _context.Tags.AsNoTracking().SingleAsync(t => t.Id == type.Fields[2].TagId)).InputTypeId);
+
+        var renamed = await _types.Update(type.Id, WithPulse("Heart rate", InputTypeIds.Integer), _userId);
+        Assert.Equal("Heart rate", renamed.Fields[2].Name);
     }
 
     [Fact]
