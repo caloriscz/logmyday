@@ -14,7 +14,6 @@ Follow these steps to run the LogMyDay web stack on a workstation. The commands 
 - .NET SDK 9.0 (`dotnet --list-sdks` should list 9.x)
 - Node.js 20 LTS and npm 10+
 - Android SDK + .NET MAUI workloads if you plan to build the mobile client (`dotnet workload install maui`)
-- A database: **SQLite** (zero setup, default) or **SQL Server** (for multi-user production)
 
 ## Clone the repository
 
@@ -49,49 +48,19 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database
 
-LogMyDay supports two database providers. Choose the one that fits your needs:
-
-#### Option A: SQLite (Recommended for Getting Started)
-
-SQLite requires no external database server. The database is stored as a single file. This is the fastest way to get started and is ideal for single-user or small-group installations.
-
-Edit `appsettings.Development.json`:
+LogMyDay stores its data in a single SQLite file; no database server is required. Point the connection string at the file in `appsettings.Development.json`:
 
 ```json
 {
-  "Database": {
-    "Provider": "Sqlite",
-    "ConnectionString": "Data Source=logmyday.db"
-  }
-}
-```
-
-That's it — the application will create the database file automatically on first run.
-
-#### Option B: SQL Server (Recommended for Production / Multi-User)
-
-SQL Server is better suited for high-concurrency, multi-user production deployments.
-
-Edit `appsettings.Development.json`:
-
-```json
-{
-  "Database": {
-    "Provider": "SqlServer"
-  },
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost,1439;Database=logmyday;User Id=sa;Password=YOUR_DEV_PASSWORD;Encrypt=True;TrustServerCertificate=True;"
+    "DefaultConnection": "Data Source=logmyday.db"
   }
 }
 ```
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `Server` | SQL Server hostname and port | `localhost,1439` |
-| `Database` | Database name | `logmyday` |
-| `User Id` | SQL Server username | `sa` |
-| `Password` | SQL Server password | `MySecurePassword123!` |
-| `TrustServerCertificate` | Skip certificate validation | `True` (required for localhost dev) |
+That's it — the application creates the database file and applies the migrations on startup.
+
+> SQL Server is no longer supported. To move an existing SQL Server database, export it with the SQLite export of a version that still supports SQL Server (Backup page, **Export Whole Database**) and point `DefaultConnection` at the exported file.
 
 ### 3. Configure API Base Address
 
@@ -136,20 +105,6 @@ Example for Gmail:
 | `Password` | SMTP authentication password (use App Passwords for Gmail) |
 | `SenderEmail` | Email address shown as sender |
 | `PasswordResetUrl` | *(Optional)* Override the password reset link base URL. Defaults to the incoming request's scheme and host. Useful when running behind a reverse proxy that does not forward headers. |
-
-## Apply Database Migrations
-
-If you are using **SQLite**, you can skip this step — the application creates the database automatically on first run.
-
-If you are using **SQL Server**, initialize the database schema by applying the Entity Framework Core migrations:
-
-```powershell
-# Install the EF Core tool if you haven't already
-dotnet tool install --global dotnet-ef
-
-# Apply migrations
-dotnet ef database update --project src/LogMyDay.Api --startup-project src/LogMyDay.App
-```
 
 ## Install UI dependencies
 

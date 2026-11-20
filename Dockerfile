@@ -50,8 +50,9 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r logmyday && useradd -r -g logmyday logmyday
 
-# Create directories for logs and secrets
-RUN mkdir -p /app/Logs /run/secrets && \
+# Create directories for the SQLite database, logs and secrets. A new named volume mounted on
+# /app/data takes over this directory's owner, so the non-root user can write the database.
+RUN mkdir -p /app/data /app/Logs /run/secrets && \
     chown -R logmyday:logmyday /app
 
 # Copy published application

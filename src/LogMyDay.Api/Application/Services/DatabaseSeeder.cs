@@ -25,13 +25,12 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     {
         try
         {
-            // Only auto-migrate for SQLite (development).
-            // SQL Server (pre-prod/prod) migrations are applied manually via SQL scripts
-            // in logmyday.wiki/migrations/.
-            if (_context.Database.IsSqlite())
+            if (await DatabaseSchema.CreateIfEmpty(_context))
             {
-                await _context.Database.MigrateAsync();
+                _logger.LogInformation("Created the schema of a new database");
             }
+
+            await _context.Database.MigrateAsync();
 
             await EnsureDefaultUnitsAsync();
 

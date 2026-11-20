@@ -39,12 +39,12 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
 
         var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
             ?? new DatabaseProviderOptions();
+        dbOptions.EnsureSqlite();
 
         var connectionString = !string.IsNullOrEmpty(dbOptions.ConnectionString)
             ? dbOptions.ConnectionString
             : configuration.GetConnectionString("DefaultConnection");
 
-        Debug.WriteLine($"[LogMyDayDbContextFactory] Provider: {dbOptions.Provider}");
         Debug.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
 
         if (string.IsNullOrEmpty(connectionString))
@@ -56,18 +56,7 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<LogMyDayDbContext>();
-
-        switch (dbOptions.Provider)
-        {
-            case DatabaseProvider.Sqlite:
-                optionsBuilder.UseSqlite(connectionString);
-                break;
-
-            case DatabaseProvider.SqlServer:
-            default:
-                optionsBuilder.UseSqlServer(connectionString);
-                break;
-        }
+        optionsBuilder.UseSqlite(connectionString);
 
         return new LogMyDayDbContext(optionsBuilder.Options);
     }

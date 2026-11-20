@@ -1,6 +1,5 @@
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
 
 namespace LogMyDay.App.Extensions;
@@ -16,38 +15,15 @@ internal static class DatabaseExtensions
 
         var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
             ?? new DatabaseProviderOptions();
+        dbOptions.EnsureSqlite();
 
         var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
 
-        services.AddDbContext<LogMyDayDbContext>(options =>
-        {
-            ConfigureProvider(options, dbOptions.Provider, connectionString);
+        services.AddDbContext<LogMyDayDbContext>(options => options.UseSqlite(connectionString));
 
-            // Suppress PendingModelChangesWarning: migrations are scaffolded against SQLite
-            // (dev) but the runtime model uses SQL Server (pre-prod/prod). The type-annotation
-            // mismatch in Designer.cs snapshots is expected with a dual-provider setup.
-            options.ConfigureWarnings(w =>
-                w.Ignore(RelationalEventId.PendingModelChangesWarning));
-        });
-
-        Log.Information("Database provider configured: {Provider}", dbOptions.Provider);
+        Log.Information("Database provider configured: Sqlite");
 
         return services;
-    }
-
-    internal static void ConfigureProvider(DbContextOptionsBuilder options, DatabaseProvider provider, string connectionString)
-    {
-        switch (provider)
-        {
-            case DatabaseProvider.Sqlite:
-                options.UseSqlite(connectionString);
-                break;
-
-            case DatabaseProvider.SqlServer:
-            default:
-                options.UseSqlServer(connectionString);
-                break;
-        }
     }
 
     internal static string ResolveConnectionString(IConfiguration configuration, IWebHostEnvironment environment, DatabaseProviderOptions? dbOptions = null)
@@ -60,21 +36,9 @@ internal static class DatabaseExtensions
 
         if (environment.EnvironmentName == "Docker")
         {
-            var provider = dbOptions?.Provider ?? DatabaseProvider.SqlServer;
+            var dbPath = configuration["DB_PATH"] ?? "/app/data/logmyday.db";
 
-            if (provider == DatabaseProvider.Sqlite)
-            {
-                var dbPath = configuration["DB_PATH"] ?? "/app/data/logmyday.db";
-
-                return $"Data Source={dbPath}";
-            }
-
-            var dbPassword = configuration["db_password"];
-            var dbHost = configuration["DB_HOST"] ?? "host.docker.internal,1439";
-            var dbName = configuration["DB_NAME"] ?? "logmyday";
-            var dbUser = configuration["DB_USER"] ?? "sa";
-
-            return $"Server={dbHost};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+            return $"Data Source={dbPath}";
         }
 
         return configuration.GetConnectionString("DefaultConnection")

@@ -25,10 +25,9 @@ This page summarizes the containerized runtime that ships with LogMyDay. Use it 
 ```powershell
 # 1. Provide runtime values
 Copy-Item .env.example .env
-# Populate connection strings, SMTP configuration, and rate limit values.
+# Populate SMTP configuration and rate limit values.
 
 # 2. Provide secrets (kept out of git)
-Copy-Item secrets\db_password.txt.example secrets\db_password.txt
 Copy-Item secrets\smtp_password.txt.example secrets\smtp_password.txt
 # Fill the files with real credentials.
 
@@ -70,37 +69,19 @@ Traefik and Caddy stream by default and forward the header unless configured oth
 3. **Environment variables**: Provided via `docker-compose.yml` + `.env` file.
 4. **Docker secrets**: Mounted as files under `/run/secrets/` and loaded automatically when `ASPNETCORE_ENVIRONMENT=Docker`.
 
-## Database Provider
+## Database
 
-LogMyDay supports two database providers. Set the `Database__Provider` environment variable (or the `Database:Provider` key in `appsettings.Docker.json`) to choose:
-
-### SQLite (Recommended for Simple Deployments)
-
-SQLite stores the database as a single file inside the container. Ideal for single-user or small-group installations with no external database server required.
+LogMyDay stores its data in a single SQLite file. In the container the file is `/app/data/logmyday.db` (`DB_PATH`), and `docker-compose.yml` keeps `/app/data` on the `logmyday-data` volume so the database survives container restarts and rebuilds.
 
 ```yaml
 # docker-compose.yml snippet
 environment:
-  - Database__Provider=Sqlite
-  - Database__ConnectionString=Data Source=/app/data/logmyday.db
+  - DB_PATH=${DB_PATH:-/app/data/logmyday.db}
 volumes:
   - logmyday-data:/app/data
 ```
 
-> 💡 **Tip**: Mount a persistent volume for `/app/data` so the database survives container restarts.
-
-### SQL Server (Recommended for Production / Multi-User)
-
-Use the existing SQL Server configuration with Docker secrets for the database password.
-
-```yaml
-# docker-compose.yml snippet
-environment:
-  - Database__Provider=SqlServer
-  - DB_HOST=host.docker.internal,1439
-  - DB_NAME=logmyday
-  - DB_USER=sa
-```
+> 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Database** to download a copy of the database file.
 
 ## Maintenance Tips
 

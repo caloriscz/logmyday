@@ -14,10 +14,8 @@ services:
       # Non-sensitive configuration
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:9099
-      # Database configuration (using host.docker.internal to access host machine)
-      - DB_HOST=host.docker.internal,1439
-      - DB_NAME=logmyday
-      - DB_USER=sa
+      # SQLite database file on the logmyday-data volume
+      - DB_PATH=${DB_PATH:-/app/data/logmyday.db}
       # API base address
       - Api__BaseAddress=${API_BASE_URL:-http://localhost:9099}
       # Email SMTP configuration
@@ -37,10 +35,11 @@ services:
       - AI__Provider=${AI_PROVIDER:-openai}
       - AI__Model=${AI_MODEL:-gpt-4o-mini}
     secrets:
-      - db_password
       - smtp_password
       - ai_api_key
     volumes:
+      # Persistent database
+      - logmyday-data:/app/data
       # Persistent logs
       - logmyday-logs:/app/Logs
     networks:
@@ -54,46 +53,17 @@ services:
       start_period: 60s
 
 secrets:
-  db_password:
-    file: ./secrets/db_password.txt
   smtp_password:
     file: ./secrets/smtp_password.txt
   ai_api_key:
     file: ./secrets/ai_api_key.txt
 
 volumes:
+  logmyday-data:
+    driver: local
   logmyday-logs:
     driver: local
 
 networks:
   logmyday-network:
     driver: bridge
-
-# Optional: SQL Server container (commented by default since you're using external DB)
-# Uncomment this if you want to test with a local containerized SQL Server
-#
-# services:
-#   sqlserver:
-#     image: mcr.microsoft.com/mssql/server:2022-latest
-#     container_name: logmyday-sqlserver
-#     environment:
-#       - ACCEPT_EULA=Y
-#       - MSSQL_SA_PASSWORD_FILE=/run/secrets/sa_password
-#       - MSSQL_PID=Developer
-#     secrets:
-#       - sa_password
-#     ports:
-#       - "1433:1433"
-#     volumes:
-#       - sqlserver-data:/var/opt/mssql
-#     networks:
-#       - logmyday-network
-#     restart: unless-stopped
-#
-# secrets:
-#   sa_password:
-#     file: ./secrets/sa_password.txt
-#
-# volumes:
-#   sqlserver-data:
-#     driver: local
