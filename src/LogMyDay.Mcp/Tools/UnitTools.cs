@@ -9,8 +9,8 @@ using ModelContextProtocol.Server;
 namespace LogMyDay.Mcp.Tools;
 
 /// <summary>
-/// Units and quantities are shared by every user of the server, which is why changing them is
-/// worded loudly and deleting one takes a sentinel.
+/// Units and quantities are the user's own: every user's database has its copy. Deleting one
+/// takes a sentinel.
 /// </summary>
 [McpServerToolType]
 [Authorize(Policy = McpPolicies.Read)]
@@ -19,7 +19,7 @@ public sealed class UnitTools(IUnitService units)
     public const string DeleteSentinelPrefix = "DELETE_UNIT_";
 
     [McpServerTool(Name = "list_units", Title = "List units", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("Lists all units (shared by all users) with their quantity and conversion to the base unit.")]
+    [Description("Lists your units with their quantity and conversion to the base unit.")]
     public Task<IEnumerable<UnitResponse>> ListUnits() => units.GetAll();
 
     [McpServerTool(Name = "list_quantities", Title = "List quantities", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
@@ -32,7 +32,7 @@ public sealed class UnitTools(IUnitService units)
 
     [McpServerTool(Name = "create_unit", Title = "Create unit", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Creates a unit visible to ALL users. Conversion is affine: value_in_base = aToBase * value + bToBase (the base unit itself is 1 and 0; e.g. °C → K is 1 and 273.15). The key must be unique within the quantity.")]
+    [Description("Creates a unit. Conversion is affine: value_in_base = aToBase * value + bToBase (the base unit itself is 1 and 0; e.g. °C → K is 1 and 273.15). The key must be unique within the quantity.")]
     public async Task<UnitResponse> CreateUnit(
         [Description("Machine key, e.g. \"mg\".")] string key,
         [Description("Display symbol, e.g. \"mg\".")] string symbol,
@@ -48,7 +48,7 @@ public sealed class UnitTools(IUnitService units)
 
     [McpServerTool(Name = "update_unit", Title = "Update unit", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Updates a unit for ALL users; omitted arguments keep their current value.")]
+    [Description("Updates a unit; omitted arguments keep their current value.")]
     public async Task<UnitResponse> UpdateUnit(
         [Description("Unit id.")] int unitId,
         string? key = null,
@@ -72,14 +72,14 @@ public sealed class UnitTools(IUnitService units)
 
     [McpServerTool(Name = "delete_unit", Title = "Delete unit", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Deletes a unit for ALL users. Requires confirm = \"DELETE_UNIT_<unitId>\". Refused with conflict while any tag (of any user) uses it, and for a quantity's base unit.")]
+    [Description("Deletes a unit. Requires confirm = \"DELETE_UNIT_<unitId>\". Refused with conflict while a tag uses it, and for a quantity's base unit.")]
     public async Task<object> DeleteUnit(
         [Description("Unit id.")] int unitId,
         [Description("Must be exactly DELETE_UNIT_<unitId>.")] string? confirm = null)
     {
         var unit = await units.GetById(unitId);
         ConfirmSentinel.Require(confirm, DeleteSentinelPrefix + unitId,
-            $"Deletes unit {unitId} '{unit.Symbol}' ({unit.QuantityKey}) for every user of this server.");
+            $"Deletes unit {unitId} '{unit.Symbol}' ({unit.QuantityKey}).");
 
         await units.Delete(unitId);
 

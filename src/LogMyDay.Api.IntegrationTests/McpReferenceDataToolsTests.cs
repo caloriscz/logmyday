@@ -82,7 +82,7 @@ public class McpReferenceDataToolsTests : IClassFixture<CustomWebApplicationFact
             options = new object[] { new { value = "happy", displayName = "Happy 😊" }, new { value = "meh" }, new { value = "sad" } }
         }));
         var listId = list.GetProperty("id").GetInt32();
-        Assert.False(list.GetProperty("isGlobal").GetBoolean());
+        Assert.False(list.TryGetProperty("isGlobal", out _));
         Assert.Equal(3, list.GetProperty("options").GetArrayLength());
 
         var tagName = Unique("Feeling");
@@ -114,12 +114,9 @@ public class McpReferenceDataToolsTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
-    public async Task OptionLists_GlobalNeedsAnAdmin_AndEmptyIsInvalid()
+    public async Task OptionLists_EmptyOrDuplicateOptionsAreInvalid()
     {
         await using var client = await WriteClient();
-
-        var forbidden = await client.CallAsync("create_option_list", new { name = Unique("Global"), isGlobal = true, options = new[] { new { value = "a" } } });
-        Assert.Equal(McpErrorMapper.Forbidden, ErrorCode(forbidden));
 
         Assert.Equal(McpErrorMapper.Invalid, ErrorCode(await client.CallAsync("create_option_list", new { name = Unique("Empty"), options = Array.Empty<object>() })));
         Assert.Equal(McpErrorMapper.Invalid, ErrorCode(await client.CallAsync("create_option_list", new { name = Unique("Dup"), options = new[] { new { value = "a" }, new { value = "A" } } })));
@@ -163,7 +160,7 @@ public class McpReferenceDataToolsTests : IClassFixture<CustomWebApplicationFact
         var refused = await client.CallAsync("delete_unit", new { unitId });
         Assert.Equal(McpErrorMapper.ConfirmationRequired, ErrorCode(refused));
         Assert.Equal(UnitTools.DeleteSentinelPrefix + unitId, McpTestClient.Json(refused).GetProperty("expected").GetString());
-        Assert.Contains("every user", McpTestClient.Json(refused).GetProperty("impact").GetString());
+        Assert.Contains("Deletes unit", McpTestClient.Json(refused).GetProperty("impact").GetString());
 
         var inUse = await client.CallAsync("delete_unit", new { unitId, confirm = UnitTools.DeleteSentinelPrefix + unitId });
         Assert.Equal(McpErrorMapper.Conflict, ErrorCode(inUse));

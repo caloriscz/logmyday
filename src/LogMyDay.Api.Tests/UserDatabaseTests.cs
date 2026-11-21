@@ -39,6 +39,8 @@ public sealed class UserDatabaseTests : IDisposable
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+        services.AddSingleton(new Mock<IEmailSender>().Object);
+        services.AddScoped<IUserService, UserService>();
         _services = services.BuildServiceProvider();
     }
 
@@ -167,6 +169,49 @@ public sealed class UserDatabaseTests : IDisposable
 
         userScope.Use(Alice);
         Assert.Throws<InvalidOperationException>(() => userScope.Use(Bob));
+    }
+
+    [Fact]
+    public async Task CreatingAUser_CreatesTheirDatabase_AndDeletingTheUser_DeletesIt()
+    {
+        Guid adminId;
+        Guid friendId;
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+            adminId = (await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.SingleAsync()).Id;
+
+            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
+            var friend = await users.CreateUser("friend@example.com", "Friend-Pa55word!", "Friend", false, "en-US", "Europe/Prague", adminId, CancellationToken.None);
+            friendId = friend.Id;
+        }
+
+        var file = Databases.GetFilePath(friendId);
+        Assert.True(File.Exists(file));
+
+        await using (var scope = Scopes.Create(friendId))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+            Assert.True(await data.Units.AnyAsync());
+
+            data.Tags.Add(new Tag { TagName = "Coffee", UserId = friendId });
+            await data.SaveChangesAsync();
+        }
+
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>().Delete(friendId, adminId, CancellationToken.None);
+        }
+
+        Assert.False(File.Exists(file));
+        Assert.False(File.Exists(file + "-wal"));
+        Assert.False(File.Exists(file + "-shm"));
+        Assert.True(File.Exists(Databases.GetFilePath(adminId)));
+
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            Assert.Null(await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.FindAsync(friendId));
+        }
     }
 
     private static async Task<long> TableCount(string path, string table)

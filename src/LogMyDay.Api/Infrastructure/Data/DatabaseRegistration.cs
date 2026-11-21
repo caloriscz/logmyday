@@ -15,6 +15,7 @@ public static class DatabaseRegistration
     {
         services.TryAddScoped<UserDatabaseScope>();
         services.TryAddSingleton<IUserScopeFactory, UserScopeFactory>();
+        services.TryAddSingleton<IUserDataStore, SharedUserDataStore>();
 
         return services;
     }
@@ -29,6 +30,7 @@ public static class DatabaseRegistration
         services.AddUserScopes();
 
         services.AddSingleton(sp => new UserDatabases(platformConnectionString, sp.GetRequiredService<ILogger<UserDatabases>>()));
+        services.Replace(ServiceDescriptor.Singleton<IUserDataStore>(sp => sp.GetRequiredService<UserDatabases>()));
 
         services.AddDbContext<PlatformDbContext>(options => options.UseSqlite(platformConnectionString));
 

@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 /// The one place that knows where a user's database is. The configured database file is the
 /// platform database; each user's data is the file <c>users/&lt;User.Id&gt;.db</c> next to it.
 /// </summary>
-public sealed class UserDatabases
+public sealed class UserDatabases : IUserDataStore
 {
     /// <summary>The folder of the user databases, next to the platform database.</summary>
     public const string FolderName = "users";
@@ -111,5 +111,33 @@ public sealed class UserDatabases
     public void Forget(Guid userId)
     {
         _ready.TryRemove(userId, out _);
+    }
+
+    public void Create(Guid userId)
+    {
+        Ensure(userId);
+    }
+
+    /// <summary>Deletes the user's database file, with the files SQLite keeps beside it.</summary>
+    public void Delete(Guid userId)
+    {
+        lock (_createLock)
+        {
+            Forget(userId);
+
+            // Pooled connections keep the file open.
+            using (var connection = new SqliteConnection(GetConnectionString(userId)))
+            {
+                SqliteConnection.ClearPool(connection);
+            }
+
+            var path = GetFilePath(userId);
+            foreach (var file in new[] { path, path + "-wal", path + "-shm", path + "-journal" })
+            {
+                File.Delete(file);
+            }
+
+            _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, path);
+        }
     }
 }
