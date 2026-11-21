@@ -31,6 +31,7 @@ public static class DatabaseRegistration
 
         services.AddSingleton(sp => new UserDatabases(platformConnectionString, sp.GetRequiredService<ILogger<UserDatabases>>()));
         services.Replace(ServiceDescriptor.Singleton<IUserDataStore>(sp => sp.GetRequiredService<UserDatabases>()));
+        services.AddSingleton(sp => new SingleFileSplit(platformConnectionString, sp.GetRequiredService<UserDatabases>(), sp.GetRequiredService<ILogger<SingleFileSplit>>()));
 
         services.AddDbContext<PlatformDbContext>(options => options.UseSqlite(platformConnectionString));
 
