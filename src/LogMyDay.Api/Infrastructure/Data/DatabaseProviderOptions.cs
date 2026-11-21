@@ -7,6 +7,12 @@ public class DatabaseProviderOptions
 {
     public const string SectionName = "Database";
 
+    /// <summary>How to move an installation that is still configured for SQL Server.</summary>
+    public const string SqliteOnlyHelp =
+        "Move the data with the SQLite export of a version that still supports SQL Server "
+        + "(Backup page, Export Whole Database), point ConnectionStrings:DefaultConnection at the "
+        + "exported file (\"Data Source=<path>\") and remove Database:Provider.";
+
     /// <summary>
     /// Optional, and "Sqlite" if set. Kept so that a configuration still asking for SQL Server
     /// stops the app with an explanation instead of a connection-string error.
@@ -24,10 +30,7 @@ public class DatabaseProviderOptions
         if (!string.IsNullOrEmpty(Provider) && !string.Equals(Provider, "Sqlite", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"Database:Provider is \"{Provider}\", but LogMyDay runs on SQLite only. "
-                + "Move the data with the SQLite export of a version that still supports SQL Server "
-                + "(Backup page, Export Whole Database), point ConnectionStrings:DefaultConnection at the "
-                + "exported file (\"Data Source=<path>\") and remove Database:Provider.");
+                $"Database:Provider is \"{Provider}\", but LogMyDay runs on SQLite only. " + SqliteOnlyHelp);
         }
     }
 }

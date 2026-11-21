@@ -417,3 +417,6 @@ secrets/*.txt
 
 # Skills folder
 .github/skills/
+
+# Default location of the SQLite database when no connection string is configured
+/src/LogMyDay.App/data/

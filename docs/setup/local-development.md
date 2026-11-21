@@ -60,6 +60,13 @@ LogMyDay stores its data in a single SQLite file; no database server is required
 
 That's it — the application creates the database file and applies the migrations on startup.
 
+Where the file lives:
+
+- A relative path counts from the application's folder (here `src/LogMyDay.App`), on every host. An absolute path is used as it is.
+- Without a connection string the file is `data/logmyday.db` in the application's folder.
+- The startup log names the file in use: `Database: SQLite, <full path>`.
+- On a hosted installation, prefer an absolute path to a folder outside the site, so that a deployment that syncs the site's folder cannot delete the database.
+
 > SQL Server is no longer supported. To move an existing SQL Server database, export it with the SQLite export of a version that still supports SQL Server (Backup page, **Export Whole Database**) and point `DefaultConnection` at the exported file.
 
 ### 3. Configure API Base Address

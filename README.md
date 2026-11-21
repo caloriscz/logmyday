@@ -118,6 +118,8 @@ LogMyDay stores its data in a single SQLite file. Point the connection string at
 }
 ```
 
+A relative path counts from the application's folder; without a connection string the file is `data/logmyday.db` there. The startup log names the file in use.
+
 ### 3. Configure API Base Address
 
 The Blazor Server application needs to know where to find the API endpoints. For local development with the combined host:
