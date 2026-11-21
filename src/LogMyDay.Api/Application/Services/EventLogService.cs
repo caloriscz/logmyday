@@ -149,7 +149,7 @@ public class EventLogService : IEventLogService
 
     // Categories are message-prefix conventions, not a database column: synced mobile diagnostics
     // arrive as "[category] body"; other events use stable "Activity/Reminder/Todo list/MCP …"
-    // prefixes. "\" escapes "[" so the pattern stays literal on SQL Server as well as SQLite.
+    // prefixes. "\" escapes "[" so the pattern stays literal.
     private static IQueryable<EventLog> ApplyCategoryFilter(IQueryable<EventLog> query, EventLogCategoryFilter categoryFilter)
     {
         return categoryFilter switch
