@@ -181,11 +181,6 @@ public class LogMyDayDbContext : DbContext
 
             entity.Property(l => l.Name).HasMaxLength(200).IsRequired();
             entity.Property(l => l.DisplayOrder).HasDefaultValue(0);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(l => l.DateCreated).HasDefaultValueSql("GETUTCDATE()");
-            }
         });
 
         modelBuilder.Entity<TodoItem>(entity =>
@@ -198,15 +193,6 @@ public class LogMyDayDbContext : DbContext
             entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
             entity.Property(i => i.IsDone).HasDefaultValue(false);
             entity.Property(i => i.DisplayOrder).HasDefaultValue(0);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
-                entity.Property(i => i.StartDate).HasColumnType("date");
-                entity.Property(i => i.DueDate).HasColumnType("date");
-                entity.Property(i => i.NotifyAt).HasColumnType("time");
-                entity.Property(i => i.DoneAt).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<Reminder>(entity =>
@@ -220,15 +206,6 @@ public class LogMyDayDbContext : DbContext
             entity.Property(i => i.Title).HasMaxLength(500).IsRequired();
             entity.Property(i => i.IsDone).HasDefaultValue(false);
             entity.Property(i => i.DisplayOrder).HasDefaultValue(0);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(i => i.DateCreated).HasDefaultValueSql("GETUTCDATE()");
-                entity.Property(i => i.NotifyAt).HasColumnType("time");
-                entity.Property(i => i.DoneAt).HasColumnType("datetime2");
-                entity.Property(i => i.MonitorFromDate).HasColumnType("date");
-                entity.Property(i => i.MonitorToDate).HasColumnType("date");
-            }
         });
 
         modelBuilder.Entity<TagDayLock>(entity =>
@@ -244,13 +221,6 @@ public class LogMyDayDbContext : DbContext
 
             entity.Property(l => l.Reason).HasMaxLength(200);
             entity.Property(l => l.SetBy).HasConversion<int>();
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(l => l.Date).HasColumnType("date");
-                entity.Property(l => l.SetAt).HasColumnType("datetime2");
-                entity.Property(l => l.SetAt).HasDefaultValueSql("GETUTCDATE()");
-            }
         });
 
         modelBuilder.Entity<ReminderDay>(entity =>
@@ -266,13 +236,6 @@ public class LogMyDayDbContext : DbContext
 
             entity.HasIndex(d => new { d.UserId, d.Date })
                 .HasDatabaseName("IX_LogMyDay_ReminderDays_UserId_Date");
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(d => d.Date).HasColumnType("date");
-                entity.Property(d => d.DoneAt).HasColumnType("datetime2");
-                entity.Property(d => d.SkippedAt).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<ColorScheme>(entity =>
@@ -303,14 +266,6 @@ public class LogMyDayDbContext : DbContext
             entity.Property(k => k.Prefix).HasMaxLength(16).IsRequired();
             entity.Property(k => k.KeyHash).HasMaxLength(64).IsRequired();
             entity.Property(k => k.Scope).HasConversion<int>();
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(k => k.CreatedUtc).HasColumnType("datetime2");
-                entity.Property(k => k.ExpiresUtc).HasColumnType("datetime2");
-                entity.Property(k => k.RevokedUtc).HasColumnType("datetime2");
-                entity.Property(k => k.LastUsedUtc).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<ColorSchemeEntry>(entity =>
@@ -344,13 +299,6 @@ public class LogMyDayDbContext : DbContext
                 .WithOne(c => c.Rule)
                 .HasForeignKey(c => c.RuleId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(r => r.EffectiveFrom).HasColumnType("date");
-                entity.Property(r => r.DateCreated).HasColumnType("datetime2");
-                entity.Property(r => r.DateUpdated).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<TagRuleSource>(entity =>
@@ -397,12 +345,6 @@ public class LogMyDayDbContext : DbContext
             entity.Property(c => c.IfOperand).HasMaxLength(500);
             entity.Property(c => c.ThenOperator).HasConversion<int>();
             entity.Property(c => c.ThenOperand).HasMaxLength(500);
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(c => c.DateCreated).HasColumnType("datetime2");
-                entity.Property(c => c.DateUpdated).HasColumnType("datetime2");
-            }
         });
 
         // Triggers read one tag and prompt for another. Like checked tags, neither can be deleted
@@ -424,13 +366,6 @@ public class LogMyDayDbContext : DbContext
             entity.Property(t => t.IfOperator).HasConversion<int>();
             entity.Property(t => t.IfOperand).HasMaxLength(500);
             entity.Property(t => t.Timing).HasConversion<int>();
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(t => t.AtTime).HasColumnType("time");
-                entity.Property(t => t.DateCreated).HasColumnType("datetime2");
-                entity.Property(t => t.DateUpdated).HasColumnType("datetime2");
-            }
         });
 
         // A trigger's reminders: one per (TriggerId, TriggerDay). As for generated activity rows,
@@ -489,12 +424,6 @@ public class LogMyDayDbContext : DbContext
 
             entity.HasIndex(r => new { r.UserId, r.DateStarted }).HasDatabaseName("IX_LogMyDay_Records_UserId_DateStarted");
             entity.HasIndex(r => r.RecordTypeId).HasDatabaseName("IX_LogMyDay_Records_RecordTypeId");
-
-            if (Database.IsSqlServer())
-            {
-                entity.Property(r => r.DateStarted).HasColumnType("datetime2");
-                entity.Property(r => r.DateCreated).HasColumnType("datetime2");
-            }
         });
 
         modelBuilder.Entity<Tag>(entity =>

@@ -1,6 +1,5 @@
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
 
 namespace LogMyDay.App.Extensions;
@@ -16,68 +15,43 @@ internal static class DatabaseExtensions
 
         var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
             ?? new DatabaseProviderOptions();
+        dbOptions.EnsureSqlite();
 
         var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
+        DatabaseLocation.EnsureDirectory(connectionString);
 
-        services.AddDbContext<LogMyDayDbContext>(options =>
-        {
-            ConfigureProvider(options, dbOptions.Provider, connectionString);
+        services.AddDbContext<LogMyDayDbContext>(options => options.UseSqlite(connectionString));
 
-            // Suppress PendingModelChangesWarning: migrations are scaffolded against SQLite
-            // (dev) but the runtime model uses SQL Server (pre-prod/prod). The type-annotation
-            // mismatch in Designer.cs snapshots is expected with a dual-provider setup.
-            options.ConfigureWarnings(w =>
-                w.Ignore(RelationalEventId.PendingModelChangesWarning));
-        });
-
-        Log.Information("Database provider configured: {Provider}", dbOptions.Provider);
+        Log.Information("Database: SQLite, {Path}", DatabaseLocation.GetFilePath(connectionString) ?? connectionString);
 
         return services;
     }
 
-    internal static void ConfigureProvider(DbContextOptionsBuilder options, DatabaseProvider provider, string connectionString)
-    {
-        switch (provider)
-        {
-            case DatabaseProvider.Sqlite:
-                options.UseSqlite(connectionString);
-                break;
-
-            case DatabaseProvider.SqlServer:
-            default:
-                options.UseSqlServer(connectionString);
-                break;
-        }
-    }
-
+    /// <summary>
+    /// The connection string from the configuration, with an absolute path to the database file:
+    /// Database:ConnectionString, then DB_PATH in Docker, then ConnectionStrings:DefaultConnection,
+    /// then the default location in the application's folder.
+    /// </summary>
     internal static string ResolveConnectionString(IConfiguration configuration, IWebHostEnvironment environment, DatabaseProviderOptions? dbOptions = null)
     {
-        // If Database:ConnectionString is explicitly set, use it
-        if (!string.IsNullOrEmpty(dbOptions?.ConnectionString))
+        var configured = dbOptions?.ConnectionString;
+
+        if (string.IsNullOrEmpty(configured) && environment.EnvironmentName == "Docker")
         {
-            return dbOptions.ConnectionString;
+            configured = $"Data Source={configuration["DB_PATH"] ?? "/app/data/logmyday.db"}";
         }
 
-        if (environment.EnvironmentName == "Docker")
+        if (string.IsNullOrEmpty(configured))
         {
-            var provider = dbOptions?.Provider ?? DatabaseProvider.SqlServer;
-
-            if (provider == DatabaseProvider.Sqlite)
-            {
-                var dbPath = configuration["DB_PATH"] ?? "/app/data/logmyday.db";
-
-                return $"Data Source={dbPath}";
-            }
-
-            var dbPassword = configuration["db_password"];
-            var dbHost = configuration["DB_HOST"] ?? "host.docker.internal,1439";
-            var dbName = configuration["DB_NAME"] ?? "logmyday";
-            var dbUser = configuration["DB_USER"] ?? "sa";
-
-            return $"Server={dbHost};Database={dbName};User Id={dbUser};Password={dbPassword};Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+            configured = configuration.GetConnectionString("DefaultConnection");
         }
 
-        return configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            Log.Warning("No database connection string is configured; using the default location {Path} in the application's folder",
+                DatabaseLocation.DefaultPath);
+        }
+
+        return DatabaseLocation.Resolve(configured, environment.ContentRootPath);
     }
 }

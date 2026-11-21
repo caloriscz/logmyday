@@ -330,7 +330,10 @@ Task("Deploy")
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
         $"-enableRule:AppOffline " +
-        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys " +
+        // The default place of the SQLite database (data/logmyday.db) must survive the sync.
+        $"-skip:objectName=dirPath,absolutePath=\\\\data$ " +
+        $"-skip:objectName=filePath,absolutePath=\\\\data\\\\";
     
     try
     {
@@ -398,7 +401,10 @@ Task("FastDeploy")
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
         $"-enableRule:AppOffline " +
-        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys " +
+        // The default place of the SQLite database (data/logmyday.db) must survive the sync.
+        $"-skip:objectName=dirPath,absolutePath=\\\\data$ " +
+        $"-skip:objectName=filePath,absolutePath=\\\\data\\\\";
     
     try
     {
@@ -453,7 +459,10 @@ Task("DeployUnsafe")
         $"-dest:iisApp={deploySite},wmsvc={wmsvcUrl},userName={deployUsername},password={deployPassword},authtype=basic " +
         $"-allowUntrusted=true " +
         $"-enableRule:AppOffline " +
-        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys";
+        $"-skip:objectName=dirPath,absolutePath=DataProtection-Keys " +
+        // The default place of the SQLite database (data/logmyday.db) must survive the sync.
+        $"-skip:objectName=dirPath,absolutePath=\\\\data$ " +
+        $"-skip:objectName=filePath,absolutePath=\\\\data\\\\";
     
     try
     {

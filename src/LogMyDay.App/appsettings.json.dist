@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "DefaultConnection": "server=host-and-port;user=user-name;password=your-password;database=db-name;Encrypt=True;TrustServerCertificate=False"
+    "DefaultConnection": "Data Source=path/to/logmyday.db"
   },
   "Security": {
     "RateLimit": {

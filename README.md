@@ -43,7 +43,7 @@ LogMyDay helps you capture the story of your day. Use it to record habits, welln
 ## For Self-Hosted Deployments
 
 - Deploy the full stack on Windows, Linux, or in containers
-- Use SQL Server for storage with HTTPS enforced throughout the stack
+- Keep all data in a single SQLite file, with HTTPS enforced throughout the stack
 
 ## Migration
 
@@ -74,7 +74,6 @@ Follow these steps to run the LogMyDay web stack on a workstation. The commands 
 - .NET SDK 9.0 (`dotnet --list-sdks` should list 9.x)
 - Node.js 20 LTS and npm 10+
 - Android SDK + .NET MAUI workloads if you plan to build the mobile client (`dotnet workload install maui`)
-- A SQL Server instance (local or remote)
 
 ## Clone the repository
 
@@ -109,23 +108,17 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database Connection
 
-Edit `appsettings.Development.json` to set up the SQL Server connection string for local development.
+LogMyDay stores its data in a single SQLite file. Point the connection string at the file in `appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost,1439;Database=logmyday;User Id=sa;Password=YOUR_DEV_PASSWORD;Encrypt=True;TrustServerCertificate=True;"
+    "DefaultConnection": "Data Source=logmyday.db"
   }
 }
 ```
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `Server` | SQL Server hostname and port | `localhost,1439` |
-| `Database` | Database name | `logmyday` |
-| `User Id` | SQL Server username | `sa` |
-| `Password` | SQL Server password | `MySecurePassword123!` |
-| `TrustServerCertificate` | Skip certificate validation | `True` (required for localhost dev) |
+A relative path counts from the application's folder; without a connection string the file is `data/logmyday.db` there. The startup log names the file in use.
 
 ### 3. Configure API Base Address
 

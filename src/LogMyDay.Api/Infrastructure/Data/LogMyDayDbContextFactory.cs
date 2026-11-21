@@ -39,35 +39,20 @@ public class LogMyDayDbContextFactory : IDesignTimeDbContextFactory<LogMyDayDbCo
 
         var dbOptions = configuration.GetSection(DatabaseProviderOptions.SectionName).Get<DatabaseProviderOptions>()
             ?? new DatabaseProviderOptions();
+        dbOptions.EnsureSqlite();
 
-        var connectionString = !string.IsNullOrEmpty(dbOptions.ConnectionString)
+        var configured = !string.IsNullOrEmpty(dbOptions.ConnectionString)
             ? dbOptions.ConnectionString
             : configuration.GetConnectionString("DefaultConnection");
 
-        Debug.WriteLine($"[LogMyDayDbContextFactory] Provider: {dbOptions.Provider}");
-        Debug.WriteLine($"[LogMyDayDbContextFactory] Connection String found: {(string.IsNullOrEmpty(connectionString) ? "NO" : "YES")}");
+        // The same file the app uses: relative paths count from the LogMyDay.App folder.
+        var connectionString = DatabaseLocation.Resolve(configured, appProjectDir ?? currentDir);
+        DatabaseLocation.EnsureDirectory(connectionString);
 
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            Debug.WriteLine("[LogMyDayDbContextFactory] ERROR: Connection string not found.");
-            Debug.WriteLine("[LogMyDayDbContextFactory] Please ensure appsettings.json or appsettings.Development.json exists in LogMyDay.App and contains the connection string.");
-
-            throw new InvalidOperationException("Could not find a database connection string.");
-        }
+        Debug.WriteLine($"[LogMyDayDbContextFactory] Database: {DatabaseLocation.GetFilePath(connectionString) ?? connectionString}");
 
         var optionsBuilder = new DbContextOptionsBuilder<LogMyDayDbContext>();
-
-        switch (dbOptions.Provider)
-        {
-            case DatabaseProvider.Sqlite:
-                optionsBuilder.UseSqlite(connectionString);
-                break;
-
-            case DatabaseProvider.SqlServer:
-            default:
-                optionsBuilder.UseSqlServer(connectionString);
-                break;
-        }
+        optionsBuilder.UseSqlite(connectionString);
 
         return new LogMyDayDbContext(optionsBuilder.Options);
     }

@@ -14,7 +14,7 @@ This directory holds the Cake build that tests, publishes and deploys the web ap
 
 Web Deploy **syncs** the publish folder to the site: files that are missing from the publish output are **deleted on the server**. `src/LogMyDay.App/appsettings.json` is gitignored, so it is in the publish output only on a machine that has it. Deploying without it removes the server's `appsettings.json`, and the app then fails to start (HTTP 500.30).
 
-For this reason there is no GitHub Actions deployment: the former tag-triggered workflow built without the appsettings and took the site down twice (v0.7.0, v0.7.1). Only the `DataProtection-Keys` folder is protected from the sync.
+For this reason there is no GitHub Actions deployment: the former tag-triggered workflow built without the appsettings and took the site down twice (v0.7.0, v0.7.1). Only the `DataProtection-Keys` folder and the `data` folder (the default place of the SQLite database) are protected from the sync.
 
 ## Targets
 
@@ -98,6 +98,7 @@ LMD_PASSWORD=your-password
 - Only changed files are transferred.
 - The `AppOffline` rule takes the app offline during the deployment.
 - The `DataProtection-Keys` folder on the server is skipped, so its keys survive every deployment.
+- The `data` folder on the server is skipped too: it is where the SQLite database lives when no other place is configured. A database anywhere else inside the site's folder is **deleted** by the sync, so keep it in `data` or, better, outside the site's folder (an absolute path in `ConnectionStrings:DefaultConnection`).
 
 ## Troubleshooting
 
