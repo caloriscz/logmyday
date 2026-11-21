@@ -121,12 +121,6 @@ if (builder.Environment.EnvironmentName != "Test")
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IDatabaseSeeder>();
     await seeder.SeedAsync();
-
-    var reminderDayBackfill = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderDayBackfill>();
-    await reminderDayBackfill.RunAsync();
-
-    var reminderRecurrenceMigration = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Application.Interfaces.IReminderRecurrenceMigration>();
-    await reminderRecurrenceMigration.RunAsync();
 }
 
 app.Run();

@@ -16,7 +16,7 @@ public static class DatabaseSchema
     /// Creates the schema when the database is missing or has no tables, and returns whether it
     /// did. A database that already has tables is left to the migrations.
     /// </summary>
-    public static async Task<bool> CreateIfEmpty(LogMyDayDbContext context, PlatformDbContext platform, CancellationToken cancellationToken = default)
+    public static async Task<bool> CreateIfEmpty(LogMyDayDbContext context, PlatformDbContext? platform = null, CancellationToken cancellationToken = default)
     {
         var creator = context.GetService<IRelationalDatabaseCreator>();
         if (await creator.ExistsAsync(cancellationToken) && await creator.HasTablesAsync(cancellationToken))
@@ -26,13 +26,16 @@ public static class DatabaseSchema
 
         await context.Database.EnsureCreatedAsync(cancellationToken);
 
-        // Both models still share one file, and the data context has just created it. The
-        // platform tables follow; Settings belongs to both models and exists already.
-        foreach (var statement in platform.Database.GenerateCreateScript().Split(";", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        // The SQLite export still writes the platform tables into the same file. They follow the
+        // data model's tables; Settings belongs to both models and exists already.
+        if (platform != null)
         {
-            if (!statement.Contains("LogMyDay_Settings", StringComparison.Ordinal))
+            foreach (var statement in platform.Database.GenerateCreateScript().Split(";", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                await context.Database.ExecuteSqlRawAsync(statement + ";", cancellationToken);
+                if (!statement.Contains("LogMyDay_Settings", StringComparison.Ordinal))
+                {
+                    await context.Database.ExecuteSqlRawAsync(statement + ";", cancellationToken);
+                }
             }
         }
 
