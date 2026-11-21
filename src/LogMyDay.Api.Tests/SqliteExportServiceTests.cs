@@ -151,9 +151,9 @@ public sealed class SqliteExportServiceTests : IDisposable
     {
         await CreateSchema(db);
 
-        var hasher = new Mock<IPasswordHasher>();
-        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("admin-hash");
-        await new DatabaseSeeder(db, TestPlatform.For(db), hasher.Object, NullLogger<DatabaseSeeder>.Instance).SeedAsync();
+        await DefaultUnits.Ensure(db);
+        TestPlatform.For(db).Users.Add(new User { Email = "admin", DisplayName = "Administrator", PasswordHash = "admin-hash", IsAdmin = true });
+        await TestPlatform.For(db).SaveChangesAsync();
 
         var admin = await TestPlatform.For(db).Users.SingleAsync();
         var friend = new User { Email = "friend@example.com", PasswordHash = "friend-hash", TimeZone = "Europe/Prague" };

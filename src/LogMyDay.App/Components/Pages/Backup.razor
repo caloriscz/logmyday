@@ -6,8 +6,7 @@
 @using LogMyDay.App.Services
 @using LogMyDay.App.Components.Shared
 @using Microsoft.AspNetCore.Components.Authorization
-@inject IBackupService BackupService
-@inject ISqliteExportService SqliteExportService
+@inject LogMyDay.Api.Infrastructure.Data.IUserScopeFactory UserScopes
 @inject AuthenticationStateProvider AuthStateProvider
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
@@ -484,6 +483,11 @@
 
     private BackupInfoResponse? backupInfo;
 
+    // The page runs in a Blazor circuit, not in a request, so nothing says whose data its services
+    // work on. Every operation opens a scope for the signed-in user and takes the service from it.
+    private static IBackupService BackupService(AsyncServiceScope scope) =>
+        scope.ServiceProvider.GetRequiredService<IBackupService>();
+
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Backup & Restore");
@@ -499,7 +503,8 @@
         {
             // Get the current authenticated user ID
             var currentUser = await AuthApi.GetCurrentUserAsync();
-            var backupData = await BackupService.ExportDataAsync(currentUser?.Id);
+            await using var scope = UserScopes.Create(currentUser.Id);
+            var backupData = await BackupService(scope).ExportDataAsync(currentUser.Id);
 
             backupInfo = new BackupInfoResponse
             {
@@ -522,7 +527,8 @@
         {
             // Get the current authenticated user ID
             var currentUser = await AuthApi.GetCurrentUserAsync();
-            var backupData = await BackupService.ExportDataAsync(currentUser?.Id);
+            await using var scope = UserScopes.Create(currentUser.Id);
+            var backupData = await BackupService(scope).ExportDataAsync(currentUser.Id);
 
             var jsonOptions = new JsonSerializerOptions
             {
@@ -560,7 +566,9 @@
 
         try
         {
-            await using var export = await SqliteExportService.ExportDatabase(CancellationToken.None);
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            await using var scope = UserScopes.Create(currentUser.Id);
+            await using var export = await scope.ServiceProvider.GetRequiredService<ISqliteExportService>().ExportDatabase(CancellationToken.None);
 
             // Disposing the export deletes its temporary file, so the reference must not close it.
             using var streamReference = new DotNetStreamReference(export.Content, leaveOpen: true);
@@ -625,7 +633,9 @@
                 return;
             }
 
-            var validationResult = await BackupService.ValidateBackupData(backupData);
+            var validatingUser = await AuthApi.GetCurrentUserAsync();
+            await using var validationScope = UserScopes.Create(validatingUser.Id);
+            var validationResult = await BackupService(validationScope).ValidateBackupData(backupData);
 
             if (validationResult.IsValid)
             {
@@ -691,7 +701,8 @@
                 return;
             }
 
-            importResult = await BackupService.ImportDataAsync(backupData, clearExistingData, currentUser.Id);
+            await using var scope = UserScopes.Create(currentUser.Id);
+            importResult = await BackupService(scope).ImportDataAsync(backupData, clearExistingData, currentUser.Id);
 
             if (importResult.Success)
             {
@@ -737,7 +748,8 @@
                 return;
             }
 
-            var recordsCleared = await BackupService.ClearDataAsync(currentUser.Id);
+            await using var scope = UserScopes.Create(currentUser.Id);
+            var recordsCleared = await BackupService(scope).ClearDataAsync(currentUser.Id);
             SetStatus($"Your data was cleared: {recordsCleared} records removed.", false);
             await LoadBackupInfo(); // Refresh statistics
         }
