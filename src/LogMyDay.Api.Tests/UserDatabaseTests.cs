@@ -214,6 +214,35 @@ public sealed class UserDatabaseTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Startup_Stops_WhenAUsersDatabaseCantBeMigrated_AndNamesTheFile()
+    {
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+
+            var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            platform.Users.Add(new User { Id = Bob, Email = "bob@example.com", DisplayName = "Bob", PasswordHash = "hash", Culture = "en-US", TimeZone = "UTC" });
+            await platform.SaveChangesAsync();
+        }
+
+        // Bob's file comes from somewhere else: it has a table, and no migration of this version.
+        var file = Databases.GetFilePath(Bob);
+        await using (var connection = new SqliteConnection($"Data Source={file};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE LogMyDay_Tags (Id INTEGER PRIMARY KEY);";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using var startup = _services.CreateAsyncScope();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => startup.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync());
+
+        Assert.Contains(file, error.Message);
+    }
+
     private static async Task<long> TableCount(string path, string table)
     {
         await using var connection = new SqliteConnection($"Data Source={path};Mode=ReadOnly;Pooling=False");

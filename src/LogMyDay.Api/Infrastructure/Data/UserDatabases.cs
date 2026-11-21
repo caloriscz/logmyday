@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using LogMyDay.Api.Application.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -18,6 +17,7 @@ public sealed class UserDatabases : IUserDataStore
 
     private readonly SqliteConnectionStringBuilder _platform;
     private readonly string _folder;
+    private readonly string _snapshotFolder;
     private readonly ILogger<UserDatabases> _logger;
     private readonly ConcurrentDictionary<Guid, bool> _ready = new();
     private readonly object _createLock = new();
@@ -30,12 +30,17 @@ public sealed class UserDatabases : IUserDataStore
                 "The database has to be a file: each user's data is a file of its own next to it.");
 
         _platform = new SqliteConnectionStringBuilder(platformConnectionString);
-        _folder = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, FolderName);
+        var root = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        _folder = Path.Combine(root, FolderName);
+        _snapshotFolder = Path.Combine(root, DatabaseUpgrade.SnapshotFolderName);
         _logger = logger;
     }
 
     /// <summary>The folder that holds the user databases.</summary>
     public string Folder => _folder;
+
+    /// <summary>The folder that receives a database's snapshot before it is migrated.</summary>
+    public string SnapshotFolder => _snapshotFolder;
 
     /// <summary>The file of a user's database. It may not exist yet.</summary>
     public string GetFilePath(Guid userId)
@@ -54,10 +59,7 @@ public sealed class UserDatabases : IUserDataStore
     {
         options
             .UseSqlite(GetConnectionString(userId))
-            .AddInterceptors(new OwnerGuardInterceptor(userId))
-            // The model no longer matches the last migration: the platform tables left it. The new
-            // migration baseline brings the check back.
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+            .AddInterceptors(new OwnerGuardInterceptor(userId));
     }
 
     /// <summary>
@@ -73,7 +75,8 @@ public sealed class UserDatabases : IUserDataStore
 
     /// <summary>
     /// Makes sure the user's database exists with this version's schema and the reference data.
-    /// A new user's database is created here, the first time it is needed.
+    /// A new user's database is created here, the first time it is needed; an existing one is
+    /// migrated, after a snapshot.
     /// </summary>
     public void Ensure(Guid userId)
     {
@@ -95,12 +98,13 @@ public sealed class UserDatabases : IUserDataStore
             Configure(options, userId);
             using var context = new LogMyDayDbContext(options.Options);
 
-            if (DatabaseSchema.CreateIfEmpty(context).GetAwaiter().GetResult())
+            var isNew = !File.Exists(GetFilePath(userId));
+            DatabaseUpgrade.Migrate(context, _snapshotFolder, _logger);
+            if (isNew)
             {
                 _logger.LogInformation("Created the database of user {UserId}: {Path}", userId, GetFilePath(userId));
             }
 
-            context.Database.Migrate();
             DefaultUnits.Ensure(context).GetAwaiter().GetResult();
 
             _ready[userId] = true;

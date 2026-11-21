@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace LogMyDay.Api.Infrastructure.Data.Migrations
+namespace LogMyDay.Api.Infrastructure.Data.Migrations.UserData
 {
     [DbContext(typeof(LogMyDayDbContext))]
-    [Migration("20261116095546_AddTagChecks")]
-    partial class AddTagChecks
+    [Migration("20261121132700_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -70,56 +70,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_LogMyDay_Activities_UserId_TagId_DateStarted");
 
                     b.ToTable("LogMyDay_Activities", (string)null);
-                });
-
-            modelBuilder.Entity("LogMyDay.Domain.Entities.ApiKey", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ExpiresUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("KeyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LastUsedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Prefix")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("RevokedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Scope")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Prefix")
-                        .HasDatabaseName("IX_LogMyDay_ApiKeys_Prefix");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("IX_LogMyDay_ApiKeys_UserId");
-
-                    b.ToTable("LogMyDay_ApiKeys", (string)null);
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.ColorScheme", b =>
@@ -395,38 +345,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.PasswordReset", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("ExpiresUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("UsedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Token")
-                        .HasDatabaseName("IX_LogMyDay_PasswordResets_Token");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("LogMyDay_PasswordResets", (string)null);
-                });
-
             modelBuilder.Entity("LogMyDay.Domain.Entities.Pattern", b =>
                 {
                     b.Property<int>("Id")
@@ -552,6 +470,12 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("TriggerDay")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TriggerId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("TEXT");
 
@@ -561,6 +485,11 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_LogMyDay_Reminders_UserId");
+
+                    b.HasIndex("TriggerId", "TriggerDay")
+                        .IsUnique()
+                        .HasDatabaseName("IX_LogMyDay_Reminders_TriggerId_TriggerDay")
+                        .HasFilter("[TriggerId] IS NOT NULL");
 
                     b.ToTable("LogMyDay_Reminders", (string)null);
                 });
@@ -1055,6 +984,63 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_TagRuleSources", (string)null);
                 });
 
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagTrigger", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<TimeOnly?>("AtTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DateUpdated")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IfOperand")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("IfOperator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("IfTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("OffsetMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PromptTagId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Timing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IfTagId");
+
+                    b.HasIndex("PromptTagId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_LogMyDay_TagTriggers_UserId");
+
+                    b.ToTable("LogMyDay_TagTriggers", (string)null);
+                });
+
             modelBuilder.Entity("LogMyDay.Domain.Entities.TodoItem", b =>
                 {
                     b.Property<int>("Id")
@@ -1192,61 +1178,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.ToTable("LogMyDay_Units", (string)null);
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.User", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ActivityDisplayType")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ActivityPeriodSort")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ActivitySortOrder")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Culture")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DisplayName")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsAdmin")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("TimeZone")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasDatabaseName("IX_LogMyDay_Users_Email");
-
-                    b.ToTable("LogMyDay_Users", (string)null);
-                });
-
             modelBuilder.Entity("LogMyDay.Domain.Entities.Activity", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.Record", null)
@@ -1268,17 +1199,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Tag");
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.ApiKey", b =>
-                {
-                    b.HasOne("LogMyDay.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("LogMyDay.Domain.Entities.ColorSchemeEntry", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.ColorScheme", "ColorScheme")
@@ -1290,17 +1210,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("ColorScheme");
                 });
 
-            modelBuilder.Entity("LogMyDay.Domain.Entities.EventLog", b =>
-                {
-                    b.HasOne("LogMyDay.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("LogMyDay.Domain.Entities.EventLogDetail", b =>
                 {
                     b.HasOne("LogMyDay.Domain.Entities.EventLog", "EventLog")
@@ -1310,17 +1219,6 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("EventLog");
-                });
-
-            modelBuilder.Entity("LogMyDay.Domain.Entities.PasswordReset", b =>
-                {
-                    b.HasOne("LogMyDay.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.Quantity", b =>
@@ -1351,7 +1249,13 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                         .HasForeignKey("CompletionTagId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("LogMyDay.Domain.Entities.TagTrigger", "Trigger")
+                        .WithMany()
+                        .HasForeignKey("TriggerId");
+
                     b.Navigation("CompletionTag");
+
+                    b.Navigation("Trigger");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.ReminderDay", b =>
@@ -1506,6 +1410,25 @@ namespace LogMyDay.Api.Infrastructure.Data.Migrations
                     b.Navigation("Rule");
 
                     b.Navigation("SourceTag");
+                });
+
+            modelBuilder.Entity("LogMyDay.Domain.Entities.TagTrigger", b =>
+                {
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "IfTag")
+                        .WithMany()
+                        .HasForeignKey("IfTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LogMyDay.Domain.Entities.Tag", "PromptTag")
+                        .WithMany()
+                        .HasForeignKey("PromptTagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("IfTag");
+
+                    b.Navigation("PromptTag");
                 });
 
             modelBuilder.Entity("LogMyDay.Domain.Entities.TodoItem", b =>
