@@ -6,7 +6,6 @@ public class TagOptionListResponse
 
     public required string Name { get; set; }
 
-    public bool IsGlobal { get; set; }
 
     public List<TagOptionResponse> Options { get; set; } = new();
 }

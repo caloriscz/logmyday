@@ -4,16 +4,15 @@ using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
 using LogMyDay.Shared.Preferences;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Application.Services;
 
 /// <summary>
-/// Prepares the databases at startup: the platform database with its first admin, and then the
-/// database of every user, with the one-time migrations of its data.
+/// Prepares the databases at startup: migrates the platform database and seeds its first admin,
+/// then migrates the database of every user and runs the one-time migrations of its data. Any
+/// failure stops the start.
 /// </summary>
 public sealed class DatabaseSeeder : IDatabaseSeeder
 {
@@ -37,7 +36,7 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     {
         try
         {
-            await CreatePlatform();
+            DatabaseUpgrade.Migrate(_platform, _databases.SnapshotFolder, _logger);
             await SeedAdmin();
 
             var userIds = await _platform.Users.Select(u => u.Id).ToListAsync();
@@ -51,22 +50,6 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             _logger.LogError(ex, "Error occurred while seeding database");
             throw;
         }
-    }
-
-    /// <summary>
-    /// The platform database has no migrations yet, so a new one is created from the model. A
-    /// database that already has the platform tables is used as it is.
-    /// </summary>
-    private async Task CreatePlatform()
-    {
-        var creator = _platform.GetService<IRelationalDatabaseCreator>();
-        if (await creator.ExistsAsync() && await creator.HasTablesAsync())
-        {
-            return;
-        }
-
-        await _platform.Database.EnsureCreatedAsync();
-        _logger.LogInformation("Created the platform database");
     }
 
     private async Task SeedAdmin()

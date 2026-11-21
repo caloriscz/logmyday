@@ -4,7 +4,9 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Application.Services;
@@ -12,8 +14,7 @@ namespace LogMyDay.Api.Application.Services;
 /// <summary>
 /// Exports the whole database into a new SQLite file. The file gets this version's schema, with
 /// every migration recorded as applied, so LogMyDay runs on it and applies later migrations as
-/// usual. It is built the way a new installation's database is (DatabaseSchema), and the rows are
-/// then copied from the current database.
+/// usual. The rows are then copied from the current database.
 /// </summary>
 public sealed class SqliteExportService : ISqliteExportService
 {
@@ -108,7 +109,7 @@ public sealed class SqliteExportService : ISqliteExportService
             .UseSqlite(connection)
             .Options;
         await using var targetPlatform = new PlatformDbContext(platformOptions);
-        await DatabaseSchema.CreateIfEmpty(target, targetPlatform, cancellationToken);
+        await CreateSchema(target, targetPlatform, cancellationToken);
 
         // Rows keep their keys and come table by table, and some tables point at each other
         // (Quantity and Unit, Tag and its record type), so no table order satisfies every key.
@@ -141,6 +142,33 @@ public sealed class SqliteExportService : ISqliteExportService
         await transaction.CommitAsync(cancellationToken);
 
         return rowCounts;
+    }
+
+    /// <summary>
+    /// The one file holds both models, so neither model's migrations can build it: the schema
+    /// comes from the models, with the data model's migrations recorded as applied. Settings
+    /// belongs to both models and is one table.
+    /// </summary>
+    private static async Task CreateSchema(LogMyDayDbContext target, PlatformDbContext targetPlatform, CancellationToken cancellationToken)
+    {
+        await target.Database.EnsureCreatedAsync(cancellationToken);
+
+        foreach (var statement in targetPlatform.Database.GenerateCreateScript().Split(";", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!statement.Contains("LogMyDay_Settings", StringComparison.Ordinal))
+            {
+                await target.Database.ExecuteSqlRawAsync(statement + ";", cancellationToken);
+            }
+        }
+
+        var history = target.GetService<IHistoryRepository>();
+        await target.Database.ExecuteSqlRawAsync(history.GetCreateScript(), cancellationToken);
+
+        var productVersion = ProductInfo.GetVersion();
+        foreach (var migration in target.Database.GetMigrations())
+        {
+            await target.Database.ExecuteSqlRawAsync(history.GetInsertScript(new HistoryRow(migration, productVersion)), cancellationToken);
+        }
     }
 
     private async Task<int> CopyTable<TEntity>(DbContext source, DbConnection connection, DbTransaction transaction, IEntityType entityType, CancellationToken cancellationToken)

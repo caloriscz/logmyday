@@ -116,7 +116,6 @@ public sealed class SqliteExportServiceTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
             .UseSqlite($"Data Source={path}")
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         return new LogMyDayDbContext(options);
@@ -124,8 +123,7 @@ public sealed class SqliteExportServiceTests : IDisposable
 
     /// <summary>
     /// The current schema with the migrations recorded as applied, leaving out the newest ones
-    /// when asked. The oldest migrations were scaffolded for SQL Server and can't build a new
-    /// SQLite file themselves.
+    /// when asked.
     /// </summary>
     private static async Task CreateSchema(LogMyDayDbContext db, int migrationsLeftOut = 0)
     {

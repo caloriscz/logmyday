@@ -39,6 +39,8 @@ public sealed class UserDatabaseTests : IDisposable
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+        services.AddSingleton(new Mock<IEmailSender>().Object);
+        services.AddScoped<IUserService, UserService>();
         _services = services.BuildServiceProvider();
     }
 
@@ -167,6 +169,78 @@ public sealed class UserDatabaseTests : IDisposable
 
         userScope.Use(Alice);
         Assert.Throws<InvalidOperationException>(() => userScope.Use(Bob));
+    }
+
+    [Fact]
+    public async Task CreatingAUser_CreatesTheirDatabase_AndDeletingTheUser_DeletesIt()
+    {
+        Guid adminId;
+        Guid friendId;
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+            adminId = (await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.SingleAsync()).Id;
+
+            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
+            var friend = await users.CreateUser("friend@example.com", "Friend-Pa55word!", "Friend", false, "en-US", "Europe/Prague", adminId, CancellationToken.None);
+            friendId = friend.Id;
+        }
+
+        var file = Databases.GetFilePath(friendId);
+        Assert.True(File.Exists(file));
+
+        await using (var scope = Scopes.Create(friendId))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+            Assert.True(await data.Units.AnyAsync());
+
+            data.Tags.Add(new Tag { TagName = "Coffee", UserId = friendId });
+            await data.SaveChangesAsync();
+        }
+
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>().Delete(friendId, adminId, CancellationToken.None);
+        }
+
+        Assert.False(File.Exists(file));
+        Assert.False(File.Exists(file + "-wal"));
+        Assert.False(File.Exists(file + "-shm"));
+        Assert.True(File.Exists(Databases.GetFilePath(adminId)));
+
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            Assert.Null(await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.FindAsync(friendId));
+        }
+    }
+
+    [Fact]
+    public async Task Startup_Stops_WhenAUsersDatabaseCantBeMigrated_AndNamesTheFile()
+    {
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+
+            var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            platform.Users.Add(new User { Id = Bob, Email = "bob@example.com", DisplayName = "Bob", PasswordHash = "hash", Culture = "en-US", TimeZone = "UTC" });
+            await platform.SaveChangesAsync();
+        }
+
+        // Bob's file comes from somewhere else: it has a table, and no migration of this version.
+        var file = Databases.GetFilePath(Bob);
+        await using (var connection = new SqliteConnection($"Data Source={file};Pooling=False"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE LogMyDay_Tags (Id INTEGER PRIMARY KEY);";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using var startup = _services.CreateAsyncScope();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => startup.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync());
+
+        Assert.Contains(file, error.Message);
     }
 
     private static async Task<long> TableCount(string path, string table)

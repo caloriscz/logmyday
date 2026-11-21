@@ -139,7 +139,7 @@ Deleting a single activity, reminder, todo item or scan mapping needs no ceremon
 | Tool | Sentinel | Why |
 |---|---|---|
 | `delete_tag` | `DELETE_TAG_<id>` | deletes every activity ever logged for the tag |
-| `delete_unit` | `DELETE_UNIT_<id>` | units are shared by all users |
+| `delete_unit` | `DELETE_UNIT_<id>` | tags and record fields may use the unit |
 | `delete_todo_list` | `DELETE_LIST_<id>` | deletes its items |
 | `restore_secure_backup` | `RESTORE_LMD_BACKUP` | merges a backup into your account |
 | `clear_user_data` | `CLEAR_MY_DATA` | deletes all your data |

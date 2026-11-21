@@ -85,7 +85,7 @@ public sealed class TagTools(
         [Description("Input type id.")] int inputTypeId,
         [Description("Optional description.")] string? description = null,
         [Description("Group id.")] int? groupId = null,
-        [Description("Unit id (units are global).")] int? unitId = null,
+        [Description("Unit id (see list_units).")] int? unitId = null,
         [Description("Option list id; the value must then be one of its options.")] int? optionListId = null,
         [Description("Colour scheme id.")] int? colorSchemeId = null,
         [Description("Whether several rows per period are allowed (default true). Non-repeatable numeric tags accumulate.")] bool isRepeatable = true,

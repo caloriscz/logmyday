@@ -34,9 +34,4 @@
 		<ProjectReference Include="..\LogMyDay.Shared\LogMyDay.Shared.csproj" />
 	</ItemGroup>
 
-
-	<ItemGroup>
-	  <Folder Include="Infrastructure\Data\Migrations\" />
-	</ItemGroup>
-
 </Project>
