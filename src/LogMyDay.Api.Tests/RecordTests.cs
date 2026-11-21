@@ -30,15 +30,15 @@ public sealed class RecordTests : IDisposable
         _connection.Open();
         _context = new LogMyDayDbContext(new DbContextOptionsBuilder<LogMyDayDbContext>().UseSqlite(_connection).Options);
         _context.Database.EnsureCreated();
-        _context.Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
+        TestPlatform.For(_context).Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
         _context.SaveChanges();
 
         var engine = new TagRuleEngine(_context);
         var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
-        _activities = new ActivityService(_context, new ActivityRepository(_context), eventLog, new TagDayLockService(_context), engine);
-        _rules = new TagRuleService(_context, engine, eventLog);
+        _activities = new ActivityService(_context, TestPlatform.Users(_context), new ActivityRepository(_context), eventLog, new TagDayLockService(_context), engine);
+        _rules = new TagRuleService(_context, TestPlatform.Users(_context), engine, eventLog);
         _types = new RecordTypeService(_context, eventLog);
-        _records = new RecordService(_context, eventLog, engine);
+        _records = new RecordService(_context, TestPlatform.Users(_context), eventLog, engine);
     }
 
     public void Dispose()
@@ -499,13 +499,13 @@ public sealed class RecordTests : IDisposable
     }
 
     private ReminderService Reminders() =>
-        new(_context, _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<ReminderService>.Instance);
+        new(_context, TestPlatform.Users(_context), _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<ReminderService>.Instance);
 
     private TodoListService TodoLists() =>
-        new(_context, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoListService>.Instance);
+        new(_context, TestPlatform.Users(_context), new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoListService>.Instance);
 
     private TodoItemService TodoItems() =>
-        new(_context, _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoItemService>.Instance);
+        new(_context, TestPlatform.Users(_context), _activities, new EventLogService(_context, NullLogger<EventLogService>.Instance), NullLogger<TodoItemService>.Instance);
 
     [Fact]
     public async Task AReminderOnARecordType_CompletesOnlyWithARecordOfThatType()

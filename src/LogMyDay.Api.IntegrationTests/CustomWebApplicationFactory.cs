@@ -40,6 +40,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var descriptors = services.Where(
                 d => d.ServiceType == typeof(DbContextOptions<LogMyDayDbContext>) ||
                      d.ServiceType == typeof(LogMyDayDbContext) ||
+                     d.ServiceType == typeof(PlatformDbContext) ||
                      d.ServiceType == typeof(DbContextOptions) ||
                      (d.ServiceType.IsGenericType && 
                       d.ServiceType.GetGenericTypeDefinition() == typeof(DbContextOptions<>)))
@@ -60,6 +61,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
             });
 
+            // The platform tables live in the same store, as they share the file in the app.
+            services.AddDbContext<PlatformDbContext>(options =>
+            {
+                options.UseInMemoryDatabase(_databaseName);
+                options.ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+            });
+
             // Build service provider and seed data
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
@@ -77,7 +85,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             Email = TestUserEmail,
             PasswordHash = passwordHasher.Hash(TestUserPassword)
         };
-        db.Users.Add(testUser);
+        TestPlatform.For(db).Users.Add(testUser);
 
         var mcpUser = new User
         {
@@ -85,7 +93,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             Email = McpUserEmail,
             PasswordHash = "not-used"
         };
-        db.Users.Add(mcpUser);
+        TestPlatform.For(db).Users.Add(mcpUser);
         var adminUser = new User
         {
             Id = Guid.NewGuid(),
@@ -93,8 +101,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             PasswordHash = "not-used",
             IsAdmin = true
         };
-        db.Users.Add(adminUser);
-        db.ApiKeys.AddRange(
+        TestPlatform.For(db).Users.Add(adminUser);
+        TestPlatform.For(db).ApiKeys.AddRange(
             SeededKey(mcpUser.Id, "rw", ReadWriteKeyToken, ApiKeyScope.ReadWrite),
             SeededKey(mcpUser.Id, "ro", ReadOnlyKeyToken, ApiKeyScope.ReadOnly),
             SeededKey(adminUser.Id, "admin", AdminKeyToken, ApiKeyScope.ReadWrite));

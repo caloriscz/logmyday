@@ -11,11 +11,13 @@ namespace LogMyDay.Api.Application.Services;
 public class TagTriggerService : ITagTriggerService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IEventLogService _eventLogService;
 
-    public TagTriggerService(LogMyDayDbContext context, IEventLogService eventLogService)
+    public TagTriggerService(LogMyDayDbContext context, IUserDirectory users, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
 
@@ -143,7 +145,7 @@ public class TagTriggerService : ITagTriggerService
     // Reminders of the triggers that are still to come: today or later and neither done nor skipped.
     private async Task<Dictionary<int, int>> OpenReminderCounts(Guid userId, List<int> triggerIds)
     {
-        var today = await UserDay.Today(_context, userId);
+        var today = await UserDay.Today(_users, userId);
 
         return await _context.Reminders
             .Where(r => r.TriggerId != null && triggerIds.Contains(r.TriggerId.Value) && r.MonitorToDate >= today

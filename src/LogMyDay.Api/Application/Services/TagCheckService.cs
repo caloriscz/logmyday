@@ -14,11 +14,13 @@ public class TagCheckService : ITagCheckService
     public const int MaxReviewDays = 366;
 
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IEventLogService _eventLogService;
 
-    public TagCheckService(LogMyDayDbContext context, IEventLogService eventLogService)
+    public TagCheckService(LogMyDayDbContext context, IUserDirectory users, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
 
@@ -101,7 +103,7 @@ public class TagCheckService : ITagCheckService
 
     public async Task<TagCheckReviewResponse> Review(DateOnly? from, DateOnly? to, Guid userId)
     {
-        var today = await UserDay.Today(_context, userId);
+        var today = await UserDay.Today(_users, userId);
         var end = to ?? today;
         var start = from ?? end.AddDays(-(DefaultReviewDays - 1));
 
@@ -227,7 +229,7 @@ public class TagCheckService : ITagCheckService
         }
 
         var entries = await LoadEntries(userId, checks, day, day);
-        var isToday = day == await UserDay.Today(_context, userId);
+        var isToday = day == await UserDay.Today(_users, userId);
         var warnings = new List<TagCheckWarning>();
         foreach (var check in checks)
         {

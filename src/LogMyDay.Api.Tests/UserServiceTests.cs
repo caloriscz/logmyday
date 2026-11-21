@@ -17,12 +17,12 @@ namespace LogMyDay.Api.Tests;
 /// </summary>
 public class UserServiceTests
 {
-    private static LogMyDayDbContext CreateContext()
+    private static PlatformDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) // Unique DB per test
             .Options;
-        return new LogMyDayDbContext(options);
+        return new PlatformDbContext(options);
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public class EventLogCategoryFilterTests
             .Options;
         var context = new LogMyDayDbContext(options);
 
-        context.Users.Add(new User { Id = UserId, Email = "e@test.com", PasswordHash = "x" });
+        TestPlatform.For(context).Users.Add(new User { Id = UserId, Email = "e@test.com", PasswordHash = "x" });
         context.EventLogs.AddRange(
             Row("MCP delete_tag via lmd_abcd1234: ok"),
             Row("MCP log_value via lmd_abcd1234: error"),

@@ -12,9 +12,6 @@ public class EventLog
 
     public required Guid UserId { get; set; }
 
-    [ForeignKey(nameof(UserId))]
-    public User User { get; set; } = null!;
-
     public EventLogLevel Level { get; set; }
 
     [Required]

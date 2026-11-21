@@ -82,7 +82,7 @@ public class ApiKeysEndpointTests : IClassFixture<CustomWebApplicationFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-            var user = await db.Users.FirstAsync(u => u.Email == Email);
+            var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == Email);
             var keys = scope.ServiceProvider.GetRequiredService<Application.Interfaces.IApiKeyService>();
             token = (await keys.Create(user.Id, "escalation-attempt", ApiKeyScope.ReadWrite, null, CancellationToken.None)).Token;
         }

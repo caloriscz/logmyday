@@ -82,7 +82,7 @@ public class TagRuleTests
     private static Fixture CreateFixture(LogMyDayDbContext context)
     {
         var userId = Guid.NewGuid();
-        context.Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
+        TestPlatform.For(context).Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
         context.SaveChanges();
 
         var engine = new TagRuleEngine(context);
@@ -91,8 +91,8 @@ public class TagRuleTests
         return new Fixture
         {
             Context = context,
-            Activities = new ActivityService(context, new ActivityRepository(context), eventLog, new TagDayLockService(context), engine),
-            Rules = new TagRuleService(context, engine, eventLog),
+            Activities = new ActivityService(context, TestPlatform.Users(context), new ActivityRepository(context), eventLog, new TagDayLockService(context), engine),
+            Rules = new TagRuleService(context, TestPlatform.Users(context), engine, eventLog),
             UserId = userId
         };
     }

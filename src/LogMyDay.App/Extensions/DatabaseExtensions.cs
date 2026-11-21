@@ -1,5 +1,6 @@
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Serilog;
 
 namespace LogMyDay.App.Extensions;
@@ -20,7 +21,14 @@ internal static class DatabaseExtensions
         var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
         DatabaseLocation.EnsureDirectory(connectionString);
 
-        services.AddDbContext<LogMyDayDbContext>(options => options.UseSqlite(connectionString));
+        // The model no longer matches the last migration: the platform tables left it. The new
+        // migration baseline brings the check back.
+        services.AddDbContext<LogMyDayDbContext>(options => options
+            .UseSqlite(connectionString)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+
+        // The platform tables still live in the same file as the users' data.
+        services.AddDbContext<PlatformDbContext>(options => options.UseSqlite(connectionString));
 
         Log.Information("Database: SQLite, {Path}", DatabaseLocation.GetFilePath(connectionString) ?? connectionString);
 

@@ -30,7 +30,7 @@ public class ActivityServiceTests
         var repository = new ActivityRepository(context);
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var tagDayLockService = new TagDayLockService(context);
-        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
+        var service = new ActivityService(context, TestPlatform.Users(context), repository, eventLogService, tagDayLockService);
         var request = new ActivityRequest
         {
             DateStarted = DateTime.UtcNow.AddHours(-1),
@@ -78,7 +78,7 @@ public class ActivityServiceTests
         var repository = new ActivityRepository(context);
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var tagDayLockService = new TagDayLockService(context);
-        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
+        var service = new ActivityService(context, TestPlatform.Users(context), repository, eventLogService, tagDayLockService);
         var when = DateTime.UtcNow;
 
         // Two completions, each "Add 20".
@@ -115,7 +115,7 @@ public class ActivityServiceTests
         var repository = new ActivityRepository(context);
         var eventLogService = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var tagDayLockService = new TagDayLockService(context);
-        var service = new ActivityService(context, repository, eventLogService, tagDayLockService);
+        var service = new ActivityService(context, TestPlatform.Users(context), repository, eventLogService, tagDayLockService);
         var when = DateTime.UtcNow;
 
         await service.Create(new ActivityRequest { DateStarted = when, Description = "5", PrimaryTagId = tag.Id }, userId);
@@ -132,7 +132,7 @@ public class ActivityServiceTests
             .Options;
         var context = new LogMyDayDbContext(options);
         var service = new ActivityService(
-            context,
+            context, TestPlatform.Users(context),
             new ActivityRepository(context),
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             new TagDayLockService(context));
@@ -219,13 +219,13 @@ public class ActivityServiceTests
             .Options;
         var context = new LogMyDayDbContext(options);
         var userId = Guid.NewGuid();
-        context.Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "Europe/Prague", Culture = "en-US" });
+        TestPlatform.For(context).Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "Europe/Prague", Culture = "en-US" });
         var tag = new Tag { TagName = "Coffee", InputTypeId = 1, IsRequired = false, UserId = userId };
         context.Tags.Add(tag);
         context.SaveChanges();
 
         var service = new ActivityService(
-            context,
+            context, TestPlatform.Users(context),
             new ActivityRepository(context),
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             new TagDayLockService(context));

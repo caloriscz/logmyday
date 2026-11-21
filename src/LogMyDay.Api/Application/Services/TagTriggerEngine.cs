@@ -14,14 +14,16 @@ public class TagTriggerEngine : ITagTriggerEngine
     public const int KeepDays = 30;
 
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IEventLogService _eventLogService;
 
     // Reminders created in this request, until its response takes them.
     private readonly List<(Reminder Reminder, TagTrigger Trigger)> _created = [];
 
-    public TagTriggerEngine(LogMyDayDbContext context, IEventLogService eventLogService)
+    public TagTriggerEngine(LogMyDayDbContext context, IUserDirectory users, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
 
@@ -44,7 +46,7 @@ public class TagTriggerEngine : ITagTriggerEngine
             return;
         }
 
-        var now = await UserDay.Now(_context, userId);
+        var now = await UserDay.Now(_users, userId);
         var log = new List<string>();
         foreach (var trigger in triggers)
         {

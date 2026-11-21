@@ -12,19 +12,21 @@ namespace LogMyDay.Api.Application.Services;
 public class TodoListService : ITodoListService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IEventLogService _eventLogService;
     private readonly ILogger<TodoListService> _logger;
 
-    public TodoListService(LogMyDayDbContext context, IEventLogService eventLogService, ILogger<TodoListService> logger)
+    public TodoListService(LogMyDayDbContext context, IUserDirectory users, IEventLogService eventLogService, ILogger<TodoListService> logger)
     {
         _context = context;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventLogService = eventLogService;
         _logger = logger;
     }
 
     public async Task<IList<TodoListResponse>> GetAll(Guid userId, DateOnly? date = null)
     {
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         var lists = await _context.TodoLists
             .AsNoTracking()
@@ -40,7 +42,7 @@ public class TodoListService : ITodoListService
 
     public async Task<TodoListResponse> GetById(int id, Guid userId)
     {
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         var list = await _context.TodoLists
             .AsNoTracking()

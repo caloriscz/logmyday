@@ -1,3 +1,4 @@
+using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,18 +8,15 @@ namespace LogMyDay.Api.Application.Services;
 /// or unknown).</summary>
 public static class UserDay
 {
-    public static async Task<DateOnly> Today(LogMyDayDbContext context, Guid userId)
+    public static async Task<DateOnly> Today(IUserDirectory users, Guid userId)
     {
-        return DateOnly.FromDateTime(await Now(context, userId));
+        return DateOnly.FromDateTime(await Now(users, userId));
     }
 
     /// <summary>The user's local wall-clock time, as activities store it (unspecified kind).</summary>
-    public static async Task<DateTime> Now(LogMyDayDbContext context, Guid userId)
+    public static async Task<DateTime> Now(IUserDirectory users, Guid userId)
     {
-        var timeZone = await context.Users
-            .Where(u => u.Id == userId)
-            .Select(u => u.TimeZone)
-            .FirstOrDefaultAsync();
+        var timeZone = await users.GetTimeZone(userId);
 
         TimeZoneInfo tz;
         try
