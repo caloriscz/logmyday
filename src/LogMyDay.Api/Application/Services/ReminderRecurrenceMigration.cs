@@ -16,7 +16,7 @@ namespace LogMyDay.Api.Application.Services;
 /// </summary>
 public sealed class ReminderRecurrenceMigration : IReminderRecurrenceMigration
 {
-    private const string FlagKey = "reminder.recurrence.none-to-daily.v1";
+    public const string FlagKey = "reminder.recurrence.none-to-daily.v1";
 
     private readonly LogMyDayDbContext _context;
     private readonly ILogger<ReminderRecurrenceMigration> _logger;

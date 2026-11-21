@@ -10,7 +10,8 @@ using Microsoft.Extensions.Logging;
 namespace LogMyDay.Api.Application.Services;
 
 /// <summary>
-/// Prepares the databases at startup: migrates the platform database and seeds its first admin,
+/// Prepares the databases at startup: splits a single-file database of v0.7.2 into the platform
+/// database and the users' databases, migrates the platform database and seeds its first admin,
 /// then migrates the database of every user and runs the one-time migrations of its data. Any
 /// failure stops the start.
 /// </summary>
@@ -18,15 +19,17 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
 {
     private readonly PlatformDbContext _platform;
     private readonly UserDatabases _databases;
+    private readonly SingleFileSplit _split;
     private readonly IUserScopeFactory _userScopes;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<DatabaseSeeder> _logger;
 
-    public DatabaseSeeder(PlatformDbContext platform, UserDatabases databases, IUserScopeFactory userScopes,
+    public DatabaseSeeder(PlatformDbContext platform, UserDatabases databases, SingleFileSplit split, IUserScopeFactory userScopes,
         IPasswordHasher passwordHasher, ILogger<DatabaseSeeder> logger)
     {
         _platform = platform;
         _databases = databases;
+        _split = split;
         _userScopes = userScopes;
         _passwordHasher = passwordHasher;
         _logger = logger;
@@ -36,6 +39,9 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     {
         try
         {
+            // An installation of v0.7.2 kept everything in the one file.
+            _split.SplitIfNeeded();
+
             DatabaseUpgrade.Migrate(_platform, _databases.SnapshotFolder, _logger);
             await SeedAdmin();
 
