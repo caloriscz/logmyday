@@ -1,6 +1,26 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## Unreleased
+
+### Added
+
+  - Backup → **Export Whole Database (SQLite)**, for admins: downloads the whole installation (every user, all data, reference data and settings) as one SQLite file. The file is a complete LogMyDay database: point `ConnectionStrings:DefaultConnection` at it and the app runs on it. Also `GET /api/backup/export/sqlite`. (The export itself shipped in v0.7.2; it is the way from SQL Server to SQLite.)
+  - A default place for the database: without a connection string it is `data/logmyday.db` in the application's folder. A relative `Data Source` counts from the application's folder on every host, and the startup log names the file in use.
+
+### Changed
+
+  - **LogMyDay runs on SQLite only.** `Database:Provider` is optional and must be `Sqlite` if set. Docker uses `DB_PATH` and the `logmyday-data` volume instead of the SQL Server settings and secrets.
+  - The local deployment (Cake, Web Deploy) keeps the `data` folder on the server, next to `DataProtection-Keys`.
+
+### Removed
+
+  - **SQL Server support.** This version does not start on SQL Server: a configuration that still points at it stops the start and says how to move. **Before upgrading**, move the installation on v0.7.2: export the database (Backup → Export Whole Database), put the file where the app can write, set `Database:Provider` to `Sqlite` and `ConnectionStrings:DefaultConnection` to `Data Source=<path to the file>`, and restart. Migrations no longer come with SQL Server scripts.
+
+### Fixed
+
+  - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
+
 ## v0.7.2 — 2026‑11‑20
 
 ### Fixed

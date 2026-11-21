@@ -16,8 +16,8 @@ public interface ISqliteExportService
 {
     /// <summary>
     /// Copies the whole database, all users and every table, into a new SQLite file with this
-    /// version's schema and migration history. LogMyDay runs on the file as it is. Works from
-    /// either provider. Refuses a database that lacks some of this version's migrations.
+    /// version's schema and migration history. LogMyDay runs on the file as it is. Refuses a
+    /// database that lacks some of this version's migrations.
     /// </summary>
     Task<SqliteExport> ExportDatabase(CancellationToken cancellationToken);
 }

@@ -4,10 +4,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Infrastructure.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Application.Services;
@@ -15,8 +12,8 @@ namespace LogMyDay.Api.Application.Services;
 /// <summary>
 /// Exports the whole database into a new SQLite file. The file gets this version's schema, with
 /// every migration recorded as applied, so LogMyDay runs on it and applies later migrations as
-/// usual. The rows are read through the current context (SQL Server or SQLite) and written with
-/// the SQLite type mappings, so every value is stored the way EF would store it on SQLite.
+/// usual. It is built the way a new installation's database is (DatabaseSchema), and the rows are
+/// then copied from the current database.
 /// </summary>
 public sealed class SqliteExportService : ISqliteExportService
 {
@@ -103,10 +100,9 @@ public sealed class SqliteExportService : ISqliteExportService
 
         var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
             .UseSqlite(connection)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
         await using var target = new LogMyDayDbContext(options);
-        await CreateSchema(target, connection, cancellationToken);
+        await DatabaseSchema.CreateIfEmpty(target, cancellationToken);
 
         // Rows keep their keys and come table by table, and some tables point at each other
         // (Quantity and Unit, Tag and its record type), so no table order satisfies every key.
@@ -133,25 +129,6 @@ public sealed class SqliteExportService : ISqliteExportService
         await transaction.CommitAsync(cancellationToken);
 
         return rowCounts;
-    }
-
-    /// <summary>
-    /// Creates this version's schema from the model and records every migration as applied.
-    /// Running the migrations is not an option: the oldest ones were scaffolded for SQL Server
-    /// (nvarchar(max) and the like) and fail on a new SQLite file.
-    /// </summary>
-    private static async Task CreateSchema(LogMyDayDbContext target, DbConnection connection, CancellationToken cancellationToken)
-    {
-        await target.Database.EnsureCreatedAsync(cancellationToken);
-
-        var history = target.GetService<IHistoryRepository>();
-        await Execute(connection, null, history.GetCreateScript(), cancellationToken);
-
-        var productVersion = ProductInfo.GetVersion();
-        foreach (var migration in target.Database.GetMigrations())
-        {
-            await Execute(connection, null, history.GetInsertScript(new HistoryRow(migration, productVersion)), cancellationToken);
-        }
     }
 
     private async Task<int> CopyTable<TEntity>(DbConnection connection, DbTransaction transaction, IEntityType entityType, CancellationToken cancellationToken)
