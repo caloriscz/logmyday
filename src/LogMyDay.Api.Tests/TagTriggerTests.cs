@@ -32,14 +32,14 @@ public sealed class TagTriggerTests : IDisposable
         _connection.Open();
         _context = new LogMyDayDbContext(new DbContextOptionsBuilder<LogMyDayDbContext>().UseSqlite(_connection).Options);
         _context.Database.EnsureCreated();
-        _context.Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
+        TestPlatform.For(_context).Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
         _context.SaveChanges();
 
         _eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
-        _triggers = new TagTriggerService(_context, _eventLog);
-        _activities = new ActivityService(_context, new ActivityRepository(_context), _eventLog, new TagDayLockService(_context));
+        _triggers = new TagTriggerService(_context, TestPlatform.Users(_context), _eventLog);
+        _activities = new ActivityService(_context, TestPlatform.Users(_context), new ActivityRepository(_context), _eventLog, new TagDayLockService(_context));
         _types = new RecordTypeService(_context, _eventLog);
-        _records = new RecordService(_context, _eventLog, new TagRuleEngine(_context));
+        _records = new RecordService(_context, TestPlatform.Users(_context), _eventLog, new TagRuleEngine(_context));
     }
 
     public void Dispose()
@@ -120,7 +120,7 @@ public sealed class TagTriggerTests : IDisposable
         Assert.True(await _context.EventLogs.AnyAsync(e => e.Message.Contains("set a reminder to log 'Effect'")));
 
         // The Reminders list shows it with its trigger.
-        var reminders = new ReminderService(_context, _activities, _eventLog, NullLogger<ReminderService>.Instance);
+        var reminders = new ReminderService(_context, TestPlatform.Users(_context), _activities, _eventLog, NullLogger<ReminderService>.Instance);
         var listed = Assert.Single(await reminders.GetAll(_userId, DateOnly.FromDateTime(fire)));
         Assert.Equal((trigger.Id, "Log the effect"), (listed.TriggerId, listed.TriggerName));
         Assert.Equal(1, (await _triggers.GetById(trigger.Id, _userId)).OpenReminderCount);
@@ -176,8 +176,8 @@ public sealed class TagTriggerTests : IDisposable
     public async Task ASave_ReportsTheReminderItSet_Once_AndNotOneWithdrawnInTheSameRequest()
     {
         // One engine per request, shared by the service and the response, as in the host.
-        var engine = new TagTriggerEngine(_context, _eventLog);
-        var activities = new ActivityService(_context, new ActivityRepository(_context), _eventLog, new TagDayLockService(_context), tagTriggerEngine: engine);
+        var engine = new TagTriggerEngine(_context, TestPlatform.Users(_context), _eventLog);
+        var activities = new ActivityService(_context, TestPlatform.Users(_context), new ActivityRepository(_context), _eventLog, new TagDayLockService(_context), tagTriggerEngine: engine);
         var alcohol = await AddTag("Alcohol", InputTypeIds.Boolean);
         var sleep = await AddTag("Sleep", InputTypeIds.Score);
         var anchor = Minute(Now.AddMinutes(-10));
@@ -276,7 +276,7 @@ public sealed class TagTriggerTests : IDisposable
         await Log(dose, Minute(Now), "100");
         var reminder = Assert.Single(await RemindersOf(trigger));
 
-        var reminders = new ReminderService(_context, _activities, _eventLog, NullLogger<ReminderService>.Instance);
+        var reminders = new ReminderService(_context, TestPlatform.Users(_context), _activities, _eventLog, NullLogger<ReminderService>.Instance);
         var completed = await reminders.Complete(reminder.Id, new ReminderCompleteRequest { DoneAt = DateTime.UtcNow, CompletionValue = "Calm" }, _userId);
 
         Assert.True(completed.IsDone);
@@ -294,7 +294,7 @@ public sealed class TagTriggerTests : IDisposable
         var reminder = Assert.Single(await RemindersOf(trigger));
 
         // Skipping logs an empty Effect entry; it must not turn the skip into "done".
-        var reminders = new ReminderService(_context, _activities, _eventLog, NullLogger<ReminderService>.Instance);
+        var reminders = new ReminderService(_context, TestPlatform.Users(_context), _activities, _eventLog, NullLogger<ReminderService>.Instance);
         var skipped = await reminders.Skip(reminder.Id, _userId);
 
         Assert.True(skipped.IsSkipped);
@@ -342,7 +342,7 @@ public sealed class TagTriggerTests : IDisposable
         var espresso = await AddTag("Espresso", InputTypeIds.Integer);
         var total = await AddTag("Caffeine drinks", InputTypeIds.Integer, repeatable: false);
         var sleep = await AddTag("Sleep", InputTypeIds.Score);
-        var rules = new TagRuleService(_context, new TagRuleEngine(_context), _eventLog);
+        var rules = new TagRuleService(_context, TestPlatform.Users(_context), new TagRuleEngine(_context), _eventLog);
         await rules.Create(new TagRuleRequest
         {
             Name = "Caffeine",
@@ -400,7 +400,7 @@ public sealed class TagTriggerTests : IDisposable
         var dose = await AddTag("Dose", InputTypeIds.Integer);
         var effect = await AddTag("Effect", InputTypeIds.Integer);
         await Trigger(dose, effect, name: "Effect later");
-        var rules = new TagRuleService(_context, new TagRuleEngine(_context), _eventLog);
+        var rules = new TagRuleService(_context, TestPlatform.Users(_context), new TagRuleEngine(_context), _eventLog);
 
         var refusal = await Assert.ThrowsAsync<ArgumentException>(() => rules.Create(new TagRuleRequest
         {

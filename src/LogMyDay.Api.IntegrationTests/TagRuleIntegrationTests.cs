@@ -42,7 +42,7 @@ public class TagRuleIntegrationTests : IClassFixture<CustomWebApplicationFactory
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-            var userId = await db.Users.Where(u => u.Email == CustomWebApplicationFactory.McpUserEmail).Select(u => u.Id).SingleAsync();
+            var userId = await TestPlatform.For(db).Users.Where(u => u.Email == CustomWebApplicationFactory.McpUserEmail).Select(u => u.Id).SingleAsync();
             var rules = scope.ServiceProvider.GetRequiredService<ITagRuleService>();
             await rules.Create(new TagRuleRequest
             {

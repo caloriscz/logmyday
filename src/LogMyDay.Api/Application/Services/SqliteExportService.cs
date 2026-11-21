@@ -21,11 +21,13 @@ public sealed class SqliteExportService : ISqliteExportService
         .GetMethod(nameof(CopyTable), BindingFlags.NonPublic | BindingFlags.Instance)!;
 
     private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _platform;
     private readonly ILogger<SqliteExportService> _logger;
 
-    public SqliteExportService(LogMyDayDbContext context, ILogger<SqliteExportService> logger)
+    public SqliteExportService(LogMyDayDbContext context, PlatformDbContext platform, ILogger<SqliteExportService> logger)
     {
         _context = context;
+        _platform = platform;
         _logger = logger;
     }
 
@@ -102,7 +104,11 @@ public sealed class SqliteExportService : ISqliteExportService
             .UseSqlite(connection)
             .Options;
         await using var target = new LogMyDayDbContext(options);
-        await DatabaseSchema.CreateIfEmpty(target, cancellationToken);
+        var platformOptions = new DbContextOptionsBuilder<PlatformDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var targetPlatform = new PlatformDbContext(platformOptions);
+        await DatabaseSchema.CreateIfEmpty(target, targetPlatform, cancellationToken);
 
         // Rows keep their keys and come table by table, and some tables point at each other
         // (Quantity and Unit, Tag and its record type), so no table order satisfies every key.
@@ -110,20 +116,26 @@ public sealed class SqliteExportService : ISqliteExportService
         await Execute(connection, null, "PRAGMA foreign_keys = OFF;", cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        var entityTypes = target.Model.GetEntityTypes().ToList();
+
+        // The users' data and the platform tables go into the one file. Settings belongs to both
+        // models and is one table, so it is copied once.
+        var tables = target.Model.GetEntityTypes().Select(t => (Source: (DbContext)_context, EntityType: t))
+            .Concat(targetPlatform.Model.GetEntityTypes().Select(t => (Source: (DbContext)_platform, EntityType: t)))
+            .DistinctBy(t => t.EntityType.GetTableName())
+            .ToList();
 
         // The migrations seed reference rows (HasData). The copy brings the source's rows instead.
-        foreach (var entityType in entityTypes)
+        foreach (var table in tables)
         {
-            await Execute(connection, transaction, $"DELETE FROM \"{entityType.GetTableName()}\";", cancellationToken);
+            await Execute(connection, transaction, $"DELETE FROM \"{table.EntityType.GetTableName()}\";", cancellationToken);
         }
 
         var rowCounts = new Dictionary<string, int>();
-        foreach (var entityType in entityTypes)
+        foreach (var table in tables)
         {
-            var copy = (Task<int>)CopyTableMethod.MakeGenericMethod(entityType.ClrType)
-                .Invoke(this, [connection, transaction, entityType, cancellationToken])!;
-            rowCounts[entityType.GetTableName()!] = await copy;
+            var copy = (Task<int>)CopyTableMethod.MakeGenericMethod(table.EntityType.ClrType)
+                .Invoke(this, [table.Source, connection, transaction, table.EntityType, cancellationToken])!;
+            rowCounts[table.EntityType.GetTableName()!] = await copy;
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -131,7 +143,7 @@ public sealed class SqliteExportService : ISqliteExportService
         return rowCounts;
     }
 
-    private async Task<int> CopyTable<TEntity>(DbConnection connection, DbTransaction transaction, IEntityType entityType, CancellationToken cancellationToken)
+    private async Task<int> CopyTable<TEntity>(DbContext source, DbConnection connection, DbTransaction transaction, IEntityType entityType, CancellationToken cancellationToken)
         where TEntity : class
     {
         var properties = entityType.GetProperties().ToList();
@@ -153,7 +165,7 @@ public sealed class SqliteExportService : ISqliteExportService
         command.CommandText = $"INSERT INTO \"{entityType.GetTableName()}\" ({columns}) VALUES ({parameters});";
 
         var count = 0;
-        var rows = _context.Set<TEntity>().AsNoTracking().AsAsyncEnumerable();
+        var rows = source.Set<TEntity>().AsNoTracking().AsAsyncEnumerable();
         await foreach (var row in rows.WithCancellation(cancellationToken))
         {
             command.Parameters.Clear();

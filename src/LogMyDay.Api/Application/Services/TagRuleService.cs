@@ -13,12 +13,14 @@ public class TagRuleService : ITagRuleService
     private const int MaxSources = 20;
 
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly ITagRuleEngine _engine;
     private readonly IEventLogService _eventLogService;
 
-    public TagRuleService(LogMyDayDbContext context, ITagRuleEngine engine, IEventLogService eventLogService)
+    public TagRuleService(LogMyDayDbContext context, IUserDirectory users, ITagRuleEngine engine, IEventLogService eventLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _engine = engine ?? throw new ArgumentNullException(nameof(engine));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
     }
@@ -476,7 +478,7 @@ public class TagRuleService : ITagRuleService
 
     private Task<DateOnly> UserToday(Guid userId)
     {
-        return UserDay.Today(_context, userId);
+        return UserDay.Today(_users, userId);
     }
 
     private static string Describe(TagRule rule, Dictionary<int, Tag> sources)

@@ -4,6 +4,7 @@ using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -23,8 +24,13 @@ public sealed class DatabaseSchemaTests : IDisposable
         File.Delete(_path);
     }
 
+    // The warning is ignored as the app ignores it, until the new migration baseline: the platform
+    // tables left the model, so it no longer matches the last migration.
     private LogMyDayDbContext Open() =>
-        new(new DbContextOptionsBuilder<LogMyDayDbContext>().UseSqlite($"Data Source={_path}").Options);
+        new(new DbContextOptionsBuilder<LogMyDayDbContext>()
+            .UseSqlite($"Data Source={_path}")
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
+            .Options);
 
     [Fact]
     public async Task Startup_OnANewFile_CreatesTheSchemaAndSeedsIt()
@@ -34,13 +40,13 @@ public sealed class DatabaseSchemaTests : IDisposable
 
         await using (var db = Open())
         {
-            await new DatabaseSeeder(db, hasher.Object, NullLogger<DatabaseSeeder>.Instance).SeedAsync();
+            await new DatabaseSeeder(db, TestPlatform.For(db), hasher.Object, NullLogger<DatabaseSeeder>.Instance).SeedAsync();
         }
 
         await using var check = Open();
         Assert.Equal(check.Database.GetMigrations(), await check.Database.GetAppliedMigrationsAsync());
         Assert.Empty(await check.Database.GetPendingMigrationsAsync());
-        Assert.True(await check.Users.AnyAsync(u => u.IsAdmin));
+        Assert.True(await TestPlatform.For(check).Users.AnyAsync(u => u.IsAdmin));
         Assert.True(await check.Units.AnyAsync());
         Assert.True(await check.InputTypes.AnyAsync());
 
@@ -56,8 +62,8 @@ public sealed class DatabaseSchemaTests : IDisposable
     {
         await using var db = Open();
 
-        Assert.True(await DatabaseSchema.CreateIfEmpty(db));
-        Assert.False(await DatabaseSchema.CreateIfEmpty(db));
+        Assert.True(await DatabaseSchema.CreateIfEmpty(db, TestPlatform.For(db)));
+        Assert.False(await DatabaseSchema.CreateIfEmpty(db, TestPlatform.For(db)));
 
         await db.Database.MigrateAsync();
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());

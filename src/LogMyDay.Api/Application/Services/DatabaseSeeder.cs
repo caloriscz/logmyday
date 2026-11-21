@@ -11,12 +11,14 @@ namespace LogMyDay.Api.Application.Services;
 public sealed class DatabaseSeeder : IDatabaseSeeder
 {
     private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _platform;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<DatabaseSeeder> _logger;
 
-    public DatabaseSeeder(LogMyDayDbContext context, IPasswordHasher passwordHasher, ILogger<DatabaseSeeder> logger)
+    public DatabaseSeeder(LogMyDayDbContext context, PlatformDbContext platform, IPasswordHasher passwordHasher, ILogger<DatabaseSeeder> logger)
     {
         _context = context;
+        _platform = platform;
         _passwordHasher = passwordHasher;
         _logger = logger;
     }
@@ -25,7 +27,7 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     {
         try
         {
-            if (await DatabaseSchema.CreateIfEmpty(_context))
+            if (await DatabaseSchema.CreateIfEmpty(_context, _platform))
             {
                 _logger.LogInformation("Created the schema of a new database");
             }
@@ -35,7 +37,7 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             await EnsureDefaultUnitsAsync();
 
             // Check if any users exist
-            var userCount = await _context.Users.CountAsync();
+            var userCount = await _platform.Users.CountAsync();
             if (userCount > 0)
             {
                 _logger.LogInformation("Users already exist in database. Skipping admin user seeding.");
@@ -56,8 +58,8 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
                 UpdatedUtc = DateTime.UtcNow
             };
 
-            _context.Users.Add(adminUser);
-            await _context.SaveChangesAsync();
+            _platform.Users.Add(adminUser);
+            await _platform.SaveChangesAsync();
 
             _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}",
                 adminUser.Email, adminUser.Id);

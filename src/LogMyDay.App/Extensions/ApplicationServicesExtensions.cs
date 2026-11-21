@@ -77,6 +77,7 @@ internal static class ApplicationServicesExtensions
         // Authentication and user services
         services.AddScoped<IPasswordHasher, Argon2IdPasswordHasher>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();

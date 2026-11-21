@@ -31,7 +31,7 @@ public class ApiKeyAuthenticationTests : IClassFixture<CustomWebApplicationFacto
     {
         using var scopeSvc = _factory.Services.CreateScope();
         var db = scopeSvc.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-        var user = await db.Users.FirstAsync(u => u.Email == "test@example.com");
+        var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == "test@example.com");
         var keys = scopeSvc.ServiceProvider.GetRequiredService<IApiKeyService>();
         var created = await keys.Create(user.Id, $"test-{Guid.NewGuid():N}", scope, null, CancellationToken.None);
 

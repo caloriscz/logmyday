@@ -19,17 +19,17 @@ public class TodoItemServiceTests
         var context = new LogMyDayDbContext(options);
 
         var userId = Guid.NewGuid();
-        context.Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
+        TestPlatform.For(context).Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
         context.SaveChanges();
 
         var activityService = new ActivityService(
-            context,
+            context, TestPlatform.Users(context),
             new ActivityRepository(context),
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             new TagDayLockService(context));
 
         var service = new TodoItemService(
-            context,
+            context, TestPlatform.Users(context),
             activityService,
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             NullLogger<TodoItemService>.Instance);
@@ -105,7 +105,7 @@ public class TodoItemServiceTests
     public async Task Complete_AutoLogsActivityInUserLocalTime()
     {
         var (service, context, userId) = CreateService(nameof(Complete_AutoLogsActivityInUserLocalTime));
-        var user = await context.Users.SingleAsync(u => u.Id == userId);
+        var user = await TestPlatform.For(context).Users.SingleAsync(u => u.Id == userId);
         user.TimeZone = "Europe/Prague";
         var tag = new Tag { TagName = "Groceries", IsRequired = false, UserId = userId };
         context.Tags.Add(tag);

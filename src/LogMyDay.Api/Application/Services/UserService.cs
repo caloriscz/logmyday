@@ -12,12 +12,12 @@ namespace LogMyDay.Api.Application.Services;
 
 public sealed class UserService : IUserService
 {
-    private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<UserService> _logger;
     private readonly IEmailSender _emailSender;
 
-    public UserService(LogMyDayDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger, IEmailSender emailSender)
+    public UserService(PlatformDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger, IEmailSender emailSender)
     {
         _context = context;
         _passwordHasher = passwordHasher;

@@ -36,7 +36,7 @@ public sealed class SqliteExportServiceTests : IDisposable
         await using var source = OpenDatabase(_sourcePath);
         var seeded = await SeedEveryTable(source);
 
-        var service = new SqliteExportService(source, NullLogger<SqliteExportService>.Instance);
+        var service = new SqliteExportService(source, TestPlatform.For(source), NullLogger<SqliteExportService>.Instance);
         string temporaryFile;
         IReadOnlyDictionary<string, int> rowCounts;
         await using (var export = await service.ExportDatabase(CancellationToken.None))
@@ -67,7 +67,7 @@ public sealed class SqliteExportServiceTests : IDisposable
         }
 
         // EF finds rows by Guid and date in the file, so it stores them the way EF itself does.
-        var friend = await exported.Users.SingleAsync(u => u.Id == seeded.FriendId);
+        var friend = await TestPlatform.For(exported).Users.SingleAsync(u => u.Id == seeded.FriendId);
         Assert.Equal("friend-hash", friend.PasswordHash);
         Assert.Equal(1, await exported.Activities.CountAsync(a => a.UserId == seeded.FriendId && a.DateStarted >= new DateTime(2026, 11, 20)));
         Assert.False((await exported.ScanMappings.SingleAsync()).IsActive);
@@ -79,7 +79,7 @@ public sealed class SqliteExportServiceTests : IDisposable
         await using var source = OpenDatabase(_sourcePath);
         await CreateSchema(source, migrationsLeftOut: 1);
 
-        var service = new SqliteExportService(source, NullLogger<SqliteExportService>.Instance);
+        var service = new SqliteExportService(source, TestPlatform.For(source), NullLogger<SqliteExportService>.Instance);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ExportDatabase(CancellationToken.None));
         Assert.Contains("lacks migrations", error.Message);
@@ -96,7 +96,7 @@ public sealed class SqliteExportServiceTests : IDisposable
         var history = source.GetService<IHistoryRepository>();
         await source.Database.ExecuteSqlRawAsync(history.GetInsertScript(new HistoryRow(unknown, ProductInfo.GetVersion())));
 
-        var service = new SqliteExportService(source, NullLogger<SqliteExportService>.Instance);
+        var service = new SqliteExportService(source, TestPlatform.For(source), NullLogger<SqliteExportService>.Instance);
         await using (var export = await service.ExportDatabase(CancellationToken.None))
         {
             Assert.Equal([unknown], export.UnknownMigrations);
@@ -153,11 +153,11 @@ public sealed class SqliteExportServiceTests : IDisposable
 
         var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("admin-hash");
-        await new DatabaseSeeder(db, hasher.Object, NullLogger<DatabaseSeeder>.Instance).SeedAsync();
+        await new DatabaseSeeder(db, TestPlatform.For(db), hasher.Object, NullLogger<DatabaseSeeder>.Instance).SeedAsync();
 
-        var admin = await db.Users.SingleAsync();
+        var admin = await TestPlatform.For(db).Users.SingleAsync();
         var friend = new User { Email = "friend@example.com", PasswordHash = "friend-hash", TimeZone = "Europe/Prague" };
-        db.Users.Add(friend);
+        TestPlatform.For(db).Users.Add(friend);
         db.Patterns.Add(new Pattern { Name = "Digits", PatternValue = "^[0-9]+$" });
 
         var milligram = await db.Units.SingleAsync(u => u.Key == "milligram");
@@ -253,8 +253,8 @@ public sealed class SqliteExportServiceTests : IDisposable
             TriggerDay = new DateOnly(2026, 11, 20),
             Days = { new ReminderDay { UserId = friend.Id, Date = new DateOnly(2026, 11, 20), IsDone = true, DoneAt = new DateTime(2026, 11, 20, 21, 5, 0), CompletionValue = "125" } }
         });
-        db.ApiKeys.Add(new ApiKey { UserId = friend.Id, Name = "Phone", Prefix = "lmd_abcd", KeyHash = new string('a', 64), Scope = ApiKeyScope.ReadWrite, ExpiresUtc = new DateTime(2027, 1, 1) });
-        db.PasswordResets.Add(new PasswordReset { UserId = friend.Id, Token = "reset-token", ExpiresUtc = new DateTime(2026, 11, 21) });
+        TestPlatform.For(db).ApiKeys.Add(new ApiKey { UserId = friend.Id, Name = "Phone", Prefix = "lmd_abcd", KeyHash = new string('a', 64), Scope = ApiKeyScope.ReadWrite, ExpiresUtc = new DateTime(2027, 1, 1) });
+        TestPlatform.For(db).PasswordResets.Add(new PasswordReset { UserId = friend.Id, Token = "reset-token", ExpiresUtc = new DateTime(2026, 11, 21) });
         db.EventLogs.Add(new EventLog { UserId = admin.Id, Level = EventLogLevel.Error, Message = "Something failed", Detail = new EventLogDetail { EventLogId = 0, Description = "Stack trace" } });
         db.Settings.Add(new Setting { Key = "Test:Flag", Value = "done", Description = "One-time migration flag" });
         await db.SaveChangesAsync();

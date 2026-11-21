@@ -20,11 +20,13 @@ public sealed class ReminderDayBackfill : IReminderDayBackfill
     private const string FlagKey = "reminderday.backfill.v1";
 
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly ILogger<ReminderDayBackfill> _logger;
 
-    public ReminderDayBackfill(LogMyDayDbContext context, ILogger<ReminderDayBackfill> logger)
+    public ReminderDayBackfill(LogMyDayDbContext context, IUserDirectory users, ILogger<ReminderDayBackfill> logger)
     {
         _context = context;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _logger = logger;
     }
 
@@ -40,9 +42,7 @@ public sealed class ReminderDayBackfill : IReminderDayBackfill
             .Where(r => r.DoneAt != null || r.SkippedAt != null)
             .ToListAsync(cancellationToken);
 
-        var users = await _context.Users
-            .AsNoTracking()
-            .ToDictionaryAsync(u => u.Id, cancellationToken);
+        var users = (await _users.List(cancellationToken)).ToDictionary(u => u.Id);
 
         var created = 0;
         foreach (var reminder in reminders)

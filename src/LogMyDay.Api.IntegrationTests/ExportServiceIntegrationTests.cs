@@ -21,7 +21,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
 
         var request = new ExcelExportRequest
         {
@@ -44,7 +44,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
 
         var request = new ExcelExportRequest
         {
@@ -67,7 +67,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
 
         var request = new ExcelExportRequest
         {
@@ -98,7 +98,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
 
         var request = new ExcelExportRequest
         {
@@ -121,7 +121,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
         var tagIds = context.Tags.Select(t => t.Id).ToList();
 
         var request = new ExcelExportRequest
@@ -149,7 +149,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
         var tagIds = context.Tags.Select(t => t.Id).ToList();
 
         var request = new ExcelExportRequest
@@ -177,7 +177,7 @@ public class ExportServiceIntegrationTests : IClassFixture<CustomWebApplicationF
         var service = scope.ServiceProvider.GetRequiredService<IExcelExportService>();
         var context = scope.ServiceProvider.GetRequiredService<LogMyDay.Api.Infrastructure.Data.LogMyDayDbContext>();
         
-        var testUserId = context.Users.First().Id;
+        var testUserId = TestPlatform.For(context).Users.First().Id;
         var tagIds = context.Tags.Select(t => t.Id).ToList();
 
         var request = new ExcelExportRequest

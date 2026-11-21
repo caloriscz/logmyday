@@ -14,7 +14,7 @@ namespace LogMyDay.Api.Application.Services;
 /// so an agent's numbers agree with what the user sees on screen. The user's time zone plays no
 /// part here; culture only decides where a week starts.
 /// </summary>
-public class ActivitySummaryService(LogMyDayDbContext context) : IActivitySummaryService
+public class ActivitySummaryService(LogMyDayDbContext context, IUserDirectory users) : IActivitySummaryService
 {
     public const int MaxDaysForDayBucket = 400;
     public const int MaxDaysForWeekBucket = 1100;
@@ -45,7 +45,7 @@ public class ActivitySummaryService(LogMyDayDbContext context) : IActivitySummar
             .FirstOrDefaultAsync(t => t.Id == request.TagId && t.UserId == userId)
             ?? throw new KeyNotFoundException("Tag not found");
 
-        var user = await context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await users.Find(userId);
         var weekStartsOn = FirstDayOfWeek(user?.Culture);
 
         var rangeStart = request.From.ToDateTime(TimeOnly.MinValue);

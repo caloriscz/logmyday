@@ -12,8 +12,6 @@ public class LogMyDayDbContext : DbContext
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<InputType> InputTypes => Set<InputType>();
     public DbSet<Pattern> Patterns => Set<Pattern>();
-    public DbSet<User> Users => Set<User>();
-    public DbSet<PasswordReset> PasswordResets => Set<PasswordReset>();
     public DbSet<Quantity> Quantities => Set<Quantity>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<TagOptionList> TagOptionLists => Set<TagOptionList>();
@@ -30,7 +28,6 @@ public class LogMyDayDbContext : DbContext
     public DbSet<ReminderDay> ReminderDays => Set<ReminderDay>();
     public DbSet<ColorScheme> ColorSchemes => Set<ColorScheme>();
     public DbSet<ColorSchemeEntry> ColorSchemeEntries => Set<ColorSchemeEntry>();
-    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TagRule> TagRules => Set<TagRule>();
     public DbSet<TagRuleSource> TagRuleSources => Set<TagRuleSource>();
     public DbSet<TagRuleCase> TagRuleCases => Set<TagRuleCase>();
@@ -47,8 +44,6 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<Tag>().ToTable("LogMyDay_Tags");
         modelBuilder.Entity<InputType>().ToTable("LogMyDay_InputTypes");
         modelBuilder.Entity<Pattern>().ToTable("LogMyDay_Patterns");
-        modelBuilder.Entity<User>().ToTable("LogMyDay_Users");
-        modelBuilder.Entity<PasswordReset>().ToTable("LogMyDay_PasswordResets");
         modelBuilder.Entity<Quantity>().ToTable("LogMyDay_Quantities");
         modelBuilder.Entity<Unit>().ToTable("LogMyDay_Units");
         modelBuilder.Entity<TagOptionList>().ToTable("LogMyDay_TagOptionLists");
@@ -65,7 +60,6 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<ReminderDay>().ToTable("LogMyDay_ReminderDays");
         modelBuilder.Entity<ColorScheme>().ToTable("LogMyDay_ColorSchemes");
         modelBuilder.Entity<ColorSchemeEntry>().ToTable("LogMyDay_ColorSchemeEntries");
-        modelBuilder.Entity<ApiKey>().ToTable("LogMyDay_ApiKeys");
         modelBuilder.Entity<TagRule>().ToTable("LogMyDay_TagRules");
         modelBuilder.Entity<TagRuleSource>().ToTable("LogMyDay_TagRuleSources");
         modelBuilder.Entity<TagRuleCase>().ToTable("LogMyDay_TagRuleCases");
@@ -73,32 +67,7 @@ public class LogMyDayDbContext : DbContext
         modelBuilder.Entity<TagTrigger>().ToTable("LogMyDay_TagTriggers");
         modelBuilder.Entity<Record>().ToTable("LogMyDay_Records");
 
-        // Configure Setting entity
-        modelBuilder.Entity<Setting>(entity =>
-        {
-            entity.HasKey(e => e.Key);
-            entity.HasIndex(e => e.Key).IsUnique().HasDatabaseName("IX_LogMyDay_Settings_Key");
-            entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.Value).IsRequired();
-            entity.Property(e => e.Description).HasMaxLength(500);
-        });
-
-        // Configure User entity
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasIndex(e => e.Email).IsUnique().HasDatabaseName("IX_LogMyDay_Users_Email");
-        });
-
-        // Configure PasswordReset entity
-        modelBuilder.Entity<PasswordReset>(entity =>
-        {
-            entity.HasOne(e => e.User)
-                .WithMany()
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(e => e.Token).HasDatabaseName("IX_LogMyDay_PasswordResets_Token");
-        });
+        modelBuilder.Entity<Setting>(SettingModel.Configure);
 
         modelBuilder.Entity<Quantity>(entity =>
         {
@@ -248,24 +217,6 @@ public class LogMyDayDbContext : DbContext
             entity.HasIndex(s => s.UserId).HasDatabaseName("IX_LogMyDay_ColorSchemes_UserId");
             entity.Property(s => s.Name).HasMaxLength(100).IsRequired();
             entity.Property(s => s.Description).HasMaxLength(500);
-        });
-
-        // Configure ApiKey entity. Prefix is indexed but not unique: it is a lookup hint and the
-        // hash decides; UserId serves the owner's key list. Deleting a user takes their keys.
-        modelBuilder.Entity<ApiKey>(entity =>
-        {
-            entity.HasOne(k => k.User)
-                .WithMany()
-                .HasForeignKey(k => k.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(k => k.Prefix).HasDatabaseName("IX_LogMyDay_ApiKeys_Prefix");
-            entity.HasIndex(k => k.UserId).HasDatabaseName("IX_LogMyDay_ApiKeys_UserId");
-
-            entity.Property(k => k.Name).HasMaxLength(100).IsRequired();
-            entity.Property(k => k.Prefix).HasMaxLength(16).IsRequired();
-            entity.Property(k => k.KeyHash).HasMaxLength(64).IsRequired();
-            entity.Property(k => k.Scope).HasConversion<int>();
         });
 
         modelBuilder.Entity<ColorSchemeEntry>(entity =>

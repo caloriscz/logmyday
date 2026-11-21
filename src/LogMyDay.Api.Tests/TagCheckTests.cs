@@ -29,13 +29,13 @@ public sealed class TagCheckTests : IDisposable
         _connection.Open();
         _context = new LogMyDayDbContext(new DbContextOptionsBuilder<LogMyDayDbContext>().UseSqlite(_connection).Options);
         _context.Database.EnsureCreated();
-        _context.Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
+        TestPlatform.For(_context).Users.Add(new User { Id = _userId, Email = "t@t", PasswordHash = "x", TimeZone = "UTC", Culture = "en-US" });
         _context.SaveChanges();
 
         var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
-        _checks = new TagCheckService(_context, eventLog);
+        _checks = new TagCheckService(_context, TestPlatform.Users(_context), eventLog);
         _types = new RecordTypeService(_context, eventLog);
-        _records = new RecordService(_context, eventLog, new TagRuleEngine(_context));
+        _records = new RecordService(_context, TestPlatform.Users(_context), eventLog, new TagRuleEngine(_context));
     }
 
     public void Dispose()
@@ -367,7 +367,7 @@ public sealed class TagCheckTests : IDisposable
         var a = await AddTag("A", InputTypeIds.Integer);
         var result = await AddTag("Result", InputTypeIds.String);
         var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
-        var rules = new TagRuleService(_context, new TagRuleEngine(_context), eventLog);
+        var rules = new TagRuleService(_context, TestPlatform.Users(_context), new TagRuleEngine(_context), eventLog);
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => rules.Create(new TagRuleRequest
         {
@@ -482,7 +482,7 @@ public sealed class TagCheckTests : IDisposable
         var total = await AddTag("Caffeine drinks", InputTypeIds.Integer);
         var water = await AddTag("Water", InputTypeIds.Integer);
         var eventLog = new EventLogService(_context, NullLogger<EventLogService>.Instance);
-        var rules = new TagRuleService(_context, new TagRuleEngine(_context), eventLog);
+        var rules = new TagRuleService(_context, TestPlatform.Users(_context), new TagRuleEngine(_context), eventLog);
         await rules.Create(new TagRuleRequest
         {
             Name = "Caffeine",

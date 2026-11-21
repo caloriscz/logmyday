@@ -29,11 +29,11 @@ public sealed class ApiKeyService : IApiKeyService
 
     private const int TokenRandomBytes = 32;
 
-    private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _context;
     private readonly TimeProvider _time;
     private readonly ILogger<ApiKeyService> _logger;
 
-    public ApiKeyService(LogMyDayDbContext context, TimeProvider time, ILogger<ApiKeyService> logger)
+    public ApiKeyService(PlatformDbContext context, TimeProvider time, ILogger<ApiKeyService> logger)
     {
         _context = context;
         _time = time;
