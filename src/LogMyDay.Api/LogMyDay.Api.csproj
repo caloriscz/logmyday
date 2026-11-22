@@ -28,6 +28,10 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="LogMyDay.Api.Tests" />
+	</ItemGroup>
+
 
 	<ItemGroup>
 		<ProjectReference Include="..\LogMyDay.Domain\LogMyDay.Domain.csproj" />

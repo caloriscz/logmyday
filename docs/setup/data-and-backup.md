@@ -78,7 +78,7 @@ Up to v0.7.2 an installation was one database file with every user's data. v0.8.
 3. Install v0.8.0 and start it. It builds the platform database and one database per user next to the original file, compares the number of rows of every table, and only then puts the new files in place.
 4. The original file stays in the data folder as `logmyday.before-v0.8.0.db`. Keep it until you have checked the upgraded installation; then you can delete it.
 
-The split needs free disk space of about twice the size of the database. If anything fails, the original file stays where it was, nothing new is left behind, and the application does not start; the log says what failed.
+The split needs free disk space of about twice the size of the database. If anything fails, the original file stays where it was, nothing new is left behind, and the application does not start; the log says what failed. If a failure comes while the files are being put in place and a step cannot be taken back, for example because another program holds a file, the log and the error say what to rename or remove by hand before the next start.
 
 What changes for users:
 
