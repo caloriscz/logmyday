@@ -7,7 +7,7 @@
 @using LogMyDay.App.Services
 @using LogMyDay.App.Components.Shared
 @using LogMyDay.App.Models
-@inject IExcelExportService ExcelExportService
+@inject LogMyDay.Api.Infrastructure.Data.IUserScopeFactory UserScopes
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
 @inject ILogger<Reports> Logger
@@ -293,6 +293,11 @@
     private ReportPageState state = new();
     private List<TagResponse>? availableTags;
 
+    // The page runs in a Blazor circuit, not in a request, so nothing says whose data its services
+    // work on. Every operation opens a scope for the signed-in user and takes the service from it.
+    private static IExcelExportService ExportService(AsyncServiceScope scope) =>
+        scope.ServiceProvider.GetRequiredService<IExcelExportService>();
+
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Reports & Exports");
@@ -307,7 +312,8 @@
 
             if (currentUser?.Id != null)
             {
-                availableTags = await ExcelExportService.GetAvailableTags(currentUser.Id);
+                await using var scope = UserScopes.Create(currentUser.Id);
+                availableTags = await ExportService(scope).GetAvailableTags(currentUser.Id);
             }
         }
         catch (Exception ex)
@@ -353,7 +359,11 @@
                 FreezeFirstRow = state.FreezeFirstRow
             };
 
-            var result = await ExcelExportService.GenerateExcelReport(request);
+            ExcelExportResult result;
+            await using (var scope = UserScopes.Create(currentUser.Id))
+            {
+                result = await ExportService(scope).GenerateExcelReport(request);
+            }
 
             if (result.Success && result.FileContent != null)
             {
@@ -391,13 +401,17 @@
         {
             var currentUser = await AuthApi.GetCurrentUserAsync();
 
-            var activities = await ExcelExportService.GetActivitiesForExport(new ExcelExportRequest
+            List<ActivityExportRow> activities;
+            await using (var scope = UserScopes.Create(currentUser.Id))
             {
-                TagIds = state.HtmlSelectedTagIds,
-                StartDate = state.HtmlIncludeAllData ? null : state.HtmlStartDate,
-                EndDate = state.HtmlIncludeAllData ? null : state.HtmlEndDate,
-                UserId = currentUser.Id
-            });
+                activities = await ExportService(scope).GetActivitiesForExport(new ExcelExportRequest
+                {
+                    TagIds = state.HtmlSelectedTagIds,
+                    StartDate = state.HtmlIncludeAllData ? null : state.HtmlStartDate,
+                    EndDate = state.HtmlIncludeAllData ? null : state.HtmlEndDate,
+                    UserId = currentUser.Id
+                });
+            }
 
             if (!activities.Any())
             {
