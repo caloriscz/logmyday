@@ -59,7 +59,7 @@ Other files in the folder are left alone. Copy a snapshot elsewhere if you want 
 
 **Backup → Database File → Restore Database** replaces your database with a file you downloaded earlier. Everything logged since the file was taken is replaced.
 
-The file is checked before anything changes. It is refused when it is not a LogMyDay user database, when it comes from a newer version of LogMyDay, or when it holds another account's data. A file from an older version is migrated first. The replaced database is kept in `snapshots/`, among the user's three newest snapshots before a restore.
+The file is checked before anything changes. It is refused when it is not a LogMyDay user database, when it comes from a newer version of LogMyDay, or when it holds another account's data. A file from an older version is migrated first. The replaced database is kept in `snapshots/`, among the user's three newest snapshots before a restore. If the file cannot be put in place, for example because the database is in use, your database stays as it was and the page says so.
 
 A database file restores only into the account it was taken from. To bring data into a different account, import a JSON export.
 

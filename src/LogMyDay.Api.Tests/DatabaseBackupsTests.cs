@@ -63,6 +63,7 @@ public sealed class DatabaseBackupsTests : IDisposable
         var snapshot = Assert.Single(Directory.GetFiles(Databases.SnapshotFolder, $"{_friend:D}-*-before-restore.db"));
         Assert.Equal(2L, Scalar(snapshot, "SELECT COUNT(*) FROM LogMyDay_Tags;"));
         Assert.Empty(Directory.GetFiles(Path.Combine(Databases.Root, DatabaseBackups.WorkFolderName)));
+        Assert.Empty(Directory.GetFiles(Databases.Folder, "*.previous*"));
 
         // The restored database is in use again.
         await AddTag(_services, _friend, "Tea");
@@ -98,6 +99,42 @@ public sealed class DatabaseBackupsTests : IDisposable
         // The new snapshot holds the replaced state, with the tag logged after the backup.
         Assert.Equal(2L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
         Assert.True(File.Exists(Path.Combine(Databases.SnapshotFolder, admins)));
+    }
+
+    [Fact]
+    public async Task WhenTheNewDatabaseCannotBeMovedIn_TheUsersDatabaseIsPutBack()
+    {
+        await Start();
+        await AddTag(_services, _friend, "Keep");
+
+        var error = Assert.Throws<DatabaseNotReplacedException>(() => Databases.Replace(_friend, Path.Combine(Databases.Root, "gone.db")));
+
+        Assert.True(error.DatabaseUnchanged);
+        Assert.Contains("left as it was", error.Message);
+        Assert.IsType<FileNotFoundException>(error.InnerException);
+        AssertPutBack();
+        Assert.Equal(["Keep"], await TagNames(_services, _friend));
+    }
+
+    [Fact]
+    public async Task WhenTheNewDatabaseCannotBeOpened_TheUsersDatabaseIsPutBack()
+    {
+        await Start();
+        await AddTag(_services, _friend, "Keep");
+
+        // Moved in, then the database cannot be prepared: the new file has to come out again.
+        var damaged = Path.Combine(Databases.Root, "damaged.db");
+        await File.WriteAllTextAsync(damaged, new string('x', 5000));
+
+        var error = Assert.Throws<DatabaseNotReplacedException>(() => Databases.Replace(_friend, damaged));
+
+        Assert.True(error.DatabaseUnchanged);
+        Assert.IsType<SqliteException>(error.InnerException);
+        AssertPutBack();
+        Assert.Equal(["Keep"], await TagNames(_services, _friend));
+
+        await AddTag(_services, _friend, "Still works");
+        Assert.Equal(["Keep", "Still works"], await TagNames(_services, _friend));
     }
 
     [Fact]
@@ -286,6 +323,13 @@ public sealed class DatabaseBackupsTests : IDisposable
         Assert.False(File.Exists(temporaryFile), "Disposing the download deletes its temporary file.");
 
         return path;
+    }
+
+    /// <summary>The friend's own database is back at its place, and nothing of the failed replace is left beside it.</summary>
+    private void AssertPutBack()
+    {
+        Assert.Equal([Databases.GetFilePath(_friend)], Directory.GetFiles(Databases.Folder, $"{_friend:D}*.db"));
+        Assert.Empty(Directory.GetFiles(Databases.Folder, "*.previous*"));
     }
 
     private async Task<InvalidDataException> Refused(string path)

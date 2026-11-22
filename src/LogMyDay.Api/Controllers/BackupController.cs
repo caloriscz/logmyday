@@ -149,11 +149,15 @@ public class BackupController : BaseApiController
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (DatabaseNotReplacedException ex)
+        {
+            return ex.DatabaseUnchanged ? Conflict(new { message = ex.Message }) : StatusCode(500, new { message = ex.Message });
+        }
         catch (IOException ex)
         {
-            _logger.LogWarning(ex, "The database of user {UserId} could not be replaced", userId);
+            _logger.LogWarning(ex, "The upload for the database restore of user {UserId} could not be stored", userId);
 
-            return Conflict(new { message = "The database is in use right now. Try again in a moment." });
+            return StatusCode(500, new { message = "The uploaded file could not be stored on the server, so nothing was restored. Your database was not changed." });
         }
 
         return Ok(new { message = "The database was restored.", userId = userId.ToString() });

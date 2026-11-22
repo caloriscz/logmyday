@@ -738,6 +738,11 @@
         {
             SetStatus($"The file was not restored: {ex.Message}", true);
         }
+        catch (LogMyDay.Api.Infrastructure.Data.DatabaseNotReplacedException ex)
+        {
+            // Logged where it happened; the message says what the user's database is now.
+            SetStatus(ex.Message, true);
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Database restore failed");
