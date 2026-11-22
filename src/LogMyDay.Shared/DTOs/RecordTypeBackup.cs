@@ -24,6 +24,7 @@ public class RecordFieldBackup
     public double? Step { get; set; }
     public string? DefaultValue { get; set; }
     public string? OptionListKey { get; set; }
+    public string? ColorSchemeName { get; set; }
 }
 
 public class RecordBackup

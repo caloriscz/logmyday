@@ -9,6 +9,7 @@ public class BackupData
     public List<TagOptionListBackup> TagOptionLists { get; set; } = new();
     public List<TagOptionBackup> TagOptions { get; set; } = new();
     public List<TagGroupBackup> TagGroups { get; set; } = new();
+    public List<ColorSchemeBackup> ColorSchemes { get; set; } = new();
     public List<TagBackup> Tags { get; set; } = new();
     public List<NotificationBackup> Notifications { get; set; } = new();
     public List<ActivityBackup> Activities { get; set; } = new();
@@ -33,6 +34,7 @@ public class BackupMetadata
     public int TotalTagOptionLists { get; set; }
     public int TotalTagOptions { get; set; }
     public int TotalTagGroups { get; set; }
+    public int TotalColorSchemes { get; set; }
     public int TotalNotifications { get; set; }
     public int TotalScanMappings { get; set; }
     public int TotalTodoLists { get; set; }

@@ -355,6 +355,7 @@ public class BackupService : IBackupService
             .Include(t => t.RecordFields).ThenInclude(f => f.InputType)
             .Include(t => t.RecordFields).ThenInclude(f => f.Unit)
             .Include(t => t.RecordFields).ThenInclude(f => f.OptionList)
+            .Include(t => t.RecordFields).ThenInclude(f => f.ColorScheme)
             .Where(t => t.IsRecordType && (userId == null || t.UserId == userId))
             .OrderBy(t => t.TagName)
             .ToListAsync();
@@ -388,7 +389,8 @@ public class BackupService : IBackupService
                     MaxValue = f.MaxValue,
                     Step = f.Step,
                     DefaultValue = f.DefaultValue,
-                    OptionListKey = f.OptionList?.Name
+                    OptionListKey = f.OptionList?.Name,
+                    ColorSchemeName = f.ColorScheme?.Name
                 }).ToList(),
                 Records = records[t.Id].Select(r => new RecordBackup
                 {
@@ -426,6 +428,7 @@ public class BackupService : IBackupService
         var optionLists = (await _context.TagOptionLists.Where(l => userId == null || l.UserId == userId).ToListAsync())
             .GroupBy(l => l.Name)
             .ToDictionary(g => g.Key, g => g.First().Id);
+        var colorSchemes = await ColorSchemeIdsByName(userId);
 
         foreach (var backup in recordTypes)
         {
@@ -475,6 +478,7 @@ public class BackupService : IBackupService
                     Step = field.Step,
                     DefaultValue = field.DefaultValue,
                     OptionListId = optionListId,
+                    ColorSchemeId = field.ColorSchemeName != null && colorSchemes.TryGetValue(field.ColorSchemeName, out var schemeId) ? schemeId : null,
                     GroupId = type.GroupId,
                     UserId = owner,
                     RecordType = type,
@@ -854,7 +858,8 @@ public class BackupService : IBackupService
                     Step = t.Step,
                     DefaultValue = t.DefaultValue,
                     OptionListKey = t.OptionList != null ? t.OptionList.Name : null,
-                    GroupName = t.Group != null ? t.Group.Name : null
+                    GroupName = t.Group != null ? t.Group.Name : null,
+                    ColorSchemeName = t.ColorScheme != null ? t.ColorScheme.Name : null
                 })
                 .ToListAsync();
 
@@ -1009,6 +1014,7 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
+            var colorSchemes = await ExportColorSchemesAsync(userId);
             var tagRules = await ExportTagRulesAsync(userId);
             var tagChecks = await ExportTagChecksAsync(userId);
             var tagTriggers = await ExportTagTriggersAsync(userId);
@@ -1026,6 +1032,7 @@ public class BackupService : IBackupService
                     TotalTagOptionLists = tagOptionLists.Count,
                     TotalTagOptions = tagOptions.Count,
                     TotalTagGroups = tagGroups.Count,
+                    TotalColorSchemes = colorSchemes.Count,
                     TotalTags = tags.Count,
                     TotalActivities = totalActivities,
                     TotalScanMappings = scanMappings.Count,
@@ -1044,6 +1051,7 @@ public class BackupService : IBackupService
                 TagOptionLists = tagOptionLists,
                 TagOptions = tagOptions,
                 TagGroups = tagGroups,
+                ColorSchemes = colorSchemes,
                 Tags = tags,
                 Activities = activities,
                 ScanMappings = scanMappings,
@@ -1102,6 +1110,7 @@ public class BackupService : IBackupService
                 await ImportTagOptionListsAsync(backupData.TagOptionLists, result, userId);
                 await ImportTagOptionsAsync(backupData.TagOptions, result);
                 await ImportTagGroupsAsync(backupData.TagGroups, result, userId);
+                await ImportColorSchemesAsync(backupData.ColorSchemes, result, userId);
                 await ImportTagsAsync(backupData.Tags, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
                 await ImportRecordTypesAsync(backupData.RecordTypes, result, userId);
@@ -1586,6 +1595,86 @@ public class BackupService : IBackupService
         await _context.SaveChangesAsync();
     }
 
+    // Colour schemes travel whole, with their entries. Tags and record fields name their scheme.
+    private async Task<List<ColorSchemeBackup>> ExportColorSchemesAsync(Guid? userId)
+    {
+        return await _context.ColorSchemes
+            .Where(c => userId == null || c.UserId == userId)
+            .OrderBy(c => c.Name)
+            .Select(c => new ColorSchemeBackup
+            {
+                Name = c.Name,
+                Description = c.Description,
+                DisplayOrder = c.DisplayOrder,
+                DateCreated = c.DateCreated,
+                Entries = c.Entries
+                    .OrderBy(e => e.SortOrder)
+                    .ThenBy(e => e.Id)
+                    .Select(e => new ColorSchemeEntryBackup
+                    {
+                        RangeFrom = e.RangeFrom,
+                        RangeTo = e.RangeTo,
+                        Color = e.Color,
+                        SortOrder = e.SortOrder,
+                        Label = e.Label
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+    }
+
+    // A scheme whose name the user already has is left as it is, like a tag group.
+    private async Task ImportColorSchemesAsync(List<ColorSchemeBackup> colorSchemes, BackupImportResult result, Guid? userId)
+    {
+        if (colorSchemes.Count == 0)
+        {
+            return;
+        }
+
+        var existingNames = await _context.ColorSchemes
+            .Where(c => userId == null || c.UserId == userId)
+            .Select(c => c.Name)
+            .ToHashSetAsync();
+
+        foreach (var scheme in colorSchemes)
+        {
+            if (string.IsNullOrWhiteSpace(scheme.Name) || !existingNames.Add(scheme.Name))
+            {
+                result.Statistics.ColorSchemesSkipped++;
+                continue;
+            }
+
+            _context.ColorSchemes.Add(new ColorScheme
+            {
+                Name = scheme.Name,
+                UserId = userId ?? Guid.Empty,
+                Description = scheme.Description,
+                DisplayOrder = scheme.DisplayOrder,
+                DateCreated = scheme.DateCreated == default ? DateTime.UtcNow : scheme.DateCreated,
+                Entries = scheme.Entries
+                    .Select(e => new ColorSchemeEntry
+                    {
+                        RangeFrom = e.RangeFrom,
+                        RangeTo = e.RangeTo,
+                        Color = e.Color,
+                        SortOrder = e.SortOrder,
+                        Label = e.Label
+                    })
+                    .ToList()
+            });
+            result.Statistics.ColorSchemesImported++;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task<Dictionary<string, int>> ColorSchemeIdsByName(Guid? userId)
+    {
+        return (await _context.ColorSchemes.Where(c => userId == null || c.UserId == userId).ToListAsync())
+            .GroupBy(c => c.Name)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+    }
+
     private async Task ImportTagGroupsAsync(List<TagGroupBackup> tagGroups, BackupImportResult result, Guid? userId)
     {
         var existingGroupNames = await _context.TagGroups
@@ -1637,6 +1726,8 @@ public class BackupService : IBackupService
             .Where(g => userId == null || g.UserId == userId)
             .ToDictionaryAsync(g => g.Name, g => g.Id);
 
+        var colorSchemeLookup = await ColorSchemeIdsByName(userId);
+
         var existingTagNames = await _context.Tags
             .Where(t => (userId == null || t.UserId == userId) && !t.IsRecordType)
             .Select(t => t.TagName)
@@ -1672,6 +1763,8 @@ public class BackupService : IBackupService
                     ? tagOptionListLookup[tag.OptionListKey] : null,
                 GroupId = !string.IsNullOrEmpty(tag.GroupName) && tagGroupLookup.ContainsKey(tag.GroupName)
                     ? tagGroupLookup[tag.GroupName] : null,
+                ColorSchemeId = !string.IsNullOrEmpty(tag.ColorSchemeName) && colorSchemeLookup.TryGetValue(tag.ColorSchemeName, out var colorSchemeId)
+                    ? colorSchemeId : null,
                 UserId = userId ?? Guid.Empty
             };
 
@@ -1966,7 +2059,8 @@ public class BackupService : IBackupService
                     TimeGranularity = t.TimeGranularity.ToString(),
                     IsRepeatable = t.IsRepeatable,
                     IsRange = t.IsRange,
-                    PatternName = t.Pattern != null ? t.Pattern.Name : null
+                    PatternName = t.Pattern != null ? t.Pattern.Name : null,
+                    ColorSchemeName = t.ColorScheme != null ? t.ColorScheme.Name : null
                     // Note: UserId explicitly excluded for security
                 })
                 .ToListAsync();
@@ -2044,6 +2138,7 @@ public class BackupService : IBackupService
                 Activities = userActivities,
                 Tags = userTags,
                 TagGroups = userTagGroups,
+                ColorSchemes = await ExportColorSchemesAsync(userId),
                 TagOptionLists = userTagOptionLists,
                 TagOptions = userTagOptions,
                 ScanMappings = userScanMappings,
@@ -2152,6 +2247,9 @@ public class BackupService : IBackupService
 
                 await _context.SaveChangesAsync();
 
+                await ImportColorSchemesAsync(backup.ColorSchemes, result, userId);
+                var colorSchemeLookup = await ColorSchemeIdsByName(userId);
+
                 // Step 4: Import tags with current user ID
                 var tagGroupLookup = await _context.TagGroups
                     .Where(g => g.UserId == userId)
@@ -2195,6 +2293,7 @@ public class BackupService : IBackupService
                             IsRepeatable = tagDto.IsRepeatable,
                             IsRange = tagDto.IsRange,
                             PatternId = patternId,
+                            ColorSchemeId = tagDto.ColorSchemeName != null && colorSchemeLookup.TryGetValue(tagDto.ColorSchemeName, out var colorSchemeId) ? colorSchemeId : null,
                             UserId = userId
                         };
                         
