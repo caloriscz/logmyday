@@ -44,7 +44,7 @@ internal static class ApplicationServicesExtensions
         // Injected as a clock so expiry and last-used throttling are testable with a fake time.
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IBackupService, BackupService>();
-        services.AddScoped<ISqliteExportService, SqliteExportService>();
+        services.AddScoped<IUserDataAdminService, UserDataAdminService>();
         services.AddScoped<ITodoListService, TodoListService>();
         services.AddScoped<ITodoItemService, TodoItemService>();
         services.AddScoped<ITagDayLockService, TagDayLockService>();

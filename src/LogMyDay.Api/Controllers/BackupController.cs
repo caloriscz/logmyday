@@ -1,4 +1,6 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services;
+using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -12,6 +14,9 @@ namespace LogMyDay.Api.Controllers;
 [Route("api/[controller]")]
 public class BackupController : BaseApiController
 {
+    /// <summary>The largest database file a restore accepts.</summary>
+    public const long MaxDatabaseUploadBytes = 1024L * 1024 * 1024;
+
     private readonly IBackupService _backupService;
     private readonly ILogger<BackupController> _logger;
 
@@ -47,20 +52,104 @@ public class BackupController : BaseApiController
     }
 
     /// <summary>
-    /// Admin only: export the whole database (all users, their accounts and data) as a SQLite
-    /// file that LogMyDay can run on as it is.
+    /// Admin only: the whole installation as a zip archive, with the platform database (accounts
+    /// and settings) and every user's database. Unpacked into an empty data folder, LogMyDay
+    /// runs on it.
     /// </summary>
-    /// <returns>SQLite database file</returns>
-    [HttpGet("export/sqlite")]
+    [HttpGet("export/installation")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> ExportSqlite([FromServices] ISqliteExportService sqliteExportService, CancellationToken cancellationToken)
+    public async Task<IActionResult> ExportInstallation([FromServices] IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("SQLite export request received from admin: {UserId}", GetCurrentUserId());
+        _logger.LogInformation("Installation export request received from admin: {UserId}", GetCurrentUserId());
 
-        var export = await sqliteExportService.ExportDatabase(cancellationToken);
+        var export = await databaseBackups.ExportInstallation(cancellationToken);
 
         // The result disposes the stream after sending it, which deletes the temporary file.
-        return File(export.Content, "application/vnd.sqlite3", export.FileName);
+        return File(export.Content, export.ContentType, export.FileName);
+    }
+
+    /// <summary>The current user's database file: a complete copy of everything they logged.</summary>
+    [HttpGet("database")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    public async Task<IActionResult> ExportDatabase([FromServices] IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
+    {
+        var export = await databaseBackups.ExportUser(GetCurrentUserId(), cancellationToken);
+
+        return File(export.Content, export.ContentType, export.FileName);
+    }
+
+    /// <summary>Admin only: the database file of any user.</summary>
+    [HttpGet("database/{userId:guid}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> ExportUserDatabase(Guid userId, [FromServices] IDatabaseBackups databaseBackups, [FromServices] IUserService users, CancellationToken cancellationToken)
+    {
+        if (await users.Get(userId, cancellationToken) == null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        _logger.LogInformation("Database export of user {UserId} requested by admin {AdminId}", userId, GetCurrentUserId());
+
+        var export = await databaseBackups.ExportUser(userId, cancellationToken);
+
+        return File(export.Content, export.ContentType, export.FileName);
+    }
+
+    /// <summary>
+    /// Replaces the current user's database with a database file taken from the same account.
+    /// Everything logged since the file was taken is lost; the replaced database is kept on the
+    /// server as a snapshot.
+    /// </summary>
+    [HttpPost("database/restore")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    [RequestSizeLimit(MaxDatabaseUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxDatabaseUploadBytes)]
+    public Task<IActionResult> RestoreDatabase(IFormFile file, [FromServices] IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
+    {
+        return RestoreDatabaseOf(GetCurrentUserId(), file, databaseBackups, cancellationToken);
+    }
+
+    /// <summary>Admin only: replaces any user's database with a database file taken from that account.</summary>
+    [HttpPost("database/{userId:guid}/restore")]
+    [Authorize(Policy = "AdminOnly")]
+    [RequestSizeLimit(MaxDatabaseUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxDatabaseUploadBytes)]
+    public async Task<IActionResult> RestoreUserDatabase(Guid userId, IFormFile file, [FromServices] IDatabaseBackups databaseBackups, [FromServices] IUserService users, CancellationToken cancellationToken)
+    {
+        if (await users.Get(userId, cancellationToken) == null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        _logger.LogInformation("Database restore of user {UserId} requested by admin {AdminId}", userId, GetCurrentUserId());
+
+        return await RestoreDatabaseOf(userId, file, databaseBackups, cancellationToken);
+    }
+
+    private async Task<IActionResult> RestoreDatabaseOf(Guid userId, IFormFile file, IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file provided" });
+        }
+
+        try
+        {
+            await using var content = file.OpenReadStream();
+            await databaseBackups.RestoreUser(userId, content, cancellationToken);
+        }
+        catch (InvalidDataException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "The database of user {UserId} could not be replaced", userId);
+
+            return Conflict(new { message = "The database is in use right now. Try again in a moment." });
+        }
+
+        return Ok(new { message = "The database was restored.", userId = userId.ToString() });
     }
 
     /// <summary>
@@ -136,11 +225,19 @@ public class BackupController : BaseApiController
     /// <returns>Number of records cleared</returns>
     [HttpDelete("clear")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> ClearData([FromQuery] Guid? userId = null)
+    public async Task<IActionResult> ClearData([FromServices] IUserDataAdminService userData, CancellationToken cancellationToken, [FromQuery] Guid? userId = null)
     {
         _logger.LogInformation("Clear data request received for user: {UserId}", userId?.ToString() ?? "All users");
 
-        var recordsCleared = await _backupService.ClearDataAsync(userId);
+        int recordsCleared;
+        try
+        {
+            recordsCleared = await userData.ClearData(userId, cancellationToken);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { message = "User not found" });
+        }
 
         return Ok(new
         {
