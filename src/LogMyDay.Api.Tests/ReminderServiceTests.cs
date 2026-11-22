@@ -19,7 +19,7 @@ public class ReminderServiceTests
         var context = new LogMyDayDbContext(options);
 
         var userId = Guid.NewGuid();
-        context.Users.Add(new User
+        TestPlatform.For(context).Users.Add(new User
         {
             Id = userId,
             Email = "t@t",
@@ -30,13 +30,13 @@ public class ReminderServiceTests
         context.SaveChanges();
 
         var activityService = new ActivityService(
-            context,
+            context, TestPlatform.Users(context),
             new ActivityRepository(context),
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             new TagDayLockService(context));
 
         var service = new ReminderService(
-            context,
+            context, TestPlatform.Users(context),
             activityService,
             new EventLogService(context, NullLogger<EventLogService>.Instance),
             NullLogger<ReminderService>.Instance);
@@ -237,7 +237,7 @@ public class ReminderServiceTests
 
     private static async Task SetTimeZone(LogMyDayDbContext context, Guid userId, string timeZone)
     {
-        var user = await context.Users.SingleAsync(u => u.Id == userId);
+        var user = await TestPlatform.For(context).Users.SingleAsync(u => u.Id == userId);
         user.TimeZone = timeZone;
         await context.SaveChangesAsync();
     }

@@ -20,4 +20,5 @@ public class TagBackup
     public string? DefaultValue { get; set; }
     public string? OptionListKey { get; set; }
     public string? GroupName { get; set; }
+    public string? ColorSchemeName { get; set; }
 }

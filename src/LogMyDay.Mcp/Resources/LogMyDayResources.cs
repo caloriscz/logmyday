@@ -63,7 +63,7 @@ public sealed class LogMyDayResources(
     public async Task<TextResourceContents> OptionLists() => Json("logmyday://option-lists", await optionLists.GetAll(user.UserId));
 
     [McpServerResource(UriTemplate = "logmyday://units", Name = "units", Title = "Units", MimeType = JsonMime)]
-    [Description("All units and quantities (shared by every user).")]
+    [Description("Your units and quantities.")]
     public async Task<TextResourceContents> Units()
     {
         return Json("logmyday://units", new { units = await units.GetAll(), quantities = await units.GetQuantities() });

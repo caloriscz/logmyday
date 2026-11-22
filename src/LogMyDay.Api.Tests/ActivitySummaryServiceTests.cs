@@ -23,10 +23,10 @@ public class ActivitySummaryServiceTests
         {
             var options = new DbContextOptionsBuilder<LogMyDayDbContext>().UseInMemoryDatabase(name).Options;
             Context = new LogMyDayDbContext(options);
-            Context.Users.Add(new User { Id = UserId, Email = "s@test.com", PasswordHash = "x", Culture = culture });
-            Context.Users.Add(new User { Id = OtherUserId, Email = "o@test.com", PasswordHash = "x" });
+            TestPlatform.For(Context).Users.Add(new User { Id = UserId, Email = "s@test.com", PasswordHash = "x", Culture = culture });
+            TestPlatform.For(Context).Users.Add(new User { Id = OtherUserId, Email = "o@test.com", PasswordHash = "x" });
             Context.SaveChanges();
-            Service = new ActivitySummaryService(Context);
+            Service = new ActivitySummaryService(Context, TestPlatform.Users(Context));
         }
 
         public Tag Tag(int inputTypeId, int? optionListId = null, Guid? owner = null)

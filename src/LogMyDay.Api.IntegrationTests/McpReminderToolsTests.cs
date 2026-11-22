@@ -145,7 +145,7 @@ public class McpReminderToolsTests : IClassFixture<CustomWebApplicationFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-            var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
+            var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
             await scope.ServiceProvider.GetRequiredService<ITagDayLockService>()
                 .Upsert(user.Id, new TagDayLockRequest { TagId = tagId, Date = new DateOnly(2026, 3, 23), IsLocked = true }, DayLockSetBy.User);
         }

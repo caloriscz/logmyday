@@ -15,17 +15,19 @@ namespace LogMyDay.Api.Application.Services;
 public class RecordService : IRecordService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IEventLogService _eventLogService;
     private readonly ITagRuleEngine _tagRuleEngine;
     private readonly ITagTriggerEngine _tagTriggerEngine;
 
-    public RecordService(LogMyDayDbContext context, IEventLogService eventLogService, ITagRuleEngine tagRuleEngine,
+    public RecordService(LogMyDayDbContext context, IUserDirectory users, IEventLogService eventLogService, ITagRuleEngine tagRuleEngine,
         ITagTriggerEngine? tagTriggerEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _tagRuleEngine = tagRuleEngine ?? throw new ArgumentNullException(nameof(tagRuleEngine));
-        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, eventLogService);
+        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, users, eventLogService);
     }
 
     // Rules first, so a trigger on a computed tag sees the tag's new value; both inside the
@@ -298,7 +300,7 @@ public class RecordService : IRecordService
             return value;
         }
 
-        var timeZone = await _context.Users.Where(u => u.Id == userId).Select(u => u.TimeZone).FirstOrDefaultAsync();
+        var timeZone = await _users.GetTimeZone(userId);
 
         TimeZoneInfo tz;
         try

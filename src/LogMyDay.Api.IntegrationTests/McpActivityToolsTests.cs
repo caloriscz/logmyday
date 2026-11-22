@@ -109,7 +109,7 @@ public class McpActivityToolsTests : IClassFixture<CustomWebApplicationFactory>
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-            var user = await db.Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
+            var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.McpUserEmail);
             await scope.ServiceProvider.GetRequiredService<ITagDayLockService>()
                 .Upsert(user.Id, new TagDayLockRequest { TagId = id, Date = new DateOnly(2026, 3, 14), IsLocked = true }, DayLockSetBy.User);
         }
@@ -176,7 +176,7 @@ public class McpActivityToolsTests : IClassFixture<CustomWebApplicationFactory>
             var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
             var other = new User { Id = Guid.NewGuid(), Email = $"other-{Guid.NewGuid():N}@example.com", PasswordHash = "x" };
             var tag = new Tag { TagName = "Theirs", UserId = other.Id, InputTypeId = InputTypeIds.Integer, TimeGranularity = TimeGranularity.Daily };
-            db.Users.Add(other);
+            TestPlatform.For(db).Users.Add(other);
             db.Tags.Add(tag);
             await db.SaveChangesAsync();
             foreignId = tag.Id;

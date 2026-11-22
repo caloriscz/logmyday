@@ -14,6 +14,7 @@ namespace LogMyDay.Api.Application.Services;
 public class ActivityService : IActivityService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IActivityRepository _activityRepository;
     private readonly IEventLogService _eventLogService;
     private readonly ITagDayLockService _tagDayLockService;
@@ -21,7 +22,7 @@ public class ActivityService : IActivityService
     private readonly ITagTriggerEngine _tagTriggerEngine;
 
     public ActivityService(
-        LogMyDayDbContext context,
+        LogMyDayDbContext context, IUserDirectory users,
         IActivityRepository activityRepository,
         IEventLogService eventLogService,
         ITagDayLockService tagDayLockService,
@@ -29,11 +30,12 @@ public class ActivityService : IActivityService
         ITagTriggerEngine? tagTriggerEngine = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _activityRepository = activityRepository ?? throw new ArgumentNullException(nameof(activityRepository));
         _eventLogService = eventLogService ?? throw new ArgumentNullException(nameof(eventLogService));
         _tagDayLockService = tagDayLockService ?? throw new ArgumentNullException(nameof(tagDayLockService));
         _tagRuleEngine = tagRuleEngine ?? new TagRuleEngine(context);
-        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, eventLogService);
+        _tagTriggerEngine = tagTriggerEngine ?? new TagTriggerEngine(context, users, eventLogService);
     }
 
     // Rules first, so a trigger on a computed tag sees the tag's new value; both inside the
@@ -228,7 +230,7 @@ public class ActivityService : IActivityService
             return value;
         }
 
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         TimeZoneInfo tz;
         try

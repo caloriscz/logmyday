@@ -294,6 +294,141 @@ public class BackupServiceTests
         Assert.Equal("Buy bread", (await context.TodoItems.SingleAsync()).Title);
     }
 
+    /// <summary>
+    /// Both ways of clearing remove everything the user logged and set up, also what no backup
+    /// carries, and leave what a database can't work without.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Clearing_RemovesRemindersDayLocksColorSchemesAndEventLogs_AndKeepsReferenceData(bool secureEndpoint)
+    {
+        using var context = CreateContext();
+        var service = new BackupService(context, new Mock<ILogger<BackupService>>().Object);
+        var user1Id = Guid.NewGuid();
+        var user2Id = Guid.NewGuid();
+
+        context.InputTypes.Add(new Domain.Entities.InputType { Name = "Integer" });
+        foreach (var userId in new[] { user1Id, user2Id })
+        {
+            var tag = new Domain.Entities.Tag
+            {
+                TagName = $"Tag of {userId}",
+                UserId = userId,
+                ColorScheme = new Domain.Entities.ColorScheme { Name = "Traffic", UserId = userId, Entries = { new Domain.Entities.ColorSchemeEntry { Color = "#ff0000" } } }
+            };
+            context.Tags.Add(tag);
+            context.TagDayLocks.Add(new Domain.Entities.TagDayLock { UserId = userId, Tag = tag, Date = new DateOnly(2026, 11, 19), IsLocked = true });
+            context.Reminders.Add(new Domain.Entities.Reminder
+            {
+                UserId = userId,
+                Title = "Take magnesium",
+                Days = { new Domain.Entities.ReminderDay { UserId = userId, Date = new DateOnly(2026, 11, 20), IsDone = true } }
+            });
+            context.TodoLists.Add(new Domain.Entities.TodoList { Name = "Errands", UserId = userId, Items = { new Domain.Entities.TodoItem { Title = "Buy milk" } } });
+            context.EventLogs.Add(new Domain.Entities.EventLog { UserId = userId, Message = "Something happened", Detail = new Domain.Entities.EventLogDetail { EventLogId = 0, Description = "Detail" } });
+        }
+
+        await context.SaveChangesAsync();
+
+        var cleared = secureEndpoint ? await service.ClearUserData(user1Id) : await service.ClearDataAsync(user1Id);
+
+        Assert.True(cleared > 0);
+        Assert.Equal(user2Id, (await context.Tags.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.Reminders.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.ReminderDays.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.TagDayLocks.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.ColorSchemes.SingleAsync()).UserId);
+        Assert.Equal(1, await context.ColorSchemeEntries.CountAsync());
+        Assert.Equal(user2Id, (await context.TodoLists.SingleAsync()).UserId);
+        Assert.Equal(1, await context.TodoItems.CountAsync());
+        Assert.Equal(user2Id, (await context.EventLogs.SingleAsync()).UserId);
+        Assert.Equal(1, await context.EventLogDetails.CountAsync());
+
+        // Without a user everything in the database goes, except the reference data.
+        await service.ClearDataAsync();
+
+        Assert.Empty(await context.Tags.ToListAsync());
+        Assert.Empty(await context.EventLogs.ToListAsync());
+        Assert.Equal(1, await context.InputTypes.CountAsync());
+    }
+
+    /// <summary>
+    /// The clear deletes colour schemes, so both JSON backups carry them: the schemes with their
+    /// entries, and which scheme a tag or a record field uses.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ColorSchemes_ComeBackWithTheirEntriesAndLinks_AfterClearAndImport(bool secureBackup)
+    {
+        using var context = CreateContext();
+        var service = new BackupService(context, new Mock<ILogger<BackupService>>().Object);
+        var userId = Guid.NewGuid();
+
+        var traffic = new Domain.Entities.ColorScheme
+        {
+            Name = "Traffic",
+            UserId = userId,
+            Description = "Low to high",
+            DisplayOrder = 3,
+            DateCreated = new DateTime(2026, 5, 1, 8, 0, 0),
+            Entries =
+            {
+                new Domain.Entities.ColorSchemeEntry { Color = "#22c55e", SortOrder = 1, RangeFrom = 90, RangeTo = null, Label = "High" },
+                new Domain.Entities.ColorSchemeEntry { Color = "#ff0000", SortOrder = 2, RangeFrom = 0.5, RangeTo = 2.75, Label = "Low" }
+            }
+        };
+        var workout = new Domain.Entities.Tag { TagName = "Workout", UserId = userId, IsRecordType = true };
+        context.ColorSchemes.Add(new Domain.Entities.ColorScheme { Name = "Unused", UserId = userId });
+        context.Tags.AddRange(
+            new Domain.Entities.Tag { TagName = "Mood", UserId = userId, ColorScheme = traffic },
+            new Domain.Entities.Tag { TagName = "Plain", UserId = userId },
+            workout,
+            new Domain.Entities.Tag { TagName = RecordFieldValues.TagName("Workout", "reps"), UserId = userId, RecordType = workout, RecordFieldOrder = 0, ColorScheme = traffic });
+        await context.SaveChangesAsync();
+
+        // Through JSON, as a downloaded backup travels.
+        var json = secureBackup
+            ? System.Text.Json.JsonSerializer.Serialize(await service.CreateSecureBackup(userId))
+            : System.Text.Json.JsonSerializer.Serialize(await service.ExportDataAsync(userId));
+
+        await service.ClearDataAsync(userId);
+        Assert.Empty(await context.ColorSchemes.ToListAsync());
+
+        var result = secureBackup
+            ? await service.RestoreSecureBackup(System.Text.Json.JsonSerializer.Deserialize<SecureBackupDto>(json)!, userId)
+            : await service.ImportDataAsync(System.Text.Json.JsonSerializer.Deserialize<BackupData>(json)!, clearExistingData: false, userId: userId);
+
+        Assert.True(result.Success, string.Join("; ", result.Errors));
+        Assert.Equal(2, result.Statistics.ColorSchemesImported);
+
+        var restored = await context.ColorSchemes.Include(c => c.Entries).SingleAsync(c => c.Name == "Traffic");
+        Assert.Equal(userId, restored.UserId);
+        Assert.Equal("Low to high", restored.Description);
+        Assert.Equal(3, restored.DisplayOrder);
+        Assert.Equal(new DateTime(2026, 5, 1, 8, 0, 0), restored.DateCreated);
+        Assert.Equal(
+            new[] { "#22c55e|1|90||High", "#ff0000|2|0.5|2.75|Low" },
+            restored.Entries.OrderBy(e => e.SortOrder).Select(e => FormattableString.Invariant($"{e.Color}|{e.SortOrder}|{e.RangeFrom}|{e.RangeTo}|{e.Label}")));
+        Assert.Empty((await context.ColorSchemes.Include(c => c.Entries).SingleAsync(c => c.Name == "Unused")).Entries);
+
+        var tags = await context.Tags.ToDictionaryAsync(t => t.TagName, t => t.ColorSchemeId);
+        Assert.Equal(restored.Id, tags["Mood"]);
+        Assert.Equal(restored.Id, tags[RecordFieldValues.TagName("Workout", "reps")]);
+        Assert.Null(tags["Plain"]);
+
+        // A second import leaves the schemes the user already has as they are.
+        var again = secureBackup
+            ? await service.RestoreSecureBackup(System.Text.Json.JsonSerializer.Deserialize<SecureBackupDto>(json)!, userId)
+            : await service.ImportDataAsync(System.Text.Json.JsonSerializer.Deserialize<BackupData>(json)!, clearExistingData: false, userId: userId);
+
+        Assert.Equal(0, again.Statistics.ColorSchemesImported);
+        Assert.Equal(2, again.Statistics.ColorSchemesSkipped);
+        Assert.Equal(2, await context.ColorSchemes.CountAsync());
+        Assert.Equal(2, await context.ColorSchemeEntries.CountAsync());
+    }
+
     [Fact]
     public async Task ImportDataAsync_WithClearTrue_DoesNotAffectOtherUsers()
     {
@@ -884,7 +1019,8 @@ public class BackupControllerTests
         var mockLogger = new Mock<ILogger<BackupController>>();
         var mockAuthService = new Mock<IAuthService>();
 
-        mockBackupService.Setup(s => s.ClearDataAsync(It.IsAny<Guid?>())).ReturnsAsync(42);
+        var userData = new Mock<LogMyDay.Api.Application.Services.IUserDataAdminService>();
+        userData.Setup(s => s.ClearData(It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(42);
 
         var controller = new BackupController(
             mockBackupService.Object,
@@ -893,14 +1029,14 @@ public class BackupControllerTests
         );
 
         // Act
-        var result = await controller.ClearData();
+        var result = await controller.ClearData(userData.Object, CancellationToken.None);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
 
-        // Verify the service was called
-        mockBackupService.Verify(s => s.ClearDataAsync(null), Times.Once);
+        // Every user is cleared through the admin service, which works in each user's database.
+        userData.Verify(s => s.ClearData(null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
 

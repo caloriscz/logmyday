@@ -51,15 +51,15 @@ public class RecordCompletionTimeTests
         using var context = new LogMyDayDbContext(new DbContextOptionsBuilder<LogMyDayDbContext>().UseSqlite(connection).Options);
         context.Database.EnsureCreated();
         var userId = Guid.NewGuid();
-        context.Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = zoneId, Culture = "en-US" });
+        TestPlatform.For(context).Users.Add(new User { Id = userId, Email = "t@t", PasswordHash = "x", TimeZone = zoneId, Culture = "en-US" });
         context.SaveChanges();
 
         var eventLog = new EventLogService(context, NullLogger<EventLogService>.Instance);
         var engine = new TagRuleEngine(context);
-        var activities = new ActivityService(context, new ActivityRepository(context), eventLog, new TagDayLockService(context), engine);
+        var activities = new ActivityService(context, TestPlatform.Users(context), new ActivityRepository(context), eventLog, new TagDayLockService(context), engine);
         var types = new RecordTypeService(context, eventLog);
-        var records = new RecordService(context, eventLog, engine);
-        var reminders = new ReminderService(context, activities, eventLog, NullLogger<ReminderService>.Instance);
+        var records = new RecordService(context, TestPlatform.Users(context), eventLog, engine);
+        var reminders = new ReminderService(context, TestPlatform.Users(context), activities, eventLog, NullLogger<ReminderService>.Instance);
 
         var type = await types.Create(new RecordTypeRequest { Name = "Blood pressure", Fields = [new() { Name = "Systolic", TypeId = InputTypeIds.Integer }] }, userId);
         var reminder = await reminders.Create(new ReminderRequest { Title = "Measure blood pressure", CompletionTagId = type.Id }, userId);

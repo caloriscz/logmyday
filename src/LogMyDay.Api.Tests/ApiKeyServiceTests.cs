@@ -17,17 +17,17 @@ public class ApiKeyServiceTests
     private static readonly DateTime Now = new(2026, 9, 18, 12, 0, 0, DateTimeKind.Utc);
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(Now));
-    private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _context;
     private readonly ApiKeyService _service;
     private readonly Guid _userId;
 
     public ApiKeyServiceTests()
     {
-        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _context = new LogMyDayDbContext(options);
+        _context = new PlatformDbContext(options);
         _userId = SeedUser("owner@test.com");
         _service = new ApiKeyService(_context, _time, NullLogger<ApiKeyService>.Instance);
     }

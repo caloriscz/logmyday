@@ -23,7 +23,7 @@ public class TagOptionListService : ITagOptionListService
     {
         var lists = await _context.TagOptionLists
             .Include(l => l.Options)
-            .Where(l => l.UserId == null || l.UserId == userId)
+            .Where(l => l.UserId == userId)
             .OrderBy(l => l.Name)
             .ToListAsync();
 
@@ -34,7 +34,7 @@ public class TagOptionListService : ITagOptionListService
     {
         var list = await _context.TagOptionLists
             .Include(l => l.Options)
-            .FirstOrDefaultAsync(l => l.Id == id && (l.UserId == null || l.UserId == userId));
+            .FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId);
 
         if (list == null)
         {
@@ -49,7 +49,7 @@ public class TagOptionListService : ITagOptionListService
         var list = new TagOptionList
         {
             Name = request.Name.Trim(),
-            UserId = request.IsGlobal ? null : userId
+            UserId = userId
         };
 
         foreach (var option in request.Options)
@@ -64,7 +64,7 @@ public class TagOptionListService : ITagOptionListService
         _context.TagOptionLists.Add(list);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Created option list {ListId} for user {UserId}", list.Id, list.UserId ?? userId);
+        _logger.LogInformation("Created option list {ListId} for user {UserId}", list.Id, userId);
 
         return list.Id;
     }
@@ -152,7 +152,6 @@ public class TagOptionListService : ITagOptionListService
         {
             Id = list.Id,
             Name = list.Name,
-            IsGlobal = list.UserId == null,
             Options = list.Options
                 .OrderBy(o => o.DisplayName ?? o.Value)
                 .Select(o => new TagOptionResponse

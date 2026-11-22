@@ -15,13 +15,15 @@ namespace LogMyDay.Api.Application.Services;
 public class TodoItemService : ITodoItemService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IActivityService _activityService;
     private readonly IEventLogService _eventLogService;
     private readonly ILogger<TodoItemService> _logger;
 
-    public TodoItemService(LogMyDayDbContext context, IActivityService activityService, IEventLogService eventLogService, ILogger<TodoItemService> logger)
+    public TodoItemService(LogMyDayDbContext context, IUserDirectory users, IActivityService activityService, IEventLogService eventLogService, ILogger<TodoItemService> logger)
     {
         _context = context;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _activityService = activityService;
         _eventLogService = eventLogService;
         _logger = logger;
@@ -104,7 +106,7 @@ public class TodoItemService : ITodoItemService
         }
 
         // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
         var doneLocal = ToUserLocalTime(request.DoneAt, user);
 
         // A record type completes with the record its form saved that day; completing logs nothing more.
@@ -202,7 +204,7 @@ public class TodoItemService : ITodoItemService
 
         if (date.HasValue)
         {
-            var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            var user = await _users.Find(userId);
             TimeZoneInfo tz;
             try
             {

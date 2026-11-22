@@ -17,12 +17,12 @@ namespace LogMyDay.Api.Tests;
 /// </summary>
 public class UserServiceTests
 {
-    private static LogMyDayDbContext CreateContext()
+    private static PlatformDbContext CreateContext()
     {
-        var options = new DbContextOptionsBuilder<LogMyDayDbContext>()
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()) // Unique DB per test
             .Options;
-        return new LogMyDayDbContext(options);
+        return new PlatformDbContext(options);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var email = "admin@test.com";
         var password = "SecurePassword123!";
@@ -62,7 +62,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         // Create first admin
         await service.CreateFirstAdmin("first@test.com", "Password123!", "First Admin", CancellationToken.None);
@@ -81,7 +81,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         // Create admin user
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
@@ -103,7 +103,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
 
@@ -122,7 +122,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var createdUser = await service.CreateFirstAdmin("test@example.com", "Password123!", "Test", CancellationToken.None);
 
@@ -148,7 +148,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var user = await service.CreateFirstAdmin("user@test.com", "OldPassword123!", "User", CancellationToken.None);
         var oldPasswordHash = user.PasswordHash;
@@ -172,7 +172,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
         var user = await service.CreateUser("user@test.com", "CorrectPassword123!", "User", false, "en-US", "UTC", admin.Id, CancellationToken.None);
@@ -191,7 +191,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
         var user1 = await service.CreateUser("user1@test.com", "Pass123!", "User 1", false, "en-US", "UTC", admin.Id, CancellationToken.None);
@@ -211,7 +211,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
         var user = await service.CreateUser("user@test.com", "OldPass123!", "User", false, "en-US", "UTC", admin.Id, CancellationToken.None);
@@ -233,7 +233,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
         var user1 = await service.CreateUser("user1@test.com", "Pass123!", "User 1", false, "en-US", "UTC", admin.Id, CancellationToken.None);
@@ -274,7 +274,7 @@ public class UserServiceTests
         var passwordHasher = new Argon2IdPasswordHasher();
         var logger = Mock.Of<ILogger<UserService>>();
         var emailSender = Mock.Of<IEmailSender>();
-        var service = new UserService(context, passwordHasher, logger, emailSender);
+        var service = new UserService(context, passwordHasher, logger, emailSender, new SharedUserDataStore());
 
         var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
 

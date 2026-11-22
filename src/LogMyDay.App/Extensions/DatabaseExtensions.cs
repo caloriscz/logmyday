@@ -8,6 +8,8 @@ internal static class DatabaseExtensions
 {
     internal static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
+        services.AddUserScopes();
+
         if (environment.EnvironmentName == "Test")
         {
             return services;
@@ -20,7 +22,8 @@ internal static class DatabaseExtensions
         var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
         DatabaseLocation.EnsureDirectory(connectionString);
 
-        services.AddDbContext<LogMyDayDbContext>(options => options.UseSqlite(connectionString));
+        // The configured file is the platform database; each user's data is a file next to it.
+        services.AddLogMyDayDatabases(connectionString);
 
         Log.Information("Database: SQLite, {Path}", DatabaseLocation.GetFilePath(connectionString) ?? connectionString);
 

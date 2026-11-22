@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Mcp.Infrastructure;
 using LogMyDay.Shared.DTOs;
@@ -17,7 +18,7 @@ namespace LogMyDay.Mcp.Tools;
 /// </summary>
 [McpServerToolType]
 [Authorize(Policy = McpPolicies.Read)]
-public sealed class BackupTools(McpUserContext user, IBackupService backups, IUserService users)
+public sealed class BackupTools(McpUserContext user, IBackupService backups, IUserService users, IUserDataAdminService userData)
 {
     public const long MaxInlineBytes = 1_000_000;
     public const string RestoreSentinel = "RESTORE_LMD_BACKUP";
@@ -34,7 +35,7 @@ public sealed class BackupTools(McpUserContext user, IBackupService backups, IUs
     }
 
     [McpServerTool(Name = "export_secure_backup", Title = "Export secure backup", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("The user's data as a secure backup document (activities, tags, groups, option lists, notifications, scan mappings; no credentials), inline as JSON. Over 1 MB the call fails with too-large and points to the REST download.")]
+    [Description("The user's data as a secure backup document (activities, tags, groups, colour schemes, option lists, notifications, scan mappings; no credentials), inline as JSON. Over 1 MB the call fails with too-large and points to the REST download.")]
     public async Task<SecureBackupDto> ExportSecureBackup()
     {
         var backup = await backups.CreateSecureBackup(user.UserId);
@@ -66,7 +67,7 @@ public sealed class BackupTools(McpUserContext user, IBackupService backups, IUs
 
     [McpServerTool(Name = "clear_user_data", Title = "Clear my data", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Deletes ALL of the user's logged data — activities, tags, groups, option lists, reminders, todo lists, scan mappings — keeping the account. Requires confirm = \"CLEAR_MY_DATA\". Take export_secure_backup first and ask the user before confirming.")]
+    [Description("Deletes ALL of the user's logged data — activities, records, tags, groups, option lists, rules, checks, triggers, reminders, todo lists, scan mappings, colour schemes, day locks and the event log — keeping the account, the units and the input types. Requires confirm = \"CLEAR_MY_DATA\". Take export_secure_backup first and ask the user before confirming.")]
     public async Task<object> ClearUserData([Description("Must be exactly CLEAR_MY_DATA.")] string? confirm = null)
     {
         var info = await backups.ExportDataAsync(user.UserId);
@@ -83,8 +84,7 @@ public sealed class BackupTools(McpUserContext user, IBackupService backups, IUs
     [Description("Admin: a full-format backup document (version 2.0) of one user's data, inline as JSON (1 MB cap → too-large). Contains entities only — no accounts, password hashes, API keys or settings.")]
     public async Task<BackupData> AdminExportBackup([Description("The user's id.")] Guid userId)
     {
-        _ = await users.Get(userId, CancellationToken.None) ?? throw new KeyNotFoundException("User not found");
-        var data = await backups.ExportDataAsync(userId);
+        var data = await userData.ExportData(userId, CancellationToken.None);
         EnforceCap(data, "Have that user download it with GET /api/backup/export instead.");
 
         return data;
@@ -98,7 +98,7 @@ public sealed class BackupTools(McpUserContext user, IBackupService backups, IUs
         var accounts = (await users.List(CancellationToken.None)).Count;
         ConfirmSentinel.Require(confirm, ClearAllSentinel, $"Deletes the logged data of all {accounts} user accounts on this server.");
 
-        var cleared = await backups.ClearDataAsync(null);
+        var cleared = await userData.ClearData(null, CancellationToken.None);
 
         return new { cleared = true, recordsCleared = cleared, accountsAffected = accounts };
     }

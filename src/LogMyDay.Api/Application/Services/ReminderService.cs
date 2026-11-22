@@ -13,13 +13,15 @@ namespace LogMyDay.Api.Application.Services;
 public class ReminderService : IReminderService
 {
     private readonly LogMyDayDbContext _context;
+    private readonly IUserDirectory _users;
     private readonly IActivityService _activityService;
     private readonly IEventLogService _eventLogService;
     private readonly ILogger<ReminderService> _logger;
 
-    public ReminderService(LogMyDayDbContext context, IActivityService activityService, IEventLogService eventLogService, ILogger<ReminderService> logger)
+    public ReminderService(LogMyDayDbContext context, IUserDirectory users, IActivityService activityService, IEventLogService eventLogService, ILogger<ReminderService> logger)
     {
         _context = context;
+        _users = users ?? throw new ArgumentNullException(nameof(users));
         _activityService = activityService;
         _eventLogService = eventLogService;
         _logger = logger;
@@ -27,7 +29,7 @@ public class ReminderService : IReminderService
 
     public async Task<IList<ReminderResponse>> GetAll(Guid userId, DateOnly? date = null)
     {
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         var reminders = await _context.Reminders
             .AsNoTracking()
@@ -220,7 +222,7 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         // DoneAt is UTC; the auto-logged activity is stored in naive local time like every other activity.
         var doneLocal = ToUserLocalTime(request.DoneAt, user);
@@ -315,7 +317,7 @@ public class ReminderService : IReminderService
     public async Task<ReminderResponse> Reopen(int id, Guid userId)
     {
         var item = await LoadItemForUser(id, userId);
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         item.IsDone = false;
         item.DoneAt = null;
@@ -346,7 +348,7 @@ public class ReminderService : IReminderService
             throw new KeyNotFoundException("Reminder not found");
         }
 
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
         var tz = ResolveTimeZone(user);
         var localDate = ReferenceLocalDate(date, user);
 
@@ -417,7 +419,7 @@ public class ReminderService : IReminderService
     public async Task<ReminderResponse> Unskip(int id, Guid userId, DateOnly? date = null)
     {
         var item = await LoadItemForUser(id, userId);
-        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        var user = await _users.Find(userId);
 
         item.SkippedAt = null;
 

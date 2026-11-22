@@ -12,13 +12,15 @@ namespace LogMyDay.Api.Application.Services;
 
 public sealed class UserService : IUserService
 {
-    private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<UserService> _logger;
     private readonly IEmailSender _emailSender;
+    private readonly IUserDataStore _userData;
 
-    public UserService(LogMyDayDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger, IEmailSender emailSender)
+    public UserService(PlatformDbContext context, IPasswordHasher passwordHasher, ILogger<UserService> logger, IEmailSender emailSender, IUserDataStore userData)
     {
+        _userData = userData;
         _context = context;
         _passwordHasher = passwordHasher;
         _logger = logger;
@@ -58,6 +60,7 @@ public sealed class UserService : IUserService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);
+        _userData.Create(user.Id);
 
         _logger.LogInformation("First admin user created with email: {Email}", normalizedEmail);
 
@@ -103,6 +106,7 @@ public sealed class UserService : IUserService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync(cancellationToken);
+        _userData.Create(user.Id);
         _logger.LogInformation("User created with email: {Email} by admin: {ActorId}", normalizedEmail, actorId);
 
         return user;
@@ -215,6 +219,10 @@ public sealed class UserService : IUserService
 
         _context.Users.Remove(user);
         await _context.SaveChangesAsync(cancellationToken);
+
+        // The account goes first: if the data can't be deleted, nobody can sign in to it any more
+        // and the error says what is left behind.
+        _userData.Delete(id);
 
         _logger.LogInformation("User {UserId} deleted by admin {ActorId}", id, actorId);
     }

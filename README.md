@@ -43,26 +43,19 @@ LogMyDay helps you capture the story of your day. Use it to record habits, welln
 ## For Self-Hosted Deployments
 
 - Deploy the full stack on Windows, Linux, or in containers
-- Keep all data in a single SQLite file, with HTTPS enforced throughout the stack
+- Keep all data in SQLite files in one folder, a database per user, with HTTPS enforced throughout the stack
 
-## Migration
+## Migrations
 
-Run from the root of your solution (or in LogMyDay.App folder):
+The application migrates its databases itself when it starts: the platform database (users and
+settings) and then each user's database. A database that already holds data is copied into the
+`snapshots` folder next to the platform database first. A failed migration stops the start.
 
-```
-dotnet ef migrations add InitialCreate --project LogMyDay.Api --startup-project LogMyDay.App --output-dir Infrastructure/Data/Migrations
-```
-
-Then apply the migration:
+The two kinds of database have a migration set each. To add a migration, run from `src/LogMyDay.Api`:
 
 ```
-dotnet ef database update --project LogMyDay.Api --startup-project LogMyDay.App
-```
-
-## Generate migration script
-
-```
-dotnet ef migrations script --project LogMyDay.Api --startup-project LogMyDay.App --output InitialCreate.sql
+dotnet ef migrations add <Name> --context LogMyDayDbContext --output-dir Infrastructure/Data/Migrations/UserData
+dotnet ef migrations add <Name> --context PlatformDbContext --output-dir Infrastructure/Data/Migrations/Platform
 ```
 
 ## Installation
@@ -108,12 +101,12 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database Connection
 
-LogMyDay stores its data in a single SQLite file. Point the connection string at the file in `appsettings.Development.json`:
+LogMyDay stores its data in SQLite files: the file the connection string names holds the accounts and settings, and each user's data is a file of its own in the `users` folder next to it. Point the connection string at the file in `appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Data Source=logmyday.db"
+    "DefaultConnection": "Data Source=data/logmyday.db"
   }
 }
 ```
@@ -164,17 +157,9 @@ Example for Gmail:
 | `SenderEmail` | Email address shown as sender |
 | `PasswordResetUrl` | *(Optional)* Override the password reset link base URL. Defaults to the incoming request's scheme and host. Useful when running behind a reverse proxy that does not forward headers. |
 
-## Apply Database Migrations
+## Database
 
-Initialize the database schema by applying the Entity Framework Core migrations. This step creates the necessary tables (like `LogMyDay_Units`) and seeds initial data.
-
-```powershell
-# Install the EF Core tool if you haven't already
-dotnet tool install --global dotnet-ef
-
-# Apply migrations
-dotnet ef database update --project src/LogMyDay.Api --startup-project src/LogMyDay.App
-```
+There is nothing to prepare: the first start creates the database files and seeds the reference data.
 
 ## Install UI dependencies
 

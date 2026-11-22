@@ -33,7 +33,7 @@ public sealed class RecordTools(
     public sealed record FieldInput(
         [property: Description("Field name within the record type, e.g. \"Systolic\"; its tag is named \"{record type}: {field}\".")] string Name,
         [property: Description("Input type id, as for create_tag; required for a new field.")] int? InputTypeId,
-        [property: Description("Unit id (units are global).")] int? UnitId = null,
+        [property: Description("Unit id (see list_units).")] int? UnitId = null,
         [property: Description("Option list id; the value must then be one of its options.")] int? OptionListId = null,
         [property: Description("Minimum for numeric types.")] double? MinValue = null,
         [property: Description("Maximum for numeric types.")] double? MaxValue = null,

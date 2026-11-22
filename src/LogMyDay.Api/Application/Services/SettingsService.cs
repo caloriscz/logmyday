@@ -11,13 +11,13 @@ namespace LogMyDay.Api.Application.Services;
 
 public sealed class SettingsService : ISettingsService
 {
-    private readonly LogMyDayDbContext _context;
+    private readonly PlatformDbContext _context;
     private readonly IOptionsMonitor<AiOptions> _defaultAiOptions;
     private readonly ILogger<SettingsService> _logger;
     private readonly ISettingProtector _protector;
 
     public SettingsService(
-        LogMyDayDbContext context,
+        PlatformDbContext context,
         IOptionsMonitor<AiOptions> defaultAiOptions,
         ILogger<SettingsService> logger,
         ISettingProtector protector)

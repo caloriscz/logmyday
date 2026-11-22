@@ -22,7 +22,7 @@ public sealed class OptionListTools(McpUserContext user, ITagOptionListService o
         [property: Description("Optional label shown instead of the value.")] string? DisplayName);
 
     [McpServerTool(Name = "list_option_lists", Title = "List option lists", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("Lists the option lists the user can use — personal ones and global ones — with their options.")]
+    [Description("Lists your option lists with their options.")]
     public Task<IEnumerable<TagOptionListResponse>> ListOptionLists() => optionLists.GetAll(user.UserId);
 
     [McpServerTool(Name = "get_option_list", Title = "Get option list", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
@@ -31,14 +31,12 @@ public sealed class OptionListTools(McpUserContext user, ITagOptionListService o
 
     [McpServerTool(Name = "create_option_list", Title = "Create option list", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Creates an option list. isGlobal makes it visible to every user and needs an admin.")]
+    [Description("Creates an option list.")]
     public async Task<TagOptionListResponse> CreateOptionList(
         [Description("List name.")] string name,
-        [Description("The options, in order.")] List<OptionInput> options,
-        [Description("Shared with all users (admin only).")] bool isGlobal = false)
+        [Description("The options, in order.")] List<OptionInput> options)
     {
-        RequireGlobalPermission(isGlobal);
-        var request = new TagOptionListRequest { Name = Required(name), IsGlobal = isGlobal, Options = ToRequests(options, allowIds: false) };
+        var request = new TagOptionListRequest { Name = Required(name), Options = ToRequests(options, allowIds: false) };
 
         var id = await optionLists.Create(request, user.UserId);
 
@@ -47,7 +45,7 @@ public sealed class OptionListTools(McpUserContext user, ITagOptionListService o
 
     [McpServerTool(Name = "update_option_list", Title = "Update option list", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Updates a personal option list. When options is given it REPLACES the whole set: an option whose id is included is kept (its value/label updated), one whose id is omitted is deleted, one without an id is added. Omit options to keep them all.")]
+    [Description("Updates an option list. When options is given it REPLACES the whole set: an option whose id is included is kept (its value/label updated), one whose id is omitted is deleted, one without an id is added. Omit options to keep them all.")]
     public async Task<TagOptionListResponse> UpdateOptionList(
         [Description("Option list id.")] int optionListId,
         string? name = null,
@@ -57,7 +55,6 @@ public sealed class OptionListTools(McpUserContext user, ITagOptionListService o
         var request = new TagOptionListRequest
         {
             Name = name == null ? current.Name : Required(name),
-            IsGlobal = current.IsGlobal,
             Options = options == null
                 ? current.Options.Select(o => new TagOptionRequest { Id = o.Id, Value = o.Value, DisplayName = o.DisplayName }).ToList()
                 : ToRequests(options, allowIds: true)
@@ -70,21 +67,13 @@ public sealed class OptionListTools(McpUserContext user, ITagOptionListService o
 
     [McpServerTool(Name = "delete_option_list", Title = "Delete option list", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Authorize(Policy = McpPolicies.Write)]
-    [Description("Deletes a personal option list. Fails with conflict while a tag still uses it; detach the tag first (update_tag optionListId 0).")]
+    [Description("Deletes an option list. Fails with conflict while a tag still uses it; detach the tag first (update_tag optionListId 0).")]
     public async Task<object> DeleteOptionList([Description("Option list id.")] int optionListId)
     {
         var list = await optionLists.GetById(optionListId, user.UserId);
         await optionLists.Delete(optionListId, user.UserId);
 
         return new { deleted = true, optionListId, name = list.Name };
-    }
-
-    private void RequireGlobalPermission(bool isGlobal)
-    {
-        if (isGlobal && !user.IsAdmin)
-        {
-            throw new UnauthorizedAccessException("Only an admin can create a global option list.");
-        }
     }
 
     private static List<TagOptionRequest> ToRequests(List<OptionInput> options, bool allowIds)
