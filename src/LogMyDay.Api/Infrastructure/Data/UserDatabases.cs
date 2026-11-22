@@ -108,6 +108,7 @@ public sealed class UserDatabases : IUserDataStore
             DatabaseUpgrade.Migrate(context, _snapshotFolder, _logger);
             if (isNew)
             {
+                OneTimeDataMigrations.MarkDone(context);
                 _logger.LogInformation("Created the database of user {UserId}: {Path}", userId, GetFilePath(userId));
             }
 

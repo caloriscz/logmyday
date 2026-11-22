@@ -38,7 +38,7 @@ public sealed class SingleFileSplit
 
     // A user's database keeps the flags of its own one-time migrations; the rest of the settings
     // belong to the installation.
-    private static readonly string[] UserSettingKeys = [ReminderDayBackfill.FlagKey, ReminderRecurrenceMigration.FlagKey];
+    private static readonly IReadOnlyList<string> UserSettingKeys = OneTimeDataMigrations.FlagKeys;
 
     private readonly SqliteConnectionStringBuilder _platform;
     private readonly UserDatabases _databases;
