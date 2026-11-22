@@ -48,17 +48,17 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database
 
-LogMyDay stores its data in a single SQLite file; no database server is required. Point the connection string at the file in `appsettings.Development.json`:
+LogMyDay stores its data in SQLite files; no database server is required. The file the connection string names holds the accounts and settings, and each user's data is a file of its own in the `users` folder next to it (see [Data, Backup and Upgrade](data-and-backup.md)). Point the connection string at the file in `appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Data Source=logmyday.db"
+    "DefaultConnection": "Data Source=data/logmyday.db"
   }
 }
 ```
 
-That's it — the application creates the database file and applies the migrations on startup.
+That's it — the application creates the database files and applies the migrations on startup.
 
 Where the file lives:
 
@@ -67,7 +67,7 @@ Where the file lives:
 - The startup log names the file in use: `Database: SQLite, <full path>`.
 - On a hosted installation, prefer an absolute path to a folder outside the site, so that a deployment that syncs the site's folder cannot delete the database.
 
-> SQL Server is no longer supported. To move an existing SQL Server database, export it with the SQLite export of a version that still supports SQL Server (Backup page, **Export Whole Database**) and point `DefaultConnection` at the exported file.
+> SQL Server is no longer supported. To move an existing SQL Server database, export it on v0.7.2 (Backup page, **Export Whole Database**), point `DefaultConnection` at the exported file, and then upgrade: see [Upgrading from v0.7.2](data-and-backup.md#upgrading-from-v072).
 
 ### 3. Configure API Base Address
 

@@ -71,7 +71,7 @@ Traefik and Caddy stream by default and forward the header unless configured oth
 
 ## Database
 
-LogMyDay stores its data in a single SQLite file. In the container the file is `/app/data/logmyday.db` (`DB_PATH`), and `docker-compose.yml` keeps `/app/data` on the `logmyday-data` volume so the database survives container restarts and rebuilds.
+LogMyDay stores its data in SQLite files in one folder. In the container the folder is `/app/data`: `DB_PATH` names the platform database (`/app/data/logmyday.db`, accounts and settings), and each user's database is in `/app/data/users`. `docker-compose.yml` keeps `/app/data` on the `logmyday-data` volume so the databases survive container restarts and rebuilds. Mount the whole folder, not the single file.
 
 ```yaml
 # docker-compose.yml snippet
@@ -81,7 +81,7 @@ volumes:
   - logmyday-data:/app/data
 ```
 
-> 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Installation** to download an archive of the database files.
+> 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Installation** to download an archive of the database files. See [Data, Backup and Upgrade](data-and-backup.md).
 
 ## Maintenance Tips
 

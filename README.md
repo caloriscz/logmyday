@@ -43,7 +43,7 @@ LogMyDay helps you capture the story of your day. Use it to record habits, welln
 ## For Self-Hosted Deployments
 
 - Deploy the full stack on Windows, Linux, or in containers
-- Keep all data in a single SQLite file, with HTTPS enforced throughout the stack
+- Keep all data in SQLite files in one folder, a database per user, with HTTPS enforced throughout the stack
 
 ## Migrations
 
@@ -101,12 +101,12 @@ Copy-Item appsettings.Development.json.dist appsettings.Development.json
 
 ### 2. Configure Database Connection
 
-LogMyDay stores its data in a single SQLite file. Point the connection string at the file in `appsettings.Development.json`:
+LogMyDay stores its data in SQLite files: the file the connection string names holds the accounts and settings, and each user's data is a file of its own in the `users` folder next to it. Point the connection string at the file in `appsettings.Development.json`:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Data Source=logmyday.db"
+    "DefaultConnection": "Data Source=data/logmyday.db"
   }
 }
 ```
