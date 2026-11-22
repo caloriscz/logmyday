@@ -10,6 +10,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject IJSRuntime JSRuntime
+@inject IServiceProvider Services
 @inject ILogger<Backup> Logger
 @inject IPageTitleService PageTitleService
 
@@ -202,29 +203,94 @@
         </div>
     </div>
 
+    <!-- The user's database file -->
+    <div class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
+        <div class="border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
+            <h2 class="text-lg font-semibold flex items-center gap-2">
+                <Icon Name="database" Class="h-5 w-5" />
+                Database File
+            </h2>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-sm text-gray-700 dark:text-slate-200">
+                Your data is one SQLite database file. Download a complete copy of it, or put a copy you downloaded earlier back.
+                The file restores only into this account; to move data to another account, use the JSON export above.
+            </p>
+            <button type="button"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    @onclick="DownloadDatabase"
+                    disabled="@isDownloadingDatabase">
+                @if (isDownloadingDatabase)
+                {
+                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                    <span>Preparing...</span>
+                }
+                else
+                {
+                    <Icon Name="download" Class="h-4 w-4" />
+                    <span>Download Database</span>
+                }
+            </button>
+
+            <div class="space-y-2 border-t border-gray-200 pt-4 dark:border-slate-700">
+                <label for="databaseFileInput" class="block text-sm font-medium text-gray-700 dark:text-slate-200">Restore from a database file</label>
+                <InputFile id="databaseFileInput"
+                           OnChange="OnDatabaseFileSelected"
+                           accept=".db"
+                           class="block w-full text-sm text-gray-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" />
+                <p class="text-sm text-gray-700 dark:text-slate-200">
+                    <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> restoring replaces everything you have logged with the content of the file.
+                    The server keeps a snapshot of the replaced database.
+                </p>
+                <div class="flex items-start gap-2">
+                    <input type="checkbox"
+                           id="confirmDatabaseRestore"
+                           @bind="confirmDatabaseRestore"
+                           class="mt-1 h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800">
+                    <label for="confirmDatabaseRestore" class="text-sm font-medium text-gray-700 dark:text-slate-200">Replace my data with this file</label>
+                </div>
+                <button type="button"
+                        class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-rose-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        @onclick="RestoreDatabase"
+                        disabled="@(selectedDatabaseFile == null || !confirmDatabaseRestore || isRestoringDatabase)">
+                    @if (isRestoringDatabase)
+                    {
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                        <span>Restoring...</span>
+                    }
+                    else
+                    {
+                        <Icon Name="upload" Class="h-4 w-4" />
+                        <span>Restore Database</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+
     @if (isAdmin)
     {
-        <!-- Whole-database SQLite export (admins only) -->
+        <!-- Whole-installation archive (admins only) -->
         <div class="rounded-xl border border-gray-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
             <div class="border-b border-gray-200 bg-primary-600 px-6 py-4 text-white dark:border-slate-700 rounded-t-xl">
                 <h2 class="text-lg font-semibold flex items-center gap-2">
                     <Icon Name="database" Class="h-5 w-5" />
-                    Export Whole Database (SQLite)
+                    Export Whole Installation
                 </h2>
             </div>
             <div class="p-6 space-y-4">
                 <p class="text-sm text-gray-700 dark:text-slate-200">
-                    Exports every user, with their account and all their data, as a SQLite database file.
-                    LogMyDay can run on this file as it is, so it also serves to move an installation to SQLite.
+                    Downloads a zip archive with the platform database (accounts and settings) and the database of every user.
+                    Unpacked into an empty data folder, LogMyDay runs on it as it is.
                 </p>
                 <p class="text-sm text-gray-700 dark:text-slate-200">
-                    <strong class="text-rose-700 dark:text-rose-400">Keep the file private:</strong> it contains password and API key hashes.
+                    <strong class="text-rose-700 dark:text-rose-400">Keep the archive private:</strong> it contains password and API key hashes.
                 </p>
                 <button type="button"
                         class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-primary-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        @onclick="ExportSqlite"
-                        disabled="@isExportingSqlite">
-                    @if (isExportingSqlite)
+                        @onclick="ExportInstallation"
+                        disabled="@isExportingInstallation">
+                    @if (isExportingInstallation)
                     {
                         <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
                         <span>Exporting...</span>
@@ -232,7 +298,7 @@
                     else
                     {
                         <Icon Name="download" Class="h-4 w-4" />
-                        <span>Export SQLite</span>
+                        <span>Export Installation</span>
                     }
                 </button>
             </div>
@@ -249,8 +315,8 @@
         </div>
         <div class="p-6 space-y-4">
             <p class="text-sm text-gray-700 dark:text-slate-200">
-                <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> This action will permanently delete your tags and activities with the data that depends on them.
-                Other users' data is not affected. Make sure to export your data first if you want to keep it.
+                <strong class="text-rose-700 dark:text-rose-400">Warning:</strong> This action will permanently delete everything you have logged and set up.
+                Your account, other users' data, the units and the input types are not affected. Make sure to export your data first if you want to keep it.
             </p>
 
             <button type="button"
@@ -428,7 +494,7 @@
                 </div>
                 <div class="px-6 py-5 space-y-4">
                     <p class="text-sm font-semibold text-gray-900 dark:text-slate-100">Are you sure you want to delete your data?</p>
-                    <p class="text-sm text-gray-700 dark:text-slate-200">This action cannot be undone. Your tags, activities, records, scan mappings, todo lists, rules, checks, triggers, tag groups and option lists will be permanently deleted. Other users' data and the shared input types, patterns and units stay.</p>
+                    <p class="text-sm text-gray-700 dark:text-slate-200">This action cannot be undone. Your tags, activities, records, scan mappings, todo lists, reminders, rules, checks, triggers, tag groups, option lists, colour schemes, day locks and event log will be permanently deleted. Your account, the units and the input types stay.</p>
                     <div class="space-y-2">
                         <p class="text-sm text-gray-700 dark:text-slate-200">Type <code class="rounded-sm bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-800">DELETE</code> to confirm:</p>
                         <input type="text"
@@ -461,7 +527,11 @@
 
 @code {
     private bool isExporting = false;
-    private bool isExportingSqlite = false;
+    private bool isExportingInstallation = false;
+    private bool isDownloadingDatabase = false;
+    private bool isRestoringDatabase = false;
+    private bool confirmDatabaseRestore = false;
+    private IBrowserFile? selectedDatabaseFile;
     private bool isAdmin = false;
     private bool isImporting = false;
     private bool isValidating = false;
@@ -554,41 +624,111 @@
         }
     }
 
-    private async Task ExportSqlite()
+    // The database files exist only where the data is kept in files, so the service is taken
+    // when it is needed.
+    private LogMyDay.Api.Infrastructure.Data.IDatabaseBackups DatabaseBackups =>
+        Services.GetRequiredService<LogMyDay.Api.Infrastructure.Data.IDatabaseBackups>();
+
+    private async Task Download(LogMyDay.Api.Infrastructure.Data.DatabaseDownload download)
+    {
+        // Disposing the download deletes its temporary file, so the reference must not close it.
+        using var streamReference = new DotNetStreamReference(download.Content, leaveOpen: true);
+
+        // A large file takes longer to send than the default one-minute interop timeout.
+        await JSRuntime.InvokeVoidAsync("downloadFileFromStream", TimeSpan.FromMinutes(10), download.FileName, streamReference, download.ContentType);
+    }
+
+    private async Task ExportInstallation()
     {
         if (!isAdmin)
         {
             return;
         }
 
-        isExportingSqlite = true;
+        isExportingInstallation = true;
+        ClearStatus();
+
+        try
+        {
+            await using var export = await DatabaseBackups.ExportInstallation(CancellationToken.None);
+            await Download(export);
+
+            SetStatus("Installation exported.", false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Installation export failed");
+            SetStatus($"Installation export failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isExportingInstallation = false;
+        }
+    }
+
+    private async Task DownloadDatabase()
+    {
+        isDownloadingDatabase = true;
         ClearStatus();
 
         try
         {
             var currentUser = await AuthApi.GetCurrentUserAsync();
-            await using var scope = UserScopes.Create(currentUser.Id);
-            await using var export = await scope.ServiceProvider.GetRequiredService<ISqliteExportService>().ExportDatabase(CancellationToken.None);
+            await using var export = await DatabaseBackups.ExportUser(currentUser.Id, CancellationToken.None);
+            await Download(export);
 
-            // Disposing the export deletes its temporary file, so the reference must not close it.
-            using var streamReference = new DotNetStreamReference(export.Content, leaveOpen: true);
-
-            // A large database takes longer to send than the default one-minute interop timeout.
-            await JSRuntime.InvokeVoidAsync("downloadFileFromStream", TimeSpan.FromMinutes(10), export.FileName, streamReference, "application/vnd.sqlite3");
-
-            var leftOut = export.UnknownMigrations.Count == 0
-                ? ""
-                : $" Left out whatever these migrations, unknown to this version, added: {string.Join(", ", export.UnknownMigrations)}.";
-            SetStatus($"Database exported: {export.TotalRows:N0} rows in {export.RowCounts.Count} tables.{leftOut}", false);
+            SetStatus("Database downloaded.", false);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "SQLite export failed");
-            SetStatus($"SQLite export failed: {ex.Message}", true);
+            Logger.LogError(ex, "Database download failed");
+            SetStatus($"Database download failed: {ex.Message}", true);
         }
         finally
         {
-            isExportingSqlite = false;
+            isDownloadingDatabase = false;
+        }
+    }
+
+    private void OnDatabaseFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedDatabaseFile = e.File;
+        confirmDatabaseRestore = false;
+        ClearStatus();
+    }
+
+    private async Task RestoreDatabase()
+    {
+        if (selectedDatabaseFile == null || !confirmDatabaseRestore)
+        {
+            return;
+        }
+
+        isRestoringDatabase = true;
+        ClearStatus();
+
+        try
+        {
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            await using var stream = selectedDatabaseFile.OpenReadStream(maxAllowedSize: LogMyDay.Api.Controllers.BackupController.MaxDatabaseUploadBytes);
+            await DatabaseBackups.RestoreUser(currentUser.Id, stream, CancellationToken.None);
+
+            SetStatus("Database restored from the file.", false);
+            confirmDatabaseRestore = false;
+            await LoadBackupInfo();
+        }
+        catch (InvalidDataException ex)
+        {
+            SetStatus($"The file was not restored: {ex.Message}", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Database restore failed");
+            SetStatus($"Database restore failed: {ex.Message}", true);
+        }
+        finally
+        {
+            isRestoringDatabase = false;
         }
     }
 

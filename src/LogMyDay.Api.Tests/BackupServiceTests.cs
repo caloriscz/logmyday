@@ -294,6 +294,65 @@ public class BackupServiceTests
         Assert.Equal("Buy bread", (await context.TodoItems.SingleAsync()).Title);
     }
 
+    /// <summary>
+    /// Both ways of clearing remove everything the user logged and set up, also what no backup
+    /// carries, and leave what a database can't work without.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Clearing_RemovesRemindersDayLocksColorSchemesAndEventLogs_AndKeepsReferenceData(bool secureEndpoint)
+    {
+        using var context = CreateContext();
+        var service = new BackupService(context, new Mock<ILogger<BackupService>>().Object);
+        var user1Id = Guid.NewGuid();
+        var user2Id = Guid.NewGuid();
+
+        context.InputTypes.Add(new Domain.Entities.InputType { Name = "Integer" });
+        foreach (var userId in new[] { user1Id, user2Id })
+        {
+            var tag = new Domain.Entities.Tag
+            {
+                TagName = $"Tag of {userId}",
+                UserId = userId,
+                ColorScheme = new Domain.Entities.ColorScheme { Name = "Traffic", UserId = userId, Entries = { new Domain.Entities.ColorSchemeEntry { Color = "#ff0000" } } }
+            };
+            context.Tags.Add(tag);
+            context.TagDayLocks.Add(new Domain.Entities.TagDayLock { UserId = userId, Tag = tag, Date = new DateOnly(2026, 11, 19), IsLocked = true });
+            context.Reminders.Add(new Domain.Entities.Reminder
+            {
+                UserId = userId,
+                Title = "Take magnesium",
+                Days = { new Domain.Entities.ReminderDay { UserId = userId, Date = new DateOnly(2026, 11, 20), IsDone = true } }
+            });
+            context.TodoLists.Add(new Domain.Entities.TodoList { Name = "Errands", UserId = userId, Items = { new Domain.Entities.TodoItem { Title = "Buy milk" } } });
+            context.EventLogs.Add(new Domain.Entities.EventLog { UserId = userId, Message = "Something happened", Detail = new Domain.Entities.EventLogDetail { EventLogId = 0, Description = "Detail" } });
+        }
+
+        await context.SaveChangesAsync();
+
+        var cleared = secureEndpoint ? await service.ClearUserData(user1Id) : await service.ClearDataAsync(user1Id);
+
+        Assert.True(cleared > 0);
+        Assert.Equal(user2Id, (await context.Tags.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.Reminders.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.ReminderDays.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.TagDayLocks.SingleAsync()).UserId);
+        Assert.Equal(user2Id, (await context.ColorSchemes.SingleAsync()).UserId);
+        Assert.Equal(1, await context.ColorSchemeEntries.CountAsync());
+        Assert.Equal(user2Id, (await context.TodoLists.SingleAsync()).UserId);
+        Assert.Equal(1, await context.TodoItems.CountAsync());
+        Assert.Equal(user2Id, (await context.EventLogs.SingleAsync()).UserId);
+        Assert.Equal(1, await context.EventLogDetails.CountAsync());
+
+        // Without a user everything in the database goes, except the reference data.
+        await service.ClearDataAsync();
+
+        Assert.Empty(await context.Tags.ToListAsync());
+        Assert.Empty(await context.EventLogs.ToListAsync());
+        Assert.Equal(1, await context.InputTypes.CountAsync());
+    }
+
     [Fact]
     public async Task ImportDataAsync_WithClearTrue_DoesNotAffectOtherUsers()
     {
@@ -884,7 +943,8 @@ public class BackupControllerTests
         var mockLogger = new Mock<ILogger<BackupController>>();
         var mockAuthService = new Mock<IAuthService>();
 
-        mockBackupService.Setup(s => s.ClearDataAsync(It.IsAny<Guid?>())).ReturnsAsync(42);
+        var userData = new Mock<LogMyDay.Api.Application.Services.IUserDataAdminService>();
+        userData.Setup(s => s.ClearData(It.IsAny<Guid?>(), It.IsAny<CancellationToken>())).ReturnsAsync(42);
 
         var controller = new BackupController(
             mockBackupService.Object,
@@ -893,14 +953,14 @@ public class BackupControllerTests
         );
 
         // Act
-        var result = await controller.ClearData();
+        var result = await controller.ClearData(userData.Object, CancellationToken.None);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
 
-        // Verify the service was called
-        mockBackupService.Verify(s => s.ClearDataAsync(null), Times.Once);
+        // Every user is cleared through the admin service, which works in each user's database.
+        userData.Verify(s => s.ClearData(null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
 

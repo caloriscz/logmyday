@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-  - Backup → **Export Whole Database (SQLite)**, for admins: downloads the whole installation (every user, all data, reference data and settings) as one SQLite file. The file is a complete LogMyDay database: point `ConnectionStrings:DefaultConnection` at it and the app runs on it. Also `GET /api/backup/export/sqlite`. (The export itself shipped in v0.7.2; it is the way from SQL Server to SQLite.)
+  - Backup → **Database File**: download your data as one SQLite file, and restore it into the same account later. A restore checks the file first (a LogMyDay user database, of this version or an older one, with this account's data only) and keeps the replaced database in the `snapshots` folder. Also `GET /api/backup/database` and `POST /api/backup/database/restore`; an admin reaches any user's database with `GET /api/backup/database/{userId}` and `POST /api/backup/database/{userId}/restore`.
+  - Backup → **Export Whole Installation**, for admins: a zip archive with the platform database and every user's database. Unpacked into an empty data folder, LogMyDay runs on it. Also `GET /api/backup/export/installation`. It replaces v0.7.2's single-file export (`GET /api/backup/export/sqlite`).
   - A default place for the database: without a connection string it is `data/logmyday.db` in the application's folder. A relative `Data Source` counts from the application's folder on every host, and the startup log names the file in use.
 
 ### Changed
@@ -19,6 +20,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Fixed
 
+  - Clearing your data removes everything you logged and set up: reminders, colour schemes, day locks and the event log stayed before, and the API and MCP clear also left todo lists. The units and input types stay.
+  - An admin's clear and backup of another user's data (`DELETE /api/backup/clear`, the MCP tools `admin_clear_all_data` and `admin_export_backup`) work on that user's data.
   - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
 
 ## v0.7.2 — 2026‑11‑20

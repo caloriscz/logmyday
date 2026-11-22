@@ -1260,18 +1260,35 @@ public class BackupService : IBackupService
             _context.TagOptionLists.RemoveRange(tagOptionListsToDelete);
             recordsCleared += tagOptionListsToDelete.Count;
 
-            // Clear patterns and input types only if clearing all data (no user filter)
-            // Units are global and not user-specific, so they're never cleared
-            if (!userId.HasValue)
-            {
-                var patternsToDelete = await _context.Patterns.ToListAsync();
-                _context.Patterns.RemoveRange(patternsToDelete);
-                recordsCleared += patternsToDelete.Count;
+            // What is left of the reminders: a trigger's done ones were kept above, and the
+            // standalone ones. Their days go with them.
+            var remindersToDelete = await _context.Reminders
+                .Include(r => r.Days)
+                .Where(r => !userId.HasValue || r.UserId == userId)
+                .ToListAsync();
+            _context.Reminders.RemoveRange(remindersToDelete);
+            recordsCleared += remindersToDelete.Count;
 
-                var inputTypesToDelete = await _context.InputTypes.ToListAsync();
-                _context.InputTypes.RemoveRange(inputTypesToDelete);
-                recordsCleared += inputTypesToDelete.Count;
-            }
+            var dayLocksToDelete = await _context.TagDayLocks.Where(l => !userId.HasValue || l.UserId == userId).ToListAsync();
+            _context.TagDayLocks.RemoveRange(dayLocksToDelete);
+            recordsCleared += dayLocksToDelete.Count;
+
+            var colorSchemesToDelete = await _context.ColorSchemes
+                .Include(c => c.Entries)
+                .Where(c => !userId.HasValue || c.UserId == userId)
+                .ToListAsync();
+            _context.ColorSchemes.RemoveRange(colorSchemesToDelete);
+            recordsCleared += colorSchemesToDelete.Count;
+
+            var eventLogsToDelete = await _context.EventLogs
+                .Include(e => e.Detail)
+                .Where(e => !userId.HasValue || e.UserId == userId)
+                .ToListAsync();
+            _context.EventLogs.RemoveRange(eventLogsToDelete);
+            recordsCleared += eventLogsToDelete.Count;
+
+            // Input types, patterns, quantities and units stay: a database can't work without
+            // them, and nothing puts them back.
 
             await _context.SaveChangesAsync();
 
@@ -2294,111 +2311,9 @@ public class BackupService : IBackupService
     /// <summary>
     /// Clears all data for the specified user only (preserves other users' data)
     /// </summary>
-    public async Task<int> ClearUserData(Guid userId)
+    public Task<int> ClearUserData(Guid userId)
     {
-        _logger.LogInformation("Clearing user data");
-
-        int recordsCleared = 0;
-
-        try
-        {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            
-            try
-            {
-                // Clear in reverse dependency order
-
-                // 1. Clear user's activities
-                var userActivities = await _context.Activities
-                    .Where(a => a.UserId == userId)
-                    .ToListAsync();
-
-                _context.Activities.RemoveRange(userActivities);
-                recordsCleared += userActivities.Count;
-
-                // Records go with their values, before the tags (record types and their fields).
-                var userRecords = await _context.Records.Where(r => r.UserId == userId).ToListAsync();
-                _context.Records.RemoveRange(userRecords);
-                recordsCleared += userRecords.Count;
-
-                // 2. Clear user's scan mappings
-                var userScanMappings = await _context.ScanMappings
-                    .Where(sm => sm.UserId == userId)
-                    .ToListAsync();
-
-                _context.ScanMappings.RemoveRange(userScanMappings);
-                recordsCleared += userScanMappings.Count;
-
-                // Tag Activity Relations rules, checks and triggers reference tags (Restrict), so
-                // they go before the tags.
-                recordsCleared += await RemoveTagTriggersAsync(userId);
-
-                var userTagChecks = await _context.TagChecks
-                    .Where(c => c.UserId == userId)
-                    .ToListAsync();
-
-                _context.TagChecks.RemoveRange(userTagChecks);
-                recordsCleared += userTagChecks.Count;
-
-                var userTagRules = await _context.TagRules
-                    .Include(r => r.Sources)
-                    .Where(r => r.UserId == userId)
-                    .ToListAsync();
-
-                _context.TagRules.RemoveRange(userTagRules);
-                recordsCleared += userTagRules.Count;
-
-                // 3. Clear user's tags
-                var userTags = await _context.Tags
-                    .Where(t => t.UserId == userId)
-                    .ToListAsync();
-
-                _context.Tags.RemoveRange(userTags);
-                recordsCleared += userTags.Count;
-
-                // 5. Clear user's tag groups
-                var userTagGroups = await _context.TagGroups
-                    .Where(g => g.UserId == userId)
-                    .ToListAsync();
-
-                _context.TagGroups.RemoveRange(userTagGroups);
-                recordsCleared += userTagGroups.Count;
-
-                // 6. Clear user's tag options (via option lists)
-                var userTagOptions = await _context.TagOptions
-                    .Include(to => to.OptionList)
-                    .Where(to => to.OptionList != null && to.OptionList.UserId == userId)
-                    .ToListAsync();
-
-                _context.TagOptions.RemoveRange(userTagOptions);
-                recordsCleared += userTagOptions.Count;
-
-                // 7. Clear user's tag option lists
-                var userTagOptionLists = await _context.TagOptionLists
-                    .Where(ol => ol.UserId == userId)
-                    .ToListAsync();
-
-                _context.TagOptionLists.RemoveRange(userTagOptionLists);
-                recordsCleared += userTagOptionLists.Count;
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                _logger.LogInformation("User data cleared successfully");
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred during user data clearing for user: {UserId}", userId);
-            throw;
-        }
-
-        return recordsCleared;
+        return ClearDataAsync(userId);
     }
 
     private static List<ActivityBackup> CompressActivitiesToStreaks(List<ActivityBackup> activities)

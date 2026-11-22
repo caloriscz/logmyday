@@ -81,7 +81,7 @@ volumes:
   - logmyday-data:/app/data
 ```
 
-> 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Database** to download a copy of the database file.
+> 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Installation** to download an archive of the database files.
 
 ## Maintenance Tips
 

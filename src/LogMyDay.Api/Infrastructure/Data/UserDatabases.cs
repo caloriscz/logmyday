@@ -42,6 +42,12 @@ public sealed class UserDatabases : IUserDataStore
     /// <summary>The folder that receives a database's snapshot before it is migrated.</summary>
     public string SnapshotFolder => _snapshotFolder;
 
+    /// <summary>The connection string of the platform database.</summary>
+    public string PlatformConnectionString => _platform.ConnectionString;
+
+    /// <summary>The folder of the platform database, which holds everything of the installation.</summary>
+    public string Root => Path.GetDirectoryName(_folder)!;
+
     /// <summary>The file of a user's database. It may not exist yet.</summary>
     public string GetFilePath(Guid userId)
     {
@@ -127,21 +133,71 @@ public sealed class UserDatabases : IUserDataStore
     {
         lock (_createLock)
         {
-            Forget(userId);
+            RemoveFiles(userId);
 
-            // Pooled connections keep the file open.
-            using (var connection = new SqliteConnection(GetConnectionString(userId)))
-            {
-                SqliteConnection.ClearPool(connection);
-            }
+            _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, GetFilePath(userId));
+        }
+    }
 
+    /// <summary>
+    /// Puts another database file in the place of the user's database. The database it replaces
+    /// is copied into the snapshot folder first.
+    /// </summary>
+    /// <param name="newFile">A database with this version's schema, on the same volume. It is moved.</param>
+    /// <returns>The snapshot of the replaced database, or null when the user had none.</returns>
+    public string? Replace(Guid userId, string newFile)
+    {
+        lock (_createLock)
+        {
             var path = GetFilePath(userId);
-            foreach (var file in new[] { path, path + "-wal", path + "-shm", path + "-journal" })
+            string? snapshot = null;
+            if (File.Exists(path))
             {
-                File.Delete(file);
+                Directory.CreateDirectory(_snapshotFolder);
+                snapshot = Path.Combine(_snapshotFolder, $"{userId:D}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-before-restore.db");
+                WriteCopy(GetConnectionString(userId), snapshot);
             }
 
-            _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, path);
+            RemoveFiles(userId);
+            Directory.CreateDirectory(_folder);
+            File.Move(newFile, path);
+            Ensure(userId);
+
+            _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
+
+            return snapshot;
+        }
+    }
+
+    /// <summary>
+    /// Writes a consistent copy of a database into a new file, whatever is still in the
+    /// write-ahead log.
+    /// </summary>
+    public static void WriteCopy(string connectionString, string targetPath)
+    {
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "VACUUM INTO $target;";
+        command.Parameters.AddWithValue("$target", targetPath);
+        command.ExecuteNonQuery();
+    }
+
+    private void RemoveFiles(Guid userId)
+    {
+        Forget(userId);
+
+        // Pooled connections keep the file open.
+        using (var connection = new SqliteConnection(GetConnectionString(userId)))
+        {
+            SqliteConnection.ClearPool(connection);
+        }
+
+        var path = GetFilePath(userId);
+        foreach (var file in new[] { path, path + "-wal", path + "-shm", path + "-journal" })
+        {
+            File.Delete(file);
         }
     }
 }

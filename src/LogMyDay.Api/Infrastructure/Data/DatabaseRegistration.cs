@@ -33,6 +33,8 @@ public static class DatabaseRegistration
         services.Replace(ServiceDescriptor.Singleton<IUserDataStore>(sp => sp.GetRequiredService<UserDatabases>()));
         services.AddSingleton(sp => new SingleFileSplit(platformConnectionString, sp.GetRequiredService<UserDatabases>(), sp.GetRequiredService<ILogger<SingleFileSplit>>()));
 
+        services.AddSingleton<IDatabaseBackups>(sp => new DatabaseBackups(sp.GetRequiredService<UserDatabases>(), sp.GetRequiredService<ILogger<DatabaseBackups>>()));
+
         services.AddDbContext<PlatformDbContext>(options => options.UseSqlite(platformConnectionString));
 
         services.AddDbContext<LogMyDayDbContext>((sp, options) =>
