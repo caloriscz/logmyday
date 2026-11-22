@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file. The format 
   - Clearing your data removes everything you logged and set up: reminders, colour schemes, day locks and the event log stayed before, and the API and MCP clear also left todo lists. The units and input types stay.
   - An admin's clear and backup of another user's data (`DELETE /api/backup/clear`, the MCP tools `admin_clear_all_data` and `admin_export_backup`) work on that user's data.
   - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
+  - A deleted user's web sign-in ends with their next request. Before, their cookie stayed valid for up to 30 days, and their next request created a new, empty database for them.
 
 ## v0.7.2 — 2026‑11‑20
 
