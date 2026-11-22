@@ -26,13 +26,6 @@ public class DatabaseProviderOptions
     /// </summary>
     public string? ConnectionString { get; set; }
 
-    /// <summary>How to move a Docker installation that still has the SQL Server settings of v0.7.2.</summary>
-    public const string DockerSqliteOnlyHelp =
-        "Move the data with the SQLite export of a version that still supports SQL Server "
-        + "(Backup page, Export Whole Database), put the exported file at DB_PATH on the logmyday-data "
-        + "volume (/app/data/logmyday.db by default), and remove DB_HOST, DB_NAME, DB_USER and the "
-        + "db_password secret.";
-
     /// <summary>The settings that LogMyDay up to v0.7.2 read in Docker to reach SQL Server.</summary>
     public static readonly IReadOnlyList<string> DockerSqlServerSettings = ["DB_HOST", "DB_NAME", "DB_USER", "db_password"];
 
@@ -51,19 +44,39 @@ public class DatabaseProviderOptions
     /// SQLite database, the start would create an empty installation instead of using the data in
     /// SQL Server, so it throws. Once the SQLite database exists, the settings are only leftovers.
     /// </summary>
-    /// <param name="databasePath">The SQLite database file the installation is configured for.</param>
+    /// <param name="databasePath">
+    /// The SQLite database file the installation is configured for, or null when the location is
+    /// not a file: that can't be checked here, and the user databases refuse it with their own message.
+    /// </param>
     /// <returns>The SQL Server settings found, which are ignored.</returns>
     public static IReadOnlyList<string> CheckDockerSqlServerSettings(IConfiguration configuration, string? databasePath)
     {
         var found = DockerSqlServerSettings.Where(name => !string.IsNullOrWhiteSpace(configuration[name])).ToList();
-        if (found.Count > 0 && (databasePath is null || !File.Exists(databasePath)))
+        if (found.Count == 0 || databasePath is null || HasSqliteData(databasePath))
         {
-            throw new InvalidOperationException(
-                $"The Docker configuration still has the SQL Server settings of LogMyDay v0.7.2 ({string.Join(", ", found)}), "
-                + $"and there is no SQLite database at {databasePath ?? "the configured location"}. LogMyDay runs on SQLite only; "
-                + "starting now would create an empty installation. " + DockerSqliteOnlyHelp);
+            return found;
         }
 
-        return found;
+        throw new InvalidOperationException(
+            $"The Docker configuration still has the SQL Server settings of LogMyDay v0.7.2 ({string.Join(", ", found)}), "
+            + $"and there is no SQLite database at {databasePath}. LogMyDay runs on SQLite only; starting now would create an empty installation. "
+            + "Move the data with the SQLite export of a version that still supports SQL Server (Backup page, Export Whole Database), "
+            + $"put the exported file at {databasePath} (on the logmyday-data volume when DB_PATH gives the path), "
+            + "and remove DB_HOST, DB_NAME, DB_USER and the db_password secret.");
+    }
+
+    /// <summary>
+    /// A database file with content, or the backup an interrupted upgrade to v0.8.0 left next to
+    /// it, whose recovery the split explains. An empty file is not data: SQLite would start on it
+    /// as a new, empty database.
+    /// </summary>
+    private static bool HasSqliteData(string databasePath)
+    {
+        return HasContent(databasePath) || HasContent(SingleFileSplit.BackupPathOf(databasePath));
+    }
+
+    private static bool HasContent(string path)
+    {
+        return new FileInfo(path) is { Exists: true, Length: > 0 };
     }
 }

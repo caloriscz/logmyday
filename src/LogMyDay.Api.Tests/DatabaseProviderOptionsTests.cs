@@ -49,17 +49,60 @@ public class DatabaseProviderOptionsTests
     [Fact]
     public void TheSqlServerSettings_OnceTheSqliteDatabaseExists_AreLeftoversOnly()
     {
-        var existing = Path.GetTempFileName();
+        var folder = NewFolder();
         try
         {
+            var database = Path.Combine(folder, "logmyday.db");
+            File.WriteAllText(database, "the data");
             var configuration = Configuration(("DB_HOST", "host.docker.internal,1439"), ("DB_USER", "sa"), ("db_password", "secret"));
 
-            Assert.Equal(["DB_HOST", "DB_USER", "db_password"], DatabaseProviderOptions.CheckDockerSqlServerSettings(configuration, existing));
+            Assert.Equal(["DB_HOST", "DB_USER", "db_password"], DatabaseProviderOptions.CheckDockerSqlServerSettings(configuration, database));
         }
         finally
         {
-            File.Delete(existing);
+            Directory.Delete(folder, recursive: true);
         }
+    }
+
+    [Fact]
+    public void AnEmptyDatabaseFile_IsNoData_AndStopsTheStart()
+    {
+        var folder = NewFolder();
+        try
+        {
+            var database = Path.Combine(folder, "logmyday.db");
+            File.WriteAllBytes(database, []);
+
+            Assert.Throws<InvalidOperationException>(
+                () => DatabaseProviderOptions.CheckDockerSqlServerSettings(Configuration(("db_password", "secret")), database));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AfterAnInterruptedUpgrade_TheBackupCountsAsData_SoTheSplitCanSayHowToRecover()
+    {
+        var folder = NewFolder();
+        try
+        {
+            var database = Path.Combine(folder, "logmyday.db");
+            File.WriteAllText(Path.Combine(folder, "logmyday.before-v0.8.0.db"), "the original");
+
+            Assert.Equal(["DB_HOST"], DatabaseProviderOptions.CheckDockerSqlServerSettings(Configuration(("DB_HOST", "sql")), database));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ALocationThatIsNotAFile_IsNotChecked()
+    {
+        Assert.Equal(["DB_HOST"], DatabaseProviderOptions.CheckDockerSqlServerSettings(Configuration(("DB_HOST", "sql")), databasePath: null));
     }
 
     [Fact]
@@ -68,6 +111,11 @@ public class DatabaseProviderOptionsTests
         var missing = Path.Combine(Path.GetTempPath(), $"lmd-no-db-{Guid.NewGuid():N}", "logmyday.db");
 
         Assert.Empty(DatabaseProviderOptions.CheckDockerSqlServerSettings(Configuration(("DB_PATH", missing), ("DB_HOST", " ")), missing));
+    }
+
+    private static string NewFolder()
+    {
+        return Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"lmd-docker-db-{Guid.NewGuid():N}")).FullName;
     }
 
     private static IConfiguration Configuration(params (string Name, string Value)[] settings)

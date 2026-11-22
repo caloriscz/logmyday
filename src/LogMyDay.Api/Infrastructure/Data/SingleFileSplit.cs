@@ -58,7 +58,15 @@ public sealed class SingleFileSplit
     }
 
     /// <summary>Where the original file is kept after the split.</summary>
-    public string BackupPath => Path.Combine(_root, Path.GetFileNameWithoutExtension(_sourcePath) + BackupSuffix + Path.GetExtension(_sourcePath));
+    public string BackupPath => BackupPathOf(_sourcePath);
+
+    /// <summary>Where the split keeps the original of the given database file.</summary>
+    public static string BackupPathOf(string databasePath)
+    {
+        var fullPath = Path.GetFullPath(databasePath);
+
+        return Path.Combine(Path.GetDirectoryName(fullPath)!, Path.GetFileNameWithoutExtension(fullPath) + BackupSuffix + Path.GetExtension(fullPath));
+    }
 
     /// <summary>Tests make a step of putting the files in place fail through this. It gets the step's number, from 0.</summary>
     internal Action<int>? BeforeStep { get; set; }

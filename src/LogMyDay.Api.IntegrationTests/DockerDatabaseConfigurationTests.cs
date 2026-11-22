@@ -31,14 +31,14 @@ public sealed class DockerDatabaseConfigurationTests : IDisposable
         var error = Assert.Throws<InvalidOperationException>(() => Register("Docker", ("DB_HOST", "host.docker.internal,1439"), ("db_password", "secret")));
 
         Assert.Contains("DB_HOST, db_password", error.Message);
-        Assert.False(File.Exists(DatabasePath), "No empty installation is created.");
+        Assert.Contains(DatabasePath, error.Message);
     }
 
     [Fact]
     public void ADockerStart_OnAnExistingSqliteDatabase_IgnoresTheLeftoverSettings()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
-        File.WriteAllBytes(DatabasePath, []);
+        File.WriteAllText(DatabasePath, "the data");
 
         Register("Docker", ("DB_HOST", "host.docker.internal,1439"), ("db_password", "secret"));
     }
