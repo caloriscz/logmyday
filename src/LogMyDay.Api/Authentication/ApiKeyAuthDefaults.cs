@@ -1,3 +1,5 @@
+using System.Security.Claims;
+
 namespace LogMyDay.Api.Authentication;
 
 /// <summary>
@@ -21,6 +23,12 @@ public static class ApiKeyAuthDefaults
 
     public const string KeyIdClaim = "lmd_api_key_id";
     public const string KeyPrefixClaim = "lmd_api_key_prefix";
+
+    /// <summary>True when the request was authenticated by an API key that may only read.</summary>
+    public static bool IsReadOnlyKey(ClaimsPrincipal user)
+    {
+        return user.HasClaim(AuthSourceClaim, AuthSourceValue) && !user.HasClaim(ScopeClaim, ScopeWrite);
+    }
 }
 
 /// <summary>

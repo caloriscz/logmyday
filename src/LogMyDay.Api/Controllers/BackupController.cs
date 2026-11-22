@@ -57,7 +57,7 @@ public class BackupController : BaseApiController
     /// runs on it.
     /// </summary>
     [HttpGet("export/installation")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic", Policy = "AdminOnly")]
     public async Task<IActionResult> ExportInstallation([FromServices] IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Installation export request received from admin: {UserId}", GetCurrentUserId());
@@ -80,7 +80,7 @@ public class BackupController : BaseApiController
 
     /// <summary>Admin only: the database file of any user.</summary>
     [HttpGet("database/{userId:guid}")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic", Policy = "AdminOnly")]
     public async Task<IActionResult> ExportUserDatabase(Guid userId, [FromServices] IDatabaseBackups databaseBackups, [FromServices] IUserService users, CancellationToken cancellationToken)
     {
         if (await users.Get(userId, cancellationToken) == null)
@@ -111,7 +111,7 @@ public class BackupController : BaseApiController
 
     /// <summary>Admin only: replaces any user's database with a database file taken from that account.</summary>
     [HttpPost("database/{userId:guid}/restore")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic", Policy = "AdminOnly")]
     [RequestSizeLimit(MaxDatabaseUploadBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxDatabaseUploadBytes)]
     public async Task<IActionResult> RestoreUserDatabase(Guid userId, IFormFile file, [FromServices] IDatabaseBackups databaseBackups, [FromServices] IUserService users, CancellationToken cancellationToken)
@@ -224,7 +224,7 @@ public class BackupController : BaseApiController
     /// <param name="userId">Optional user ID to clear data for specific user only</param>
     /// <returns>Number of records cleared</returns>
     [HttpDelete("clear")]
-    [Authorize(Policy = "AdminOnly")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie,basic", Policy = "AdminOnly")]
     public async Task<IActionResult> ClearData([FromServices] IUserDataAdminService userData, CancellationToken cancellationToken, [FromQuery] Guid? userId = null)
     {
         _logger.LogInformation("Clear data request received for user: {UserId}", userId?.ToString() ?? "All users");

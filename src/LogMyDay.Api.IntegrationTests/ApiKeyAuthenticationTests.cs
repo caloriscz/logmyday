@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Authentication;
@@ -27,11 +28,11 @@ public class ApiKeyAuthenticationTests : IClassFixture<CustomWebApplicationFacto
         _factory = factory;
     }
 
-    private async Task<(string Token, int KeyId, Guid UserId)> CreateKeyAsync(ApiKeyScope scope)
+    private async Task<(string Token, int KeyId, Guid UserId)> CreateKeyAsync(ApiKeyScope scope, string email = CustomWebApplicationFactory.TestUserEmail)
     {
         using var scopeSvc = _factory.Services.CreateScope();
         var db = scopeSvc.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
-        var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == "test@example.com");
+        var user = await TestPlatform.For(db).Users.FirstAsync(u => u.Email == email);
         var keys = scopeSvc.ServiceProvider.GetRequiredService<IApiKeyService>();
         var created = await keys.Create(user.Id, $"test-{Guid.NewGuid():N}", scope, null, CancellationToken.None);
 
@@ -99,6 +100,70 @@ public class ApiKeyAuthenticationTests : IClassFixture<CustomWebApplicationFacto
         var response = await ClientWithBearer(token).GetAsync("/api/auth/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // --- A key's scope on REST ---
+
+    [Fact]
+    public async Task ReadOnlyKey_ReadsThroughRest_ButChangesNothing()
+    {
+        var client = ClientWithBearer(CustomWebApplicationFactory.ReadOnlyKeyToken);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/tags")).StatusCode);
+
+        await AssertReadOnlyRefusal(await client.DeleteAsync("/api/tags/999999"));
+        await AssertReadOnlyRefusal(await client.PostAsJsonAsync("/api/tags", new { tagName = "Refused" }));
+
+        // A controller outside BaseApiController.
+        await AssertReadOnlyRefusal(await client.PatchAsJsonAsync($"/api/users/{Guid.NewGuid()}", new { displayName = "Refused" }));
+    }
+
+    [Fact]
+    public async Task ReadWriteKey_StillWritesThroughRest()
+    {
+        var response = await ClientWithBearer(CustomWebApplicationFactory.ReadWriteKeyToken).DeleteAsync("/api/tags/999999");
+
+        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminsReadWriteKey_ManagesUsersAndSettings()
+    {
+        var client = ClientWithBearer(CustomWebApplicationFactory.AdminKeyToken);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/settings/ai")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminsReadOnlyKey_PassesNoAdminEndpoint()
+    {
+        var (token, _, _) = await CreateKeyAsync(ApiKeyScope.ReadOnly, CustomWebApplicationFactory.AdminUserEmail);
+        var client = ClientWithBearer(token);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/settings/ai")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(ApiKeyScope.ReadWrite)]
+    [InlineData(ApiKeyScope.ReadOnly)]
+    public async Task NoKey_ReachesDatabaseFiles_OrTheInstallation(ApiKeyScope scope)
+    {
+        var (token, _, adminId) = await CreateKeyAsync(scope, CustomWebApplicationFactory.AdminUserEmail);
+        var client = ClientWithBearer(token);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/backup/export/installation")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"/api/backup/database/{adminId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"/api/backup/database/{adminId}/restore", new MultipartFormDataContent())).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync("/api/backup/clear")).StatusCode);
+    }
+
+    private static async Task AssertReadOnlyRefusal(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains(ReadOnlyApiKeyFilter.Message, await response.Content.ReadAsStringAsync());
     }
 
     // --- Selector: the Basic path is untouched ---
@@ -180,5 +245,16 @@ public class ApiKeyAuthenticationTests : IClassFixture<CustomWebApplicationFacto
         // Write key, ordinary user.
         Assert.False(await Authorized(Principal("api-key", "write", false), McpPolicies.Admin));
         Assert.False(await Authorized(Principal("lmd-cookie", null, true), McpPolicies.Admin));
+    }
+
+    [Fact]
+    public async Task AdminOnly_AdmitsAdminSessionsAndReadWriteKeys_NotReadOnlyKeys()
+    {
+        Assert.True(await Authorized(Principal("lmd-cookie", null, true), "AdminOnly"));
+        Assert.True(await Authorized(Principal("api-key", "write", true), "AdminOnly"));
+        // Admin with a read-only key: the key's scope wins, for reads too.
+        Assert.False(await Authorized(Principal("api-key", "read", true), "AdminOnly"));
+        Assert.False(await Authorized(Principal("api-key", "write", false), "AdminOnly"));
+        Assert.False(await Authorized(Principal("lmd-cookie", null, false), "AdminOnly"));
     }
 }

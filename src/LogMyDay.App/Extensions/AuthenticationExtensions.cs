@@ -2,6 +2,7 @@ using LogMyDay.Api.Authentication;
 using LogMyDay.Mcp;
 using LogMyDay.App.Authentication;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 namespace LogMyDay.App.Extensions;
@@ -101,14 +102,20 @@ internal static class AuthenticationExtensions
             .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { })
             .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>(ApiKeyAuthDefaults.SchemeName, _ => { });
 
+        // A read-only key may read through REST, never change anything.
+        services.Configure<MvcOptions>(options => options.Filters.Add<ReadOnlyApiKeyFilter>());
+
         services.AddSingleton<LogMyDay.Api.Authentication.AuthAttemptTracker>();
         services.AddSingleton<LogMyDay.Api.Authentication.PasswordVerificationCache>();
 
         services.AddAuthorization(options =>
         {
+            // An admin's read-only key passes no admin endpoint, reads included. The endpoints
+            // that reach database files also pin "lmd-cookie,basic", so no key passes them.
             options.AddPolicy("AdminOnly", policy =>
                 policy.RequireAuthenticatedUser()
-                      .RequireClaim("is_admin", "true"));
+                      .RequireClaim("is_admin", "true")
+                      .RequireAssertion(context => !ApiKeyAuthDefaults.IsReadOnlyKey(context.User)));
 
             // MCP policies. All three insist the request was authenticated by an API key, so a
             // browser session can never drive the MCP endpoint (see McpPolicies for why).

@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file. The format 
   - The migrations start again from one initial migration per kind of database. A database older than v0.7.2 is refused with a message to install v0.7.2 first.
   - **LogMyDay runs on SQLite only.** `Database:Provider` is optional and must be `Sqlite` if set. Docker uses `DB_PATH` and the `logmyday-data` volume instead of the SQL Server settings and secrets.
   - The local deployment (Cake, Web Deploy) keeps the `data` folder on the server, next to `DataProtection-Keys`.
+  - **API keys on REST.** A read-only key only reads: any REST request that changes data answers 403. An admin's read-only key passes no admin endpoint. Another user's database file, the installation export and the admin clear accept the web session and Basic only, never a key.
 
 ### Removed
 
