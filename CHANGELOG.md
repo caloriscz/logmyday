@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
-## v0.8.0 — 2026‑11‑22
+## Unreleased
 
 **Upgrade from v0.7.2 on SQLite only.** The first start splits the database into one file per user; the original stays as `logmyday.before-v0.8.0.db`. Back up the database file first and read [Data, Backup and Upgrade](docs/setup/data-and-backup.md).
 
