@@ -17,7 +17,7 @@ namespace LogMyDay.Api.Application.Services;
 /// </summary>
 public sealed class ReminderDayBackfill : IReminderDayBackfill
 {
-    private const string FlagKey = "reminderday.backfill.v1";
+    public const string FlagKey = "reminderday.backfill.v1";
 
     private readonly LogMyDayDbContext _context;
     private readonly IUserDirectory _users;
