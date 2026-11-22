@@ -127,7 +127,7 @@ public sealed class DatabaseBackupsTests : IDisposable
         var restored = Path.Combine(_folder, "restored");
         ZipFile.ExtractToDirectory(archive, restored);
         Assert.Equal(
-            new[] { "logmyday.db", $"users/{_admin:D}.db", $"users/{_friend:D}.db" },
+            new[] { "logmyday.db", $"users/{_admin:D}.db", $"users/{_friend:D}.db" }.Order(),
             Directory.GetFiles(restored, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(restored, f).Replace('\\', '/')).Order());
 
         var hasher = new Mock<IPasswordHasher>();

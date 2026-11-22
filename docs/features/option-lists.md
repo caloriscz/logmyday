@@ -13,11 +13,10 @@ Option lists let you reuse curated sets of values—perfect for intensity levels
 
 - Ensure consistent wording for recurring choices, making charts and exports easier to read.
 - Offer friendly display names while storing the underlying value you prefer (e.g., show "Great" but store "5").
-- Share lists with your whole household or team so everyone speaks the same language.
 
 ## Managing lists
 
-- Visit the Option Lists page on the web to create personal or shared lists.
+- Visit the Option Lists page on the web to create your lists. Each user has their own.
 - Add, reorder, or remove individual options with a simple modal editor.
 - Mark a default option if most entries use the same choice; it saves time when logging from mobile quick buttons.
 
