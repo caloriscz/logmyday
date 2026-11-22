@@ -35,7 +35,7 @@ public sealed class BackupTools(McpUserContext user, IBackupService backups, IUs
     }
 
     [McpServerTool(Name = "export_secure_backup", Title = "Export secure backup", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("The user's data as a secure backup document (activities, tags, groups, option lists, notifications, scan mappings; no credentials), inline as JSON. Over 1 MB the call fails with too-large and points to the REST download.")]
+    [Description("The user's data as a secure backup document (activities, tags, groups, colour schemes, option lists, notifications, scan mappings; no credentials), inline as JSON. Over 1 MB the call fails with too-large and points to the REST download.")]
     public async Task<SecureBackupDto> ExportSecureBackup()
     {
         var backup = await backups.CreateSecureBackup(user.UserId);

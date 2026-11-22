@@ -10,6 +10,7 @@ public class SecureBackupDto
     public List<SecureActivityBackupDto> Activities { get; set; } = new();
     public List<SecureTagBackupDto> Tags { get; set; } = new();
     public List<SecureTagGroupBackupDto> TagGroups { get; set; } = new();
+    public List<ColorSchemeBackup> ColorSchemes { get; set; } = new();
     public List<SecureTagOptionListBackupDto> TagOptionLists { get; set; } = new();
     public List<SecureTagOptionBackupDto> TagOptions { get; set; } = new();
     public List<SecureNotificationBackupDto> Notifications { get; set; } = new();
@@ -46,6 +47,7 @@ public class SecureTagBackupDto
     public bool IsRepeatable { get; set; }
     public bool IsRange { get; set; }
     public string? PatternName { get; set; }
+    public string? ColorSchemeName { get; set; }
     
     // Note: UserId not included - will be assigned to current user during restore
 }
