@@ -60,6 +60,9 @@ public sealed class SingleFileSplit
     /// <summary>Where the original file is kept after the split.</summary>
     public string BackupPath => Path.Combine(_root, Path.GetFileNameWithoutExtension(_sourcePath) + BackupSuffix + Path.GetExtension(_sourcePath));
 
+    /// <summary>Tests make a step of putting the files in place fail through this. It gets the step's number, from 0.</summary>
+    internal Action<int>? BeforeStep { get; set; }
+
     /// <summary>
     /// Splits the configured database when it is a single file of v0.7.2, and returns what was
     /// done. Returns null when there is nothing to split.
@@ -91,27 +94,34 @@ public sealed class SingleFileSplit
 
         var work = Path.Combine(_root, WorkFolderName);
         DeleteFolder(work);
+        SplitReport report;
         try
         {
             Directory.CreateDirectory(Path.Combine(work, UserDatabases.FolderName));
 
-            var report = Build(work);
-            PutInPlace(work);
-            DeleteFolder(work);
-
-            _logger.LogInformation("Split done: {Users} user databases in {Folder}. The original file is kept as {Backup}",
-                report.Users.Count, _databases.Folder, report.BackupPath);
-
-            return report;
+            report = Build(work);
         }
-        catch (Exception ex) when (File.Exists(_sourcePath))
+        catch (Exception ex)
         {
-            // The original is still in its place, so nothing changed for the installation.
-            SqliteConnection.ClearAllPools();
-            DeleteFolder(work);
-
-            throw new InvalidOperationException($"The database {_sourcePath} could not be split, and it was left as it is. {ex.Message}", ex);
+            // The new files are only in the work folder, so nothing changed for the installation.
+            throw LeftAsItIs(work, ex);
         }
+
+        PutInPlace(work);
+        DeleteFolder(work);
+
+        _logger.LogInformation("Split done: {Users} user databases in {Folder}. The original file is kept as {Backup}",
+            report.Users.Count, _databases.Folder, report.BackupPath);
+
+        return report;
+    }
+
+    private InvalidOperationException LeftAsItIs(string work, Exception failure)
+    {
+        SqliteConnection.ClearAllPools();
+        DeleteFolder(work);
+
+        return new InvalidOperationException($"The database {_sourcePath} could not be split, and it was left as it is. {failure.Message}", failure);
     }
 
     /// <summary>A single-file database has the users' data tables next to the user accounts.</summary>
@@ -341,20 +351,98 @@ public sealed class SingleFileSplit
         }
     }
 
-    /// <summary>The users folder first, then the original becomes the backup and the new platform database takes its place.</summary>
+    /// <summary>
+    /// The users folder first, then the original becomes the backup and the new platform database
+    /// takes its place. When a step fails, the steps before it are taken back, so the data folder
+    /// is as it was before the split.
+    /// </summary>
     private void PutInPlace(string work)
     {
         SqliteConnection.ClearAllPools();
 
+        var newUsers = Path.Combine(work, UserDatabases.FolderName);
+        var newPlatform = Path.Combine(work, Path.GetFileName(_sourcePath));
+        var steps = new PlacementStep[]
+        {
+            new($"move {newUsers} to {_databases.Folder}",
+                () => MoveUsersFolder(newUsers),
+                () => Directory.Move(_databases.Folder, newUsers),
+                $"Remove the folder {_databases.Folder}."),
+            new($"rename {_sourcePath} to {BackupPath}",
+                () => File.Move(_sourcePath, BackupPath),
+                () => File.Move(BackupPath, _sourcePath),
+                $"Rename {BackupPath} back to {Path.GetFileName(_sourcePath)}."),
+            // The last step is never taken back: once it is done, so is the split.
+            new($"move {newPlatform} to {_sourcePath}",
+                () => File.Move(newPlatform, _sourcePath),
+                () => { },
+                string.Empty),
+        };
+
+        var done = 0;
+        try
+        {
+            for (; done < steps.Length; done++)
+            {
+                BeforeStep?.Invoke(done);
+                steps[done].Do();
+            }
+        }
+        catch (Exception ex)
+        {
+            throw TakeBack(steps[..done], work, ex);
+        }
+    }
+
+    /// <summary>
+    /// Takes back the steps that were done, the last one first. Returns the error to report: the
+    /// database was left as it is, or what could not be taken back and how to finish by hand.
+    /// </summary>
+    private InvalidOperationException TakeBack(PlacementStep[] done, string work, Exception failure)
+    {
+        SqliteConnection.ClearAllPools();
+
+        var byHand = new List<string>();
+        for (var i = done.Length - 1; i >= 0; i--)
+        {
+            try
+            {
+                done[i].Undo();
+                _logger.LogWarning("Took back the step of the split: {Step}", done[i].Name);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "Could not take back the step of the split: {Step}", done[i].Name);
+                byHand.Add(done[i].ByHand);
+            }
+        }
+
+        if (byHand.Count == 0)
+        {
+            return LeftAsItIs(work, failure);
+        }
+
+        var instructions = string.Join(" ", byHand) + " Then start again.";
+        _logger.LogCritical(failure, "The database {Path} could not be split, and not every step could be taken back. {Instructions}", _sourcePath, instructions);
+
+        return new InvalidOperationException(
+            $"The database {_sourcePath} could not be split, and not every step could be taken back. {instructions} {failure.Message}", failure);
+    }
+
+    /// <summary>The users folder is missing or empty: the check before the split refuses one with files.</summary>
+    private void MoveUsersFolder(string newUsers)
+    {
         if (Directory.Exists(_databases.Folder))
         {
             Directory.Delete(_databases.Folder);
         }
 
-        Directory.Move(Path.Combine(work, UserDatabases.FolderName), _databases.Folder);
-        File.Move(_sourcePath, BackupPath);
-        File.Move(Path.Combine(work, Path.GetFileName(_sourcePath)), _sourcePath);
+        Directory.Move(newUsers, _databases.Folder);
     }
+
+    /// <param name="Name">What the step does, for the log.</param>
+    /// <param name="ByHand">What to do by hand when the step cannot be taken back.</param>
+    private sealed record PlacementStep(string Name, Action Do, Action Undo, string ByHand);
 
     /// <summary>Copies the rows of one table from the original file, column by column as the model names them.</summary>
     private long Copy(SqliteConnection target, IEntityType entityType, string filter, params (string Name, object Value)[] parameters)

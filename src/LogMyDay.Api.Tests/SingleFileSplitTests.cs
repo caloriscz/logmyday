@@ -176,6 +176,66 @@ public sealed class SingleFileSplitTests : IDisposable
         AssertNothingChanged();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ASplitThatFailsWhilePuttingTheFilesInPlace_IsTakenBack_AndTheNextStartSplits(int failingStep)
+    {
+        await SeedSingleFile();
+        var split = Split();
+        split.BeforeStep = step =>
+        {
+            if (step == failingStep)
+            {
+                throw new IOException("The file is held by another program.");
+            }
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => split.SplitIfNeeded());
+
+        Assert.Contains("left as it is", error.Message);
+        Assert.Contains("held by another program", error.Message);
+        AssertNothingChanged();
+
+        var report = Split().SplitIfNeeded();
+
+        Assert.NotNull(report);
+        Assert.Equal([Admin, Alice, Bob], report.Users.Order());
+        Assert.True(File.Exists(BackupPath));
+        Assert.Equal(3, Directory.GetFiles(UsersFolder).Length);
+    }
+
+    [Fact]
+    public async Task WhenAStepCannotBeTakenBack_TheErrorSaysWhatToDoByHand()
+    {
+        await SeedSingleFile();
+        var split = Split();
+        split.BeforeStep = step =>
+        {
+            if (step == 1)
+            {
+                // Something takes the place the users folder came from, so it cannot go back there.
+                File.WriteAllText(Path.Combine(_folder, "split-work", "users"), "in the way");
+
+                throw new IOException("The file is held by another program.");
+            }
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => split.SplitIfNeeded());
+
+        Assert.DoesNotContain("left as it is", error.Message);
+        Assert.Contains($"Remove the folder {UsersFolder}. Then start again.", error.Message);
+        Assert.Contains("LogMyDay_Activities", Tables(DatabasePath));
+        Assert.False(File.Exists(BackupPath));
+
+        // Until it is done, the start stops; once it is, the next start splits.
+        Assert.Contains("already holds files", Assert.Throws<InvalidOperationException>(() => Split().SplitIfNeeded()).Message);
+        Directory.Delete(UsersFolder, recursive: true);
+        Assert.NotNull(Split().SplitIfNeeded());
+        Assert.Equal(3, Directory.GetFiles(UsersFolder).Length);
+    }
+
     [Fact]
     public async Task ADatabaseThatIsAlreadySplit_IsLeftAlone()
     {
