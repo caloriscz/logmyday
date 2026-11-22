@@ -3,6 +3,7 @@ using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
+using LogMyDay.Domain.Enums;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -241,6 +242,110 @@ public sealed class UserDatabaseTests : IDisposable
             () => startup.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync());
 
         Assert.Contains(file, error.Message);
+    }
+
+    [Fact]
+    public async Task AUserCreatedAtRuntime_WhoCompletedAndSkippedReminders_DoesNotStopTheNextStart()
+    {
+        Guid friendId;
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+            var adminId = (await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.SingleAsync()).Id;
+
+            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
+            var friend = await users.CreateUser("friend@example.com", "Friend-Pa55word!", "Friend", false, "en-US", "UTC", adminId, CancellationToken.None);
+            friendId = friend.Id;
+        }
+
+        // What completing and skipping a daily reminder leaves: the reminder's scalar and that day's row.
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        await using (var scope = Scopes.Create(friendId))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+
+            // A new database has nothing for the one-time migrations to convert.
+            Assert.Equal(
+                OneTimeDataMigrations.FlagKeys.Order(),
+                (await data.Settings.Select(s => s.Key).ToListAsync()).Order());
+
+            var done = new Reminder { Title = "Vitamins", UserId = friendId, RecurrenceType = RecurrenceType.Daily, DoneAt = now };
+            var skipped = new Reminder { Title = "Walk", UserId = friendId, RecurrenceType = RecurrenceType.Daily, SkippedAt = now };
+            data.Reminders.AddRange(done, skipped);
+            await data.SaveChangesAsync();
+
+            data.ReminderDays.AddRange(
+                new ReminderDay { ReminderId = done.Id, UserId = friendId, Date = today, IsDone = true, DoneAt = now },
+                new ReminderDay { ReminderId = skipped.Id, UserId = friendId, Date = today, IsSkipped = true, SkippedAt = now });
+            await data.SaveChangesAsync();
+        }
+
+        for (var start = 0; start < 2; start++)
+        {
+            await using var scope = _services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+        }
+
+        await using (var scope = Scopes.Create(friendId))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+            Assert.Equal(2, await data.ReminderDays.CountAsync());
+            Assert.True(await data.Settings.AnyAsync(s => s.Key == ReminderDayBackfill.FlagKey));
+            Assert.True(await data.Settings.AnyAsync(s => s.Key == ReminderRecurrenceMigration.FlagKey));
+        }
+    }
+
+    [Fact]
+    public async Task TheReminderDayBackfill_KeepsTheDaysTheDatabaseAlreadyHas()
+    {
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+        }
+
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        var threeDaysAgo = now.AddDays(-3);
+        int doneId;
+        int legacyId;
+        await using (var scope = Scopes.Create(Alice))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+
+            // A database without the flag that already has a day row, like one created at runtime before the flag was written.
+            data.Settings.RemoveRange(await data.Settings.Where(s => s.Key == ReminderDayBackfill.FlagKey).ToListAsync());
+
+            var done = new Reminder { Title = "Vitamins", UserId = Alice, RecurrenceType = RecurrenceType.Daily, DoneAt = now };
+            var legacy = new Reminder { Title = "Walk", UserId = Alice, RecurrenceType = RecurrenceType.Daily, DoneAt = threeDaysAgo };
+            data.Reminders.AddRange(done, legacy);
+            await data.SaveChangesAsync();
+            doneId = done.Id;
+            legacyId = legacy.Id;
+
+            data.ReminderDays.Add(new ReminderDay { ReminderId = done.Id, UserId = Alice, Date = today, IsDone = true, DoneAt = now, CompletionValue = "2" });
+            await data.SaveChangesAsync();
+        }
+
+        await using (var scope = Scopes.Create(Alice))
+        {
+            await scope.ServiceProvider.GetRequiredService<IReminderDayBackfill>().RunAsync();
+        }
+
+        await using (var scope = Scopes.Create(Alice))
+        {
+            var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+
+            var kept = Assert.Single(await data.ReminderDays.Where(d => d.ReminderId == doneId).ToListAsync());
+            Assert.Equal(today, kept.Date);
+            Assert.Equal("2", kept.CompletionValue);
+
+            var backfilled = Assert.Single(await data.ReminderDays.Where(d => d.ReminderId == legacyId).ToListAsync());
+            Assert.Equal(DateOnly.FromDateTime(threeDaysAgo), backfilled.Date);
+            Assert.True(backfilled.IsDone);
+
+            Assert.True(await data.Settings.AnyAsync(s => s.Key == ReminderDayBackfill.FlagKey));
+        }
     }
 
     private static async Task<long> TableCount(string path, string table)

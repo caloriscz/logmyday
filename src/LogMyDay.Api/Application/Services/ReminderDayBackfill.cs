@@ -44,6 +44,14 @@ public sealed class ReminderDayBackfill : IReminderDayBackfill
 
         var users = (await _users.List(cancellationToken)).ToDictionary(u => u.Id);
 
+        // A day that already has its row keeps it: the row was written by the reminder's own
+        // completion or skip, and a second row for the same day would break the start.
+        var existingDays = (await _context.ReminderDays
+                .Select(d => new { d.ReminderId, d.Date })
+                .ToListAsync(cancellationToken))
+            .Select(d => (d.ReminderId, d.Date))
+            .ToHashSet();
+
         var created = 0;
         foreach (var reminder in reminders)
         {
@@ -69,8 +77,9 @@ public sealed class ReminderDayBackfill : IReminderDayBackfill
                 row.SkippedAt = skippedAt;
             }
 
-            _context.ReminderDays.AddRange(rows.Values);
-            created += rows.Count;
+            var newRows = rows.Values.Where(r => !existingDays.Contains((r.ReminderId, r.Date))).ToList();
+            _context.ReminderDays.AddRange(newRows);
+            created += newRows.Count;
         }
 
         _context.Settings.Add(new Setting
