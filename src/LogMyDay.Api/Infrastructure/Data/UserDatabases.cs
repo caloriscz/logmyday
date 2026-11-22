@@ -98,13 +98,20 @@ public sealed class UserDatabases : IUserDataStore
                 return;
             }
 
+            // A database is created only for an account: a deleted user's request must not bring
+            // theirs back.
+            var isNew = !File.Exists(GetFilePath(userId));
+            if (isNew && !HasAccount(userId))
+            {
+                throw new InvalidOperationException($"There is no account {userId}, so no database is created for it.");
+            }
+
             Directory.CreateDirectory(_folder);
 
             var options = new DbContextOptionsBuilder<LogMyDayDbContext>();
             Configure(options, userId);
             using var context = new LogMyDayDbContext(options.Options);
 
-            var isNew = !File.Exists(GetFilePath(userId));
             DatabaseUpgrade.Migrate(context, _snapshotFolder, _logger);
             if (isNew)
             {
@@ -116,6 +123,20 @@ public sealed class UserDatabases : IUserDataStore
 
             _ready[userId] = true;
         }
+    }
+
+    /// <summary>Whether the platform database holds the user's account.</summary>
+    private bool HasAccount(Guid userId)
+    {
+        var readOnly = new SqliteConnectionStringBuilder(_platform.ConnectionString) { Mode = SqliteOpenMode.ReadOnly };
+        using var connection = new SqliteConnection(readOnly.ToString());
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM LogMyDay_Users WHERE Id = $id COLLATE NOCASE;";
+        command.Parameters.AddWithValue("$id", userId.ToString("D"));
+
+        return (long)command.ExecuteScalar()! > 0;
     }
 
     /// <summary>Forgets that a user's database was prepared, e.g. after its file was replaced or removed.</summary>

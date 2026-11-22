@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Mcp;
 using LogMyDay.App.Authentication;
@@ -92,11 +94,23 @@ internal static class AuthenticationExtensions
                     Log.Information("Cookie authentication: User signing out - {User}", context.HttpContext.User?.Identity?.Name);
                     return Task.CompletedTask;
                 };
-                options.Events.OnValidatePrincipal = context =>
+                options.Events.OnValidatePrincipal = async context =>
                 {
                     Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}",
                         context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
-                    return Task.CompletedTask;
+
+                    // The cookie outlives a deleted account. Basic and API keys look the user up on
+                    // every request; the cookie does it here, so a deleted user is signed out.
+                    var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                    var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
+                    if (Guid.TryParse(userId, out var id) && await users.Find(id, context.HttpContext.RequestAborted) != null)
+                    {
+                        return;
+                    }
+
+                    Log.Information("Cookie authentication: the account {UserId} no longer exists, signing out", userId);
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync("lmd-cookie");
                 };
             })
             .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { })

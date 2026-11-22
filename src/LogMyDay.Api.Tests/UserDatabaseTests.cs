@@ -109,6 +109,8 @@ public sealed class UserDatabaseTests : IDisposable
     [Fact]
     public async Task EachUser_ReadsAndWritesOnlyTheirOwnDatabase()
     {
+        await AddAccounts(Alice, Bob);
+
         await using (var scope = Scopes.Create(Alice))
         {
             var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
@@ -139,6 +141,8 @@ public sealed class UserDatabaseTests : IDisposable
     [Fact]
     public async Task ARowOfAnotherUser_CantBeSavedIntoAUsersDatabase()
     {
+        await AddAccounts(Alice);
+
         await using var scope = Scopes.Create(Alice);
         var data = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
         data.Tags.Add(new Tag { TagName = "Smuggled", UserId = Bob });
@@ -164,6 +168,8 @@ public sealed class UserDatabaseTests : IDisposable
     [Fact]
     public async Task AScope_CantChangeItsUser_OnceTheDataWasReached()
     {
+        await AddAccounts(Alice);
+
         await using var scope = Scopes.Create(Alice);
         scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
         var userScope = scope.ServiceProvider.GetRequiredService<UserDatabaseScope>();
@@ -213,6 +219,34 @@ public sealed class UserDatabaseTests : IDisposable
         {
             Assert.Null(await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.FindAsync(friendId));
         }
+    }
+
+    [Fact]
+    public async Task ADeletedUser_GetsNoDatabaseBack_NorDoesAnUnknownOne()
+    {
+        Guid adminId;
+        Guid friendId;
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
+            adminId = (await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Users.SingleAsync()).Id;
+
+            var users = scope.ServiceProvider.GetRequiredService<IUserService>();
+            friendId = (await users.CreateUser("friend@example.com", "Friend-Pa55word!", "Friend", false, "en-US", "UTC", adminId, CancellationToken.None)).Id;
+            await users.Delete(friendId, adminId, CancellationToken.None);
+        }
+
+        // What a request of the deleted user does, e.g. with a cookie signed before the delete.
+        foreach (var userId in new[] { friendId, Guid.NewGuid() })
+        {
+            await using var scope = Scopes.Create(userId);
+            var error = Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>());
+
+            Assert.Contains("no account", error.Message);
+            Assert.False(File.Exists(Databases.GetFilePath(userId)));
+        }
+
+        Assert.Equal([Databases.GetFilePath(adminId)], Directory.GetFiles(Databases.Folder, "*.db"));
     }
 
     [Fact]
@@ -304,6 +338,8 @@ public sealed class UserDatabaseTests : IDisposable
             await scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>().SeedAsync();
         }
 
+        await AddAccounts(Alice);
+
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
         var threeDaysAgo = now.AddDays(-3);
@@ -346,6 +382,20 @@ public sealed class UserDatabaseTests : IDisposable
 
             Assert.True(await data.Settings.AnyAsync(s => s.Key == ReminderDayBackfill.FlagKey));
         }
+    }
+
+    /// <summary>A database is created only for an account, so the test users get one.</summary>
+    private async Task AddAccounts(params Guid[] userIds)
+    {
+        await using var scope = _services.CreateAsyncScope();
+        var platform = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        await platform.Database.MigrateAsync();
+        foreach (var userId in userIds)
+        {
+            platform.Users.Add(new User { Id = userId, Email = $"{userId:N}@example.com", PasswordHash = "hash" });
+        }
+
+        await platform.SaveChangesAsync();
     }
 
     private static async Task<long> TableCount(string path, string table)
