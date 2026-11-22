@@ -247,6 +247,21 @@ public sealed class UserDatabaseTests : IDisposable
         }
 
         Assert.Equal([Databases.GetFilePath(adminId)], Directory.GetFiles(Databases.Folder, "*.db"));
+
+        // A connection that a request of the user opened after the delete creates an empty file.
+        // It is not taken up as the user's database.
+        var leftover = Databases.GetFilePath(friendId);
+        await using (var connection = new SqliteConnection($"Data Source={leftover};Pooling=False"))
+        {
+            await connection.OpenAsync();
+        }
+
+        await using (var scope = Scopes.Create(friendId))
+        {
+            Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>());
+        }
+
+        Assert.Equal(0, new FileInfo(leftover).Length);
     }
 
     [Fact]

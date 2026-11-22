@@ -82,7 +82,7 @@ public sealed class UserDatabases : IUserDataStore
     /// <summary>
     /// Makes sure the user's database exists with this version's schema and the reference data.
     /// A new user's database is created here, the first time it is needed; an existing one is
-    /// migrated, after a snapshot.
+    /// migrated, after a snapshot. Refused for a user without an account.
     /// </summary>
     public void Ensure(Guid userId)
     {
@@ -98,13 +98,14 @@ public sealed class UserDatabases : IUserDataStore
                 return;
             }
 
-            // A database is created only for an account: a deleted user's request must not bring
-            // theirs back.
-            var isNew = !File.Exists(GetFilePath(userId));
-            if (isNew && !HasAccount(userId))
+            // Only for an account: a deleted user's request must not bring their database back, nor
+            // take up an empty file that a connection opened late, after the delete, left behind.
+            if (!HasAccount(userId))
             {
-                throw new InvalidOperationException($"There is no account {userId}, so no database is created for it.");
+                throw new InvalidOperationException($"There is no account {userId}, so its database is neither created nor opened.");
             }
+
+            var isNew = !File.Exists(GetFilePath(userId));
 
             Directory.CreateDirectory(_folder);
 
