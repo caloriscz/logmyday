@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file. The format 
 ### Removed
 
   - Shared ("global") option lists, from the API, the MCP tools and the pages. On the upgrade each user whose tags used a shared list gets a copy; a shared list nobody used goes to the first admin.
-  - **SQL Server support.** This version does not start on SQL Server: a configuration that still points at it stops the start and says how to move. **Before upgrading**, move the installation on v0.7.2: export the database (Backup → Export Whole Database), put the file where the app can write, set `Database:Provider` to `Sqlite` and `ConnectionStrings:DefaultConnection` to `Data Source=<path to the file>`, and restart. Migrations no longer come with SQL Server scripts.
+  - **SQL Server support.** This version does not start on SQL Server: a configuration that still points at it stops the start and says how to move. **Before upgrading**, move the installation on v0.7.2: export the database (Backup → Export Whole Database), put the file where the app can write, set `Database:Provider` to `Sqlite` and `ConnectionStrings:DefaultConnection` to `Data Source=<path to the file>`, and restart. In Docker, put the file at `DB_PATH` on the `logmyday-data` volume and remove `DB_HOST`, `DB_NAME`, `DB_USER` and the `db_password` secret: while any of them is set and no SQLite database exists, the start stops. Migrations no longer come with SQL Server scripts.
 
 ### Fixed
 

@@ -20,6 +20,18 @@ internal static class DatabaseExtensions
         dbOptions.EnsureSqlite();
 
         var connectionString = ResolveConnectionString(configuration, environment, dbOptions);
+        if (environment.EnvironmentName == "Docker")
+        {
+            // Up to v0.7.2, Docker reached SQL Server through these settings and ignored DB_PATH.
+            var path = DatabaseLocation.GetFilePath(connectionString);
+            var leftovers = DatabaseProviderOptions.CheckDockerSqlServerSettings(configuration, path);
+            if (leftovers.Count > 0)
+            {
+                Log.Warning("The SQL Server settings {Settings} of LogMyDay v0.7.2 are ignored: the data is in {Path}. Remove them from the Docker configuration",
+                    string.Join(", ", leftovers), path);
+            }
+        }
+
         DatabaseLocation.EnsureDirectory(connectionString);
 
         // The configured file is the platform database; each user's data is a file next to it.
