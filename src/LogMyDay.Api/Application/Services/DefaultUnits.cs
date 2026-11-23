@@ -1,19 +1,27 @@
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
 
 namespace LogMyDay.Api.Application.Services;
 
 /// <summary>The quantities and units every user's database starts with.</summary>
 public static class DefaultUnits
 {
-    /// <summary>Adds the default quantities and units to a database that has no units yet.</summary>
-    public static async Task Ensure(LogMyDayDbContext context)
+    /// <summary>
+    /// Adds the default quantities and units to a database that has no units yet. Synchronous, as
+    /// its caller is: UserDatabases.Ensure prepares a user's database while a data context is
+    /// being created, with a short-lived context of its own.
+    /// </summary>
+    public static void Ensure(LogMyDayDbContext context)
     {
-        if (await context.Units.AnyAsync())
+        if (context.Units.Any())
         {
             return;
         }
+
+        // One transaction for the three saves: a seed that is interrupted leaves nothing behind,
+        // so the next attempt seeds again, instead of finding units without base units or adding
+        // the quantities a second time.
+        using var transaction = context.Database.BeginTransaction();
 
         var timeQuantity = new Quantity { Key = "time" };
         var massQuantity = new Quantity { Key = "mass" };
@@ -28,7 +36,7 @@ public static class DefaultUnits
             timeQuantity, massQuantity, countQuantity,
             volumeQuantity, energyQuantity, lengthQuantity,
             temperatureQuantity, dosageQuantity);
-        await context.SaveChangesAsync();
+        context.SaveChanges();
 
         var second = new Unit
         {
@@ -239,7 +247,7 @@ public static class DefaultUnits
             meter, centimeter, kilometer,
             celsius, fahrenheit,
             iu);
-        await context.SaveChangesAsync();
+        context.SaveChanges();
 
         timeQuantity.BaseUnitId = second.Id;
         massQuantity.BaseUnitId = kilogram.Id;
@@ -250,7 +258,7 @@ public static class DefaultUnits
         temperatureQuantity.BaseUnitId = celsius.Id;
         dosageQuantity.BaseUnitId = iu.Id;
 
-        await context.SaveChangesAsync();
-    
+        context.SaveChanges();
+        transaction.Commit();
     }
 }
