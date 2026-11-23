@@ -34,6 +34,8 @@ services:
       - AI__Enabled=${AI_ENABLED:-false}
       - AI__Provider=${AI_PROVIDER:-openai}
       - AI__Model=${AI_MODEL:-gpt-4o-mini}
+      # The first admin's email, used only by the first start of a new installation
+      - Admin__Email=${ADMIN_EMAIL:-}
     secrets:
       - smtp_password
       - ai_api_key

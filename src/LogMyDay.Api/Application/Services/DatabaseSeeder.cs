@@ -1,9 +1,7 @@
+using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Infrastructure.Data;
-using LogMyDay.Api.Security;
-using LogMyDay.Domain.Entities;
-using LogMyDay.Shared.Preferences;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,18 +21,18 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     private readonly UserDatabases _databases;
     private readonly SingleFileSplit _split;
     private readonly IUserScopeFactory _userScopes;
-    private readonly IPasswordHasher _passwordHasher;
+    private readonly IUserService _users;
     private readonly InitialAdminOptions _initialAdmin;
     private readonly ILogger<DatabaseSeeder> _logger;
 
     public DatabaseSeeder(PlatformDbContext platform, UserDatabases databases, SingleFileSplit split, IUserScopeFactory userScopes,
-        IPasswordHasher passwordHasher, IOptions<InitialAdminOptions> initialAdmin, ILogger<DatabaseSeeder> logger)
+        IUserService users, IOptions<InitialAdminOptions> initialAdmin, ILogger<DatabaseSeeder> logger)
     {
         _platform = platform;
         _databases = databases;
         _split = split;
         _userScopes = userScopes;
-        _passwordHasher = passwordHasher;
+        _users = users;
         _initialAdmin = initialAdmin.Value;
         _logger = logger;
     }
@@ -63,8 +61,8 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     }
 
     /// <summary>
-    /// The first admin of a new installation, with the password from the configuration: without
-    /// one, the start stops rather than create an account with a known password.
+    /// The first admin of a new installation, with the email and password from the configuration:
+    /// without them, the start stops rather than create an account with a known password.
     /// </summary>
     private async Task SeedAdmin()
     {
@@ -80,43 +78,43 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
             return;
         }
 
+        var email = _initialAdmin.Email?.Trim();
+        var problems = new List<string>();
+        if (string.IsNullOrEmpty(email))
+        {
+            problems.Add("Admin:Email is not set.");
+        }
+        else if (!EmailValidator.IsValidEmail(email))
+        {
+            problems.Add($"Admin:Email \"{email}\" is not an email address.");
+        }
+
         if (string.IsNullOrWhiteSpace(password))
         {
-            throw new InvalidOperationException(InitialPasswordHelp("Admin:InitialPassword is not set."));
+            problems.Add("Admin:InitialPassword is not set.");
+        }
+        else if (password.Length < InitialAdminOptions.MinimumPasswordLength)
+        {
+            problems.Add($"Admin:InitialPassword is shorter than {InitialAdminOptions.MinimumPasswordLength} characters.");
         }
 
-        if (password.Length < InitialAdminOptions.MinimumPasswordLength)
+        if (problems.Count > 0)
         {
-            throw new InvalidOperationException(InitialPasswordHelp(
-                $"Admin:InitialPassword is shorter than {InitialAdminOptions.MinimumPasswordLength} characters."));
+            throw new InvalidOperationException(FirstAdminHelp(problems));
         }
 
-        var adminUser = new User
-        {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Email = InitialAdminOptions.Email,
-            DisplayName = "Administrator",
-            PasswordHash = _passwordHasher.Hash(password),
-            IsAdmin = true,
-            Culture = PreferencesFactory.DefaultCulture,
-            TimeZone = PreferencesFactory.DefaultTimeZoneId,
-            CreatedUtc = DateTime.UtcNow,
-            UpdatedUtc = DateTime.UtcNow
-        };
+        var admin = await _users.CreateFirstAdmin(email!, password!, "Administrator", CancellationToken.None);
 
-        _platform.Users.Add(adminUser);
-        await _platform.SaveChangesAsync();
-
-        _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}",
-            adminUser.Email, adminUser.Id);
+        _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}", admin.Email, admin.Id);
     }
 
-    private static string InitialPasswordHelp(string problem)
+    private static string FirstAdminHelp(IEnumerable<string> problems)
     {
-        return $"This installation has no account yet, so this start creates the first admin, \"{InitialAdminOptions.Email}\", and needs its password. {problem} "
-            + $"Set Admin:InitialPassword to at least {InitialAdminOptions.MinimumPasswordLength} characters: in appsettings.json, "
-            + "as the environment variable Admin__InitialPassword, or in Docker in the admin_password secret. "
-            + "Once the account exists, the setting is ignored and can be removed.";
+        return "This installation has no account yet, so this start creates the first admin and needs the admin's email and password. "
+            + string.Join(" ", problems) + " "
+            + $"Set Admin:Email, and Admin:InitialPassword to at least {InitialAdminOptions.MinimumPasswordLength} characters: in appsettings.json, "
+            + "as the environment variables Admin__Email and Admin__InitialPassword, or in Docker as ADMIN_EMAIL in .env and the admin_password secret. "
+            + "Once the account exists, the settings are ignored and can be removed.";
     }
 
     /// <summary>The user's database with its schema and reference data, then its one-time data migrations.</summary>

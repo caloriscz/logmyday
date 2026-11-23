@@ -5,9 +5,6 @@ namespace LogMyDay.Shared.Interfaces;
 
 public interface IAuthApi
 {
-    [Post("/api/auth/register-first")]
-    Task RegisterFirstAdminAsync([Body] RegisterFirstDto request, CancellationToken cancellationToken = default);
-
     [Post("/api/auth/login")]
     Task LoginAsync([Body] LoginDto request, CancellationToken cancellationToken = default);
 

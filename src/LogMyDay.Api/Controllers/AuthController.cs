@@ -1,4 +1,3 @@
-using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Security;
@@ -45,37 +44,6 @@ public class AuthController : ControllerBase
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
         return $"{clientIp}:{email}";
-    }
-
-    [HttpPost("register-first")]
-    [EnableRateLimiting("auth")]
-    public async Task<IActionResult> RegisterFirstAdmin([FromBody] RegisterFirstDto request, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
-            if (string.IsNullOrWhiteSpace(request.Email) || !EmailValidator.IsValidEmail(request.Email))
-            {
-                return BadRequest("Valid email is required.");
-            }
-
-            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 10)
-            {
-                return BadRequest("Password must be at least 10 characters long.");
-            }
-
-            var user = await _userService.CreateFirstAdmin(request.Email, request.Password, request.DisplayName, cancellationToken);
-            
-            return CreatedAtAction(nameof(GetCurrentUser), new { }, new { message = "First admin user created successfully" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
     }
 
     [HttpPost("login")]

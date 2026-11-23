@@ -199,7 +199,11 @@ public sealed class DatabaseBackupsTests : IDisposable
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
-        services.Configure<InitialAdminOptions>(o => o.InitialPassword = "first-admin-password");
+        services.Configure<InitialAdminOptions>(o =>
+        {
+            o.Email = "admin@example.com";
+            o.InitialPassword = "first-admin-password";
+        });
         services.AddSingleton(new Mock<IEmailSender>().Object);
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ITagRuleEngine, TagRuleEngine>();
