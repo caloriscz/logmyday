@@ -17,6 +17,13 @@ public class BackupController : BaseApiController
     /// <summary>The largest database file a restore accepts.</summary>
     public const long MaxDatabaseUploadBytes = 1024L * 1024 * 1024;
 
+    /// <summary>
+    /// The largest restore request: the file and the multipart form around it (boundaries and part
+    /// headers), so that a file of <see cref="MaxDatabaseUploadBytes"/> fits. The web.config gives
+    /// IIS request filtering the same limit.
+    /// </summary>
+    public const long MaxDatabaseRequestBytes = MaxDatabaseUploadBytes + 1024 * 1024;
+
     private readonly IBackupService _backupService;
     private readonly ILogger<BackupController> _logger;
 
@@ -102,7 +109,7 @@ public class BackupController : BaseApiController
     /// </summary>
     [HttpPost("database/restore")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
-    [RequestSizeLimit(MaxDatabaseUploadBytes)]
+    [RequestSizeLimit(MaxDatabaseRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxDatabaseUploadBytes)]
     public Task<IActionResult> RestoreDatabase(IFormFile file, [FromServices] IDatabaseBackups databaseBackups, CancellationToken cancellationToken)
     {
@@ -112,7 +119,7 @@ public class BackupController : BaseApiController
     /// <summary>Admin only: replaces any user's database with a database file taken from that account.</summary>
     [HttpPost("database/{userId:guid}/restore")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic", Policy = "AdminOnly")]
-    [RequestSizeLimit(MaxDatabaseUploadBytes)]
+    [RequestSizeLimit(MaxDatabaseRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxDatabaseUploadBytes)]
     public async Task<IActionResult> RestoreUserDatabase(Guid userId, IFormFile file, [FromServices] IDatabaseBackups databaseBackups, [FromServices] IUserService users, CancellationToken cancellationToken)
     {
