@@ -294,7 +294,7 @@ public sealed class SingleFileSplitTests : IDisposable
         await db.Database.ExecuteSqlRawAsync(
             "CREATE TABLE __EFMigrationsHistory (MigrationId TEXT NOT NULL PRIMARY KEY, ProductVersion TEXT NOT NULL);"
             + $"INSERT INTO __EFMigrationsHistory VALUES ('{SingleFileSplit.LastSingleFileMigration}', '9.0.10');");
-        await DefaultUnits.Ensure(db);
+        DefaultUnits.Ensure(db);
 
         platform.Users.AddRange(
             new User { Id = Admin, Email = "admin", DisplayName = "Administrator", PasswordHash = "admin-hash", IsAdmin = true, CreatedUtc = new DateTime(2026, 1, 1) },

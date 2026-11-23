@@ -120,7 +120,7 @@ public sealed class UserDatabases : IUserDataStore
                 _logger.LogInformation("Created the database of user {UserId}: {Path}", userId, GetFilePath(userId));
             }
 
-            DefaultUnits.Ensure(context).GetAwaiter().GetResult();
+            DefaultUnits.Ensure(context);
 
             _ready[userId] = true;
         }

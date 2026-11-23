@@ -1014,7 +1014,7 @@ public class BackupService : IBackupService
                 })
                 .ToListAsync();
 
-            var colorSchemes = await ExportColorSchemesAsync(userId);
+            var colorSchemes = await ExportColorSchemes(userId);
             var tagRules = await ExportTagRulesAsync(userId);
             var tagChecks = await ExportTagChecksAsync(userId);
             var tagTriggers = await ExportTagTriggersAsync(userId);
@@ -1110,7 +1110,7 @@ public class BackupService : IBackupService
                 await ImportTagOptionListsAsync(backupData.TagOptionLists, result, userId);
                 await ImportTagOptionsAsync(backupData.TagOptions, result);
                 await ImportTagGroupsAsync(backupData.TagGroups, result, userId);
-                await ImportColorSchemesAsync(backupData.ColorSchemes, result, userId);
+                await ImportColorSchemes(backupData.ColorSchemes, result, userId);
                 await ImportTagsAsync(backupData.Tags, result, userId);
                 await ImportActivitiesAsync(backupData.Activities, result, userId);
                 await ImportRecordTypesAsync(backupData.RecordTypes, result, userId);
@@ -1596,7 +1596,7 @@ public class BackupService : IBackupService
     }
 
     // Colour schemes travel whole, with their entries. Tags and record fields name their scheme.
-    private async Task<List<ColorSchemeBackup>> ExportColorSchemesAsync(Guid? userId)
+    private async Task<List<ColorSchemeBackup>> ExportColorSchemes(Guid? userId)
     {
         return await _context.ColorSchemes
             .Where(c => userId == null || c.UserId == userId)
@@ -1624,7 +1624,7 @@ public class BackupService : IBackupService
     }
 
     // A scheme whose name the user already has is left as it is, like a tag group.
-    private async Task ImportColorSchemesAsync(List<ColorSchemeBackup> colorSchemes, BackupImportResult result, Guid? userId)
+    private async Task ImportColorSchemes(List<ColorSchemeBackup> colorSchemes, BackupImportResult result, Guid? userId)
     {
         if (colorSchemes.Count == 0)
         {
@@ -2138,7 +2138,7 @@ public class BackupService : IBackupService
                 Activities = userActivities,
                 Tags = userTags,
                 TagGroups = userTagGroups,
-                ColorSchemes = await ExportColorSchemesAsync(userId),
+                ColorSchemes = await ExportColorSchemes(userId),
                 TagOptionLists = userTagOptionLists,
                 TagOptions = userTagOptions,
                 ScanMappings = userScanMappings,
@@ -2247,7 +2247,7 @@ public class BackupService : IBackupService
 
                 await _context.SaveChangesAsync();
 
-                await ImportColorSchemesAsync(backup.ColorSchemes, result, userId);
+                await ImportColorSchemes(backup.ColorSchemes, result, userId);
                 var colorSchemeLookup = await ColorSchemeIdsByName(userId);
 
                 // Step 4: Import tags with current user ID
