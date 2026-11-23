@@ -1,4 +1,5 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
 using LogMyDay.Domain.Entities;
@@ -6,6 +7,7 @@ using LogMyDay.Shared.Preferences;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LogMyDay.Api.Application.Services;
 
@@ -22,16 +24,18 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
     private readonly SingleFileSplit _split;
     private readonly IUserScopeFactory _userScopes;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly InitialAdminOptions _initialAdmin;
     private readonly ILogger<DatabaseSeeder> _logger;
 
     public DatabaseSeeder(PlatformDbContext platform, UserDatabases databases, SingleFileSplit split, IUserScopeFactory userScopes,
-        IPasswordHasher passwordHasher, ILogger<DatabaseSeeder> logger)
+        IPasswordHasher passwordHasher, IOptions<InitialAdminOptions> initialAdmin, ILogger<DatabaseSeeder> logger)
     {
         _platform = platform;
         _databases = databases;
         _split = split;
         _userScopes = userScopes;
         _passwordHasher = passwordHasher;
+        _initialAdmin = initialAdmin.Value;
         _logger = logger;
     }
 
@@ -58,22 +62,41 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
         }
     }
 
+    /// <summary>
+    /// The first admin of a new installation, with the password from the configuration: without
+    /// one, the start stops rather than create an account with a known password.
+    /// </summary>
     private async Task SeedAdmin()
     {
+        var password = _initialAdmin.InitialPassword;
         if (await _platform.Users.AnyAsync())
         {
             _logger.LogInformation("Users already exist in database. Skipping admin user seeding.");
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                _logger.LogWarning("Admin:InitialPassword is ignored: the installation already has accounts. Remove it from the configuration");
+            }
 
             return;
         }
 
-        // Create the admin user with the same credentials as Basic Auth
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            throw new InvalidOperationException(InitialPasswordHelp("Admin:InitialPassword is not set."));
+        }
+
+        if (password.Length < InitialAdminOptions.MinimumPasswordLength)
+        {
+            throw new InvalidOperationException(InitialPasswordHelp(
+                $"Admin:InitialPassword is shorter than {InitialAdminOptions.MinimumPasswordLength} characters."));
+        }
+
         var adminUser = new User
         {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), // Same as Basic Auth UserId
-            Email = "admin", // Convert username to email format
+            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Email = InitialAdminOptions.Email,
             DisplayName = "Administrator",
-            PasswordHash = _passwordHasher.Hash("secret123"), // Same password as Basic Auth
+            PasswordHash = _passwordHasher.Hash(password),
             IsAdmin = true,
             Culture = PreferencesFactory.DefaultCulture,
             TimeZone = PreferencesFactory.DefaultTimeZoneId,
@@ -86,6 +109,14 @@ public sealed class DatabaseSeeder : IDatabaseSeeder
 
         _logger.LogInformation("Successfully seeded admin user: {Email} with ID: {UserId}",
             adminUser.Email, adminUser.Id);
+    }
+
+    private static string InitialPasswordHelp(string problem)
+    {
+        return $"This installation has no account yet, so this start creates the first admin, \"{InitialAdminOptions.Email}\", and needs its password. {problem} "
+            + $"Set Admin:InitialPassword to at least {InitialAdminOptions.MinimumPasswordLength} characters: in appsettings.json, "
+            + "as the environment variable Admin__InitialPassword, or in Docker in the admin_password secret. "
+            + "Once the account exists, the setting is ignored and can be removed.";
     }
 
     /// <summary>The user's database with its schema and reference data, then its one-time data migrations.</summary>

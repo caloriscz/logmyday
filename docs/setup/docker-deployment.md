@@ -29,7 +29,8 @@ Copy-Item .env.example .env
 
 # 2. Provide secrets (kept out of git)
 Copy-Item secrets\smtp_password.txt.example secrets\smtp_password.txt
-# Fill the files with real credentials.
+Copy-Item secrets\admin_password.txt.example secrets\admin_password.txt
+# Fill the files with real credentials; admin_password.txt holds the first admin's password.
 
 # 3. Build and launch
 docker compose up --build -d
@@ -38,6 +39,8 @@ docker compose up --build -d
 Docker ps
 docker inspect --format='{{json .State.Health}}' logmyday-app
 ```
+
+The first start creates the administrator `admin` with the password from `secrets/admin_password.txt` (at least 10 characters); see [First admin](#first-admin).
 
 The service exposes port `9099` by default. Add a reverse proxy (nginx, Traefik, Azure App Gateway) to terminate HTTPS in production.
 
@@ -61,6 +64,10 @@ location /mcp {
 ```
 
 Traefik and Caddy stream by default and forward the header unless configured otherwise.
+
+## First admin
+
+A new installation has no account, so its first start creates the administrator `admin` with the password from the `admin_password` secret (`secrets/admin_password.txt`, at least 10 characters). Without it the app stops at start and the container keeps restarting; `docker compose logs logmyday-app` shows why. Later starts ignore the secret, so once you have signed in you can empty the file. An installation that already has accounts never uses it, and the file can stay empty there.
 
 ## Secrets & Configuration Flow
 

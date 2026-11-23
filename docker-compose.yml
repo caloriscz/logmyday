@@ -37,6 +37,7 @@ services:
     secrets:
       - smtp_password
       - ai_api_key
+      - admin_password
     volumes:
       # Persistent database
       - logmyday-data:/app/data
@@ -57,6 +58,9 @@ secrets:
     file: ./secrets/smtp_password.txt
   ai_api_key:
     file: ./secrets/ai_api_key.txt
+  # The first admin's password, used only by the first start of a new installation
+  admin_password:
+    file: ./secrets/admin_password.txt
 
 volumes:
   logmyday-data:

@@ -1,4 +1,5 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Application.Options;
 using LogMyDay.Api.Application.Services;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Api.Security;
@@ -40,6 +41,7 @@ public sealed class UserDatabaseTests : IDisposable
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+        services.Configure<InitialAdminOptions>(o => o.InitialPassword = "first-admin-password");
         services.AddSingleton(new Mock<IEmailSender>().Object);
         services.AddScoped<IUserService, UserService>();
         _services = services.BuildServiceProvider();

@@ -19,6 +19,13 @@ if (builder.Environment.EnvironmentName == "Docker")
     {
         builder.Configuration["AI:ApiKey"] = aiApiKey;
     }
+
+    // The first admin's password, used only by the first start of a new installation.
+    var adminPassword = builder.Configuration["admin_password"];
+    if (!string.IsNullOrWhiteSpace(adminPassword))
+    {
+        builder.Configuration["Admin:InitialPassword"] = adminPassword;
+    }
 }
 
 Log.Logger = new LoggerConfiguration()

@@ -159,7 +159,7 @@ Example for Gmail:
 
 ## Database
 
-There is nothing to prepare: the first start creates the database files and seeds the reference data.
+The first start creates the database files and seeds the reference data. On a new installation it also creates the first admin, whose password you set beforehand (see **First admin** below).
 
 ## Install UI dependencies
 
@@ -185,7 +185,7 @@ dotnet run --project src/LogMyDay.App/LogMyDay.App.csproj
 
 Open `https://localhost:7064` after the server starts. The API endpoints are served from the same host; use `/swagger` for the OpenAPI surface in development.
 
-> ⚠️ **Security Warning**: The default administrator account is `admin` with the password `secret123`. You **must** change this password immediately after your first login.
+> 🔑 **First admin**: a new installation has no account, so its first start creates the administrator `admin` with the password in `Admin:InitialPassword` (at least 10 characters). Set it before the first start, in `appsettings.json` or as the environment variable `Admin__InitialPassword`; without it the start stops and says so. Later starts ignore the setting, so remove it once you have signed in.
 
 Remember to stop the process (`Ctrl+C` or `Stop-Process -Name dotnet`) at the end of every session to avoid file locking.
 
