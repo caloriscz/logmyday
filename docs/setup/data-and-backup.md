@@ -44,7 +44,13 @@ Copying the data folder works as well, with the application stopped. While the a
 
 ### What LogMyDay keeps on its own
 
-Files in `snapshots/` are taken before a migration (`<name>-<time>-before-<migration>.db`) and before a restore (`<user id>-<time>-before-restore.db`). Nothing deletes them. Remove old ones when you no longer need them.
+Files in `snapshots/` are taken before a migration (`<name>-<time>-before-<migration>.db`) and before a restore (`<user id>-<time>-before-restore.db`). LogMyDay removes the older ones itself:
+
+- Each database keeps the snapshots of its last two upgrades. The older ones go once a migration has succeeded; after a failed one, all stay.
+- Each user keeps the three newest snapshots before a restore. The older ones go right after a restore, so restoring again and again doesn't fill the disk.
+- Deleting a user deletes their snapshots with their database.
+
+Other files in the folder are left alone. Copy a snapshot elsewhere if you want to keep it for longer.
 
 ## Restore
 
@@ -52,7 +58,7 @@ Files in `snapshots/` are taken before a migration (`<name>-<time>-before-<migra
 
 **Backup → Database File → Restore Database** replaces your database with a file you downloaded earlier. Everything logged since the file was taken is replaced.
 
-The file is checked before anything changes. It is refused when it is not a LogMyDay user database, when it comes from a newer version of LogMyDay, or when it holds another account's data. A file from an older version is migrated first. The replaced database is kept in `snapshots/`.
+The file is checked before anything changes. It is refused when it is not a LogMyDay user database, when it comes from a newer version of LogMyDay, or when it holds another account's data. A file from an older version is migrated first. The replaced database is kept in `snapshots/`, among the user's three newest snapshots before a restore.
 
 A database file restores only into the account it was taken from. To bring data into a different account, import a JSON export.
 

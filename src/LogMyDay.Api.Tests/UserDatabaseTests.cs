@@ -211,6 +211,17 @@ public sealed class UserDatabaseTests : IDisposable
             await data.SaveChangesAsync();
         }
 
+        // The friend's earlier states, from a restore and from an upgrade, and one of the admin's.
+        Directory.CreateDirectory(Databases.SnapshotFolder);
+        var friendsSnapshots = new[] { $"{friendId:D}-20261101-100000-before-restore.db", $"{friendId:D}-20261102-100000-before-20261120000000_Initial.db" };
+        var adminsSnapshot = Path.Combine(Databases.SnapshotFolder, $"{adminId:D}-20261101-100000-before-restore.db");
+        foreach (var name in friendsSnapshots)
+        {
+            File.WriteAllText(Path.Combine(Databases.SnapshotFolder, name), "the friend's data");
+        }
+
+        File.WriteAllText(adminsSnapshot, "the admin's data");
+
         await using (var scope = _services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<IUserService>().Delete(friendId, adminId, CancellationToken.None);
@@ -220,6 +231,7 @@ public sealed class UserDatabaseTests : IDisposable
         Assert.False(File.Exists(file + "-wal"));
         Assert.False(File.Exists(file + "-shm"));
         Assert.True(File.Exists(Databases.GetFilePath(adminId)));
+        Assert.Equal([adminsSnapshot], Directory.GetFiles(Databases.SnapshotFolder));
 
         await using (var scope = _services.CreateAsyncScope())
         {

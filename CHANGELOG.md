@@ -9,8 +9,8 @@ All notable changes to this project will be documented in this file. The format 
 
   - **A database per user.** The configured file is now the platform database (accounts, API keys, settings), and each user's data is a file of its own, `users/<user id>.db`, next to it. A user's rows never leave their file, so one user's backup, restore or clear cannot reach another's data.
   - The first start on a v0.7.2 database splits it: it builds the new files aside, compares the row counts of every table, and only then puts them in place. On any failure the original stays untouched and the app does not start.
-  - Before a migration changes a database that holds data, a copy goes into the `snapshots` folder. The platform database and every user's database are migrated at startup; one failure stops the start and names the file.
-  - Backup → **Database File**: download your data as one SQLite file, and restore it into the same account later. A restore checks the file first (a LogMyDay user database, of this version or an older one, with this account's data only) and keeps the replaced database in the `snapshots` folder. Also `GET /api/backup/database` and `POST /api/backup/database/restore`; an admin reaches any user's database with `GET /api/backup/database/{userId}` and `POST /api/backup/database/{userId}/restore`.
+  - Before a migration changes a database that holds data, a copy goes into the `snapshots` folder; each database keeps the copies of its last two upgrades. The platform database and every user's database are migrated at startup; one failure stops the start and names the file.
+  - Backup → **Database File**: download your data as one SQLite file, and restore it into the same account later. A restore checks the file first (a LogMyDay user database, of this version or an older one, with this account's data only) and keeps the replaced database in the `snapshots` folder, the three newest per user. Also `GET /api/backup/database` and `POST /api/backup/database/restore`; an admin reaches any user's database with `GET /api/backup/database/{userId}` and `POST /api/backup/database/{userId}/restore`.
   - The JSON backups carry colour schemes: the schemes with their entries, and which scheme each tag and record field uses. An import creates the schemes you don't have yet, by name. Before, a restored tag lost its colours.
   - Backup → **Export Whole Installation**, for admins: a zip archive with the platform database and every user's database. Unpacked into an empty data folder, LogMyDay runs on it. Also `GET /api/backup/export/installation`. It replaces v0.7.2's single-file export (`GET /api/backup/export/sqlite`).
   - A default place for the database: without a connection string it is `data/logmyday.db` in the application's folder. A relative `Data Source` counts from the application's folder on every host, and the startup log names the file in use.
@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file. The format 
 ### Changed
 
   - Units, quantities and input types are each user's own; every user starts with the default set.
-  - Deleting a user deletes their database file. Before, their rows stayed behind.
+  - Deleting a user deletes their database file and their snapshots. Before, their rows stayed behind.
   - The migrations start again from one initial migration per kind of database. A database older than v0.7.2 is refused with a message to install v0.7.2 first.
   - **LogMyDay runs on SQLite only.** `Database:Provider` is optional and must be `Sqlite` if set. Docker uses `DB_PATH` and the `logmyday-data` volume instead of the SQL Server settings and secrets.
   - The local deployment (Cake, Web Deploy) keeps the `data` folder on the server, next to `DataProtection-Keys`.

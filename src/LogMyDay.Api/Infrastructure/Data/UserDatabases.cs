@@ -151,12 +151,13 @@ public sealed class UserDatabases : IUserDataStore
         Ensure(userId);
     }
 
-    /// <summary>Deletes the user's database file, with the files SQLite keeps beside it.</summary>
+    /// <summary>Deletes the user's database file, with the files SQLite keeps beside it and its snapshots.</summary>
     public void Delete(Guid userId)
     {
         lock (_createLock)
         {
             RemoveFiles(userId);
+            SnapshotRetention.RemoveAll(_snapshotFolder, userId, _logger);
 
             _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, GetFilePath(userId));
         }
@@ -164,7 +165,8 @@ public sealed class UserDatabases : IUserDataStore
 
     /// <summary>
     /// Puts another database file in the place of the user's database. The database it replaces
-    /// is copied into the snapshot folder first.
+    /// is copied into the snapshot folder first, and the user keeps the newest of these snapshots
+    /// only (<see cref="SnapshotRetention.RestoreSnapshotsKept"/>).
     /// </summary>
     /// <param name="newFile">A database with this version's schema, on the same volume. It is moved.</param>
     /// <returns>The snapshot of the replaced database, or null when the user had none.</returns>
@@ -187,6 +189,10 @@ public sealed class UserDatabases : IUserDataStore
             Ensure(userId);
 
             _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
+            if (snapshot != null)
+            {
+                SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, _logger);
+            }
 
             return snapshot;
         }

@@ -99,6 +99,37 @@ public sealed class DatabaseUpgradeTests : IDisposable
     }
 
     [Fact]
+    public void AnUpgrade_KeepsTheSnapshotsOfTheDatabasesLastTwoUpgrades()
+    {
+        var older = OldSnapshots("test-20250101-000000-before-20200101000000_First.db", "test-20250601-000000-before-20200101000000_First.db");
+        var others = OldSnapshots("other-20250101-000000-before-20200101000000_First.db", "test-20250101-000000-before-restore.db");
+        using var db = new TwoStepContext(Options<TwoStepContext>());
+        db.GetService<IMigrator>().Migrate(TwoStepContext.First);
+        db.Database.ExecuteSqlRaw("INSERT INTO Notes (Text) VALUES ('kept');");
+
+        var snapshot = DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance);
+
+        // Kept: this upgrade's snapshot and the newer of the two before it. Other files stay.
+        string[] expected = [Path.GetFileName(snapshot)!, older[1], .. others];
+        Assert.Equal(
+            expected.Order(StringComparer.Ordinal),
+            Directory.GetFiles(SnapshotFolder).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void AFailingMigration_RemovesNoSnapshot()
+    {
+        var older = OldSnapshots("test-20250101-000000-before-20200101000000_First.db", "test-20250601-000000-before-20200101000000_First.db");
+        using var db = new BrokenStepContext(Options<BrokenStepContext>());
+        db.GetService<IMigrator>().Migrate(BrokenStepContext.First);
+
+        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+
+        Assert.Equal(3, Directory.GetFiles(SnapshotFolder).Length);
+        Assert.All(older, name => Assert.True(File.Exists(Path.Combine(SnapshotFolder, name))));
+    }
+
+    [Fact]
     public void AFileOfAnotherOrigin_IsRefused_AndLeftAsItIs()
     {
         using var db = new LogMyDayDbContext(Options<LogMyDayDbContext>());
@@ -109,6 +140,17 @@ public sealed class DatabaseUpgradeTests : IDisposable
         Assert.Contains(DatabasePath, error.Message);
         Assert.Contains("older LogMyDay", error.Message);
         Assert.Equal(0, db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM sqlite_master WHERE name = 'LogMyDay_Activities'").AsEnumerable().Single());
+    }
+
+    private string[] OldSnapshots(params string[] names)
+    {
+        Directory.CreateDirectory(SnapshotFolder);
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(SnapshotFolder, name), "an earlier state");
+        }
+
+        return names;
     }
 
     private DbContextOptions<TContext> Options<TContext>()

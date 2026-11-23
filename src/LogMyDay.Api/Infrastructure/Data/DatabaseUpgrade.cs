@@ -5,7 +5,8 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Brings one database file to this version's schema with its context's migrations. A database
-/// that already holds data is copied into the snapshot folder first.
+/// that already holds data is copied into the snapshot folder first, and the database keeps the
+/// snapshots of its last upgrades only (<see cref="SnapshotRetention.UpgradeSnapshotsKept"/>).
 /// </summary>
 public static class DatabaseUpgrade
 {
@@ -56,6 +57,11 @@ public static class DatabaseUpgrade
             var hint = snapshot == null ? string.Empty : $" Its state before the migration is in {snapshot}.";
 
             throw new InvalidOperationException($"The database {path} could not be migrated.{hint} {ex.Message}", ex);
+        }
+
+        if (snapshot != null)
+        {
+            SnapshotRetention.PruneUpgradeSnapshots(snapshotFolder, Path.GetFileNameWithoutExtension(path), logger);
         }
 
         return snapshot;

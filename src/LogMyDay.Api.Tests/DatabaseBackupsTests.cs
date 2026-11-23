@@ -70,6 +70,35 @@ public sealed class DatabaseBackupsTests : IDisposable
     }
 
     [Fact]
+    public async Task ARestore_WritesItsSnapshot_AndTheUserKeepsTheirThreeNewest()
+    {
+        await Start();
+        await AddTag(_services, _friend, "Coffee");
+        var backup = await Save(await Backups.ExportUser(_friend, CancellationToken.None));
+
+        Directory.CreateDirectory(Databases.SnapshotFolder);
+        var friends = new[] { "20250101-000000", "20250201-000000", "20250301-000000" }
+            .Select(time => $"{_friend:D}-{time}-before-restore.db")
+            .ToArray();
+        var admins = $"{_admin:D}-20250101-000000-before-restore.db";
+        foreach (var name in friends.Append(admins))
+        {
+            await File.WriteAllTextAsync(Path.Combine(Databases.SnapshotFolder, name), "an earlier state");
+        }
+
+        await using (var content = File.OpenRead(backup))
+        {
+            await Backups.RestoreUser(_friend, content, CancellationToken.None);
+        }
+
+        var kept = Directory.GetFiles(Databases.SnapshotFolder, $"{_friend:D}-*-before-restore.db").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(3, kept.Length);
+        Assert.Equal([friends[1], friends[2]], kept[..2]);
+        Assert.Equal(1L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]!), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
+        Assert.True(File.Exists(Path.Combine(Databases.SnapshotFolder, admins)));
+    }
+
+    [Fact]
     public async Task ABackupOfAnotherUser_IsRefused_AndNothingChanges()
     {
         await Start();
