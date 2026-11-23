@@ -4,6 +4,7 @@ using LogMyDay.Api.Authentication;
 using LogMyDay.Mcp;
 using LogMyDay.App.Authentication;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
@@ -99,18 +100,23 @@ internal static class AuthenticationExtensions
                     Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}",
                         context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
 
-                    // The cookie outlives a deleted account, so the account is looked up on every
-                    // request and a deleted user is signed out. Only its existence is checked: unlike
-                    // Basic and API keys, the cookie keeps the claims it was signed with.
+                    // The cookie keeps the claims it was signed in with, so the account is looked up
+                    // on every request. A deleted account is signed out, and so is one whose password
+                    // or admin right changed since the sign-in (SessionStamp): the user signs in
+                    // again and gets the account's current rights.
                     var claim = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                     var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
                     if (!Guid.TryParse(claim, out var userId))
                     {
                         Log.Warning("Cookie authentication: the cookie holds no valid user id, signing out");
                     }
-                    else if (await users.Find(userId, context.HttpContext.RequestAborted) == null)
+                    else if (await users.Find(userId, context.HttpContext.RequestAborted) is not { } user)
                     {
                         Log.Information("Cookie authentication: the account {UserId} no longer exists, signing out", userId);
+                    }
+                    else if (!SessionStamp.Matches(context.Principal!, user))
+                    {
+                        Log.Information("Cookie authentication: the password or the admin right of account {UserId} changed since the sign-in, signing out", userId);
                     }
                     else
                     {
@@ -168,6 +174,9 @@ internal static class AuthenticationExtensions
 
         services.AddScoped<CircuitRequestOrigin>();
         services.AddScoped<CookieAuthenticationHandler>();
+
+        // Open pages check their account every minute, as the cookie does on each request.
+        services.AddScoped<AuthenticationStateProvider, SessionRevalidatingAuthenticationStateProvider>();
 
         return services;
     }

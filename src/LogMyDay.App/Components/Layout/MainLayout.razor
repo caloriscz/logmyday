@@ -270,6 +270,7 @@ else
             }
             
             await CheckAuthenticationState();
+            AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
         else
         {
@@ -402,8 +403,27 @@ document.addEventListener('keydown', window.layoutKeyboardHandler);
         // We'll trigger an event or use a different approach
     }
 
+    /// <summary>
+    /// The page's account was deleted, or its password or admin right changed (the authentication
+    /// state is checked every minute): the browser goes to the sign-in page, whose request ends the
+    /// cookie as well.
+    /// </summary>
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> state)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if ((await state).User.Identity?.IsAuthenticated != true)
+            {
+                Logger.LogInformation("MainLayout: the session ended, sending the browser to the sign-in page");
+                Navigation.NavigateTo("/login?signedOut=session", forceLoad: true);
+            }
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+
         if (keyboardListenerAdded)
         {
             try

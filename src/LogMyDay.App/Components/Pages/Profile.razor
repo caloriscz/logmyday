@@ -7,6 +7,7 @@
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
 @inject IAccountApi AccountApi
+@inject NavigationManager Navigation
 @inject ILogger<Profile> Logger
 @inject IPageTitleService PageTitleService
 
@@ -261,7 +262,8 @@
             await AccountApi.ChangePasswordAsync(request);
             passwordModel = new ChangePasswordModel();
 
-            SetPasswordStatus("Password updated successfully.");
+            // A changed password ends every session of the account, this one too.
+            Navigation.NavigateTo("/login?signedOut=password", forceLoad: true);
         }
         catch (Refit.ApiException ex)
         {

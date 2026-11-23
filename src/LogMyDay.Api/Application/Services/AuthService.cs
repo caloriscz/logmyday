@@ -1,4 +1,5 @@
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Domain.Entities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -25,11 +26,12 @@ public sealed class AuthService : IAuthService
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
-            new Claim("is_admin", user.IsAdmin.ToString().ToLowerInvariant())
+            new Claim("is_admin", user.IsAdmin.ToString().ToLowerInvariant()),
+            new Claim(SessionStamp.ClaimType, SessionStamp.For(user))
         };
 
         _logger.LogInformation("AuthService.SignInAsync: Created claims for User {UserId}: {Claims}",
-            user.Id, string.Join(", ", claims.Select(c => $"{c.Type}={c.Value}")));
+            user.Id, string.Join(", ", claims.Where(c => c.Type != SessionStamp.ClaimType).Select(c => $"{c.Type}={c.Value}")));
 
         var identity = new ClaimsIdentity(claims, AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
