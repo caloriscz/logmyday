@@ -18,6 +18,11 @@ public static class DefaultUnits
             return;
         }
 
+        // One transaction for the three saves: a seed that is interrupted leaves nothing behind,
+        // so the next attempt seeds again, instead of finding units without base units or adding
+        // the quantities a second time.
+        using var transaction = context.Database.BeginTransaction();
+
         var timeQuantity = new Quantity { Key = "time" };
         var massQuantity = new Quantity { Key = "mass" };
         var countQuantity = new Quantity { Key = "count" };
@@ -254,5 +259,6 @@ public static class DefaultUnits
         dosageQuantity.BaseUnitId = iu.Id;
 
         context.SaveChanges();
+        transaction.Commit();
     }
 }
