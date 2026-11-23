@@ -74,7 +74,7 @@ An admin can download and restore any user's database through the API: `GET /api
 Up to v0.7.2 an installation was one database file with every user's data. v0.8.0 splits that file the first time it starts:
 
 1. Back up the database file yourself before you upgrade.
-2. Make sure the installation runs **v0.7.2 on SQLite**. An older version is refused with a message to install v0.7.2 first. An installation on SQL Server moves to SQLite on v0.7.2 (Backup → Export Whole Database).
+2. Make sure the installation runs **v0.7.2 on SQLite**. An older version is refused with a message to install v0.7.2 first. An installation on SQL Server moves to SQLite on v0.7.2 (Backup → Export Whole Database); in Docker, see [Upgrading a v0.7.2 installation on SQL Server](docker-deployment.md#upgrading-a-v072-installation-on-sql-server).
 3. Install v0.8.0 and start it. It builds the platform database and one database per user next to the original file, compares the number of rows of every table, and only then puts the new files in place.
 4. The original file stays in the data folder as `logmyday.before-v0.8.0.db`. Keep it until you have checked the upgraded installation; then you can delete it.
 

@@ -83,6 +83,16 @@ volumes:
 
 > 💡 **Tip**: Back up the volume, or use the Backup page's **Export Whole Installation** to download an archive of the database files. See [Data, Backup and Upgrade](data-and-backup.md).
 
+### Upgrading a v0.7.2 installation on SQL Server
+
+Up to v0.7.2, the container reached SQL Server through `DB_HOST`, `DB_NAME`, `DB_USER` and the `db_password` secret. This version runs on SQLite only. Before you upgrade:
+
+1. On v0.7.2, download the database with **Backup → Export Whole Database**.
+2. Use the new `docker-compose.yml`, so that `/app/data` is on the `logmyday-data` volume, and put the exported file there under the name that `DB_PATH` gives (`logmyday.db` by default).
+3. Remove `DB_HOST`, `DB_NAME`, `DB_USER` and the `db_password` secret from your configuration.
+
+While any of those settings is present and there is no SQLite database at `DB_PATH`, the app stops at start and the container keeps restarting; `docker compose logs logmyday-app` shows the error, which says how to move. Once the database is there, leftover settings are ignored, with a warning in the log.
+
 ## Maintenance Tips
 
 - Rotate secrets and regenerate the container with `docker compose up --build`.
