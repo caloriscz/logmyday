@@ -67,7 +67,9 @@ Traefik and Caddy stream by default and forward the header unless configured oth
 
 ## First admin
 
-A new installation has no account, so its first start creates the administrator `admin` with the password from the `admin_password` secret (`secrets/admin_password.txt`, at least 10 characters). Without it the app stops at start and the container keeps restarting; `docker compose logs logmyday-app` shows why. Later starts ignore the secret, so once you have signed in you can empty the file. An installation that already has accounts never uses it, and the file can stay empty there.
+A new installation has no account, so its first start creates the administrator `admin` with the password from the `admin_password` secret (`secrets/admin_password.txt`, at least 10 characters). Spaces and line breaks around the password are dropped. Without it the app stops at start and the container keeps restarting; `docker compose logs logmyday-app` shows why. Later starts ignore the secret, so once you have signed in you can empty the file.
+
+An installation that already has accounts never uses the password, but Compose still expects the file: create `secrets/admin_password.txt` before you upgrade, and leave it empty. Without the file, Docker puts an empty folder of that name in its place; delete the folder before you create the file.
 
 ## Secrets & Configuration Flow
 

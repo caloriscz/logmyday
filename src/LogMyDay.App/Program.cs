@@ -12,20 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Load Docker secrets from /run/secrets if running in Docker environment
 if (builder.Environment.EnvironmentName == "Docker")
 {
-    builder.Configuration.AddKeyPerFile(directoryPath: "/run/secrets", optional: true, reloadOnChange: false);
-
-    var aiApiKey = builder.Configuration["ai_api_key"];
-    if (!string.IsNullOrWhiteSpace(aiApiKey))
-    {
-        builder.Configuration["AI:ApiKey"] = aiApiKey;
-    }
-
-    // The first admin's password, used only by the first start of a new installation.
-    var adminPassword = builder.Configuration["admin_password"];
-    if (!string.IsNullOrWhiteSpace(adminPassword))
-    {
-        builder.Configuration["Admin:InitialPassword"] = adminPassword;
-    }
+    builder.Configuration.AddDockerSecrets();
 }
 
 Log.Logger = new LoggerConfiguration()
