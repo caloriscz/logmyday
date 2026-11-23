@@ -45,7 +45,9 @@ public static class DatabaseUpgrade
             }
             else
             {
-                snapshot = TakeSnapshot(context, path, snapshotFolder, pending[0]);
+                // Named after the upgrade's last migration: when an upgrade stops halfway and is
+                // tried again, the retry counts as the same upgrade.
+                snapshot = TakeSnapshot(context, path, snapshotFolder, pending[^1]);
                 logger.LogInformation("Snapshot of {Path} before migrating: {Snapshot}", path, snapshot);
             }
 
@@ -86,14 +88,14 @@ public static class DatabaseUpgrade
             .Single() > 0;
     }
 
-    private static string TakeSnapshot(DbContext context, string path, string snapshotFolder, string firstPending)
+    private static string TakeSnapshot(DbContext context, string path, string snapshotFolder, string lastPending)
     {
         Directory.CreateDirectory(snapshotFolder);
 
-        var snapshot = Path.Combine(snapshotFolder, SnapshotRetention.NewName(Path.GetFileNameWithoutExtension(path), firstPending));
+        var snapshot = SnapshotRetention.NewPath(snapshotFolder, Path.GetFileNameWithoutExtension(path), lastPending);
 
         // VACUUM INTO writes a consistent copy, whatever is still in the write-ahead log.
-        context.Database.ExecuteSqlRaw("VACUUM INTO {0};", snapshot);
+        SnapshotRetention.Write(snapshot, () => context.Database.ExecuteSqlRaw("VACUUM INTO {0};", snapshot));
 
         return snapshot;
     }

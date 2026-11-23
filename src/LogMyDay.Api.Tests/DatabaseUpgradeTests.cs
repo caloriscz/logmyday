@@ -99,7 +99,7 @@ public sealed class DatabaseUpgradeTests : IDisposable
     }
 
     [Fact]
-    public void AnUpgrade_KeepsItsSnapshotAndThePreviousUpgrades_NotTheSnapshotOfAFailedAttempt()
+    public void AnUpgrade_KeepsTheSnapshotOfItsFailedFirstAttempt_AndThePreviousUpgrades()
     {
         var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
         var failedAttempt = OldSnapshots($"test-20250601-000000-before-{TwoStepContext.Second}.db");
@@ -110,15 +110,15 @@ public sealed class DatabaseUpgradeTests : IDisposable
 
         var snapshot = DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance);
 
-        // Kept: this upgrade's snapshot, which replaces the failed attempt's, and the previous
-        // upgrade's. The upgrade before that goes; other databases' files stay.
-        string[] expected = [Path.GetFileName(snapshot)!, .. previousUpgrade, others[1], others[2]];
+        // Kept: this upgrade's snapshots, the failed first attempt's (the state before the upgrade
+        // began) and this one, and the previous upgrade's. The upgrade before that goes; other
+        // databases' files stay.
+        string[] expected = [Path.GetFileName(snapshot)!, .. failedAttempt, .. previousUpgrade, others[1], others[2]];
         Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
-        Assert.DoesNotContain(failedAttempt[0], SnapshotFiles());
     }
 
     [Fact]
-    public void AStartThatFailsAgainAndAgain_KeepsOneSnapshotOfTheFailingMigration()
+    public void AStartThatFailsAgainAndAgain_KeepsTheFirstAndTheLatestSnapshot()
     {
         var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
         using var db = new BrokenStepContext(Options<BrokenStepContext>());
@@ -130,10 +130,31 @@ public sealed class DatabaseUpgradeTests : IDisposable
             error = Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
         }
 
-        var snapshot = Assert.Single(Directory.GetFiles(SnapshotFolder, "*-before-20200102000000_Broken.db"));
-        Assert.Contains(snapshot, error!.Message);
-        string[] expected = [Path.GetFileName(snapshot), .. previousUpgrade];
+        var attempts = Directory.GetFiles(SnapshotFolder, "*-before-20200102000000_Broken.db").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, attempts.Length);
+        Assert.Contains(attempts[1], error!.Message);
+        string[] expected = [.. attempts.Select(path => Path.GetFileName(path)!), .. previousUpgrade];
         Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
+    }
+
+    [Fact]
+    public void AnUpgradeThatStoppedHalfway_IsOneUpgrade_AndKeepsTheStateBeforeItBegan()
+    {
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20190101000000_Older.db");
+        using var db = new ThreeStepBrokenContext(Options<ThreeStepBrokenContext>());
+        db.GetService<IMigrator>().Migrate(ThreeStepBrokenContext.First);
+
+        // The first attempt applies the second migration and stops at the third; the retry
+        // starts from there.
+        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+
+        var attempts = Directory.GetFiles(SnapshotFolder, $"*-before-{ThreeStepBrokenContext.Third}.db").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, attempts.Length);
+        Assert.Contains(previousUpgrade[0], SnapshotFiles());
+
+        using var before = new ThreeStepBrokenContext(new DbContextOptionsBuilder<ThreeStepBrokenContext>().UseSqlite($"Data Source={attempts[0]};Pooling=False").Options);
+        Assert.Equal([ThreeStepBrokenContext.First], before.Database.GetAppliedMigrations());
     }
 
     [Fact]
@@ -195,6 +216,43 @@ public sealed class TwoStepContext(DbContextOptions<TwoStepContext> options) : D
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("ALTER TABLE Notes ADD COLUMN Done INTEGER NOT NULL DEFAULT 0;");
+        }
+    }
+}
+
+/// <summary>A context whose third migration fails, after the second has been applied.</summary>
+public sealed class ThreeStepBrokenContext(DbContextOptions<ThreeStepBrokenContext> options) : DbContext(options)
+{
+    public const string First = "20200101000000_First";
+    public const string Third = "20200103000000_Broken";
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration(First)]
+    private sealed class FirstMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("CREATE TABLE Notes (Id INTEGER PRIMARY KEY, Text TEXT);");
+        }
+    }
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration("20200102000000_Second")]
+    private sealed class SecondMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("ALTER TABLE Notes ADD COLUMN Done INTEGER NOT NULL DEFAULT 0;");
+        }
+    }
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration(Third)]
+    private sealed class BrokenMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("ALTER TABLE NoSuchTable ADD COLUMN Done INTEGER;");
         }
     }
 }

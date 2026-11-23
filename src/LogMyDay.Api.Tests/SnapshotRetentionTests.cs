@@ -64,20 +64,33 @@ public sealed class SnapshotRetentionTests : IDisposable
     }
 
     [Fact]
-    public void RetriesOfAFailingMigration_KeepOneSnapshot_AndThePreviousUpgradeStays()
+    public void RetriesOfAnUpgrade_KeepItsFirstAndLatestSnapshot_AndThePreviousUpgradeStays()
     {
         var previousUpgrade = Create("logmyday-20261101-100000-before-20261101000000_W.db");
-        var failedAttempts = new[]
-        {
-            Create("logmyday-20261102-100000-000-before-20261120000000_X.db"),
-            Create("logmyday-20261102-100100-000-before-20261120000000_X.db"),
-        };
-        var retry = Create("logmyday-20261103-100000-000-before-20261120000000_X.db");
+        var firstAttempt = Create("logmyday-20261102-100000-000-before-20261120000000_X.db");
+        var secondAttempt = Create("logmyday-20261102-100100-000-before-20261120000000_X.db");
+        var retry = Create("logmyday-20261103-100000-0000000-before-20261120000000_X.db");
 
         var removed = SnapshotRetention.PruneUpgradeSnapshots(_folder, "logmyday", retry, NullLogger.Instance);
 
-        AssertSame(failedAttempts, Names(removed));
-        AssertSame([previousUpgrade, retry], Files());
+        // The first attempt shows the state before the upgrade began, whatever a failed attempt
+        // may have left behind.
+        AssertSame([secondAttempt], Names(removed));
+        AssertSame([previousUpgrade, firstAttempt, retry], Files());
+    }
+
+    [Fact]
+    public void OfEachEarlierUpgrade_TheFirstSnapshotStays()
+    {
+        var olderUpgrade = Create("logmyday-20261001-100000-before-20261001000000_V.db");
+        var previousFirst = Create("logmyday-20261101-100000-before-20261101000000_W.db");
+        var previousRetry = Create("logmyday-20261101-100500-before-20261101000000_W.db");
+        var justTaken = Create("logmyday-20261201-100000-0000000-before-20261201000000_X.db");
+
+        var removed = SnapshotRetention.PruneUpgradeSnapshots(_folder, "logmyday", justTaken, NullLogger.Instance);
+
+        AssertSame([olderUpgrade, previousRetry], Names(removed));
+        AssertSame([previousFirst, justTaken], Files());
     }
 
     [Fact]
@@ -98,12 +111,41 @@ public sealed class SnapshotRetentionTests : IDisposable
     [Fact]
     public void ANewSnapshotsName_IsOneThatTheRetentionCounts()
     {
-        var older = Restores(Alice, "20201101-100000", "20201102-100000", "20201103-100000");
-        var justTaken = Create(SnapshotRetention.NewName(Alice.ToString("D"), SnapshotRetention.BeforeRestore));
+        var older = Restores(Alice, "20201101-100000", "20201102-100000-500", "20201103-100000");
+        var justTaken = Create(Path.GetFileName(SnapshotRetention.NewPath(_folder, Alice.ToString("D"), SnapshotRetention.BeforeRestore)));
 
         var removed = SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, justTaken, NullLogger.Instance);
 
         AssertSame([older[0]], Names(removed));
+    }
+
+    [Fact]
+    public void ANewSnapshot_NeverGetsTheNameOfAFileThatExists()
+    {
+        var now = new DateTime(2026, 11, 23, 10, 0, 0, DateTimeKind.Utc);
+        var first = SnapshotRetention.NewPath(_folder, "logmyday", "20261120000000_X", now);
+        File.WriteAllText(first, "taken");
+
+        var second = SnapshotRetention.NewPath(_folder, "logmyday", "20261120000000_X", now);
+
+        Assert.NotEqual(first, second);
+        Assert.False(File.Exists(second));
+    }
+
+    [Fact]
+    public void ASnapshotThatFailsWhileBeingWritten_LeavesNoFile()
+    {
+        var snapshot = SnapshotRetention.NewPath(_folder, Alice.ToString("D"), SnapshotRetention.BeforeRestore);
+
+        var error = Assert.Throws<IOException>(() => SnapshotRetention.Write(snapshot, () =>
+        {
+            File.WriteAllText(snapshot, "the first half");
+
+            throw new IOException("The disk is full.");
+        }));
+
+        Assert.Equal("The disk is full.", error.Message);
+        Assert.False(File.Exists(snapshot));
     }
 
     [Fact]

@@ -5,40 +5,70 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Names the snapshots and decides which stay in the snapshot folder. A snapshot is named
-/// <c>&lt;database&gt;-&lt;time&gt;-before-&lt;what&gt;.db</c>: before a restore of a user's database
-/// (<c>before-restore</c>), or before a migration (<c>before-&lt;migration&gt;</c>). Files with
-/// other names are never touched. Removing snapshots is housekeeping: it never fails the
-/// operation that wrote one.
+/// Names and writes the snapshots, and decides which stay in the snapshot folder. A snapshot is
+/// named <c>&lt;database&gt;-&lt;time&gt;-before-&lt;what&gt;.db</c>: before a restore of a user's
+/// database (<c>before-restore</c>), or before an upgrade (<c>before-&lt;the upgrade's last
+/// migration&gt;</c>). Files with other names are never touched. Removing snapshots is
+/// housekeeping: it never fails the operation that wrote one.
 /// </summary>
 public static class SnapshotRetention
 {
     /// <summary>The snapshots before a restore that each user keeps.</summary>
     public const int RestoreSnapshotsKept = 3;
 
-    /// <summary>The snapshots before a migration that each database keeps: one per upgrade.</summary>
-    public const int UpgradeSnapshotsKept = 2;
+    /// <summary>The upgrades whose snapshots each database keeps.</summary>
+    public const int UpgradesKept = 2;
 
     /// <summary>What a snapshot before a restore comes before.</summary>
     public const string BeforeRestore = "restore";
 
     /// <summary>
-    /// The time in a new snapshot's name, in UTC. Earlier versions wrote it to the second, without
-    /// the milliseconds; such names still count.
+    /// The time in a new snapshot's name, in UTC. Earlier names have it to the second or to the
+    /// millisecond; they still count.
     /// </summary>
-    private const string TimeFormat = "yyyyMMdd-HHmmss-fff";
+    private const string TimeFormat = "yyyyMMdd-HHmmss-fffffff";
 
-    /// <summary>The name of a new snapshot of a database, taken now.</summary>
+    /// <summary>
+    /// The path of a new snapshot of a database, taken now. Never a file that exists: VACUUM INTO
+    /// refuses to write over one.
+    /// </summary>
     /// <param name="databaseName">The database file's name without its extension.</param>
-    /// <param name="before">What the snapshot comes before: <see cref="BeforeRestore"/> or a migration.</param>
-    public static string NewName(string databaseName, string before)
+    /// <param name="before">What the snapshot comes before: <see cref="BeforeRestore"/> or the upgrade's last migration.</param>
+    /// <param name="utcNow">The time to name it by; now when not given.</param>
+    public static string NewPath(string snapshotFolder, string databaseName, string before, DateTime? utcNow = null)
     {
-        return $"{databaseName}-{DateTime.UtcNow.ToString(TimeFormat, CultureInfo.InvariantCulture)}-before-{before}.db";
+        var time = utcNow ?? DateTime.UtcNow;
+        while (true)
+        {
+            var path = Path.Combine(snapshotFolder, $"{databaseName}-{time.ToString(TimeFormat, CultureInfo.InvariantCulture)}-before-{before}.db");
+            if (!File.Exists(path))
+            {
+                return path;
+            }
+
+            time = time.AddTicks(1);
+        }
+    }
+
+    /// <summary>Writes a snapshot. A write that fails, e.g. on a full disk, leaves no file behind.</summary>
+    public static void Write(string snapshot, Action write)
+    {
+        // The catch is needed: a partial file would count as a snapshot and push out a real one.
+        try
+        {
+            write();
+        }
+        catch
+        {
+            TryDelete(snapshot);
+
+            throw;
+        }
     }
 
     /// <summary>
-    /// After a restore: the user keeps the snapshot just taken and their newest others, up to
-    /// <see cref="RestoreSnapshotsKept"/>.
+    /// After a successful restore: the user keeps the snapshot just taken and their newest
+    /// others, up to <see cref="RestoreSnapshotsKept"/>.
     /// </summary>
     /// <param name="justTaken">
     /// The snapshot the restore wrote. It always stays, even when the clock went back and an
@@ -62,11 +92,11 @@ public static class SnapshotRetention
     }
 
     /// <summary>
-    /// After a migration, whether it succeeded or not: the database keeps the snapshot just taken
-    /// and the newest snapshot of each of its last upgrades before it, up to
-    /// <see cref="UpgradeSnapshotsKept"/>. Snapshots before the same migration show the same state,
-    /// as a migration that fails changes nothing, so a retry replaces the snapshot of the failed
-    /// attempt instead of counting as another upgrade.
+    /// After a migration, whether it succeeded or not: the database keeps a snapshot of each of
+    /// its last <see cref="UpgradesKept"/> upgrades, the first one taken, which shows the state
+    /// before the upgrade began. The snapshot just taken also stays. An upgrade that is tried
+    /// again names its snapshots after the same last migration, so its attempts count as one
+    /// upgrade, and a start that keeps failing keeps two copies instead of adding one each time.
     /// </summary>
     /// <param name="databaseName">The database file's name without its extension.</param>
     /// <param name="justTaken">The snapshot the migration wrote. It always stays.</param>
@@ -82,12 +112,13 @@ public static class SnapshotRetention
                 return [];
             }
 
-            var earlierUpgrades = Newest(snapshots
-                    .Where(s => s.Before != taken.Before)
-                    .GroupBy(s => s.Before)
-                    .Select(upgrade => Newest(upgrade).First()))
-                .Take(UpgradeSnapshotsKept - 1);
-            var kept = earlierUpgrades.Append(taken).ToHashSet();
+            var upgrades = snapshots.GroupBy(s => s.Before).ToList();
+            var current = upgrades.Single(upgrade => upgrade.Key == taken.Before);
+            var earlier = upgrades
+                .Where(upgrade => upgrade != current)
+                .OrderByDescending(upgrade => Newest(upgrade).First().Time, StringComparer.Ordinal)
+                .Take(UpgradesKept - 1);
+            var kept = earlier.Append(current).Select(upgrade => Newest(upgrade).Last()).Append(taken).ToHashSet();
 
             return Remove(snapshots.Where(s => !kept.Contains(s)), logger);
         });
@@ -102,6 +133,8 @@ public static class SnapshotRetention
 
     private static IReadOnlyList<string> Housekeeping(ILogger logger, Func<IReadOnlyList<string>> prune)
     {
+        // The catch is needed: the restore, migration or delete that calls this has already
+        // happened, and a folder that can't be listed now must not report it as failed.
         try
         {
             return prune();
@@ -121,7 +154,7 @@ public static class SnapshotRetention
             return [];
         }
 
-        var pattern = new Regex($"^{Regex.Escape(databaseName)}-(\\d{{8}}-\\d{{6}}(?:-\\d{{3}})?)-before-(.+)\\.db$", RegexOptions.CultureInvariant);
+        var pattern = new Regex($"^{Regex.Escape(databaseName)}-(\\d{{8}}-\\d{{6}}(?:-\\d{{3,7}})?)-before-(.+)\\.db$", RegexOptions.CultureInvariant);
 
         return Directory.EnumerateFiles(snapshotFolder)
             .Select(path => (Path: path, Match: pattern.Match(Path.GetFileName(path))))
@@ -141,14 +174,9 @@ public static class SnapshotRetention
         var removed = new List<string>();
         foreach (var snapshot in snapshots)
         {
-            try
+            if (TryDelete(snapshot.Path, logger))
             {
-                File.Delete(snapshot.Path);
                 removed.Add(snapshot.Path);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                logger.LogWarning(ex, "Could not remove the snapshot {Snapshot}", snapshot.Path);
             }
         }
 
@@ -158,6 +186,24 @@ public static class SnapshotRetention
         }
 
         return removed;
+    }
+
+    private static bool TryDelete(string path, ILogger? logger = null)
+    {
+        // The catch is needed: one file that can't be removed now goes with a later snapshot, and
+        // must neither stop the others nor fail the caller.
+        try
+        {
+            File.Delete(path);
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger?.LogWarning(ex, "Could not remove the snapshot {Snapshot}", path);
+
+            return false;
+        }
     }
 
     private sealed record Snapshot(string Path, string Time, string Before)

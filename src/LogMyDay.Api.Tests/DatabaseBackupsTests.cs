@@ -92,11 +92,11 @@ public sealed class DatabaseBackupsTests : IDisposable
             await Backups.RestoreUser(_friend, content, CancellationToken.None);
         }
 
-        var kept = Directory.GetFiles(Databases.SnapshotFolder, $"{_friend:D}-*-before-restore.db").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
+        var kept = Directory.GetFiles(Databases.SnapshotFolder, $"{_friend:D}-*-before-restore.db").Select(path => Path.GetFileName(path)!).Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(3, kept.Length);
         Assert.Equal([friends[1], friends[2]], kept[..2]);
         // The new snapshot holds the replaced state, with the tag logged after the backup.
-        Assert.Equal(2L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]!), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
+        Assert.Equal(2L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
         Assert.True(File.Exists(Path.Combine(Databases.SnapshotFolder, admins)));
     }
 

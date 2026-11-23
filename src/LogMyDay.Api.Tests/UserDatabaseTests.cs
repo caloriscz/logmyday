@@ -417,6 +417,28 @@ public sealed class UserDatabaseTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task AFailedRestore_KeepsItsSnapshot_AndRemovesNoOtherOne()
+    {
+        await AddAccounts(Alice);
+        Databases.Ensure(Alice);
+        Directory.CreateDirectory(Databases.SnapshotFolder);
+        var older = new[] { "20250101-000000", "20250201-000000", "20250301-000000" }
+            .Select(time => Path.Combine(Databases.SnapshotFolder, $"{Alice:D}-{time}-before-restore.db"))
+            .ToArray();
+        foreach (var snapshot in older)
+        {
+            File.WriteAllText(snapshot, "an earlier state");
+        }
+
+        // The upload is gone, so the restore fails after it took its snapshot.
+        Assert.Throws<FileNotFoundException>(() => Databases.Replace(Alice, Path.Combine(_folder, "missing-upload.db")));
+
+        var snapshots = Directory.GetFiles(Databases.SnapshotFolder, $"{Alice:D}-*-before-restore.db");
+        Assert.Equal(4, snapshots.Length);
+        Assert.All(older, snapshot => Assert.Contains(snapshot, snapshots));
+    }
+
     /// <summary>A database is created only for an account, so the test users get one.</summary>
     private async Task AddAccounts(params Guid[] userIds)
     {

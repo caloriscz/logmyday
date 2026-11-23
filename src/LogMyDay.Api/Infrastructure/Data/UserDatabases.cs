@@ -187,26 +187,24 @@ public sealed class UserDatabases : IUserDataStore
             if (File.Exists(path))
             {
                 Directory.CreateDirectory(_snapshotFolder);
-                snapshot = Path.Combine(_snapshotFolder, SnapshotRetention.NewName(userId.ToString("D"), SnapshotRetention.BeforeRestore));
-                WriteCopy(GetConnectionString(userId), snapshot);
+                var target = SnapshotRetention.NewPath(_snapshotFolder, userId.ToString("D"), SnapshotRetention.BeforeRestore);
+                SnapshotRetention.Write(target, () => WriteCopy(GetConnectionString(userId), target));
+                snapshot = target;
             }
 
-            try
-            {
-                RemoveFiles(userId);
-                Directory.CreateDirectory(_folder);
-                File.Move(newFile, path);
-                Ensure(userId);
-            }
-            finally
-            {
-                if (snapshot != null)
-                {
-                    SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, snapshot, _logger);
-                }
-            }
+            RemoveFiles(userId);
+            Directory.CreateDirectory(_folder);
+            File.Move(newFile, path);
+            Ensure(userId);
 
             _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
+
+            // Only now: after a failed restore, the user's database may already hold the uploaded
+            // state, and a retry's snapshot would push out the one of their real data.
+            if (snapshot != null)
+            {
+                SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, snapshot, _logger);
+            }
 
             return snapshot;
         }
