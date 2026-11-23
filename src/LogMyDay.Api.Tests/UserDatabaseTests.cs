@@ -211,6 +211,17 @@ public sealed class UserDatabaseTests : IDisposable
             await data.SaveChangesAsync();
         }
 
+        // The friend's earlier states, from a restore and from an upgrade, and one of the admin's.
+        Directory.CreateDirectory(Databases.SnapshotFolder);
+        var friendsSnapshots = new[] { $"{friendId:D}-20261101-100000-before-restore.db", $"{friendId:D}-20261102-100000-before-20261120000000_Initial.db" };
+        var adminsSnapshot = Path.Combine(Databases.SnapshotFolder, $"{adminId:D}-20261101-100000-before-restore.db");
+        foreach (var name in friendsSnapshots)
+        {
+            File.WriteAllText(Path.Combine(Databases.SnapshotFolder, name), "the friend's data");
+        }
+
+        File.WriteAllText(adminsSnapshot, "the admin's data");
+
         await using (var scope = _services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<IUserService>().Delete(friendId, adminId, CancellationToken.None);
@@ -220,6 +231,7 @@ public sealed class UserDatabaseTests : IDisposable
         Assert.False(File.Exists(file + "-wal"));
         Assert.False(File.Exists(file + "-shm"));
         Assert.True(File.Exists(Databases.GetFilePath(adminId)));
+        Assert.Equal([adminsSnapshot], Directory.GetFiles(Databases.SnapshotFolder));
 
         await using (var scope = _services.CreateAsyncScope())
         {
@@ -403,6 +415,28 @@ public sealed class UserDatabaseTests : IDisposable
 
             Assert.True(await data.Settings.AnyAsync(s => s.Key == ReminderDayBackfill.FlagKey));
         }
+    }
+
+    [Fact]
+    public async Task AFailedRestore_KeepsItsSnapshot_AndRemovesNoOtherOne()
+    {
+        await AddAccounts(Alice);
+        Databases.Ensure(Alice);
+        Directory.CreateDirectory(Databases.SnapshotFolder);
+        var older = new[] { "20250101-000000", "20250201-000000", "20250301-000000" }
+            .Select(time => Path.Combine(Databases.SnapshotFolder, $"{Alice:D}-{time}-before-restore.db"))
+            .ToArray();
+        foreach (var snapshot in older)
+        {
+            File.WriteAllText(snapshot, "an earlier state");
+        }
+
+        // The upload is gone, so the restore fails after it took its snapshot.
+        Assert.Throws<FileNotFoundException>(() => Databases.Replace(Alice, Path.Combine(_folder, "missing-upload.db")));
+
+        var snapshots = Directory.GetFiles(Databases.SnapshotFolder, $"{Alice:D}-*-before-restore.db");
+        Assert.Equal(4, snapshots.Length);
+        Assert.All(older, snapshot => Assert.Contains(snapshot, snapshots));
     }
 
     /// <summary>A database is created only for an account, so the test users get one.</summary>

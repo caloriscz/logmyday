@@ -5,7 +5,8 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Brings one database file to this version's schema with its context's migrations. A database
-/// that already holds data is copied into the snapshot folder first.
+/// that already holds data is copied into the snapshot folder first, and the database keeps the
+/// snapshots of its last upgrades only (<see cref="SnapshotRetention.PruneUpgradeSnapshots"/>).
 /// </summary>
 public static class DatabaseUpgrade
 {
@@ -44,7 +45,9 @@ public static class DatabaseUpgrade
             }
             else
             {
-                snapshot = TakeSnapshot(context, path, snapshotFolder, pending[0]);
+                // Named after the upgrade's last migration: when an upgrade stops halfway and is
+                // tried again, the retry counts as the same upgrade.
+                snapshot = TakeSnapshot(context, path, snapshotFolder, pending[^1]);
                 logger.LogInformation("Snapshot of {Path} before migrating: {Snapshot}", path, snapshot);
             }
 
@@ -56,6 +59,15 @@ public static class DatabaseUpgrade
             var hint = snapshot == null ? string.Empty : $" Its state before the migration is in {snapshot}.";
 
             throw new InvalidOperationException($"The database {path} could not be migrated.{hint} {ex.Message}", ex);
+        }
+        finally
+        {
+            // Also after a failure: a start that fails again and again would otherwise add a copy
+            // of the database each time.
+            if (snapshot != null)
+            {
+                SnapshotRetention.PruneUpgradeSnapshots(snapshotFolder, Path.GetFileNameWithoutExtension(path), snapshot, logger);
+            }
         }
 
         return snapshot;
@@ -76,15 +88,14 @@ public static class DatabaseUpgrade
             .Single() > 0;
     }
 
-    private static string TakeSnapshot(DbContext context, string path, string snapshotFolder, string firstPending)
+    private static string TakeSnapshot(DbContext context, string path, string snapshotFolder, string lastPending)
     {
         Directory.CreateDirectory(snapshotFolder);
 
-        var name = $"{Path.GetFileNameWithoutExtension(path)}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-before-{firstPending}.db";
-        var snapshot = Path.Combine(snapshotFolder, name);
+        var snapshot = SnapshotRetention.NewPath(snapshotFolder, Path.GetFileNameWithoutExtension(path), lastPending);
 
         // VACUUM INTO writes a consistent copy, whatever is still in the write-ahead log.
-        context.Database.ExecuteSqlRaw("VACUUM INTO {0};", snapshot);
+        SnapshotRetention.Write(snapshot, () => context.Database.ExecuteSqlRaw("VACUUM INTO {0};", snapshot));
 
         return snapshot;
     }

@@ -99,6 +99,65 @@ public sealed class DatabaseUpgradeTests : IDisposable
     }
 
     [Fact]
+    public void AnUpgrade_KeepsTheSnapshotOfItsFailedFirstAttempt_AndThePreviousUpgrades()
+    {
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
+        var failedAttempt = OldSnapshots($"test-20250601-000000-before-{TwoStepContext.Second}.db");
+        var others = OldSnapshots("test-20240101-000000-before-20190101000000_Older.db", "other-20250101-000000-before-20200101000000_First.db", "test-20250101-000000-before-restore.db");
+        using var db = new TwoStepContext(Options<TwoStepContext>());
+        db.GetService<IMigrator>().Migrate(TwoStepContext.First);
+        db.Database.ExecuteSqlRaw("INSERT INTO Notes (Text) VALUES ('kept');");
+
+        var snapshot = DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance);
+
+        // Kept: this upgrade's snapshots, the failed first attempt's (the state before the upgrade
+        // began) and this one, and the previous upgrade's. The upgrade before that goes; other
+        // databases' files stay.
+        string[] expected = [Path.GetFileName(snapshot)!, .. failedAttempt, .. previousUpgrade, others[1], others[2]];
+        Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
+    }
+
+    [Fact]
+    public void AStartThatFailsAgainAndAgain_KeepsTheFirstAndTheLatestSnapshot()
+    {
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
+        using var db = new BrokenStepContext(Options<BrokenStepContext>());
+        db.GetService<IMigrator>().Migrate(BrokenStepContext.First);
+
+        InvalidOperationException? error = null;
+        for (var start = 0; start < 3; start++)
+        {
+            error = Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+        }
+
+        var attempts = Directory.GetFiles(SnapshotFolder, "*-before-20200102000000_Broken.db").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, attempts.Length);
+        Assert.Contains(attempts[1], error!.Message);
+        string[] expected = [.. attempts.Select(path => Path.GetFileName(path)!), .. previousUpgrade];
+        Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
+    }
+
+    [Fact]
+    public void AnUpgradeThatStoppedHalfway_IsOneUpgrade_AndKeepsTheStateBeforeItBegan()
+    {
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20190101000000_Older.db");
+        using var db = new ThreeStepBrokenContext(Options<ThreeStepBrokenContext>());
+        db.GetService<IMigrator>().Migrate(ThreeStepBrokenContext.First);
+
+        // The first attempt applies the second migration and stops at the third; the retry
+        // starts from there.
+        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+
+        var attempts = Directory.GetFiles(SnapshotFolder, $"*-before-{ThreeStepBrokenContext.Third}.db").Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(2, attempts.Length);
+        Assert.Contains(previousUpgrade[0], SnapshotFiles());
+
+        using var before = new ThreeStepBrokenContext(new DbContextOptionsBuilder<ThreeStepBrokenContext>().UseSqlite($"Data Source={attempts[0]};Pooling=False").Options);
+        Assert.Equal([ThreeStepBrokenContext.First], before.Database.GetAppliedMigrations());
+    }
+
+    [Fact]
     public void AFileOfAnotherOrigin_IsRefused_AndLeftAsItIs()
     {
         using var db = new LogMyDayDbContext(Options<LogMyDayDbContext>());
@@ -109,6 +168,22 @@ public sealed class DatabaseUpgradeTests : IDisposable
         Assert.Contains(DatabasePath, error.Message);
         Assert.Contains("older LogMyDay", error.Message);
         Assert.Equal(0, db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM sqlite_master WHERE name = 'LogMyDay_Activities'").AsEnumerable().Single());
+    }
+
+    private string[] SnapshotFiles()
+    {
+        return Directory.GetFiles(SnapshotFolder).Select(path => Path.GetFileName(path)!).Order(StringComparer.Ordinal).ToArray();
+    }
+
+    private string[] OldSnapshots(params string[] names)
+    {
+        Directory.CreateDirectory(SnapshotFolder);
+        foreach (var name in names)
+        {
+            File.WriteAllText(Path.Combine(SnapshotFolder, name), "an earlier state");
+        }
+
+        return names;
     }
 
     private DbContextOptions<TContext> Options<TContext>()
@@ -141,6 +216,43 @@ public sealed class TwoStepContext(DbContextOptions<TwoStepContext> options) : D
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("ALTER TABLE Notes ADD COLUMN Done INTEGER NOT NULL DEFAULT 0;");
+        }
+    }
+}
+
+/// <summary>A context whose third migration fails, after the second has been applied.</summary>
+public sealed class ThreeStepBrokenContext(DbContextOptions<ThreeStepBrokenContext> options) : DbContext(options)
+{
+    public const string First = "20200101000000_First";
+    public const string Third = "20200103000000_Broken";
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration(First)]
+    private sealed class FirstMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("CREATE TABLE Notes (Id INTEGER PRIMARY KEY, Text TEXT);");
+        }
+    }
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration("20200102000000_Second")]
+    private sealed class SecondMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("ALTER TABLE Notes ADD COLUMN Done INTEGER NOT NULL DEFAULT 0;");
+        }
+    }
+
+    [DbContext(typeof(ThreeStepBrokenContext))]
+    [Migration(Third)]
+    private sealed class BrokenMigration : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.Sql("ALTER TABLE NoSuchTable ADD COLUMN Done INTEGER;");
         }
     }
 }

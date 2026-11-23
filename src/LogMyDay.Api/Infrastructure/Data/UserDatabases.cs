@@ -151,12 +151,21 @@ public sealed class UserDatabases : IUserDataStore
         Ensure(userId);
     }
 
-    /// <summary>Deletes the user's database file, with the files SQLite keeps beside it.</summary>
+    /// <summary>Deletes the user's database file, with the files SQLite keeps beside it and its snapshots.</summary>
     public void Delete(Guid userId)
     {
         lock (_createLock)
         {
-            RemoveFiles(userId);
+            // The account is gone by now: its snapshots go even when a file of the database is
+            // still in use and can't be deleted yet.
+            try
+            {
+                RemoveFiles(userId);
+            }
+            finally
+            {
+                SnapshotRetention.RemoveAll(_snapshotFolder, userId, _logger);
+            }
 
             _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, GetFilePath(userId));
         }
@@ -164,7 +173,8 @@ public sealed class UserDatabases : IUserDataStore
 
     /// <summary>
     /// Puts another database file in the place of the user's database. The database it replaces
-    /// is copied into the snapshot folder first.
+    /// is copied into the snapshot folder first, and the user keeps the newest of these snapshots
+    /// only (<see cref="SnapshotRetention.PruneRestoreSnapshots"/>).
     /// </summary>
     /// <param name="newFile">A database with this version's schema, on the same volume. It is moved.</param>
     /// <returns>The snapshot of the replaced database, or null when the user had none.</returns>
@@ -177,8 +187,9 @@ public sealed class UserDatabases : IUserDataStore
             if (File.Exists(path))
             {
                 Directory.CreateDirectory(_snapshotFolder);
-                snapshot = Path.Combine(_snapshotFolder, $"{userId:D}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-before-restore.db");
-                WriteCopy(GetConnectionString(userId), snapshot);
+                var target = SnapshotRetention.NewPath(_snapshotFolder, userId.ToString("D"), SnapshotRetention.BeforeRestore);
+                SnapshotRetention.Write(target, () => WriteCopy(GetConnectionString(userId), target));
+                snapshot = target;
             }
 
             RemoveFiles(userId);
@@ -187,6 +198,13 @@ public sealed class UserDatabases : IUserDataStore
             Ensure(userId);
 
             _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
+
+            // Only now: after a failed restore, the user's database may already hold the uploaded
+            // state, and a retry's snapshot would push out the one of their real data.
+            if (snapshot != null)
+            {
+                SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, snapshot, _logger);
+            }
 
             return snapshot;
         }
