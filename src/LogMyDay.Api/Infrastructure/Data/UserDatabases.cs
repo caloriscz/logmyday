@@ -156,8 +156,16 @@ public sealed class UserDatabases : IUserDataStore
     {
         lock (_createLock)
         {
-            RemoveFiles(userId);
-            SnapshotRetention.RemoveAll(_snapshotFolder, userId, _logger);
+            // The account is gone by now: its snapshots go even when a file of the database is
+            // still in use and can't be deleted yet.
+            try
+            {
+                RemoveFiles(userId);
+            }
+            finally
+            {
+                SnapshotRetention.RemoveAll(_snapshotFolder, userId, _logger);
+            }
 
             _logger.LogInformation("Deleted the database of user {UserId}: {Path}", userId, GetFilePath(userId));
         }
@@ -166,7 +174,7 @@ public sealed class UserDatabases : IUserDataStore
     /// <summary>
     /// Puts another database file in the place of the user's database. The database it replaces
     /// is copied into the snapshot folder first, and the user keeps the newest of these snapshots
-    /// only (<see cref="SnapshotRetention.RestoreSnapshotsKept"/>).
+    /// only (<see cref="SnapshotRetention.PruneRestoreSnapshots"/>).
     /// </summary>
     /// <param name="newFile">A database with this version's schema, on the same volume. It is moved.</param>
     /// <returns>The snapshot of the replaced database, or null when the user had none.</returns>
@@ -179,20 +187,26 @@ public sealed class UserDatabases : IUserDataStore
             if (File.Exists(path))
             {
                 Directory.CreateDirectory(_snapshotFolder);
-                snapshot = Path.Combine(_snapshotFolder, $"{userId:D}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-before-restore.db");
+                snapshot = Path.Combine(_snapshotFolder, SnapshotRetention.NewName(userId.ToString("D"), SnapshotRetention.BeforeRestore));
                 WriteCopy(GetConnectionString(userId), snapshot);
             }
 
-            RemoveFiles(userId);
-            Directory.CreateDirectory(_folder);
-            File.Move(newFile, path);
-            Ensure(userId);
+            try
+            {
+                RemoveFiles(userId);
+                Directory.CreateDirectory(_folder);
+                File.Move(newFile, path);
+                Ensure(userId);
+            }
+            finally
+            {
+                if (snapshot != null)
+                {
+                    SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, snapshot, _logger);
+                }
+            }
 
             _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
-            if (snapshot != null)
-            {
-                SnapshotRetention.PruneRestoreSnapshots(_snapshotFolder, userId, _logger);
-            }
 
             return snapshot;
         }

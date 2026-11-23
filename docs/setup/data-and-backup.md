@@ -46,8 +46,9 @@ Copying the data folder works as well, with the application stopped. While the a
 
 Files in `snapshots/` are taken before a migration (`<name>-<time>-before-<migration>.db`) and before a restore (`<user id>-<time>-before-restore.db`). LogMyDay removes the older ones itself:
 
-- Each database keeps the snapshots of its last two upgrades. The older ones go once a migration has succeeded; after a failed one, all stay.
+- Each database keeps the snapshots of its last two upgrades. A migration that fails changes nothing, so when it is tried again, the new snapshot replaces the one of the failed attempt instead of counting as another upgrade.
 - Each user keeps the three newest snapshots before a restore. The older ones go right after a restore, so restoring again and again doesn't fill the disk.
+- The snapshot just taken always stays, even when the server's clock went back.
 - Deleting a user deletes their snapshots with their database.
 
 Other files in the folder are left alone. Copy a snapshot elsewhere if you want to keep it for longer.

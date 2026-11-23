@@ -5,8 +5,8 @@ namespace LogMyDay.Api.Tests;
 
 /// <summary>
 /// The snapshot folder keeps each user's newest snapshots before a restore and each database's
-/// snapshots of its last upgrades. A deleted user's snapshots go with the user. Files that are
-/// not LogMyDay's snapshots are never touched.
+/// snapshots of its last upgrades. The snapshot just taken always stays. A deleted user's
+/// snapshots go with the user. Files that are not LogMyDay's snapshots are never touched.
 /// </summary>
 public sealed class SnapshotRetentionTests : IDisposable
 {
@@ -23,14 +23,26 @@ public sealed class SnapshotRetentionTests : IDisposable
     [Fact]
     public void AfterARestore_TheUserKeepsTheirThreeNewestRestoreSnapshots()
     {
-        var alices = Restores(Alice, "20261101-100000", "20261103-100000", "20261102-100000", "20261105-100000", "20261104-100000");
+        var alices = Restores(Alice, "20261101-100000", "20261103-100000", "20261102-100000", "20261104-100000", "20261105-100000-250");
         var others = Others();
 
-        var removed = SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, NullLogger.Instance);
+        var removed = SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, alices[4], NullLogger.Instance);
 
-        // Kept: 11-05, 11-04 and 11-03, whatever order they were written in.
-        AssertSame([alices[0], alices[2]], removed.Select(Path.GetFileName)!);
-        AssertSame([.. others, alices[3], alices[4], alices[1]], Files());
+        // Kept: 11-05 (just taken), 11-04 and 11-03, whatever order they were written in.
+        AssertSame([alices[0], alices[2]], Names(removed));
+        AssertSame([.. others, alices[4], alices[3], alices[1]], Files());
+    }
+
+    [Fact]
+    public void TheSnapshotJustTaken_Stays_EvenWhenTheClockWentBack()
+    {
+        var ahead = Restores(Alice, "20261210-100000", "20261211-100000", "20261212-100000");
+        var justTaken = Create($"{Alice:D}-20261123-100000-000-before-restore.db");
+
+        var removed = SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, Path.Combine(_folder, justTaken), NullLogger.Instance);
+
+        AssertSame([ahead[0]], Names(removed));
+        AssertSame([justTaken, ahead[1], ahead[2]], Files());
     }
 
     [Fact]
@@ -41,14 +53,31 @@ public sealed class SnapshotRetentionTests : IDisposable
         {
             Create("logmyday-20261101-100000-before-20261120000000_C.db"),
             Create("logmyday-20261102-100000-before-20261110000000_B.db"),
-            Create("logmyday-20261103-100000-before-20261101000000_A.db"),
+            Create("logmyday-20261103-100000-000-before-20261101000000_A.db"),
         };
         var others = Others();
 
-        var removed = SnapshotRetention.PruneUpgradeSnapshots(_folder, "logmyday", NullLogger.Instance);
+        var removed = SnapshotRetention.PruneUpgradeSnapshots(_folder, "logmyday", platform[2], NullLogger.Instance);
 
-        AssertSame([platform[0]], removed.Select(Path.GetFileName)!);
+        AssertSame([platform[0]], Names(removed));
         AssertSame([.. others, platform[1], platform[2]], Files());
+    }
+
+    [Fact]
+    public void RetriesOfAFailingMigration_KeepOneSnapshot_AndThePreviousUpgradeStays()
+    {
+        var previousUpgrade = Create("logmyday-20261101-100000-before-20261101000000_W.db");
+        var failedAttempts = new[]
+        {
+            Create("logmyday-20261102-100000-000-before-20261120000000_X.db"),
+            Create("logmyday-20261102-100100-000-before-20261120000000_X.db"),
+        };
+        var retry = Create("logmyday-20261103-100000-000-before-20261120000000_X.db");
+
+        var removed = SnapshotRetention.PruneUpgradeSnapshots(_folder, "logmyday", retry, NullLogger.Instance);
+
+        AssertSame(failedAttempts, Names(removed));
+        AssertSame([previousUpgrade, retry], Files());
     }
 
     [Fact]
@@ -61,15 +90,35 @@ public sealed class SnapshotRetentionTests : IDisposable
             Create($"{Alice:D}-20261105-100000-before-20261121000000_B.db"),
         };
 
-        Assert.Empty(SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, NullLogger.Instance));
-        Assert.Empty(SnapshotRetention.PruneUpgradeSnapshots(_folder, Alice.ToString("D"), NullLogger.Instance));
+        Assert.Empty(SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, restores[2], NullLogger.Instance));
+        Assert.Empty(SnapshotRetention.PruneUpgradeSnapshots(_folder, Alice.ToString("D"), upgrades[1], NullLogger.Instance));
         AssertSame([.. restores, .. upgrades], Files());
+    }
+
+    [Fact]
+    public void ANewSnapshotsName_IsOneThatTheRetentionCounts()
+    {
+        var older = Restores(Alice, "20201101-100000", "20201102-100000", "20201103-100000");
+        var justTaken = Create(SnapshotRetention.NewName(Alice.ToString("D"), SnapshotRetention.BeforeRestore));
+
+        var removed = SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, justTaken, NullLogger.Instance);
+
+        AssertSame([older[0]], Names(removed));
+    }
+
+    [Fact]
+    public void WithoutTheSnapshotJustTaken_NothingIsRemoved()
+    {
+        var restores = Restores(Alice, "20261101-100000", "20261102-100000", "20261103-100000", "20261104-100000");
+
+        Assert.Empty(SnapshotRetention.PruneRestoreSnapshots(_folder, Alice, "missing.db", NullLogger.Instance));
+        AssertSame(restores, Files());
     }
 
     [Fact]
     public void ADeletedUser_LosesEverySnapshot_AndNoOtherFileGoes()
     {
-        Restores(Alice, "20261101-100000", "20261102-100000");
+        Restores(Alice, "20261101-100000", "20261102-100000-500");
         Create($"{Alice:D}-20261103-100000-before-20261120000000_A.db");
         var others = Others();
 
@@ -83,8 +132,8 @@ public sealed class SnapshotRetentionTests : IDisposable
     {
         var missing = Path.Combine(_folder, "no-snapshots-yet");
 
-        Assert.Empty(SnapshotRetention.PruneRestoreSnapshots(missing, Alice, NullLogger.Instance));
-        Assert.Empty(SnapshotRetention.PruneUpgradeSnapshots(missing, "logmyday", NullLogger.Instance));
+        Assert.Empty(SnapshotRetention.PruneRestoreSnapshots(missing, Alice, "a.db", NullLogger.Instance));
+        Assert.Empty(SnapshotRetention.PruneUpgradeSnapshots(missing, "logmyday", "a.db", NullLogger.Instance));
         Assert.Empty(SnapshotRetention.RemoveAll(missing, Alice, NullLogger.Instance));
     }
 
@@ -115,7 +164,12 @@ public sealed class SnapshotRetentionTests : IDisposable
 
     private string[] Files()
     {
-        return Directory.GetFiles(_folder).Select(Path.GetFileName).ToArray()!;
+        return Names(Directory.GetFiles(_folder));
+    }
+
+    private static string[] Names(IEnumerable<string> paths)
+    {
+        return paths.Select(path => Path.GetFileName(path)!).ToArray();
     }
 
     private static void AssertSame(IEnumerable<string> expected, IEnumerable<string> actual)

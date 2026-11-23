@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 /// <summary>
 /// Brings one database file to this version's schema with its context's migrations. A database
 /// that already holds data is copied into the snapshot folder first, and the database keeps the
-/// snapshots of its last upgrades only (<see cref="SnapshotRetention.UpgradeSnapshotsKept"/>).
+/// snapshots of its last upgrades only (<see cref="SnapshotRetention.PruneUpgradeSnapshots"/>).
 /// </summary>
 public static class DatabaseUpgrade
 {
@@ -58,10 +58,14 @@ public static class DatabaseUpgrade
 
             throw new InvalidOperationException($"The database {path} could not be migrated.{hint} {ex.Message}", ex);
         }
-
-        if (snapshot != null)
+        finally
         {
-            SnapshotRetention.PruneUpgradeSnapshots(snapshotFolder, Path.GetFileNameWithoutExtension(path), logger);
+            // Also after a failure: a start that fails again and again would otherwise add a copy
+            // of the database each time.
+            if (snapshot != null)
+            {
+                SnapshotRetention.PruneUpgradeSnapshots(snapshotFolder, Path.GetFileNameWithoutExtension(path), snapshot, logger);
+            }
         }
 
         return snapshot;
@@ -86,8 +90,7 @@ public static class DatabaseUpgrade
     {
         Directory.CreateDirectory(snapshotFolder);
 
-        var name = $"{Path.GetFileNameWithoutExtension(path)}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-before-{firstPending}.db";
-        var snapshot = Path.Combine(snapshotFolder, name);
+        var snapshot = Path.Combine(snapshotFolder, SnapshotRetention.NewName(Path.GetFileNameWithoutExtension(path), firstPending));
 
         // VACUUM INTO writes a consistent copy, whatever is still in the write-ahead log.
         context.Database.ExecuteSqlRaw("VACUUM INTO {0};", snapshot);

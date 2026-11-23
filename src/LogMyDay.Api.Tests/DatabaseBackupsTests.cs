@@ -75,6 +75,7 @@ public sealed class DatabaseBackupsTests : IDisposable
         await Start();
         await AddTag(_services, _friend, "Coffee");
         var backup = await Save(await Backups.ExportUser(_friend, CancellationToken.None));
+        await AddTag(_services, _friend, "Logged after the backup");
 
         Directory.CreateDirectory(Databases.SnapshotFolder);
         var friends = new[] { "20250101-000000", "20250201-000000", "20250301-000000" }
@@ -94,7 +95,8 @@ public sealed class DatabaseBackupsTests : IDisposable
         var kept = Directory.GetFiles(Databases.SnapshotFolder, $"{_friend:D}-*-before-restore.db").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(3, kept.Length);
         Assert.Equal([friends[1], friends[2]], kept[..2]);
-        Assert.Equal(1L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]!), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
+        // The new snapshot holds the replaced state, with the tag logged after the backup.
+        Assert.Equal(2L, Scalar(Path.Combine(Databases.SnapshotFolder, kept[2]!), "SELECT COUNT(*) FROM LogMyDay_Tags;"));
         Assert.True(File.Exists(Path.Combine(Databases.SnapshotFolder, admins)));
     }
 

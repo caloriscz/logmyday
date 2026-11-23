@@ -99,34 +99,41 @@ public sealed class DatabaseUpgradeTests : IDisposable
     }
 
     [Fact]
-    public void AnUpgrade_KeepsTheSnapshotsOfTheDatabasesLastTwoUpgrades()
+    public void AnUpgrade_KeepsItsSnapshotAndThePreviousUpgrades_NotTheSnapshotOfAFailedAttempt()
     {
-        var older = OldSnapshots("test-20250101-000000-before-20200101000000_First.db", "test-20250601-000000-before-20200101000000_First.db");
-        var others = OldSnapshots("other-20250101-000000-before-20200101000000_First.db", "test-20250101-000000-before-restore.db");
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
+        var failedAttempt = OldSnapshots($"test-20250601-000000-before-{TwoStepContext.Second}.db");
+        var others = OldSnapshots("test-20240101-000000-before-20190101000000_Older.db", "other-20250101-000000-before-20200101000000_First.db", "test-20250101-000000-before-restore.db");
         using var db = new TwoStepContext(Options<TwoStepContext>());
         db.GetService<IMigrator>().Migrate(TwoStepContext.First);
         db.Database.ExecuteSqlRaw("INSERT INTO Notes (Text) VALUES ('kept');");
 
         var snapshot = DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance);
 
-        // Kept: this upgrade's snapshot and the newer of the two before it. Other files stay.
-        string[] expected = [Path.GetFileName(snapshot)!, older[1], .. others];
-        Assert.Equal(
-            expected.Order(StringComparer.Ordinal),
-            Directory.GetFiles(SnapshotFolder).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        // Kept: this upgrade's snapshot, which replaces the failed attempt's, and the previous
+        // upgrade's. The upgrade before that goes; other databases' files stay.
+        string[] expected = [Path.GetFileName(snapshot)!, .. previousUpgrade, others[1], others[2]];
+        Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
+        Assert.DoesNotContain(failedAttempt[0], SnapshotFiles());
     }
 
     [Fact]
-    public void AFailingMigration_RemovesNoSnapshot()
+    public void AStartThatFailsAgainAndAgain_KeepsOneSnapshotOfTheFailingMigration()
     {
-        var older = OldSnapshots("test-20250101-000000-before-20200101000000_First.db", "test-20250601-000000-before-20200101000000_First.db");
+        var previousUpgrade = OldSnapshots("test-20250101-000000-before-20200101000000_First.db");
         using var db = new BrokenStepContext(Options<BrokenStepContext>());
         db.GetService<IMigrator>().Migrate(BrokenStepContext.First);
 
-        Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+        InvalidOperationException? error = null;
+        for (var start = 0; start < 3; start++)
+        {
+            error = Assert.Throws<InvalidOperationException>(() => DatabaseUpgrade.Migrate(db, SnapshotFolder, NullLogger.Instance));
+        }
 
-        Assert.Equal(3, Directory.GetFiles(SnapshotFolder).Length);
-        Assert.All(older, name => Assert.True(File.Exists(Path.Combine(SnapshotFolder, name))));
+        var snapshot = Assert.Single(Directory.GetFiles(SnapshotFolder, "*-before-20200102000000_Broken.db"));
+        Assert.Contains(snapshot, error!.Message);
+        string[] expected = [Path.GetFileName(snapshot), .. previousUpgrade];
+        Assert.Equal(expected.Order(StringComparer.Ordinal), SnapshotFiles());
     }
 
     [Fact]
@@ -140,6 +147,11 @@ public sealed class DatabaseUpgradeTests : IDisposable
         Assert.Contains(DatabasePath, error.Message);
         Assert.Contains("older LogMyDay", error.Message);
         Assert.Equal(0, db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM sqlite_master WHERE name = 'LogMyDay_Activities'").AsEnumerable().Single());
+    }
+
+    private string[] SnapshotFiles()
+    {
+        return Directory.GetFiles(SnapshotFolder).Select(path => Path.GetFileName(path)!).Order(StringComparer.Ordinal).ToArray();
     }
 
     private string[] OldSnapshots(params string[] names)
