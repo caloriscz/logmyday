@@ -76,6 +76,12 @@ The accounts, passwords, API keys and settings come with the archive. The stored
 
 An admin can download and restore any user's database through the API: `GET /api/backup/database/{userId}` and `POST /api/backup/database/{userId}/restore` (the file as the form field `file`).
 
+### File size and IIS
+
+A database file of up to 1 GB can be restored. The Backup page sends it over its live connection; the API (`POST /api/backup/database/restore`, and the admin's endpoint above) takes it as an ordinary upload.
+
+On IIS, request filtering refuses requests over 30,000,000 bytes (about 28.6 MB) by default, with a 404.13 error, before LogMyDay sees them. The `web.config` that publishing puts next to LogMyDay raises the limit to 1 GB (`requestLimits maxAllowedContentLength`). If your hosting locks that setting, the site answers every request with a 500.19 error after the update: remove the `<security>` section from the published `web.config` and raise the limit in the hosting's panel instead.
+
 ## Upgrading from v0.7.2
 
 Up to v0.7.2 an installation was one database file with every user's data. v0.8.0 splits that file the first time it starts:
