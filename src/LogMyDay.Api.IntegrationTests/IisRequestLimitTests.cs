@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Xml.Linq;
 using LogMyDay.Api.Controllers;
 
@@ -5,7 +6,7 @@ namespace LogMyDay.Api.IntegrationTests;
 
 /// <summary>
 /// On IIS, request filtering refuses larger requests before the app sees them. The web.config
-/// that publishing puts next to the app lets a database file of the size the restore takes through.
+/// that publishing puts next to the app lets a restore of the largest database file through.
 /// </summary>
 public class IisRequestLimitTests
 {
@@ -16,7 +17,30 @@ public class IisRequestLimitTests
 
         var limit = webConfig.Descendants("requestLimits").Single().Attribute("maxAllowedContentLength")!.Value;
 
-        Assert.Equal(BackupController.MaxDatabaseUploadBytes, long.Parse(limit));
+        Assert.Equal(BackupController.MaxDatabaseRequestBytes, long.Parse(limit));
+    }
+
+    [Fact]
+    public void TheWebConfig_IsNotInheritedByApplicationsNestedUnderTheSite()
+    {
+        var webConfig = XDocument.Load(Path.Combine(SourceFolder(), "LogMyDay.App", "web.config"));
+
+        var location = Assert.Single(webConfig.Root!.Elements("location"));
+        Assert.Equal(".", location.Attribute("path")?.Value);
+        Assert.Equal("false", location.Attribute("inheritInChildApplications")?.Value);
+        Assert.Empty(webConfig.Root.Elements("system.webServer"));
+    }
+
+    [Fact]
+    public void AFileOfTheLargestSize_FitsInARestoreRequest_WithTheMultipartFormAroundIt()
+    {
+        var file = new ByteArrayContent(new byte[10]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var form = new MultipartFormDataContent { { file, "file", new string('n', 255) + ".db" } };
+
+        var overhead = form.Headers.ContentLength!.Value - 10;
+
+        Assert.True(BackupController.MaxDatabaseUploadBytes + overhead <= BackupController.MaxDatabaseRequestBytes);
     }
 
     private static string SourceFolder()
