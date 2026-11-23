@@ -12,13 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Load Docker secrets from /run/secrets if running in Docker environment
 if (builder.Environment.EnvironmentName == "Docker")
 {
-    builder.Configuration.AddKeyPerFile(directoryPath: "/run/secrets", optional: true, reloadOnChange: false);
-
-    var aiApiKey = builder.Configuration["ai_api_key"];
-    if (!string.IsNullOrWhiteSpace(aiApiKey))
-    {
-        builder.Configuration["AI:ApiKey"] = aiApiKey;
-    }
+    builder.Configuration.AddDockerSecrets();
 }
 
 Log.Logger = new LoggerConfiguration()

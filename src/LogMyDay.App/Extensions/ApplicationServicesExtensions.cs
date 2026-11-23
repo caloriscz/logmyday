@@ -80,6 +80,8 @@ internal static class ApplicationServicesExtensions
         services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IDatabaseSeeder, DatabaseSeeder>();
+        services.AddOptions<InitialAdminOptions>()
+            .Bind(configuration.GetSection(InitialAdminOptions.SectionName));
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();
 

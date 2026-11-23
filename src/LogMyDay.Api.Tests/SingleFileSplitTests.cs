@@ -128,6 +128,8 @@ public sealed class SingleFileSplitTests : IDisposable
         services.AddLogging();
         services.AddLogMyDayDatabases(ConnectionString);
         services.AddSingleton(hasher.Object);
+        services.AddSingleton(new Mock<IEmailSender>().Object);
+        services.AddScoped<IUserService, UserService>();
         services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<IReminderDayBackfill, ReminderDayBackfill>();
         services.AddScoped<IReminderRecurrenceMigration, ReminderRecurrenceMigration>();

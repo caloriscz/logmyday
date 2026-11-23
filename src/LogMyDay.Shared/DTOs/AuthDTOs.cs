@@ -1,7 +1,5 @@
 namespace LogMyDay.Shared.DTOs;
 
-public record RegisterFirstDto(string Email, string Password, string? DisplayName);
-
 public record LoginDto(string Email, string Password);
 
 public record CreateUserDto(string Email, string Password, string? DisplayName, bool IsAdmin, string Culture, string TimeZone);

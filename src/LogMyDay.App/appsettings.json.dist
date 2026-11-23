@@ -2,6 +2,10 @@
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=path/to/logmyday.db"
   },
+  "Admin": {
+    "Email": "",
+    "InitialPassword": ""
+  },
   "Security": {
     "RateLimit": {
       "MaxAttemptsPerWindow": 5,
