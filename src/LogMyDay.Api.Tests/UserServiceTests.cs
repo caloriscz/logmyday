@@ -283,5 +283,53 @@ public class UserServiceTests
             await service.Delete(admin.Id, admin.Id, CancellationToken.None)
         );
     }
-}
 
+
+    [Fact]
+    public async Task ChangePassword_AnAdminChangingTheirOwnPassword_NeedsTheCurrentOne()
+    {
+        using var context = CreateContext();
+        var passwordHasher = new Argon2IdPasswordHasher();
+        var service = new UserService(context, passwordHasher, Mock.Of<ILogger<UserService>>(), Mock.Of<IEmailSender>(), new SharedUserDataStore());
+        var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => service.ChangePassword(admin.Id, "WrongPassword!", "NewAdminPass456!", admin.Id, CancellationToken.None));
+
+        await service.ChangePassword(admin.Id, "AdminPass123!", "NewAdminPass456!", admin.Id, CancellationToken.None);
+        Assert.True(passwordHasher.Verify("NewAdminPass456!", (await service.Get(admin.Id, CancellationToken.None))!.PasswordHash));
+    }
+
+    [Fact]
+    public async Task ChangePassword_AnAdminChangingAnotherUsersPassword_NeedsNoPasswordOfTheirs()
+    {
+        using var context = CreateContext();
+        var passwordHasher = new Argon2IdPasswordHasher();
+        var service = new UserService(context, passwordHasher, Mock.Of<ILogger<UserService>>(), Mock.Of<IEmailSender>(), new SharedUserDataStore());
+        var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
+        var user = await service.CreateUser("user@test.com", "UserPass123!", "User", false, "en-US", "UTC", admin.Id, CancellationToken.None);
+
+        await service.ChangePassword(user.Id, string.Empty, "NewUserPass456!", admin.Id, CancellationToken.None);
+
+        Assert.True(passwordHasher.Verify("NewUserPass456!", (await service.Get(user.Id, CancellationToken.None))!.PasswordHash));
+    }
+
+    [Fact]
+    public async Task Update_AnAdminCannotRemoveTheirOwnAdminRight_ButAnotherAdminCan()
+    {
+        using var context = CreateContext();
+        var service = new UserService(context, new Argon2IdPasswordHasher(), Mock.Of<ILogger<UserService>>(), Mock.Of<IEmailSender>(), new SharedUserDataStore());
+        var admin = await service.CreateFirstAdmin("admin@test.com", "AdminPass123!", "Admin", CancellationToken.None);
+        var second = await service.CreateUser("second@test.com", "SecondPass123!", "Second", true, "en-US", "UTC", admin.Id, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.Update(admin.Id, null, null, isAdmin: false, null, null, admin.Id, CancellationToken.None));
+        Assert.True((await service.Get(admin.Id, CancellationToken.None))!.IsAdmin);
+
+        // Saving your own row unchanged still works.
+        await service.Update(admin.Id, null, "Admin", isAdmin: true, null, null, admin.Id, CancellationToken.None);
+
+        await service.Update(admin.Id, null, null, isAdmin: false, null, null, second.Id, CancellationToken.None);
+        Assert.False((await service.Get(admin.Id, CancellationToken.None))!.IsAdmin);
+    }
+}

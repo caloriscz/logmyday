@@ -256,6 +256,9 @@ else
         // Check authentication state if not on login page
         if (!IsLoginPage)
         {
+            // Before any await, so that a layout disposed while it waits leaves no handler behind.
+            AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+
             Logger.LogInformation("MainLayout.OnInitializedAsync: Not on login page, checking authentication state. URL: {Url}", Navigation.Uri);
             
             // Check if this is a redirect from login (URL contains no query parameters and is just "/")
@@ -270,7 +273,6 @@ else
             }
             
             await CheckAuthenticationState();
-            AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
         else
         {

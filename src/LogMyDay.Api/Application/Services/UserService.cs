@@ -161,6 +161,13 @@ public sealed class UserService : IUserService
 
         if (isAdmin.HasValue && actor.IsAdmin)
         {
+            // Removing your own admin right would end your sign-in at once, and could leave the
+            // installation without an admin. Another admin can remove it.
+            if (!isAdmin.Value && user.Id == actor.Id)
+            {
+                throw new InvalidOperationException("You cannot remove your own admin right.");
+            }
+
             user.IsAdmin = isAdmin.Value;
         }
 
@@ -238,8 +245,10 @@ public sealed class UserService : IUserService
             throw new UnauthorizedAccessException("You can only change your own password.");
         }
 
-        // Non-admin users must provide current password
-        if (!actor.IsAdmin && !_passwordHasher.Verify(currentPassword, user.PasswordHash))
+        // Your own password needs the current one, an admin's too: a session left open must not
+        // be enough to take the account over. An admin changing another user's password needs no
+        // password of theirs.
+        if (actor.Id == user.Id && !_passwordHasher.Verify(currentPassword, user.PasswordHash))
         {
             throw new UnauthorizedAccessException("Current password is incorrect.");
         }

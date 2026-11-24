@@ -1,6 +1,8 @@
 ﻿@page "/login"
 @using LogMyDay.App.Services
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<Login> Logger
 @inject IPageTitleService PageTitleService
 
@@ -141,16 +143,27 @@
 </div>
 
 @code {
+    // Notices and errors are fixed texts by key, so that a link can't put words of its own on the
+    // sign-in page.
     private string? ErrorMessage { get; set; }
 
-    // Fixed texts by key, so that a link can't put words of its own on the sign-in page.
     private string? NoticeMessage { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("Login");
 
         Logger.LogInformation("Login.OnInitialized: Starting login page initialization. Current URL: {Url}", Navigation.Uri);
+
+        // A visitor who is signed in has nothing to do here: for example an older tab whose page
+        // was sent here after the user signed in again in another one.
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+
+            return;
+        }
 
         var uri = new Uri(Navigation.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
@@ -159,15 +172,21 @@
             NoticeMessage = signedOut.ToString() switch
             {
                 "password" => "Your password was changed. Sign in with the new password.",
-                "session" => "Your session ended because your password or your admin rights changed. Sign in again.",
+                "session" => "Your session ended. Sign in again.",
                 _ => null
             };
         }
 
         if (query.TryGetValue("error", out var error))
         {
-            ErrorMessage = error.ToString();
-            Logger.LogWarning("Login.OnInitialized: Error message found in query parameters: {ErrorMessage}", ErrorMessage);
+            ErrorMessage = error.ToString() switch
+            {
+                "invalid" => "Invalid email or password.",
+                "blocked" => "Too many failed attempts. Please try again later.",
+                "failed" => "An error occurred during login.",
+                _ => null
+            };
+            Logger.LogWarning("Login.OnInitialized: Error {Error} found in query parameters", error.ToString());
         }
         else
         {

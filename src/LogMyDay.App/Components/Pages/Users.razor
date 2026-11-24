@@ -149,7 +149,7 @@
                                                                                   ShowValueInList="true" />
                                                             </div>
                                                             <div class="flex items-center gap-3">
-                                                                <InputCheckbox id="editIsAdmin" @bind-Value="editUser.IsAdmin" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
+                                                                <InputCheckbox id="editIsAdmin" @bind-Value="editUser.IsAdmin" disabled="@(editingUserId == currentUserId)" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
                                                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="editIsAdmin">Administrator</label>
                                                             </div>
                                                         </div>
@@ -269,7 +269,7 @@
                                                                   SearchPlaceholder="Search time zones"
                                                                   ShowValueInList="true" />
                                                 <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-slate-200">
-                                                    <InputCheckbox id="mobileEditIsAdmin" @bind-Value="editUser.IsAdmin" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
+                                                    <InputCheckbox id="mobileEditIsAdmin" @bind-Value="editUser.IsAdmin" disabled="@(editingUserId == currentUserId)" class="h-4 w-4 rounded-sm border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800" />
                                                     Administrator
                                                 </label>
                                                 <div class="flex flex-wrap justify-end gap-2">

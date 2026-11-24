@@ -106,7 +106,7 @@ public class AuthController : ControllerBase
             {
                 _logger.LogWarning("Form login attempt with missing credentials for email: {Email}", email);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             var identifier = BuildAttemptIdentifier(email);
@@ -114,7 +114,7 @@ public class AuthController : ControllerBase
             {
                 _logger.LogWarning("Form login blocked for email {Email} due to too many failed attempts", email);
 
-                return Redirect("/login?error=Too many failed attempts. Please try again later.");
+                return Redirect("/login?error=blocked");
             }
 
             _logger.LogInformation("Looking up user with email: {Email}", email);
@@ -124,7 +124,7 @@ public class AuthController : ControllerBase
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
                 _attemptTracker.RecordFailedAttempt(identifier);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             _logger.LogInformation("User found: {UserId}, verifying password", user.Id);
@@ -133,7 +133,7 @@ public class AuthController : ControllerBase
                 _logger.LogWarning("Form login attempt with invalid password for email: {Email}", email);
                 _attemptTracker.RecordFailedAttempt(identifier);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             _attemptTracker.RecordSuccessfulAttempt(identifier);
@@ -148,7 +148,7 @@ public class AuthController : ControllerBase
         {
             _logger.LogError(ex, "Error during form login for email: {Email}", email);
 
-            return Redirect("/login?error=An error occurred during login");
+            return Redirect("/login?error=failed");
         }
     }
 

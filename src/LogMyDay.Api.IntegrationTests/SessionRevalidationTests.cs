@@ -87,6 +87,18 @@ public class SessionRevalidationTests : IClassFixture<CustomWebApplicationFactor
         Assert.False(await SessionRevalidatingAuthenticationStateProvider.IsCurrent(page, Scopes, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task AnAccountThatCantBeReadNow_CountsAsValid_SoTheChecksGoOn()
+    {
+        var (_, user) = await CreateUser();
+        var services = new ServiceCollection().AddScoped<IUserDirectory, UnreadableDirectory>().BuildServiceProvider();
+
+        var valid = await SessionRevalidatingAuthenticationStateProvider.StillValid(
+            PageSignedInAs(user), services.GetRequiredService<IServiceScopeFactory>(), Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, CancellationToken.None);
+
+        Assert.True(valid);
+    }
+
     /// <summary>The claims a sign-in gives the cookie, as the page holds them.</summary>
     private static ClaimsPrincipal PageSignedInAs(User user)
     {
@@ -108,5 +120,24 @@ public class SessionRevalidationTests : IClassFixture<CustomWebApplicationFactor
             .CreateUser($"page-{Guid.NewGuid():N}@example.com", Password, "Page", false, "en-US", "UTC", adminId, CancellationToken.None);
 
         return (adminId, user);
+    }
+
+    /// <summary>A platform database that is busy.</summary>
+    private sealed class UnreadableDirectory : IUserDirectory
+    {
+        public Task<User?> Find(Guid userId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("database is locked");
+        }
+
+        public Task<string?> GetTimeZone(Guid userId, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("database is locked");
+        }
+
+        public Task<IReadOnlyList<User>> List(CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("database is locked");
+        }
     }
 }

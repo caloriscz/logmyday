@@ -39,6 +39,9 @@ All notable changes to this project will be documented in this file. The format 
   - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
   - A deleted user's web sign-in ends with their next request. Before, their cookie stayed valid for up to 30 days, and their next request created a new, empty database for them.
   - A changed or reset password, and a changed admin right, end the account's web sign-ins: the next request, or within a minute an open page, goes to the sign-in page, and the user signs in again with the current password and rights. Before, a removed admin right and an old password kept working for up to 30 days. Changing your own password on the Profile page ends your own sign-in as well, and the page takes you to the sign-in page. Sign-ins from before this version end once.
+  - An admin can't remove their own admin right; another admin can. Before, the only admin could leave the installation without one.
+  - Changing your own password needs the current one, an admin's too. Before, an admin's open session was enough to change the admin's password.
+  - The sign-in page shows only its own messages. Before, a link could put any text in its error box.
 
 ## v0.7.2 — 2026‑11‑20
 
