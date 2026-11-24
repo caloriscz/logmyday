@@ -3,6 +3,7 @@ using LogMyDay.Api.Application.Interfaces;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
@@ -64,6 +65,57 @@ public class AccountController : ControllerBase
             _logger.LogError(ex, "Error changing password");
 
             return StatusCode(500, "An error occurred while changing the password.");
+        }
+    }
+
+    /// <summary>
+    /// Changes the password of the web app's user. The browser posts this form itself, so that it
+    /// gets the new cookie: the change ends the sign-ins made with the old password, and this one
+    /// goes on. The profile page shows the result by its key.
+    /// </summary>
+    [HttpPost("password/change-form")]
+    [Authorize(AuthenticationSchemes = "lmd-cookie")]
+    [EnableRateLimiting("auth")]
+    // SameSite=Lax keeps the cookie from a form on another site, which wouldn't know the current
+    // password either.
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> ChangePasswordForm([FromForm] string? currentPassword, [FromForm] string? newPassword, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 10)
+        {
+            return Redirect("/profile?password=short");
+        }
+
+        if (string.IsNullOrEmpty(currentPassword))
+        {
+            return Redirect("/profile?password=incorrect");
+        }
+
+        var userId = _authService.GetUserId(User);
+        if (userId == null)
+        {
+            return Redirect("/login");
+        }
+
+        try
+        {
+            await _userService.ChangePassword(userId.Value, currentPassword, newPassword, userId.Value, cancellationToken);
+
+            var user = await _userService.Get(userId.Value, cancellationToken)
+                ?? throw new InvalidOperationException($"The account {userId} is gone.");
+            await _authService.SignInAsync(HttpContext, user);
+
+            return Redirect("/profile?password=changed");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Redirect("/profile?password=incorrect");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing password");
+
+            return Redirect("/profile?password=failed");
         }
     }
 

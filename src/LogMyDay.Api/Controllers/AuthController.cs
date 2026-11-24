@@ -163,6 +163,26 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Signs the web app's user out. The browser posts this form itself, because only its own
+    /// request deletes the cookie it keeps: a call from the page's circuit deletes nothing there.
+    /// </summary>
+    [HttpPost("logout-form")]
+    // As for login-form. SameSite=Lax keeps the cookie from a form on another site, and without the
+    // cookie nothing is signed out.
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> LogoutForm()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            var userId = _authService.GetUserId(User);
+            await _authService.SignOut(HttpContext);
+            _logger.LogInformation("User {UserId} logged out", userId);
+        }
+
+        return Redirect("/login");
+    }
+
     [HttpGet("me")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)

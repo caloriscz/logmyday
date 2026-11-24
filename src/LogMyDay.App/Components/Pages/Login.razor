@@ -1,8 +1,6 @@
 ﻿@page "/login"
 @using LogMyDay.App.Services
-@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
-@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILogger<Login> Logger
 @inject IPageTitleService PageTitleService
 
@@ -46,13 +44,6 @@
                         <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Continue to LogMyDay</h1>
                         <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Sign in with your administrator credentials to manage your day.</p>
                     </div>
-
-                    @if (!string.IsNullOrEmpty(NoticeMessage))
-                    {
-                        <div class="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-100" role="status">
-                            @NoticeMessage
-                        </div>
-                    }
 
                     @if (!string.IsNullOrEmpty(ErrorMessage))
                     {
@@ -143,40 +134,17 @@
 </div>
 
 @code {
-    // Notices and errors are fixed texts by key, so that a link can't put words of its own on the
-    // sign-in page.
+    // A fixed text by key, so that a link can't put words of its own on the sign-in page.
     private string? ErrorMessage { get; set; }
 
-    private string? NoticeMessage { get; set; }
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         PageTitleService.SetTitle("Login");
 
         Logger.LogInformation("Login.OnInitialized: Starting login page initialization. Current URL: {Url}", Navigation.Uri);
 
-        // A visitor who is signed in has nothing to do here: for example an older tab whose page
-        // was sent here after the user signed in again in another one.
-        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (state.User.Identity?.IsAuthenticated == true)
-        {
-            Navigation.NavigateTo("/", forceLoad: true);
-
-            return;
-        }
-
         var uri = new Uri(Navigation.Uri);
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
-        if (query.TryGetValue("signedOut", out var signedOut))
-        {
-            NoticeMessage = signedOut.ToString() switch
-            {
-                "password" => "Your password was changed. Sign in with the new password.",
-                "session" => "Your session ended. Sign in again.",
-                _ => null
-            };
-        }
-
         if (query.TryGetValue("error", out var error))
         {
             ErrorMessage = error.ToString() switch

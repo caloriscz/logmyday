@@ -38,7 +38,9 @@ All notable changes to this project will be documented in this file. The format 
   - An admin's clear and backup of another user's data (`DELETE /api/backup/clear`, the MCP tools `admin_clear_all_data` and `admin_export_backup`) work on that user's data.
   - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
   - A deleted user's web sign-in ends with their next request. Before, their cookie stayed valid for up to 30 days, and their next request created a new, empty database for them.
-  - A changed or reset password, and a changed admin right, end the account's web sign-ins: the next request, or within a minute an open page, goes to the sign-in page, and the user signs in again with the current password and rights. Before, a removed admin right and an old password kept working for up to 30 days. Changing your own password on the Profile page ends your own sign-in as well, and the page takes you to the sign-in page. Sign-ins from before this version end once.
+  - A changed or reset password ends the web sign-ins made with the old one; before, they went on for up to 30 days, and longer while they were used. Changing your own password on the Profile page keeps the browser you do it in signed in. Sign-ins from before this version end once.
+  - A changed admin right applies from the next request. Before, a web sign-in kept the right it began with.
+  - Logout signs the browser out. Before, the browser kept its sign-in cookie, and opening the app again needed no password.
   - An admin can't remove their own admin right; another admin can. Before, the only admin could leave the installation without one.
   - Changing your own password needs the current one, an admin's too. Before, an admin's open session was enough to change the admin's password.
   - The sign-in page shows only its own messages. Before, a link could put any text in its error box.

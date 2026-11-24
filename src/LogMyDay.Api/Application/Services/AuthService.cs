@@ -10,7 +10,7 @@ namespace LogMyDay.Api.Application.Services;
 
 public sealed class AuthService : IAuthService
 {
-    private const string AuthenticationScheme = "lmd-cookie";
+    private const string AuthenticationScheme = CookieSession.AuthenticationScheme;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(ILogger<AuthService> logger)
@@ -21,20 +21,10 @@ public sealed class AuthService : IAuthService
     {
         _logger.LogInformation("AuthService: Starting sign-in for User {UserId} ({Email})", user.Id, user.Email);
 
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.DisplayName ?? user.Email),
-            new Claim("is_admin", user.IsAdmin.ToString().ToLowerInvariant()),
-            new Claim(SessionStamp.ClaimType, SessionStamp.For(user))
-        };
+        var principal = CookieSession.Create(user);
 
         _logger.LogInformation("AuthService.SignInAsync: Created claims for User {UserId}: {Claims}",
-            user.Id, string.Join(", ", claims.Where(c => c.Type != SessionStamp.ClaimType).Select(c => $"{c.Type}={c.Value}")));
-
-        var identity = new ClaimsIdentity(claims, AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
+            user.Id, string.Join(", ", principal.Claims.Where(c => c.Type != CookieSession.StampClaimType).Select(c => $"{c.Type}={c.Value}")));
 
         // Always set IsPersistent to true for proper cookie behavior with 30-day sliding expiration
         // "Remember Me" checkbox preserved for UX but both options now use persistent cookies

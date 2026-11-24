@@ -658,6 +658,15 @@
 
         try
         {
+            // The page may have been open since before the user lost the admin right or the sign-in.
+            var currentUser = await AuthApi.GetCurrentUserAsync();
+            if (!currentUser.IsAdmin)
+            {
+                SetStatus("Only an admin can export the installation.", true);
+
+                return;
+            }
+
             await using var export = await DatabaseBackups.ExportInstallation(CancellationToken.None);
             await Download(export);
 

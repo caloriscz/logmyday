@@ -4,7 +4,6 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using LogMyDay.App.Components.Shared
 @inject NavigationManager Navigation
-@inject LogMyDay.Shared.Interfaces.IAuthApi AuthApi
 @inject LogMyDay.Shared.Interfaces.IActivityApi ActivityApi
 @inject LogMyDay.UI.Services.SaveNotices SaveNotices
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -256,9 +255,6 @@ else
         // Check authentication state if not on login page
         if (!IsLoginPage)
         {
-            // Before any await, so that a layout disposed while it waits leaves no handler behind.
-            AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
-
             Logger.LogInformation("MainLayout.OnInitializedAsync: Not on login page, checking authentication state. URL: {Url}", Navigation.Uri);
             
             // Check if this is a redirect from login (URL contains no query parameters and is just "/")
@@ -405,27 +401,8 @@ document.addEventListener('keydown', window.layoutKeyboardHandler);
         // We'll trigger an event or use a different approach
     }
 
-    /// <summary>
-    /// The page's account was deleted, or its password or admin right changed (the authentication
-    /// state is checked every minute): the browser goes to the sign-in page, whose request ends the
-    /// cookie as well.
-    /// </summary>
-    private void OnAuthenticationStateChanged(Task<AuthenticationState> state)
-    {
-        _ = InvokeAsync(async () =>
-        {
-            if ((await state).User.Identity?.IsAuthenticated != true)
-            {
-                Logger.LogInformation("MainLayout: the session ended, sending the browser to the sign-in page");
-                Navigation.NavigateTo("/login?signedOut=session", forceLoad: true);
-            }
-        });
-    }
-
     public async ValueTask DisposeAsync()
     {
-        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
-
         if (keyboardListenerAdded)
         {
             try
@@ -626,23 +603,6 @@ if (window.layoutKeyboardHandler) {
         {
             await LoadTags();
             StateHasChanged();
-        }
-    }
-
-    private async Task Logout()
-    {
-        try
-        {
-            await AuthApi.LogoutAsync();
-        }
-        catch (Exception)
-        {
-            // Ignore logout errors - we'll redirect anyway
-        }
-        finally
-        {
-            IsAuthenticated = false;
-            Navigation.NavigateTo("/login", forceLoad: true);
         }
     }
 }
