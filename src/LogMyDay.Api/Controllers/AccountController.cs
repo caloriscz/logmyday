@@ -1,5 +1,6 @@
 using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,8 +27,13 @@ public class AccountController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Changes your own password, which ends the web sign-ins made with the old one. A browser that
+    /// calls this itself gets a new cookie and stays signed in.
+    /// </summary>
     [HttpPost("password/change")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request, CancellationToken cancellationToken)
     {
         try
@@ -50,6 +56,12 @@ public class AccountController : ControllerBase
 
             await _userService.ChangePassword(userId.Value, request.CurrentPassword, request.NewPassword, userId.Value, cancellationToken);
 
+            if (User.Identity?.AuthenticationType == CookieSession.AuthenticationScheme
+                && await _userService.Get(userId.Value, cancellationToken) is { } user)
+            {
+                await _authService.SignInAsync(HttpContext, user);
+            }
+
             return NoContent();
         }
         catch (UnauthorizedAccessException ex)
@@ -65,57 +77,6 @@ public class AccountController : ControllerBase
             _logger.LogError(ex, "Error changing password");
 
             return StatusCode(500, "An error occurred while changing the password.");
-        }
-    }
-
-    /// <summary>
-    /// Changes the password of the web app's user. The browser posts this form itself, so that it
-    /// gets the new cookie: the change ends the sign-ins made with the old password, and this one
-    /// goes on. The profile page shows the result by its key.
-    /// </summary>
-    [HttpPost("password/change-form")]
-    [Authorize(AuthenticationSchemes = "lmd-cookie")]
-    [EnableRateLimiting("auth")]
-    // SameSite=Lax keeps the cookie from a form on another site, which wouldn't know the current
-    // password either.
-    [IgnoreAntiforgeryToken]
-    public async Task<IActionResult> ChangePasswordForm([FromForm] string? currentPassword, [FromForm] string? newPassword, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 10)
-        {
-            return Redirect("/profile?password=short");
-        }
-
-        if (string.IsNullOrEmpty(currentPassword))
-        {
-            return Redirect("/profile?password=incorrect");
-        }
-
-        var userId = _authService.GetUserId(User);
-        if (userId == null)
-        {
-            return Redirect("/login");
-        }
-
-        try
-        {
-            await _userService.ChangePassword(userId.Value, currentPassword, newPassword, userId.Value, cancellationToken);
-
-            var user = await _userService.Get(userId.Value, cancellationToken)
-                ?? throw new InvalidOperationException($"The account {userId} is gone.");
-            await _authService.SignInAsync(HttpContext, user);
-
-            return Redirect("/profile?password=changed");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Redirect("/profile?password=incorrect");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error changing password");
-
-            return Redirect("/profile?password=failed");
         }
     }
 
@@ -151,6 +112,10 @@ public class AccountController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

@@ -7,6 +7,7 @@
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @inject ILogger<Profile> Logger
 @inject IPageTitleService PageTitleService
 
@@ -104,28 +105,37 @@
                 <div class="space-y-5 p-6">
                     <StatusAlert Message="@passwordStatusMessage" IsError="@passwordStatusIsError" />
 
-                    @* The browser posts this form itself, as on the sign-in page: only then does it get the
-                       new cookie, and the user stays signed in with the new password. *@
-                    <form method="post" action="/api/account/password/change-form">
+                    <EditForm Model="passwordModel" OnValidSubmit="ChangePasswordAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/20 dark:text-rose-200" />
+
                         <div class="grid gap-4 md:grid-cols-2">
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="currentPassword">Current Password</label>
-                                <input id="currentPassword" name="currentPassword" type="password" required class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
+                                <InputText id="currentPassword" @bind-Value="passwordModel.CurrentPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="current-password" placeholder="Enter current password" />
                             </div>
 
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-gray-700 dark:text-slate-200" for="newPassword">New Password</label>
-                                <input id="newPassword" name="newPassword" type="password" required minlength="10" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
+                                <InputText id="newPassword" @bind-Value="passwordModel.NewPassword" type="password" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-xs focus:border-transparent focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" autocomplete="new-password" placeholder="Enter new password" />
                                 <p class="text-xs text-gray-500 dark:text-slate-400">Minimum 10 characters.</p>
                             </div>
                         </div>
 
                         <div class="mt-6">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">
-                                <span>Update Password</span>
+                            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-slate-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900" disabled="@isChangingPassword">
+                                @if (isChangingPassword)
+                                {
+                                    <span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                    <span>Updating...</span>
+                                }
+                                else
+                                {
+                                    <span>Update Password</span>
+                                }
                             </button>
                         </div>
-                    </form>
+                    </EditForm>
                 </div>
             </section>
         </div>
@@ -149,13 +159,18 @@
     private string? profileStatusMessage;
     private bool profileStatusIsError;
 
+    private ChangePasswordModel passwordModel = new();
+    private bool isChangingPassword;
     private string? passwordStatusMessage;
     private bool passwordStatusIsError;
 
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("My Profile");
-        ShowPasswordResult();
+        if (PasswordWasChanged)
+        {
+            SetPasswordStatus("Password updated successfully. Reload other open LogMyDay tabs; other devices have to sign in again.");
+        }
         
         try
         {
@@ -232,30 +247,57 @@
         }
     }
 
-    /// <summary>The result of the password form, which the browser posted: a fixed text by its key.</summary>
-    private void ShowPasswordResult()
+    private bool PasswordWasChanged =>
+        Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).ContainsKey("passwordChanged");
+
+    protected override void OnAfterRender(bool firstRender)
     {
-        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
-        if (!query.TryGetValue("password", out var result))
+        // Shown once: a reload or a bookmark doesn't repeat it.
+        if (firstRender && PasswordWasChanged)
+        {
+            Navigation.NavigateTo("/profile", replace: true);
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (isChangingPassword)
         {
             return;
         }
 
-        switch (result.ToString())
+        isChangingPassword = true;
+        SetPasswordStatus(null);
+
+        try
         {
-            case "changed":
-                SetPasswordStatus("Password updated successfully. Other browsers and devices that were signed in have to sign in again.");
-                break;
-            case "incorrect":
-                SetPasswordStatus("Current password is incorrect.", true);
-                break;
-            case "short":
-                SetPasswordStatus("New password must be at least 10 characters long.", true);
-                break;
-            case "failed":
-                SetPasswordStatus("An unexpected error occurred while changing your password.", true);
-                break;
+            // The browser makes the call, so that it gets the new cookie and stays signed in.
+            var result = await JSRuntime.InvokeAsync<PasswordChangeResult>("lmdAccount.changePassword",
+                passwordModel.CurrentPassword, passwordModel.NewPassword);
+            if (result.Status is >= 200 and < 300)
+            {
+                // This page still has the old cookie. The button stays disabled until it is gone.
+                Navigation.NavigateTo("/profile?passwordChanged", forceLoad: true);
+
+                return;
+            }
+
+            Logger.LogWarning("The password change was refused with status {Status}", result.Status);
+            SetPasswordStatus(result.Status switch
+            {
+                400 when !string.IsNullOrWhiteSpace(result.Message) && !result.Message.StartsWith('{') => result.Message,
+                401 => "Your sign-in has ended. Reload the page and sign in again.",
+                429 => "Too many attempts. Please try again later.",
+                _ => "Failed to change password."
+            }, true);
         }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error while changing password");
+            SetPasswordStatus("An unexpected error occurred while changing your password.", true);
+        }
+
+        isChangingPassword = false;
     }
 
     private void SetProfileStatus(string? message, bool isError = false)
@@ -301,5 +343,18 @@
 
         [Required]
         public string TimeZone { get; set; } = string.Empty;
+    }
+
+    /// <summary>The answer to the browser's call; status 0 when there was none.</summary>
+    private sealed record PasswordChangeResult(int Status, string Message);
+
+    private sealed class ChangePasswordModel
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(10, ErrorMessage = "New password must be at least 10 characters long.")]
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

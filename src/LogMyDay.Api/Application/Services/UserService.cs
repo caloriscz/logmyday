@@ -265,6 +265,12 @@ public sealed class UserService : IUserService
         await GetUserAndEnsureAdminAsync(actorId, cancellationToken);
         var user = await GetUserAsync(id, cancellationToken);
 
+        // Your own password is changed with the current one (ChangePassword).
+        if (user.Id == actorId)
+        {
+            throw new InvalidOperationException("Change your own password on your profile, with the current password.");
+        }
+
         user.PasswordHash = _passwordHasher.Hash(newPassword);
         user.UpdatedUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);

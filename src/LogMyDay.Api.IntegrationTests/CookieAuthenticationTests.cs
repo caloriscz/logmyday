@@ -76,29 +76,61 @@ public sealed class CookieAuthenticationTests : IDisposable
         var here = await SignIn(email, Password);
         var elsewhere = await SignIn(email, Password);
 
-        var response = await PostPasswordForm(here, Password, "Changed-Pa55word!");
+        var response = await ChangePassword(here, Password, "Changed-Pa55word!");
 
-        Assert.Equal("/profile?password=changed", response.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await here.GetAsync("/api/auth/me")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await elsewhere.GetAsync("/api/auth/me")).StatusCode);
+
+        // Refused but not deleted: an earlier request of this browser must not delete the new cookie.
+        var refused = await elsewhere.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Set-Cookie"));
         Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, "Changed-Pa55word!")).GetAsync("/api/auth/me")).StatusCode);
     }
 
     [Theory]
-    [InlineData("not-the-password", "Changed-Pa55word!", "incorrect")]
-    [InlineData("", "Changed-Pa55word!", "incorrect")]
-    [InlineData(Password, "too-short", "short")]
-    public async Task ARefusedPasswordChange_ChangesNothing_AndSignsNobodyOut(string current, string changed, string result)
+    [InlineData("not-the-password", "Changed-Pa55word!", "Current password is incorrect.")]
+    [InlineData("", "Changed-Pa55word!", "")]
+    [InlineData(Password, "too-short", "New password must be at least 10 characters long.")]
+    public async Task ARefusedPasswordChange_ChangesNothing_AndSignsNobodyOut(string current, string changed, string message)
     {
         var (_, _, email) = await CreateUser(isAdmin: false);
         var here = await SignIn(email, Password);
         var elsewhere = await SignIn(email, Password);
 
-        var response = await PostPasswordForm(here, current, changed);
+        var response = await ChangePassword(here, current, changed);
 
-        Assert.Equal($"/profile?password={result}", response.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(message, await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, (await here.GetAsync("/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await elsewhere.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, Password)).GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task GuessingTheCurrentPassword_IsLimited()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+
+        var answers = new List<HttpStatusCode>();
+        for (var guess = 0; guess < 12; guess++)
+        {
+            answers.Add((await ChangePassword(browser, $"guess-number-{guess}", "Changed-Pa55word!")).StatusCode);
+        }
+
+        Assert.Contains(HttpStatusCode.TooManyRequests, answers);
+    }
+
+    [Fact]
+    public async Task AnAdminsReset_OfTheirOwnPassword_IsRefused()
+    {
+        var (_, userId, email) = await CreateUser(isAdmin: true);
+        var browser = await SignIn(email, Password);
+
+        var response = await browser.PostAsJsonAsync($"/api/account/password/reset/{userId}", new AdminResetPasswordDto("Reset-Pa55word!"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, Password)).GetAsync("/api/auth/me")).StatusCode);
     }
 
@@ -189,13 +221,9 @@ public sealed class CookieAuthenticationTests : IDisposable
             .Update(userId, null, null, isAdmin, null, null, actorId, CancellationToken.None);
     }
 
-    private static Task<HttpResponseMessage> PostPasswordForm(HttpClient browser, string current, string changed)
+    private static Task<HttpResponseMessage> ChangePassword(HttpClient browser, string current, string changed)
     {
-        return browser.PostAsync("/api/account/password/change-form", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["currentPassword"] = current,
-            ["newPassword"] = changed,
-        }));
+        return browser.PostAsJsonAsync("/api/account/password/change", new ChangePasswordDto(current, changed));
     }
 
     /// <summary>A client with its own cookie jar that doesn't follow redirects. The cookie is Secure, so it talks https.</summary>

@@ -115,7 +115,13 @@ internal static class AuthenticationExtensions
                     }
                     else if (!CookieSession.IsCurrent(context.Principal!, user))
                     {
-                        Log.Information("Cookie authentication: the password of account {UserId} changed since the sign-in, signing out", userId);
+                        Log.Information("Cookie authentication: the password of account {UserId} changed since the sign-in, refusing the cookie", userId);
+
+                        // Not deleted: this can be an earlier request of the browser that has just
+                        // got the new cookie, and the deletion would reach it after that one.
+                        context.RejectPrincipal();
+
+                        return;
                     }
                     else
                     {
