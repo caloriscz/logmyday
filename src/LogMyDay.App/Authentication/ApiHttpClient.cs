@@ -12,10 +12,10 @@ internal sealed class ApiHttpClient
     public const string Connections = "lmd-api";
 
     public ApiHttpClient(IHttpMessageHandlerFactory connections, IHttpContextAccessor httpContextAccessor, CircuitRequestOrigin origin,
-        OwnAddress own, ILogger<CookieAuthenticationHandler> logger, Uri baseAddress)
+        ILogger<CookieAuthenticationHandler> logger, Uri baseAddress)
     {
         var cookie = new CookieAuthenticationHandler(httpContextAccessor, origin, logger) { InnerHandler = connections.CreateHandler(Connections) };
-        var address = new SelfBaseAddressHandler(httpContextAccessor, origin, own) { InnerHandler = cookie };
+        var address = new SelfBaseAddressHandler(httpContextAccessor, origin) { InnerHandler = cookie };
 
         Client = new HttpClient(address, disposeHandler: false) { BaseAddress = baseAddress };
     }

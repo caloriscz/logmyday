@@ -71,6 +71,12 @@ A new installation has no account, so its first start creates an administrator w
 
 An installation that already has accounts never uses the password, but Compose still expects the file: create `secrets/admin_password.txt` before you upgrade, and leave it empty. Without the file, Docker puts an empty folder of that name in its place; delete the folder before you create the file.
 
+## Allowed hosts
+
+The app calls its own API at the host name of the request, and without `PASSWORD_RESET_URL` it also puts that name into the password reset link. On an installation that others can reach, list the names you use in `ALLOWED_HOSTS` (`.env`), for example `logmyday.example.com;localhost`. A request for any other name is then refused with 400, so a forged `Host` header can't send the app or a reset link elsewhere. Names only, without ports. Keep `localhost`: the container's health check uses it.
+
+Without Docker, set `AllowedHosts` in `appsettings.json`. On IIS, a binding with a host name does the same.
+
 ## Secrets & Configuration Flow
 
 1. **Base configuration**: `appsettings.json` baked into the image.

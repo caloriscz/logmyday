@@ -1,7 +1,5 @@
 using LogMyDay.App.Authentication;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LogMyDay.Api.IntegrationTests;
@@ -29,21 +27,6 @@ public class CircuitRequestOriginTests
         }
     }
 
-    /// <summary>A server that doesn't say where it listens, as IIS.</summary>
-    private sealed class UnknownServer : IServer
-    {
-        public IFeatureCollection Features { get; } = new FeatureCollection();
-
-        public Task StartAsync<TContext>(IHttpApplication<TContext> application, CancellationToken cancellationToken)
-            where TContext : notnull => Task.CompletedTask;
-
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public void Dispose()
-        {
-        }
-    }
-
     private static HttpContext Context(string scheme, string host, string? cookie)
     {
         var context = new DefaultHttpContext();
@@ -62,7 +45,7 @@ public class CircuitRequestOriginTests
         var accessor = new Accessor();
         var inner = new Capture();
         var cookie = new CookieAuthenticationHandler(accessor, origin, NullLogger<CookieAuthenticationHandler>.Instance) { InnerHandler = inner };
-        var self = new SelfBaseAddressHandler(accessor, origin, new OwnAddress(new UnknownServer())) { InnerHandler = cookie };
+        var self = new SelfBaseAddressHandler(accessor, origin) { InnerHandler = cookie };
 
         return (new HttpClient(self) { BaseAddress = new Uri("http://localhost") }, inner, accessor);
     }

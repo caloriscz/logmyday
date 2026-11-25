@@ -22,15 +22,14 @@ internal static class RefitExtensions
             ? new Uri(explicitBaseAddress)
             : PlaceholderBaseAddress;
 
-        // The connections are shared by all users, so they keep no cookies. They go to this app only.
-        services.AddSingleton<OwnAddress>();
+        // The connections are shared by all users, so they keep no cookies. There is one set of them:
+        // a page holds its client for as long as it is open, so replaced ones would pile up.
         services.AddHttpClient(ApiHttpClient.Connections)
-            .UseSocketsHttpHandler((handler, sp) =>
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan)
+            .UseSocketsHttpHandler((handler, _) =>
             {
-                var own = sp.GetRequiredService<OwnAddress>();
                 handler.UseCookies = false;
-                handler.UseProxy = !own.IsKnown;
-                handler.ConnectCallback = own.Connect;
+                handler.PooledConnectionLifetime = TimeSpan.FromMinutes(2);
             });
         services.AddScoped(sp => ActivatorUtilities.CreateInstance<ApiHttpClient>(sp, baseAddress));
         services.AddSingleton<CircuitConnection>();

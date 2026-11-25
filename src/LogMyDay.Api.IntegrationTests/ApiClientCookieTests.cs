@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
 using System.Security.Claims;
 using LogMyDay.App.Authentication;
 using LogMyDay.App.Extensions;
@@ -9,7 +7,6 @@ using LogMyDay.Shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections.Features;
 using Microsoft.AspNetCore.Http.Features;
@@ -55,7 +52,6 @@ public sealed class ApiClientCookieTests : IAsyncLifetime
         services.AddLogging();
         services.AddSingleton<IHttpContextAccessor>(_accessor);
         services.AddScoped<CircuitRequestOrigin>();
-        services.AddSingleton(_server.Services.GetRequiredService<IServer>());
         services.AddRefitClients(new ConfigurationBuilder().Build());
         _services = services.BuildServiceProvider();
     }
@@ -123,32 +119,31 @@ public sealed class ApiClientCookieTests : IAsyncLifetime
         Assert.Equal(["lmd.auth=cookie-of-A", "lmd.auth=cookie-of-B"], _cookies);
     }
 
-    [Theory]
-    [InlineData("127.0.0.1")]
-    [InlineData("localhost")]
-    [InlineData("attacker.invalid")]
-    public async Task TheHostHeader_DoesNotChooseWhereTheCallGoes(string host)
+    [Fact]
+    public async Task ACircuitsHandler_RunningAfterTheConnectionIsGone_StillHasItsCookie()
     {
-        var elsewhere = new TcpListener(IPAddress.Loopback, 0);
-        elsewhere.Start();
-        var port = ((IPEndPoint)elsewhere.LocalEndpoint).Port;
         await using var page = _services.CreateAsyncScope();
-        _accessor.HttpContext = Context("lmd.auth=cookie-of-A");
-        _accessor.HttpContext.Request.Host = new HostString(host, port);
+        _accessor.HttpContext = null;
 
-        await page.ServiceProvider.GetRequiredService<IAuthApi>().GetCurrentUserAsync();
+        await OpenCircuit(page, "lmd.auth=cookie-of-A", connectionGone: true);
+        await Call(page, cookie: null);
 
         Assert.Equal(["lmd.auth=cookie-of-A"], _cookies);
-        Assert.False(elsewhere.Pending(), "The server called the port that the Host header named.");
-        elsewhere.Stop();
     }
 
     /// <summary>As Blazor opens a circuit: in a call of the hub, on the connection with the cookie.</summary>
-    private async Task OpenCircuit(AsyncServiceScope page, string cookie)
+    private async Task OpenCircuit(AsyncServiceScope page, string cookie, bool connectionGone = false)
     {
-        var call = new HubInvocationContext(new Connection(Context(cookie)), page.ServiceProvider, new CircuitHub(), typeof(CircuitHub).GetMethod(nameof(CircuitHub.Start))!, []);
+        var context = Context(cookie);
+        var call = new HubInvocationContext(new Connection(context), page.ServiceProvider, new CircuitHub(), typeof(CircuitHub).GetMethod(nameof(CircuitHub.Start))!, []);
         await _services.GetRequiredService<CircuitConnection>().InvokeMethodAsync(call, async _ =>
         {
+            if (connectionGone)
+            {
+                // As the server takes the request apart when the connection ends.
+                ((DefaultHttpContext)context).Uninitialize();
+            }
+
             foreach (var handler in page.ServiceProvider.GetServices<CircuitHandler>())
             {
                 await handler.OnConnectionUpAsync(null!, CancellationToken.None);

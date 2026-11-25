@@ -14,6 +14,8 @@ services:
       # Non-sensitive configuration
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:9099
+      # Host names the app answers to
+      - AllowedHosts=${ALLOWED_HOSTS:-*}
       # SQLite database file on the logmyday-data volume
       - DB_PATH=${DB_PATH:-/app/data/logmyday.db}
       # API base address

@@ -19,10 +19,10 @@ internal sealed class CircuitOriginHandler : CircuitHandler
 
     public override Task OnConnectionUpAsync(Circuit circuit, CancellationToken cancellationToken)
     {
-        var httpContext = _connection.Current;
-        if (httpContext != null)
+        var origin = _connection.Current;
+        if (origin != null)
         {
-            _origin.Capture(httpContext);
+            _origin.Capture(origin);
         }
 
         return Task.CompletedTask;
