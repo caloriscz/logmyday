@@ -38,6 +38,7 @@ All notable changes to this project will be documented in this file. The format 
   - An admin's clear and backup of another user's data (`DELETE /api/backup/clear`, the MCP tools `admin_clear_all_data` and `admin_export_backup`) work on that user's data.
   - A new installation starts on an empty SQLite file. Before, the oldest migrations failed on SQLite, so only databases created by older versions worked.
   - With several people signed in, a page could show another user's data: its calls to the API could carry the other user's sign-in cookie after the page lost its connection, or after the other user's cookie was renewed. Each page now has its own.
+  - Outside IIS, the app calls itself at the address it listens on. Before, the Host header of a signed-in user's request chose it, so that user could make the server connect to another host.
   - A deleted user's web sign-in ends with their next request. Before, their cookie stayed valid for up to 30 days, and their next request created a new, empty database for them.
   - A changed or reset password ends the web sign-ins made with the old one; before, they went on for up to 30 days, and longer while they were used. Changing your own password on the Profile page keeps the browser you do it in signed in. Sign-ins from before this version end once.
   - A changed admin right applies from the next request. Before, a web sign-in kept the right it began with.

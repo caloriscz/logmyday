@@ -22,10 +22,18 @@ internal static class RefitExtensions
             ? new Uri(explicitBaseAddress)
             : PlaceholderBaseAddress;
 
-        // The connections are shared by all users, so they keep no cookies.
+        // The connections are shared by all users, so they keep no cookies. They go to this app only.
+        services.AddSingleton<OwnAddress>();
         services.AddHttpClient(ApiHttpClient.Connections)
-            .UseSocketsHttpHandler((handler, _) => handler.UseCookies = false);
+            .UseSocketsHttpHandler((handler, sp) =>
+            {
+                var own = sp.GetRequiredService<OwnAddress>();
+                handler.UseCookies = false;
+                handler.UseProxy = !own.IsKnown;
+                handler.ConnectCallback = own.Connect;
+            });
         services.AddScoped(sp => ActivatorUtilities.CreateInstance<ApiHttpClient>(sp, baseAddress));
+        services.AddSingleton<CircuitConnection>();
         services.AddScoped<CircuitHandler, CircuitOriginHandler>();
 
         var refitSettings = new RefitSettings
@@ -61,6 +69,8 @@ internal static class RefitExtensions
     private static void AddApi<TApi>(this IServiceCollection services, RefitSettings refitSettings)
         where TApi : class
     {
-        services.AddScoped(sp => RestService.For<TApi>(sp.GetRequiredService<ApiHttpClient>().Client, refitSettings));
+        // The builder holds what Refit reads from the interface by reflection; it has no state of a user.
+        services.AddSingleton(_ => RequestBuilder.ForType<TApi>(refitSettings));
+        services.AddScoped(sp => RestService.For(sp.GetRequiredService<ApiHttpClient>().Client, sp.GetRequiredService<IRequestBuilder<TApi>>()));
     }
 }

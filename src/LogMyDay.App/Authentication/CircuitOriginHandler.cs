@@ -8,18 +8,18 @@ namespace LogMyDay.App.Authentication;
 /// </summary>
 internal sealed class CircuitOriginHandler : CircuitHandler
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly CircuitConnection _connection;
     private readonly CircuitRequestOrigin _origin;
 
-    public CircuitOriginHandler(IHttpContextAccessor httpContextAccessor, CircuitRequestOrigin origin)
+    public CircuitOriginHandler(CircuitConnection connection, CircuitRequestOrigin origin)
     {
-        _httpContextAccessor = httpContextAccessor;
+        _connection = connection;
         _origin = origin;
     }
 
     public override Task OnConnectionUpAsync(Circuit circuit, CancellationToken cancellationToken)
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = _connection.Current;
         if (httpContext != null)
         {
             _origin.Capture(httpContext);
