@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file. The format 
   - The JSON backups carry colour schemes: the schemes with their entries, and which scheme each tag and record field uses. An import creates the schemes you don't have yet, by name. Before, a restored tag lost its colours.
   - Backup → **Export Whole Installation**, for admins: a zip archive with the platform database and every user's database. Unpacked into an empty data folder, LogMyDay runs on it. Also `GET /api/backup/export/installation`. It replaces v0.7.2's single-file export (`GET /api/backup/export/sqlite`).
   - A default place for the database: without a connection string it is `data/logmyday.db` in the application's folder. A relative `Data Source` counts from the application's folder on every host, and the startup log names the file in use.
+  - Docker: `ALLOWED_HOSTS` in `.env` lists the host names the app answers to (default `*`). A request for another name is refused, so a forged `Host` header can't redirect the app's calls to its API or a password reset link. See "Allowed hosts" in [Docker Deployment](docs/setup/docker-deployment.md).
 
 ### Changed
 
@@ -44,6 +45,12 @@ All notable changes to this project will be documented in this file. The format 
   - An admin can't remove their own admin right; another admin can. Before, the only admin could leave the installation without one.
   - Changing your own password needs the current one, an admin's too. Before, an admin's open session was enough to change the admin's password.
   - The sign-in page shows only its own messages. Before, a link could put any text in its error box.
+
+## v0.7.3 — 2026‑11‑26
+
+### Fixed
+
+  - With several people signed in, a page could show another user's data: its calls to the API could carry the other user's sign-in cookie after the page lost its connection, or after the other user's cookie was renewed. Each page now has its own.
 
 ## v0.7.2 — 2026‑11‑20
 

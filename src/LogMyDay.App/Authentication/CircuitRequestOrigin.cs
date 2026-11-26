@@ -19,6 +19,27 @@ public sealed class CircuitRequestOrigin
 
     public void Capture(HttpContext httpContext)
     {
+        Capture(RequestOrigin.Of(httpContext));
+    }
+
+    public void Capture(RequestOrigin origin)
+    {
+        lock (_gate)
+        {
+            BaseAddress = origin.BaseAddress;
+            if (!string.IsNullOrEmpty(origin.CookieHeader))
+            {
+                CookieHeader = origin.CookieHeader;
+            }
+        }
+    }
+}
+
+/// <summary>A copy of what is needed from a request, good after the request is over.</summary>
+public sealed record RequestOrigin(Uri BaseAddress, string? CookieHeader)
+{
+    public static RequestOrigin Of(HttpContext httpContext)
+    {
         var request = httpContext.Request;
         var baseAddress = new UriBuilder
         {
@@ -26,15 +47,7 @@ public sealed class CircuitRequestOrigin
             Host = request.Host.Host,
             Port = request.Host.Port ?? -1
         }.Uri;
-        var cookie = request.Headers.Cookie.FirstOrDefault();
 
-        lock (_gate)
-        {
-            BaseAddress = baseAddress;
-            if (!string.IsNullOrEmpty(cookie))
-            {
-                CookieHeader = cookie;
-            }
-        }
+        return new RequestOrigin(baseAddress, request.Headers.Cookie.FirstOrDefault());
     }
 }
