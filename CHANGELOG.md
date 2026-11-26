@@ -40,7 +40,7 @@ All notable changes to this project will be documented in this file. The format 
   - A deleted user's web sign-in ends with their next request. Before, their cookie stayed valid for up to 30 days, and their next request created a new, empty database for them.
   - A changed or reset password ends the web sign-ins made with the old one; before, they went on for up to 30 days, and longer while they were used. Changing your own password on the Profile page keeps the browser you do it in signed in. Sign-ins from before this version end once.
   - A changed admin right applies from the next request. Before, a web sign-in kept the right it began with.
-  - Logout signs the browser out. Before, the browser kept its sign-in cookie, and opening the app again needed no password.
+  - Logout deletes the browser's sign-in cookie. Before, the browser kept it, and opening the app again needed no password. Pages still open in other tabs keep working until they are reloaded.
   - An admin can't remove their own admin right; another admin can. Before, the only admin could leave the installation without one.
   - Changing your own password needs the current one, an admin's too. Before, an admin's open session was enough to change the admin's password.
   - The sign-in page shows only its own messages. Before, a link could put any text in its error box.

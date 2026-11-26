@@ -173,7 +173,9 @@ public class AuthController : ControllerBase
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> LogoutForm()
     {
-        if (User.Identity?.IsAuthenticated == true)
+        // Also a cookie that is refused, for example one of an old password: it would stay in the
+        // browser and be checked on every request until it expires.
+        if (Request.Cookies.ContainsKey(CookieSession.CookieName))
         {
             var userId = _authService.GetUserId(User);
             await _authService.SignOut(HttpContext);

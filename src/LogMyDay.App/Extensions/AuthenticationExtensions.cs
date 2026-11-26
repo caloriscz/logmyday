@@ -48,7 +48,7 @@ internal static class AuthenticationExtensions
             })
             .AddCookie("lmd-cookie", options =>
             {
-                options.Cookie.Name = "lmd.auth";
+                options.Cookie.Name = CookieSession.CookieName;
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 options.Cookie.SameSite = SameSiteMode.Lax;
@@ -132,6 +132,20 @@ internal static class AuthenticationExtensions
 
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync("lmd-cookie");
+                };
+                options.Events.OnCheckSlidingExpiration = async context =>
+                {
+                    // The renewal of a cookie past half of its life is decided before
+                    // OnValidatePrincipal, and refusing the cookie there doesn't take it back. A
+                    // cookie of an old password would come back renewed, possibly over the new
+                    // cookie of the same browser, so only a cookie the account accepts is renewed.
+                    if (context.ShouldRenew)
+                    {
+                        var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
+                        context.ShouldRenew = Guid.TryParse(context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                            && await users.Find(userId, context.HttpContext.RequestAborted) is { } user
+                            && CookieSession.IsCurrent(context.Principal!, user);
+                    }
                 };
             })
             .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { })

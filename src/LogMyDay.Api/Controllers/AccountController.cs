@@ -56,10 +56,9 @@ public class AccountController : ControllerBase
 
             await _userService.ChangePassword(userId.Value, request.CurrentPassword, request.NewPassword, userId.Value, cancellationToken);
 
-            if (User.Identity?.AuthenticationType == CookieSession.AuthenticationScheme
-                && await _userService.Get(userId.Value, cancellationToken) is { } user)
+            if (User.Identity?.AuthenticationType == CookieSession.AuthenticationScheme)
             {
-                await _authService.SignInAsync(HttpContext, user);
+                await KeepThisBrowserSignedIn(userId.Value, cancellationToken);
             }
 
             return NoContent();
@@ -77,6 +76,26 @@ public class AccountController : ControllerBase
             _logger.LogError(ex, "Error changing password");
 
             return StatusCode(500, "An error occurred while changing the password.");
+        }
+    }
+
+    /// <summary>
+    /// Gives the browser a cookie of the new password. The password is changed by now, so a
+    /// failure here doesn't fail the change: the browser's old cookie is refused, and the user
+    /// signs in again with the new password.
+    /// </summary>
+    private async Task KeepThisBrowserSignedIn(Guid userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await _userService.Get(userId, cancellationToken) is { } user)
+            {
+                await _authService.SignInAsync(HttpContext, user);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "The password of user {UserId} was changed, but the browser was not signed in again", userId);
         }
     }
 

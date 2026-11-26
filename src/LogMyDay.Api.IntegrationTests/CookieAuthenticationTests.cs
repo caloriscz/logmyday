@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Shared.DTOs;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,11 +18,22 @@ public sealed class CookieAuthenticationTests : IDisposable
     private const string Password = "Cookie-Test-Pa55word!";
 
     // A host per test: together the tests sign in more often than the rate limit allows one client.
-    private readonly CustomWebApplicationFactory _factory = new();
+    private readonly CustomWebApplicationFactory _host = new();
+    private readonly WebApplicationFactory<Program> _factory;
+
+    /// <summary>The cookie handler's clock, so that a test can age a cookie.</summary>
+    private readonly ShiftedClock _clock = new();
+
+    public CookieAuthenticationTests()
+    {
+        _factory = _host.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.PostConfigure<CookieAuthenticationOptions>(CookieSession.AuthenticationScheme, options => options.TimeProvider = _clock)));
+    }
 
     public void Dispose()
     {
-        _factory.Dispose();
+        // Disposes the host with the clock too.
+        _host.Dispose();
     }
 
     [Fact]
@@ -88,6 +102,28 @@ public sealed class CookieAuthenticationTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, "Changed-Pa55word!")).GetAsync("/api/auth/me")).StatusCode);
     }
 
+    [Fact]
+    public async Task ACookieOfAnOldPassword_IsNotRenewed_PastHalfOfItsLife()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var here = await SignIn(email, Password);
+        var elsewhere = await SignIn(email, Password);
+        Assert.Equal(HttpStatusCode.NoContent, (await ChangePassword(here, Password, "Changed-Pa55word!")).StatusCode);
+
+        _clock.Shift = TimeSpan.FromDays(20);
+
+        // The cookie of the new password is renewed: the cookies are past half of their life.
+        var current = await here.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, current.StatusCode);
+        Assert.Contains(current.Headers.GetValues("Set-Cookie"), cookie =>
+            cookie.StartsWith("lmd.auth=", StringComparison.Ordinal) && !cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
+
+        // A renewed old cookie could reach the browser after the new one and replace it.
+        var refused = await elsewhere.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Set-Cookie"));
+    }
+
     [Theory]
     [InlineData("not-the-password", "Changed-Pa55word!", "Current password is incorrect.")]
     [InlineData("", "Changed-Pa55word!", "")]
@@ -146,6 +182,23 @@ public sealed class CookieAuthenticationTests : IDisposable
         Assert.Equal("/login", response.Headers.Location?.OriginalString);
         Assert.Contains(response.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
         Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ALogout_DeletesARefusedCookie_Too()
+    {
+        var (_, userId, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>()
+                .ChangePassword(userId, Password, "Changed-Pa55word!", userId, CancellationToken.None);
+        }
+
+        var response = await browser.PostAsync("/api/auth/logout-form", content: null);
+
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -242,5 +295,15 @@ public sealed class CookieAuthenticationTests : IDisposable
         Assert.Equal(HttpStatusCode.NoContent, (await browser.PostAsJsonAsync("/api/auth/login", new LoginDto(email, password))).StatusCode);
 
         return browser;
+    }
+
+    private sealed class ShiftedClock : TimeProvider
+    {
+        public TimeSpan Shift { get; set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            return base.GetUtcNow() + Shift;
+        }
     }
 }

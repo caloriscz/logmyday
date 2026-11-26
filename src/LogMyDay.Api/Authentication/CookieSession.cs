@@ -14,6 +14,9 @@ public static class CookieSession
 {
     public const string AuthenticationScheme = "lmd-cookie";
 
+    /// <summary>The name of the cookie in the browser.</summary>
+    public const string CookieName = "lmd.auth";
+
     /// <summary>A fingerprint of the password the sign-in was made with.</summary>
     public const string StampClaimType = "lmd_session";
 
