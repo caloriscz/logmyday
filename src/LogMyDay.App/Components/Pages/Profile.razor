@@ -6,7 +6,8 @@
 @using LogMyDay.Shared.Preferences
 @inject IAuthApi AuthApi
 @inject IUsersApi UsersApi
-@inject IAccountApi AccountApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @inject ILogger<Profile> Logger
 @inject IPageTitleService PageTitleService
 
@@ -166,6 +167,10 @@
     protected override async Task OnInitializedAsync()
     {
         PageTitleService.SetTitle("My Profile");
+        if (PasswordWasChanged)
+        {
+            SetPasswordStatus("Password updated successfully. Reload other open LogMyDay tabs; other devices have to sign in again.");
+        }
         
         try
         {
@@ -242,6 +247,18 @@
         }
     }
 
+    private bool PasswordWasChanged =>
+        Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).ContainsKey("passwordChanged");
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Shown once: a reload or a bookmark doesn't repeat it.
+        if (firstRender && PasswordWasChanged)
+        {
+            Navigation.NavigateTo("/profile", replace: true);
+        }
+    }
+
     private async Task ChangePasswordAsync()
     {
         if (isChangingPassword)
@@ -254,30 +271,33 @@
 
         try
         {
-            var request = new ChangePasswordDto(
-                passwordModel.CurrentPassword,
-                passwordModel.NewPassword);
+            // The browser makes the call, so that it gets the new cookie and stays signed in.
+            var result = await JSRuntime.InvokeAsync<PasswordChangeResult>("lmdAccount.changePassword",
+                passwordModel.CurrentPassword, passwordModel.NewPassword);
+            if (result.Status is >= 200 and < 300)
+            {
+                // This page still has the old cookie. The button stays disabled until it is gone.
+                Navigation.NavigateTo("/profile?passwordChanged", forceLoad: true);
 
-            await AccountApi.ChangePasswordAsync(request);
-            passwordModel = new ChangePasswordModel();
+                return;
+            }
 
-            SetPasswordStatus("Password updated successfully.");
-        }
-        catch (Refit.ApiException ex)
-        {
-            Logger.LogWarning(ex, "Failed to change password");
-            var message = await ExtractErrorMessageAsync(ex) ?? "Failed to change password.";
-            SetPasswordStatus(message, true);
+            Logger.LogWarning("The password change was refused with status {Status}", result.Status);
+            SetPasswordStatus(result.Status switch
+            {
+                400 when !string.IsNullOrWhiteSpace(result.Message) && !result.Message.StartsWith('{') => result.Message,
+                401 => "Your sign-in has ended. Reload the page and sign in again.",
+                429 => "Too many attempts. Please try again later.",
+                _ => "Failed to change password."
+            }, true);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Unexpected error while changing password");
             SetPasswordStatus("An unexpected error occurred while changing your password.", true);
         }
-        finally
-        {
-            isChangingPassword = false;
-        }
+
+        isChangingPassword = false;
     }
 
     private void SetProfileStatus(string? message, bool isError = false)
@@ -324,6 +344,9 @@
         [Required]
         public string TimeZone { get; set; } = string.Empty;
     }
+
+    /// <summary>The answer to the browser's call; status 0 when there was none.</summary>
+    private sealed record PasswordChangeResult(int Status, string Message);
 
     private sealed class ChangePasswordModel
     {

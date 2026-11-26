@@ -106,7 +106,7 @@ public class AuthController : ControllerBase
             {
                 _logger.LogWarning("Form login attempt with missing credentials for email: {Email}", email);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             var identifier = BuildAttemptIdentifier(email);
@@ -114,7 +114,7 @@ public class AuthController : ControllerBase
             {
                 _logger.LogWarning("Form login blocked for email {Email} due to too many failed attempts", email);
 
-                return Redirect("/login?error=Too many failed attempts. Please try again later.");
+                return Redirect("/login?error=blocked");
             }
 
             _logger.LogInformation("Looking up user with email: {Email}", email);
@@ -124,7 +124,7 @@ public class AuthController : ControllerBase
                 _logger.LogWarning("Form login attempt with non-existent email: {Email}", email);
                 _attemptTracker.RecordFailedAttempt(identifier);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             _logger.LogInformation("User found: {UserId}, verifying password", user.Id);
@@ -133,7 +133,7 @@ public class AuthController : ControllerBase
                 _logger.LogWarning("Form login attempt with invalid password for email: {Email}", email);
                 _attemptTracker.RecordFailedAttempt(identifier);
 
-                return Redirect("/login?error=Invalid email or password");
+                return Redirect("/login?error=invalid");
             }
 
             _attemptTracker.RecordSuccessfulAttempt(identifier);
@@ -148,7 +148,7 @@ public class AuthController : ControllerBase
         {
             _logger.LogError(ex, "Error during form login for email: {Email}", email);
 
-            return Redirect("/login?error=An error occurred during login");
+            return Redirect("/login?error=failed");
         }
     }
 
@@ -161,6 +161,28 @@ public class AuthController : ControllerBase
         _logger.LogInformation("User {UserId} logged out", userId);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Signs the web app's user out. The browser posts this form itself, because only its own
+    /// request deletes the cookie it keeps: a call from the page's circuit deletes nothing there.
+    /// </summary>
+    [HttpPost("logout-form")]
+    // As for login-form. SameSite=Lax keeps the cookie from a form on another site, and without the
+    // cookie nothing is signed out.
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> LogoutForm()
+    {
+        // Also a cookie that is refused, for example one of an old password: it would stay in the
+        // browser and be checked on every request until it expires.
+        if (Request.Cookies.ContainsKey(CookieSession.CookieName))
+        {
+            var userId = _authService.GetUserId(User);
+            await _authService.SignOut(HttpContext);
+            _logger.LogInformation("User {UserId} logged out", userId);
+        }
+
+        return Redirect("/login");
     }
 
     [HttpGet("me")]

@@ -1,8 +1,10 @@
 using LogMyDay.Api.Application.Helpers;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 
 namespace LogMyDay.Api.Controllers;
@@ -25,8 +27,13 @@ public class AccountController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Changes your own password, which ends the web sign-ins made with the old one. A browser that
+    /// calls this itself gets a new cookie and stays signed in.
+    /// </summary>
     [HttpPost("password/change")]
     [Authorize(AuthenticationSchemes = "lmd-cookie,basic")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto request, CancellationToken cancellationToken)
     {
         try
@@ -49,6 +56,11 @@ public class AccountController : ControllerBase
 
             await _userService.ChangePassword(userId.Value, request.CurrentPassword, request.NewPassword, userId.Value, cancellationToken);
 
+            if (User.Identity?.AuthenticationType == CookieSession.AuthenticationScheme)
+            {
+                await KeepThisBrowserSignedIn(userId.Value, cancellationToken);
+            }
+
             return NoContent();
         }
         catch (UnauthorizedAccessException ex)
@@ -64,6 +76,26 @@ public class AccountController : ControllerBase
             _logger.LogError(ex, "Error changing password");
 
             return StatusCode(500, "An error occurred while changing the password.");
+        }
+    }
+
+    /// <summary>
+    /// Gives the browser a cookie of the new password. The password is changed by now, so a
+    /// failure here doesn't fail the change: the browser's old cookie is refused, and the user
+    /// signs in again with the new password.
+    /// </summary>
+    private async Task KeepThisBrowserSignedIn(Guid userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (await _userService.Get(userId, cancellationToken) is { } user)
+            {
+                await _authService.SignInAsync(HttpContext, user);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "The password of user {UserId} was changed, but the browser was not signed in again", userId);
         }
     }
 
@@ -99,6 +131,10 @@ public class AccountController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

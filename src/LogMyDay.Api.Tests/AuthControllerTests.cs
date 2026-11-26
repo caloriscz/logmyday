@@ -91,7 +91,7 @@ public class AuthControllerTests
         var blocked = await controller.LoginForm(Email, "bad");
 
         var redirect = Assert.IsType<RedirectResult>(blocked);
-        Assert.Contains("Too many failed attempts", redirect.Url);
+        Assert.Equal("/login?error=blocked", redirect.Url);
     }
 
     [Fact]

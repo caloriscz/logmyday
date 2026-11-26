@@ -48,7 +48,7 @@ internal static class AuthenticationExtensions
             })
             .AddCookie("lmd-cookie", options =>
             {
-                options.Cookie.Name = "lmd.auth";
+                options.Cookie.Name = CookieSession.CookieName;
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 options.Cookie.SameSite = SameSiteMode.Lax;
@@ -99,26 +99,53 @@ internal static class AuthenticationExtensions
                     Log.Debug("Cookie authentication: Validating principal - {Principal}, IsAuthenticated: {IsAuthenticated}",
                         context.Principal?.Identity?.Name, context.Principal?.Identity?.IsAuthenticated);
 
-                    // The cookie outlives a deleted account, so the account is looked up on every
-                    // request and a deleted user is signed out. Only its existence is checked: unlike
-                    // Basic and API keys, the cookie keeps the claims it was signed with.
+                    // The cookie lasts for weeks, so the account is looked up on every request. A
+                    // deleted account is signed out, and so is a sign-in made with a password the
+                    // account no longer has. Otherwise the request gets the account's current name,
+                    // email and admin right, not those of the sign-in.
                     var claim = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                     var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
                     if (!Guid.TryParse(claim, out var userId))
                     {
                         Log.Warning("Cookie authentication: the cookie holds no valid user id, signing out");
                     }
-                    else if (await users.Find(userId, context.HttpContext.RequestAborted) == null)
+                    else if (await users.Find(userId, context.HttpContext.RequestAborted) is not { } user)
                     {
                         Log.Information("Cookie authentication: the account {UserId} no longer exists, signing out", userId);
                     }
+                    else if (!CookieSession.IsCurrent(context.Principal!, user))
+                    {
+                        Log.Information("Cookie authentication: the password of account {UserId} changed since the sign-in, refusing the cookie", userId);
+
+                        // Not deleted: this can be an earlier request of the browser that has just
+                        // got the new cookie, and the deletion would reach it after that one.
+                        context.RejectPrincipal();
+
+                        return;
+                    }
                     else
                     {
+                        context.ReplacePrincipal(CookieSession.Create(user));
+
                         return;
                     }
 
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync("lmd-cookie");
+                };
+                options.Events.OnCheckSlidingExpiration = async context =>
+                {
+                    // The renewal of a cookie past half of its life is decided before
+                    // OnValidatePrincipal, and refusing the cookie there doesn't take it back. A
+                    // cookie of an old password would come back renewed, possibly over the new
+                    // cookie of the same browser, so only a cookie the account accepts is renewed.
+                    if (context.ShouldRenew)
+                    {
+                        var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
+                        context.ShouldRenew = Guid.TryParse(context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier), out var userId)
+                            && await users.Find(userId, context.HttpContext.RequestAborted) is { } user
+                            && CookieSession.IsCurrent(context.Principal!, user);
+                    }
                 };
             })
             .AddScheme<AuthenticationSchemeOptions, BasicAuthHandler>("basic", _ => { })

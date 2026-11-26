@@ -1,24 +1,39 @@
 using System.Net;
 using System.Net.Http.Json;
 using LogMyDay.Api.Application.Interfaces;
+using LogMyDay.Api.Authentication;
 using LogMyDay.Api.Infrastructure.Data;
 using LogMyDay.Shared.DTOs;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LogMyDay.Api.IntegrationTests;
 
 /// <summary>The sign-in cookie of the web app, end to end.</summary>
-public class CookieAuthenticationTests : IClassFixture<CustomWebApplicationFactory>
+public sealed class CookieAuthenticationTests : IDisposable
 {
     private const string Password = "Cookie-Test-Pa55word!";
 
-    private readonly CustomWebApplicationFactory _factory;
+    // A host per test: together the tests sign in more often than the rate limit allows one client.
+    private readonly CustomWebApplicationFactory _host = new();
+    private readonly WebApplicationFactory<Program> _factory;
 
-    public CookieAuthenticationTests(CustomWebApplicationFactory factory)
+    /// <summary>The cookie handler's clock, so that a test can age a cookie.</summary>
+    private readonly ShiftedClock _clock = new();
+
+    public CookieAuthenticationTests()
     {
-        _factory = factory;
+        _factory = _host.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.PostConfigure<CookieAuthenticationOptions>(CookieSession.AuthenticationScheme, options => options.TimeProvider = _clock)));
+    }
+
+    public void Dispose()
+    {
+        // Disposes the host with the clock too.
+        _host.Dispose();
     }
 
     [Fact]
@@ -54,6 +69,180 @@ public class CookieAuthenticationTests : IClassFixture<CustomWebApplicationFacto
     }
 
     [Fact]
+    public async Task AChangedAdminRight_AppliesFromTheNextRequest_AndSignsNobodyOut()
+    {
+        var (adminId, userId, email) = await CreateUser(isAdmin: true);
+        var browser = await SignIn(email, Password);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/users")).StatusCode);
+
+        await SetAdmin(userId, isAdmin: false, adminId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await browser.GetAsync("/api/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/auth/me")).StatusCode);
+
+        await SetAdmin(userId, isAdmin: true, adminId);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/users")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangingYourOwnPassword_KeepsThisBrowserSignedIn_AndSignsOutTheOthers()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var here = await SignIn(email, Password);
+        var elsewhere = await SignIn(email, Password);
+
+        var response = await ChangePassword(here, Password, "Changed-Pa55word!");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await here.GetAsync("/api/auth/me")).StatusCode);
+
+        // Refused but not deleted: an earlier request of this browser must not delete the new cookie.
+        var refused = await elsewhere.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Set-Cookie"));
+        Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, "Changed-Pa55word!")).GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ACookieOfAnOldPassword_IsNotRenewed_PastHalfOfItsLife()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var here = await SignIn(email, Password);
+        var elsewhere = await SignIn(email, Password);
+        Assert.Equal(HttpStatusCode.NoContent, (await ChangePassword(here, Password, "Changed-Pa55word!")).StatusCode);
+
+        _clock.Shift = TimeSpan.FromDays(20);
+
+        // The cookie of the new password is renewed: the cookies are past half of their life.
+        var current = await here.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, current.StatusCode);
+        Assert.Contains(current.Headers.GetValues("Set-Cookie"), cookie =>
+            cookie.StartsWith("lmd.auth=", StringComparison.Ordinal) && !cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
+
+        // A renewed old cookie could reach the browser after the new one and replace it.
+        var refused = await elsewhere.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Set-Cookie"));
+    }
+
+    [Theory]
+    [InlineData("not-the-password", "Changed-Pa55word!", "Current password is incorrect.")]
+    [InlineData("", "Changed-Pa55word!", "")]
+    [InlineData(Password, "too-short", "New password must be at least 10 characters long.")]
+    public async Task ARefusedPasswordChange_ChangesNothing_AndSignsNobodyOut(string current, string changed, string message)
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var here = await SignIn(email, Password);
+        var elsewhere = await SignIn(email, Password);
+
+        var response = await ChangePassword(here, current, changed);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(message, await response.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await here.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await elsewhere.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, Password)).GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task GuessingTheCurrentPassword_IsLimited()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+
+        var answers = new List<HttpStatusCode>();
+        for (var guess = 0; guess < 12; guess++)
+        {
+            answers.Add((await ChangePassword(browser, $"guess-number-{guess}", "Changed-Pa55word!")).StatusCode);
+        }
+
+        Assert.Contains(HttpStatusCode.TooManyRequests, answers);
+    }
+
+    [Fact]
+    public async Task AnAdminsReset_OfTheirOwnPassword_IsRefused()
+    {
+        var (_, userId, email) = await CreateUser(isAdmin: true);
+        var browser = await SignIn(email, Password);
+
+        var response = await browser.PostAsJsonAsync($"/api/account/password/reset/{userId}", new AdminResetPasswordDto("Reset-Pa55word!"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, Password)).GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ALogout_DeletesTheBrowsersCookie()
+    {
+        var (_, _, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+
+        var response = await browser.PostAsync("/api/auth/logout-form", content: null);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ALogout_DeletesARefusedCookie_Too()
+    {
+        var (_, userId, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>()
+                .ChangePassword(userId, Password, "Changed-Pa55word!", userId, CancellationToken.None);
+        }
+
+        var response = await browser.PostAsync("/api/auth/logout-form", content: null);
+
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith("lmd.auth=;", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ALogoutFormWithoutTheCookie_DeletesNothing()
+    {
+        // As a form on another site: SameSite=Lax keeps the cookie from it.
+        var response = await Browser().PostAsync("/api/auth/logout-form", content: null);
+
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
+        Assert.False(response.Headers.Contains("Set-Cookie"));
+    }
+
+    [Fact]
+    public async Task AChangedPassword_EndsTheSessions_ThatWereSignedInWithTheOldOne()
+    {
+        var (_, userId, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>()
+                .ChangePassword(userId, Password, "Changed-Pa55word!", userId, CancellationToken.None);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await SignIn(email, "Changed-Pa55word!")).GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AnAdminsPasswordReset_EndsTheUsersSessions()
+    {
+        var (adminId, userId, email) = await CreateUser(isAdmin: false);
+        var browser = await SignIn(email, Password);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IUserService>()
+                .AdminResetPassword(userId, "Reset-Pa55word!", adminId, CancellationToken.None);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
     public async Task AnExistingUsersCookie_KeepsWorking()
     {
         var browser = _factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
@@ -63,6 +252,58 @@ public class CookieAuthenticationTests : IClassFixture<CustomWebApplicationFacto
         for (var request = 0; request < 3; request++)
         {
             Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/api/auth/me")).StatusCode);
+        }
+    }
+
+    private async Task<(Guid AdminId, Guid UserId, string Email)> CreateUser(bool isAdmin)
+    {
+        var email = $"cookie-{Guid.NewGuid():N}@example.com";
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LogMyDayDbContext>();
+        var adminId = (await TestPlatform.For(db).Users.FirstAsync(u => u.Email == CustomWebApplicationFactory.AdminUserEmail)).Id;
+        var user = await scope.ServiceProvider.GetRequiredService<IUserService>()
+            .CreateUser(email, Password, "Cookie", isAdmin, "en-US", "UTC", adminId, CancellationToken.None);
+
+        return (adminId, user.Id, email);
+    }
+
+    private async Task SetAdmin(Guid userId, bool isAdmin, Guid actorId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IUserService>()
+            .Update(userId, null, null, isAdmin, null, null, actorId, CancellationToken.None);
+    }
+
+    private static Task<HttpResponseMessage> ChangePassword(HttpClient browser, string current, string changed)
+    {
+        return browser.PostAsJsonAsync("/api/account/password/change", new ChangePasswordDto(current, changed));
+    }
+
+    /// <summary>A client with its own cookie jar that doesn't follow redirects. The cookie is Secure, so it talks https.</summary>
+    private HttpClient Browser()
+    {
+        return _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+        });
+    }
+
+    private async Task<HttpClient> SignIn(string email, string password)
+    {
+        var browser = Browser();
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.PostAsJsonAsync("/api/auth/login", new LoginDto(email, password))).StatusCode);
+
+        return browser;
+    }
+
+    private sealed class ShiftedClock : TimeProvider
+    {
+        public TimeSpan Shift { get; set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            return base.GetUtcNow() + Shift;
         }
     }
 }

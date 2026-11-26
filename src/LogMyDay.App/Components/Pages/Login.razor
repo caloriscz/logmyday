@@ -134,6 +134,7 @@
 </div>
 
 @code {
+    // A fixed text by key, so that a link can't put words of its own on the sign-in page.
     private string? ErrorMessage { get; set; }
 
     protected override void OnInitialized()
@@ -146,8 +147,14 @@
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
         if (query.TryGetValue("error", out var error))
         {
-            ErrorMessage = error.ToString();
-            Logger.LogWarning("Login.OnInitialized: Error message found in query parameters: {ErrorMessage}", ErrorMessage);
+            ErrorMessage = error.ToString() switch
+            {
+                "invalid" => "Invalid email or password.",
+                "blocked" => "Too many failed attempts. Please try again later.",
+                "failed" => "An error occurred during login.",
+                _ => null
+            };
+            Logger.LogWarning("Login.OnInitialized: Error {Error} found in query parameters", error.ToString());
         }
         else
         {
