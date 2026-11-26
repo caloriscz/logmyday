@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Release dates use the Europe/Prague timezone (UTC+01:00 during winter).
+## v0.7.3 — Unreleased
+
+### Fixed
+
+  - With several people signed in, a page could show another user's data: its calls to the API could carry the other user's sign-in cookie after the page lost its connection, or after the other user's cookie was renewed. Each page now has its own.
+
 ## v0.7.2 — 2026‑11‑20
 
 ### Fixed

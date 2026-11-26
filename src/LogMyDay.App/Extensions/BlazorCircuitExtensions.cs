@@ -1,3 +1,6 @@
+using LogMyDay.App.Authentication;
+using Microsoft.AspNetCore.SignalR;
+
 namespace LogMyDay.App.Extensions;
 
 /// <summary>
@@ -60,6 +63,8 @@ internal static class BlazorCircuitExtensions
                 // A client→server message over this cap closes the circuit outright (framework
                 // default is 32 KB), which the user sees as a full page reload mid-interaction.
                 hub.MaximumReceiveMessageSize = options.MaximumReceiveMessageSizeKb * 1024;
+                // The circuit's cookie comes from its connection, whatever the transport.
+                hub.AddFilter<CircuitConnection>();
             });
 
         return services;

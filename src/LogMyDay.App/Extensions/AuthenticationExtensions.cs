@@ -138,7 +138,6 @@ internal static class AuthenticationExtensions
         });
 
         services.AddScoped<CircuitRequestOrigin>();
-        services.AddScoped<CookieAuthenticationHandler>();
 
         return services;
     }

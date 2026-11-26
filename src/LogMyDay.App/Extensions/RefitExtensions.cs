@@ -2,6 +2,7 @@ using LogMyDay.App.Authentication;
 using LogMyDay.Shared.Interfaces;
 using LogMyDay.Shared.Scanning;
 using LogMyDay.Shared.Serialization;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 using Refit;
 
 namespace LogMyDay.App.Extensions;
@@ -21,110 +22,54 @@ internal static class RefitExtensions
             ? new Uri(explicitBaseAddress)
             : PlaceholderBaseAddress;
 
-        services.AddScoped<SelfBaseAddressHandler>();
+        // The connections are shared by all users, so they keep no cookies. There is one set of them:
+        // a page holds its client for as long as it is open, so replaced ones would pile up.
+        services.AddHttpClient(ApiHttpClient.Connections)
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan)
+            .UseSocketsHttpHandler((handler, _) =>
+            {
+                handler.UseCookies = false;
+                handler.PooledConnectionLifetime = TimeSpan.FromMinutes(2);
+            });
+        services.AddScoped(sp => ActivatorUtilities.CreateInstance<ApiHttpClient>(sp, baseAddress));
+        services.AddSingleton<CircuitConnection>();
+        services.AddScoped<CircuitHandler, CircuitOriginHandler>();
 
         var refitSettings = new RefitSettings
         {
             ContentSerializer = new SystemTextJsonContentSerializer(JsonSerializationSettings.CreateDefault())
         };
 
-        services.AddRefitClient<IActivityApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IAuthApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IUsersApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IAccountApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ISecureBackupApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IAiApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ISettingsApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IScanMappingApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITagGroupApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IColorSchemeApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITagRuleApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITagCheckApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITagTriggerApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IRecordApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IEventLogApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITodoApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<ITagDayLockApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IApiKeysApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
-
-        services.AddRefitClient<IReminderApi>(refitSettings)
-            .ConfigureHttpClient(c => c.BaseAddress = baseAddress)
-            .AddHttpMessageHandler<SelfBaseAddressHandler>()
-            .AddHttpMessageHandler<CookieAuthenticationHandler>();
+        services.AddApi<IActivityApi>(refitSettings);
+        services.AddApi<IAuthApi>(refitSettings);
+        services.AddApi<IUsersApi>(refitSettings);
+        services.AddApi<IAccountApi>(refitSettings);
+        services.AddApi<ISecureBackupApi>(refitSettings);
+        services.AddApi<IAiApi>(refitSettings);
+        services.AddApi<ISettingsApi>(refitSettings);
+        services.AddApi<IScanMappingApi>(refitSettings);
+        services.AddApi<ITagGroupApi>(refitSettings);
+        services.AddApi<IColorSchemeApi>(refitSettings);
+        services.AddApi<ITagRuleApi>(refitSettings);
+        services.AddApi<ITagCheckApi>(refitSettings);
+        services.AddApi<ITagTriggerApi>(refitSettings);
+        services.AddApi<IRecordApi>(refitSettings);
+        services.AddApi<IEventLogApi>(refitSettings);
+        services.AddApi<ITodoApi>(refitSettings);
+        services.AddApi<ITagDayLockApi>(refitSettings);
+        services.AddApi<IApiKeysApi>(refitSettings);
+        services.AddApi<IReminderApi>(refitSettings);
 
         services.AddScoped<IScanOrchestrator, ScanOrchestrator>();
 
         return services;
+    }
+
+    private static void AddApi<TApi>(this IServiceCollection services, RefitSettings refitSettings)
+        where TApi : class
+    {
+        // The builder holds what Refit reads from the interface by reflection; it has no state of a user.
+        services.AddSingleton(_ => RequestBuilder.ForType<TApi>(refitSettings));
+        services.AddScoped(sp => RestService.For(sp.GetRequiredService<ApiHttpClient>().Client, sp.GetRequiredService<IRequestBuilder<TApi>>()));
     }
 }
