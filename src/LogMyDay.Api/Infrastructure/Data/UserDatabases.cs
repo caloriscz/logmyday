@@ -15,6 +15,9 @@ public sealed class UserDatabases : IUserDataStore
     /// <summary>The folder of the user databases, next to the platform database.</summary>
     public const string FolderName = "users";
 
+    /// <summary>The database file itself, then the files SQLite keeps beside it, by their suffix.</summary>
+    private static readonly string[] Companions = ["", "-wal", "-shm", "-journal"];
+
     private readonly SqliteConnectionStringBuilder _platform;
     private readonly string _folder;
     private readonly string _snapshotFolder;
@@ -173,11 +176,13 @@ public sealed class UserDatabases : IUserDataStore
 
     /// <summary>
     /// Puts another database file in the place of the user's database. The database it replaces
-    /// is copied into the snapshot folder first, and the user keeps the newest of these snapshots
-    /// only (<see cref="SnapshotRetention.PruneRestoreSnapshots"/>).
+    /// is copied into the snapshot folder first, and its files wait aside until the new one is in
+    /// place: when anything fails, they go back, so the user is never left without a database.
+    /// The user keeps the newest snapshots only (<see cref="SnapshotRetention.PruneRestoreSnapshots"/>).
     /// </summary>
     /// <param name="newFile">A database with this version's schema, on the same volume. It is moved.</param>
     /// <returns>The snapshot of the replaced database, or null when the user had none.</returns>
+    /// <exception cref="DatabaseNotReplacedException">The database was not replaced. The message says what the user has now.</exception>
     public string? Replace(Guid userId, string newFile)
     {
         lock (_createLock)
@@ -186,16 +191,51 @@ public sealed class UserDatabases : IUserDataStore
             string? snapshot = null;
             if (File.Exists(path))
             {
-                Directory.CreateDirectory(_snapshotFolder);
-                var target = SnapshotRetention.NewPath(_snapshotFolder, userId.ToString("D"), SnapshotRetention.BeforeRestore);
-                SnapshotRetention.Write(target, () => WriteCopy(GetConnectionString(userId), target));
-                snapshot = target;
+                try
+                {
+                    Directory.CreateDirectory(_snapshotFolder);
+                    var target = SnapshotRetention.NewPath(_snapshotFolder, userId.ToString("D"), SnapshotRetention.BeforeRestore);
+                    SnapshotRetention.Write(target, () => WriteCopy(GetConnectionString(userId), target));
+                    snapshot = target;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)
+                {
+                    _logger.LogWarning(ex, "The database of user {UserId} was not replaced: its snapshot could not be written", userId);
+
+                    throw new DatabaseNotReplacedException(
+                        "Your database was not replaced, because a snapshot of it could not be written first. Nothing was changed.", true, ex);
+                }
             }
 
-            RemoveFiles(userId);
-            Directory.CreateDirectory(_folder);
-            File.Move(newFile, path);
-            Ensure(userId);
+            var aside = Path.Combine(_folder, $"{userId:D}-{Guid.NewGuid():N}.previous");
+            var movedAside = new List<string>();
+            var replaced = false;
+            try
+            {
+                Release(userId);
+                foreach (var companion in Companions)
+                {
+                    if (File.Exists(path + companion))
+                    {
+                        File.Move(path + companion, aside + companion);
+                        movedAside.Add(companion);
+                    }
+                }
+
+                Directory.CreateDirectory(_folder);
+                File.Move(newFile, path);
+                replaced = true;
+                Ensure(userId);
+            }
+            catch (Exception ex)
+            {
+                throw PutBack(userId, aside, movedAside, replaced, snapshot, ex);
+            }
+
+            foreach (var companion in movedAside)
+            {
+                DeleteAside(aside + companion);
+            }
 
             _logger.LogInformation("Replaced the database of user {UserId}: {Path}. Its previous state: {Snapshot}", userId, path, snapshot ?? "none");
 
@@ -207,6 +247,62 @@ public sealed class UserDatabases : IUserDataStore
             }
 
             return snapshot;
+        }
+    }
+
+    /// <summary>
+    /// After a failed replace: takes out the new database if it got in, and puts the user's own
+    /// files back where they were.
+    /// </summary>
+    /// <returns>The error to report, saying what the user has now.</returns>
+    private DatabaseNotReplacedException PutBack(Guid userId, string aside, List<string> movedAside, bool replaced, string? snapshot, Exception failure)
+    {
+        var path = GetFilePath(userId);
+        try
+        {
+            Release(userId);
+            if (replaced)
+            {
+                foreach (var companion in Companions)
+                {
+                    File.Delete(path + companion);
+                }
+            }
+
+            // Overwrite: a request that came in meanwhile may have created an empty file there.
+            foreach (var companion in movedAside)
+            {
+                File.Move(aside + companion, path + companion, overwrite: true);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogCritical(failure,
+                "The database of user {UserId} was not replaced, and its previous files could not be put back ({PutBackError}). "
+                + "They are {Aside} with the companions {Companions}, and the snapshot {Snapshot}. Move them back to {Path} with the application stopped.",
+                userId, ex.Message, aside, string.Join(", ", movedAside), snapshot ?? "none", path);
+
+            return new DatabaseNotReplacedException(
+                "The restored database could not be put in place, and your previous database could not be put back. "
+                + "It is kept on the server; an administrator can put it back.", false, failure);
+        }
+
+        _logger.LogWarning(failure, "The database of user {UserId} could not be replaced; its previous files are back in place", userId);
+
+        return new DatabaseNotReplacedException(
+            "Your database could not be replaced right now, so it was left as it was. Try again in a moment.", true, failure);
+    }
+
+    /// <summary>The previous files are no longer needed once the new database is in place; the snapshot keeps their content.</summary>
+    private void DeleteAside(string file)
+    {
+        try
+        {
+            File.Delete(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "The replaced database file {File} could not be deleted; delete it by hand", file);
         }
     }
 
@@ -227,18 +323,22 @@ public sealed class UserDatabases : IUserDataStore
 
     private void RemoveFiles(Guid userId)
     {
+        Release(userId);
+
+        var path = GetFilePath(userId);
+        foreach (var companion in Companions)
+        {
+            File.Delete(path + companion);
+        }
+    }
+
+    /// <summary>Lets go of the user's files, so that they can be moved or deleted.</summary>
+    private void Release(Guid userId)
+    {
         Forget(userId);
 
         // Pooled connections keep the file open.
-        using (var connection = new SqliteConnection(GetConnectionString(userId)))
-        {
-            SqliteConnection.ClearPool(connection);
-        }
-
-        var path = GetFilePath(userId);
-        foreach (var file in new[] { path, path + "-wal", path + "-shm", path + "-journal" })
-        {
-            File.Delete(file);
-        }
+        using var connection = new SqliteConnection(GetConnectionString(userId));
+        SqliteConnection.ClearPool(connection);
     }
 }

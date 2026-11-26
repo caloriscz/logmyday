@@ -432,7 +432,8 @@ public sealed class UserDatabaseTests : IDisposable
         }
 
         // The upload is gone, so the restore fails after it took its snapshot.
-        Assert.Throws<FileNotFoundException>(() => Databases.Replace(Alice, Path.Combine(_folder, "missing-upload.db")));
+        var error = Assert.Throws<DatabaseNotReplacedException>(() => Databases.Replace(Alice, Path.Combine(_folder, "missing-upload.db")));
+        Assert.IsType<FileNotFoundException>(error.InnerException);
 
         var snapshots = Directory.GetFiles(Databases.SnapshotFolder, $"{Alice:D}-*-before-restore.db");
         Assert.Equal(4, snapshots.Length);
